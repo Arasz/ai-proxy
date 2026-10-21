@@ -18,4 +18,4 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.2.0](0.2.0-v1-phase1-proxy-skeleton.md) | The proxy skeleton: the provider is detected, the request is compressed and forwarded to the right upstream, and other traffic is carried through unchanged. | #PR |
+| [0.2.0](0.2.0-v1-phase1-proxy-skeleton.md) | The proxy skeleton: the provider is detected, the request is compressed and forwarded to the right upstream, and other traffic is carried through unchanged. | #2 |
