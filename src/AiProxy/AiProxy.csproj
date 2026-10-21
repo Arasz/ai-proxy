@@ -12,6 +12,7 @@
         <PackageType>DotnetTool</PackageType>
         <PackageId>ai-proxy</PackageId>
         <ToolCommandName>ai-proxy</ToolCommandName>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageTags>llm proxy anthropic openai gemini ai agent developer-tool dotnet-tool global-tool tool cli</PackageTags>
         <Authors>Rafał Araszkiewicz</Authors>
         <Copyright>Copyright (c) 2026 Rafał Araszkiewicz</Copyright>
@@ -26,6 +27,12 @@
 
     <ItemGroup>
         <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The package page is where someone lands after `dotnet tool install`; the
+             README is what they read there. -->
+        <None Include="../../README.md" Pack="true" PackagePath="/"/>
     </ItemGroup>
 
     <ItemGroup>

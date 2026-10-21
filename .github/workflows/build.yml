@@ -109,6 +109,11 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         # nuget.config references the gitignored local feed .nupkg-local/; make it
         # exist on the fresh runner or restore fails with NU1301.
+        #
+        # No -p:RuntimeIdentifiers override: the csproj already declares the six
+        # shipped RIDs, and MSBuild reads a `;` in a -p: value as a separate
+        # switch (MSB1006, "Property is not valid"). Passing the list here
+        # broke the build; declaring it in the project is the fix.
         run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo
       - name: Test
         if: needs.changes.outputs.code == 'true'
@@ -139,7 +144,43 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         # nuget.config references the gitignored local feed .nupkg-local/; make it
         # exist on the fresh runner or restore fails with NU1301.
-        run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo -p:RuntimeIdentifiers="win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64"
+        #
+        # The six RIDs come from the csproj's own RuntimeIdentifiers. This step
+        # differs from build-fast by building them all, which is what a pack
+        # for every runtime identifier needs. A -p:RuntimeIdentifiers override
+        # is deliberately absent: MSBuild reads the `;` in such a value as a
+        # separate switch and fails with MSB1006.
+        run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo
+      - name: Pack every runtime identifier
+        if: needs.changes.outputs.code == 'true'
+        # The release lane publishes one payload package per runtime identifier,
+        # so a package that cannot be packed for a shipped RID is a broken
+        # release. This lane is where that shows up, before the release is cut.
+        run: |
+          set -euo pipefail
+          for rid in win-x64 win-arm64 osx-arm64 linux-x64 linux-arm64 linux-musl-x64; do
+            echo "==> packing $rid"
+            dotnet pack src/AiProxy/AiProxy.csproj -c Release \
+              -p:RuntimeIdentifiers=$rid -o "artifacts/$rid" --nologo
+          done
+      - name: Patch the tool shell to reference every RID
+        if: needs.changes.outputs.code == 'true'
+        # The SDK writes only the packed RID into the shell's DotnetToolSettings.xml;
+        # a multi-RID tool shell must list every payload package or `dotnet tool
+        # install` rejects all other platforms. The script is self-gating: it fails
+        # the step unless the patched settings list every RID exactly once.
+        run: |
+          set -euo pipefail
+          VER=$(tr -d '[:space:]' < VERSION)
+          if [ -z "$VER" ]; then echo "::error::VERSION at the repo root is empty or missing." >&2; exit 1; fi
+          python3 scripts/patch-tool-shell.py "artifacts/osx-arm64/ai-proxy.$VER.nupkg" win-x64 win-arm64 osx-arm64 linux-x64 linux-arm64 linux-musl-x64
+      - name: Upload the packed runtime identifiers
+        if: always() && needs.changes.outputs.code == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nupkg-all-rids
+          path: artifacts/
+          if-no-files-found: ignore
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo
