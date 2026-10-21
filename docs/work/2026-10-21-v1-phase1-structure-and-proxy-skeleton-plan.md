@@ -422,9 +422,9 @@ truthful.
 
 ## What was built
 
-The five steps landed as five commits. The suite is 82 tests: 49 over the detection
+The five steps landed as five commits. The suite is 84 tests: 49 over the detection
 composite and the three detectors, 13 over the routing decisions, 3 over the compression
-pipeline, and 17 over the host over real HTTP.
+pipeline, and 19 over the host over real HTTP.
 
 Two things in the plan changed while it was being built, both recorded above: the
 credential provider is `ConfiguredCredentialProvider` rather than an

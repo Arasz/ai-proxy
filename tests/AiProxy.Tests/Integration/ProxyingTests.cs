@@ -327,5 +327,43 @@ public class ProxyingTests
         Assert.Equal("data: one\n\n", Encoding.UTF8.GetString(buffer, 0, read));
     }
 
+    [Fact]
+    public async Task A_provider_with_no_configured_upstream_is_refused()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var response = await client.PostAsync("/v1/messages", Body(AnthropicBody), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("routing_unknown", body, StringComparison.Ordinal);
+        Assert.Contains("no upstream", body, StringComparison.Ordinal);
+        Assert.Empty(upstream.Requests);
+    }
+
+    [Fact]
+    public async Task A_body_larger_than_the_limit_is_refused_rather_than_forwarded_unread()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
+        {
+            ["PROXY_ANTHROPIC_UPSTREAM"] = upstream.BaseAddress.ToString(),
+        });
+
+        var oversized = new string('x', 9 * 1024 * 1024);
+
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var response = await client.PostAsync("/v1/messages", Body(oversized), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("routing_unknown", body, StringComparison.Ordinal);
+        Assert.Empty(upstream.Requests);
+    }
+
     private static StringContent Body(string body) => new(body, Encoding.UTF8, "application/json");
 }
