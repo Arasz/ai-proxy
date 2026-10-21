@@ -25,19 +25,21 @@ The design comes from a research record written before any of this code existed:
 [detecting the provider and forwarding to the right upstream](docs/work/2026-10-21-detecting-the-provider-and-forwarding-to-the-right-upstream.md).
 Every decision below traces to a finding in it.
 
-## Status: not implemented yet
+## Status: the proxy works, the compression does not
 
-This repository is the scaffold. The provider detector exists and is tested; the forwarding,
-the routing and the pass-through do not. There is no release, and nothing to install.
-
-What is here:
+The provider is detected, the request is forwarded to the right upstream, and other traffic
+is carried through unchanged. What is here:
 
 | Piece | State |
 |---|---|
-| The provider dialect detector | Implemented, 15 tests, in `src/AiProxy.Core/Providers/` |
-| The web host | A `/health` endpoint and nothing else |
-| Forwarding, routing, pass-through | Not implemented — the v1 scope, recorded in [the v1 plan](docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md) |
-| Compression or cache alignment | Not investigated. Whether this project should do that at all is an open question in the research record (F10) |
+| The provider dialect detector | Implemented, as a composite of the path, body and header signals, in `src/AiProxy.Core/Providers/` |
+| The router and the credential rule | Implemented, in `src/AiProxy.Core/Routing/` |
+| The host, the forwarder and the pass-through | Implemented, in `src/AiProxy/` |
+| The compression pipeline | A seam with a pass-through implementation. Whether this project should compress at all is an open question in the research record (F10) |
+
+The design and the reasoning are in the
+[v1 phase 1 plan](docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md) and
+the [v1 plan](docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md).
 
 ## Install
 
@@ -49,9 +51,20 @@ dotnet tool install -g ai-proxy
 
 ## Configuration
 
-Not settled yet. The research record fixes the shape of two things — the provider dialects
-the detector knows (`anthropic`, `openai`, `gemini`) and the credential rule below — and
-nothing else.
+The environment holds the configuration, and the credentials live there and nowhere else.
+
+| Variable | What it is |
+|---|---|
+| `PROXY_ANTHROPIC_UPSTREAM` | the Anthropic upstream, for example `https://api.anthropic.com` |
+| `PROXY_OPENAI_UPSTREAM` | the OpenAI upstream |
+| `PROXY_GEMINI_UPSTREAM` | the Gemini upstream |
+| `PROXY_ANTHROPIC_KEY` | the proxy's own Anthropic credential |
+| `PROXY_OPENAI_KEY` | the proxy's own OpenAI credential |
+| `PROXY_GEMINI_KEY` | the proxy's own Gemini credential |
+| `PROXY_PASSTHROUGH` | comma-separated `prefix=upstream` pairs, for example `/mcp=http://127.0.0.1:7801` |
+
+The [environment variable reference](docs/reference/environment-variables.md) has the
+detail, including what happens when a variable is missing.
 
 ## The credential rule
 
@@ -79,6 +92,10 @@ Three signals, in order of authority:
 A path and a body that name different providers resolve to *nothing*. The request is not
 routed to either, because a request whose provider was guessed must not carry a caller's
 credential to a host the proxy chose.
+
+A path the operator named for another server, such as `/mcp`, is carried to that server
+before the body is even read. The operator's prefix is a stronger statement than a body
+shape, and the traffic is not the proxy's to interpret.
 
 ## Building
 
