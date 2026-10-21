@@ -22,6 +22,10 @@ obj/
 # macOS
 .DS_Store
 
+# The ai-badger skills ship Python scripts; running them writes bytecode caches.
+__pycache__/
+*.py[cod]
+
 # Test output
 **/TestResults/
 *.trx
