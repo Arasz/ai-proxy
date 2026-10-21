@@ -1,0 +1,1033 @@
+"""Shared helpers for the /task skill: the tracking store, transcript token parsing, session refs.
+
+Task family state lives in <project-root>/.ai-badger/task-tracking/tracking.db (ADR-0024),
+accessed through the vendored badger_store module: tasks, token_usage, sessions and the
+statusline KV rows. The legacy JSON files (executed-tasks.json, token-usage.json,
+current-session.json, statusline-*.json) are migration sources: the first write through these
+accessors imports and renames them (*.migrated.json, D6), and until then reads merge them with
+per-key last-write-wins (D5a) so old surfaces and new code share one store.
+
+Project-agnostic: the project root is resolved via `resolve_project_root()` (env var, then a
+cwd walk for the `.ai-badger/config.json` contract marker, then a fallback relative to this
+file's own location), and every path is then derived from that root via a project-root-relative
+`.ai-badger/` tracking convention, never an absolute path baked in at authoring time. This
+matters because ai-badger ships `task` as an installable plugin skill: when Claude Code runs it
+from its plugin cache (`~/.claude/plugins/cache/ai-badger/ai-badger/skills/task/scripts/`), the
+script's own location is nowhere near the user's project, so a naive fixed-depth-from-`__file__`
+lookup would misroot. Anything project-specific (build/test commands, source-control platform,
+persona routing) lives in the project's `.ai-badger/config.json`, not here.
+"""
+# pylint: disable=missing-function-docstring,invalid-name,too-many-lines
+# Ported verbatim from the originating job-search-ai-assistant repo's /task skill: kept in
+# lockstep with that source rather than churned for local docstring/naming style rules.
+# `locked_store` (lower_snake_case class) is referenced by that name elsewhere; not renamed.
+# too-many-lines: every helper the hook scripts and CLI verbs share lives here (badger_store.py
+# carries the same disable for the same reason); splitting it would scatter one shared surface
+# across files that would each still have to import all of it.
+
+from __future__ import annotations
+
+import contextlib
+import importlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from contextlib import closing
+from datetime import datetime, timezone
+from pathlib import Path
+
+# File locking is the one place this module needs a platform primitive: fcntl on POSIX,
+# msvcrt on Windows. An unconditional `import fcntl` killed every tracker command on
+# Windows — including `--help` — because the POSIX-only module does not exist there, so the
+# tracking store was never written and the worktree the tracker was supposed to create never
+# appeared. Both stay optional; the lock degrades only on a platform that has neither.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no fcntl
+    fcntl = None  # type: ignore[assignment]
+
+# msvcrt is Windows-only and unresolvable on POSIX, so it is imported lazily rather than in a
+# top-level `import` statement: a static import reads to gates/deps_guard.py as an undeclared
+# third-party dependency on the Linux CI that runs this repo. On Windows it is stdlib.
+msvcrt = importlib.import_module("msvcrt") if sys.platform == "win32" else None
+
+# Session sources: how the tracker identifies the current session and reads its token
+# usage. Every agent registers its own source the same way — an adjustment
+# (features/<agent>/adjustments/) installs a `<agent>_session_source.py` module beside this
+# file that calls register_session_source() (see features/claude/adjustments/ and
+# features/hermes/adjustments/). There is no built-in default: the registry is the only
+# thing the common scripts know.
+SESSION_SOURCES: dict = {}
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
+def _load_badger_store():
+    """The store module (ADR-0024), vendored beside this script; None only if it never shipped.
+
+    Import order: already-loaded singleton, plain import (the framework checkout has engine/ on
+    sys.path; hook scripts put their own directory there first), then the sibling file — the
+    copy the vendored manifest delivers beside tracker_lib (D16).
+    """
+    if "badger_store" in sys.modules:
+        return sys.modules["badger_store"]
+    try:
+        import badger_store  # pylint: disable=import-outside-toplevel,redefined-outer-name
+        return badger_store
+    except ImportError:
+        pass
+    path = SCRIPT_DIR / "badger_store.py"
+    if not path.exists():
+        return None
+    import importlib.util  # pylint: disable=import-outside-toplevel,redefined-outer-name
+
+    spec = importlib.util.spec_from_file_location("badger_store", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["badger_store"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+badger_store = _load_badger_store()
+
+
+# badger_lib.GIT_LOCATION_ENV, repeated because this ships into projects that have no framework
+# checkout to import it from. git exports GIT_DIR to its hooks and GIT_COMMON_DIR answers
+# `--git-common-dir` outright, so a child that inherits either reports another repository's
+# layout. tests/test_git_invocation.py pins every copy against the original.
+GIT_LOCATION_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                    "GIT_PREFIX", "GIT_NAMESPACE", "GIT_CEILING_DIRECTORIES")
+
+
+def git_env(env=None) -> dict:
+    """`env` (default `os.environ`) minus every variable that pins git to another repository."""
+    out = dict(os.environ if env is None else env)
+    for name in GIT_LOCATION_ENV:
+        out.pop(name, None)
+    return out
+
+
+def _is_inside(candidate: Path, parent: Path) -> bool:
+    """Whether *candidate* sits under *parent*, without relying on `Path.is_relative_to`."""
+    try:
+        candidate.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def _git_worktree_facts(project: Path) -> tuple:
+    """(toplevel, main checkout) for *project*, or (None, None) when git cannot say.
+
+    Parsed from `git worktree list --porcelain` line by line, never `.split()`ed as one blob
+    (L5-8): a checkout path with a space used to come apart under a whitespace split over the
+    whole `rev-parse` output. Git lists the main worktree first. *toplevel* is the longest
+    (innermost) listed entry *project* sits under — not just the first — because a task
+    worktree lives nested inside its own checkout, which would otherwise match too.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project), "worktree", "list", "--porcelain"],
+            capture_output=True, text=True, check=False, timeout=10, env=git_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None, None
+    if result.returncode != 0:
+        return None, None
+    worktrees = [
+        Path(line[len("worktree "):]).resolve()
+        for line in result.stdout.splitlines()
+        if line.startswith("worktree ")
+    ]
+    if not worktrees:
+        return None, None
+    main_checkout = worktrees[0]
+    resolved_project = project.resolve()
+    candidates = [
+        wt for wt in worktrees if wt == resolved_project or _is_inside(resolved_project, wt)
+    ]
+    toplevel = max(candidates, key=lambda p: len(str(p))) if candidates else None
+    return toplevel, main_checkout
+
+
+def collapse_worktree(project: Path) -> Path:
+    """The checkout a linked worktree belongs to, or *project* unchanged.
+
+    A task worktree carries its own copy of the `.ai-badger/config.json` marker, so the cwd
+    walk below stops there and the worktree gets an empty tracking store (B12). Only a
+    *linked worktree whose checkout is itself an ai-badger project* is collapsed: a vendored
+    project nested inside some other repo is not a working-tree root and stays where it is.
+    """
+    toplevel, checkout = _git_worktree_facts(project)
+    if checkout is None or toplevel != project.resolve() or checkout == project.resolve():
+        return project
+    if not (checkout / ".ai-badger" / "config.json").is_file():
+        return project
+    return checkout
+
+
+def project_above(start: Path, stop: Path | None = None) -> Path | None:
+    """The nearest ancestor of *start* holding `.ai-badger/config.json`, collapsed to its checkout.
+
+    `stop` is an ancestor the walk refuses to adopt or pass: `$HOME` for a walk that starts in
+    the Claude Code plugin cache, where every project's marker would otherwise be one home
+    directory away from every other project's.
+    """
+    for ancestor in (start, *start.parents):
+        if stop is not None and ancestor == stop:
+            return None
+        if (ancestor / ".ai-badger" / "config.json").is_file():
+            return collapse_worktree(ancestor)
+    return None
+
+
+def resolve_project_root(
+        env: dict | None = None, cwd: Path | None = None, script_dir: Path = SCRIPT_DIR
+) -> Path:
+    """Resolve the ai-badger project root, in precedence order:
+
+    1. `CLAUDE_PROJECT_DIR` env var, when set and pointing at an existing directory --
+       authoritative for hook/statusLine invocations (Claude Code sets it; ai-badger's own
+       scaffolded settings.json hooks already rely on it).
+    2. The marker walk up from `cwd` -- covers script invocations from anywhere in the repo.
+    3. The same marker walk up from `script_dir`, stopping at `$HOME` -- every in-repo copy of
+       these scripts (`features/common/skills/`, `.ai-badger/skills/`, `.claude/skills/`,
+       `skills/`) sits under the marker, so this answer does not depend on the cwd at all. The
+       plugin cache copy sits under `$HOME` instead, finds nothing, and falls through.
+    4. Fallback: `script_dir.parents[3]`, for a copy that is under no marker and reached from
+       no project -- the plugin cache with no session context.
+
+    Step 3 is why the catalog copy can no longer resolve `features/`: `parents[3]` of
+    `features/common/skills/task/scripts` is the catalog directory itself, and a process whose
+    cwd was outside any project used to land there and write its tracking state into it (N3).
+
+    Deliberately does not walk up from `script_dir` looking for a `.claude/` directory (as
+    the old `_find_project_root` did): from a Claude Code plugin cache
+    (`~/.claude/plugins/cache/ai-badger/ai-badger/skills/task/scripts/`), that walk finds
+    `$HOME` -- because `~/.claude` always exists there -- which is both the wrong start point
+    and the wrong marker.
+    """
+    env = os.environ if env is None else env
+    env_dir = env.get("CLAUDE_PROJECT_DIR")
+    if env_dir and Path(env_dir).is_dir():
+        return Path(env_dir)
+
+    from_cwd = project_above(Path.cwd() if cwd is None else Path(cwd))
+    if from_cwd is not None:
+        return from_cwd
+
+    from_script = project_above(script_dir, stop=Path.home())
+    if from_script is not None:
+        return from_script
+
+    return script_dir.parents[3]  # .claude/skills/task/scripts -> repo root
+
+
+def compute_paths(project_root: Path) -> dict:
+    """Derive every tracker_lib path constant from a resolved project root."""
+    data_dir = project_root / ".ai-badger" / "task-tracking"
+    return {
+        "project_root": project_root,
+        "data_dir": data_dir,
+        "executed_tasks": data_dir / "executed-tasks.json",
+        "token_usage": data_dir / "token-usage.json",
+        "current_session": data_dir / "current-session.json",
+        "lock_file": data_dir / ".write.lock",
+        "claude_md": project_root / "CLAUDE.md",
+        "state_json": project_root / ".ai-badger" / "state.json",
+        "config_json": project_root / ".ai-badger" / "config.json",
+    }
+
+
+_PATHS = compute_paths(resolve_project_root())
+PROJECT_ROOT = _PATHS["project_root"]
+DATA_DIR = _PATHS["data_dir"]
+
+EXECUTED_TASKS = _PATHS["executed_tasks"]
+TOKEN_USAGE = _PATHS["token_usage"]
+CURRENT_SESSION = _PATHS["current_session"]
+LOCK_FILE = _PATHS["lock_file"]
+
+STATE_STARTED = "STARTED"
+STATE_IN_PROGRESS = "IN_PROGRESS"
+STATE_FINISHED = "FINISHED"
+
+CLAUDE_MD = _PATHS["claude_md"]
+# Reachable by the floor: one stack, one agent renders 158-221 lines depending on the stack, so
+# 110 put every consumer over budget on day one. The budget test scaffolds every stack and holds
+# these to what the generator renders; chars move with lines or the line budget is unreachable.
+CLAUDE_MD_MAX_CHARS = 17000
+CLAUDE_MD_MAX_LINES = 260
+
+# Every agent's discovery file pays the same context cost, so all of them share the budget.
+AGENT_DOC_FILES = ("CLAUDE.md", "HERMES.md", ".hermes.md", "AGENTS.md",
+                   ".github/copilot-instructions.md")
+STATE_JSON = _PATHS["state_json"]
+CONFIG_JSON = _PATHS["config_json"]
+
+
+def now_iso() -> str:
+    # Full microsecond precision: startedAt is compared against file mtimes
+    # (state.json freshness), and second-level truncation flips comparisons
+    # for events less than a second apart.
+    return datetime.now(timezone.utc).isoformat()
+
+
+def parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
+def ensure_data_dir() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def lock_file(fh, *, blocking: bool = True) -> bool:
+    """Take an exclusive advisory lock on the open file handle *fh*.
+
+    Returns False only when non-blocking and the lock is already held; True otherwise, so the
+    blocking form is indistinguishable from the platform's own acquire. fcntl.flock carries
+    POSIX, msvcrt.locking carries Windows, and a platform with neither proceeds unlocked.
+    """
+    if fcntl is not None:
+        flags = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB
+        try:
+            fcntl.flock(fh, flags)
+            return True
+        except BlockingIOError:
+            return False
+    if msvcrt is not None:  # pragma: no cover - real msvcrt is Windows-only; tests fake it
+        mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK
+        try:
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), mode, 1)
+            return True
+        except OSError:
+            return False
+    return True
+
+
+def unlock_file(fh) -> None:
+    """Release a lock taken by lock_file(); a no-op where no primitive exists."""
+    if fcntl is not None:
+        fcntl.flock(fh, fcntl.LOCK_UN)
+    elif msvcrt is not None:  # pragma: no cover - real msvcrt is Windows-only; tests fake it
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+class locked_store:
+    """Context manager: exclusive lock over the tracking data dir for read-modify-write."""
+
+    def __init__(self):
+        self._fh = None
+
+    def __enter__(self):
+        ensure_data_dir()
+        # Marked for the same reason save_json is: this opens LOCK_FILE for writing, so it is
+        # the other way a suite process can touch real tracking state.
+        _record_real_write(LOCK_FILE)
+        self._fh = open(LOCK_FILE, "w", encoding="utf-8")
+        lock_file(self._fh)
+        return self
+
+    def __exit__(self, *exc):
+        unlock_file(self._fh)
+        self._fh.close()
+        return False
+
+
+def load_json(path: Path, default):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+
+REAL_WRITE_LOG_ENV = "AI_BADGER_REAL_WRITE_LOG"
+REAL_ROOT_ENV = "AI_BADGER_REAL_ROOT"
+
+
+def _record_real_write(path: Path) -> None:
+    """Mark a tracking write that lands outside the suite's scratch project.
+
+    The tracking-state guard used to infer "the suite wrote this" from an mtime diff, which a
+    leftover background daemon or the `*/30` resume cron satisfies just as well — it failed
+    four clean runs on 2026-08-01. An external writer inherits none of the suite's environment,
+    so a write it makes is unmarked, and the guard can report it without blaming the suite.
+
+    Inert when the variable is unset, and never raises: a diagnostic does not get to fail the
+    save it observes.
+    """
+    destination = os.environ.get(REAL_WRITE_LOG_ENV)
+    real_root = os.environ.get(REAL_ROOT_ENV)
+    if not destination or not real_root:
+        return
+    try:
+        # Against the real checkout, not CLAUDE_PROJECT_DIR: tests monkeypatch that freely, so
+        # comparing to it marked writes into the scratch project and into pytest tmpdirs — all
+        # of them legitimate. The invariant is about the real repo and nothing else.
+        resolved = Path(path).resolve()
+        if not _is_inside(resolved, Path(real_root).resolve()):
+            return
+        record = json.dumps({
+            "path": str(resolved),
+            "pid": os.getpid(),
+            "test": os.environ.get("PYTEST_CURRENT_TEST", ""),
+        })
+        with open(destination, "a", encoding="utf-8") as fh:
+            fh.write(record + "\n")
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def save_json(path: Path, data) -> None:
+    _record_real_write(path)
+    ensure_data_dir()
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(data, fh, indent=2)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+# ---------------------------------------------------------------- store accessors (ADR-0024)
+
+# The doc-level key stop_hook.py carries in executed-tasks.json for its per-session block
+# budget. No ruled tasks column holds it, so it lives in the store's meta table; the legacy
+# file's own doc-level key merges beneath the DB value during the dual-read window.
+STOP_BLOCKS_KEY = "stopBlocks"
+
+# Every table the task family owns in tracking.db, migrated lazily on the first write (D6).
+_TASK_FAMILY_TABLES = ("tasks", "token_usage", "sessions", "statusline")
+
+
+def _task_families() -> dict:
+    """The store's task-family registry, rebuilt per call over THIS module's path constants.
+
+    Lambdas over module globals resolve at call time, so a test that reassigns EXECUTED_TASKS
+    or DATA_DIR redirects the legacy sources without touching the store module (D9).
+    """
+    if badger_store is None:
+        return {}
+
+    def legacy(name):
+        return lambda: DATA_DIR / name
+
+    def families():
+        return {
+            "tasks": badger_store.Family(
+                table="tasks", db="tracking", legacy_path=legacy("executed-tasks.json"),
+                legacy_kind="tasks"),
+            "token_usage": badger_store.Family(
+                table="token_usage", db="tracking", legacy_path=legacy("token-usage.json"),
+                legacy_kind="usage"),
+            "sessions": badger_store.Family(
+                table="sessions", db="tracking", legacy_path=legacy("current-session.json"),
+                legacy_kind="sessions"),
+            "statusline": badger_store.Family(
+                table="statusline", db="tracking", legacy_path=legacy("statusline-state.json"),
+                legacy_kind="kvdoc", row_key="state"),
+            "statusline_delegate": badger_store.Family(
+                table="statusline", db="tracking",
+                legacy_path=legacy("statusline-delegate.json"),
+                legacy_kind="kvdoc", row_key="delegate"),
+        }
+
+    return families()
+
+
+def _sync_tracking_root() -> None:
+    """Aim the store at this module's tracking dir, at call time (D9).
+
+    DATA_DIR is the one task-tracking resolution every consumer already shares — collapse,
+    CLAUDE_PROJECT_DIR, plugin-cache fallbacks included — so the store must follow it wherever
+    it lands, per-test redirects included. Set, not setdefault: a stale value from an earlier
+    resolve must not outlive this module's own answer.
+    """
+    if badger_store is not None:
+        os.environ[badger_store.TRACKING_ROOT_ENV] = str(DATA_DIR)
+
+
+def _open_store():
+    """The tracking store with the task families registered; raises on a resurrected legacy
+    file (D5c) — callers decide fail-open (hooks) or fail-loud (CLI)."""
+    _sync_tracking_root()
+    return badger_store.open_tracking(families=_task_families())
+
+
+@contextlib.contextmanager
+def tracking_transaction():
+    """One BEGIN IMMEDIATE store transaction spanning the block — the flock replacement.
+
+    Migrates every task-family legacy file first (its own transaction, D6), then holds one
+    write transaction so a verb's read-modify-write across tasks and token_usage stays atomic.
+    Store failures propagate: hooks wrap and fail open (D31), CLI verbs report.
+    """
+    store = _open_store()
+    try:
+        for table in _TASK_FAMILY_TABLES:
+            store.migrate(table)
+        store.conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield store
+            store.conn.commit()
+        except BaseException:
+            store.conn.rollback()
+            raise
+        badger_store.notify_write(store.db_path)  # D24: suite attribution on committed writes
+    finally:
+        store.close()
+
+
+if badger_store is not None:
+    # D24: the store write path reports to the suite's leak-guards the way save_json does.
+    badger_store.WRITE_OBSERVERS.append(_record_real_write)
+
+
+def _legacy_stop_blocks() -> dict:
+    """The un-migrated executed-tasks.json doc-level block budget, for the dual-read window.
+
+    Resurrection is not a concern here: the store open already failed closed on it (D5c), so
+    a file that exists is pre-migration and safe to serve as the weaker source.
+    """
+    doc = load_json(EXECUTED_TASKS, {})
+    blocks = doc.get(STOP_BLOCKS_KEY) if isinstance(doc, dict) else None
+    return blocks if isinstance(blocks, dict) else {}
+
+
+def load_tasks(store=None) -> dict:
+    """Executed tasks as the doc every consumer knows: {"tasks": [...]}, dual-read (D5a).
+
+    DB rows win per task id; legacy-only entries still merge until their file migrates. The
+    doc carries the stop-block budget only when one is recorded, matching the legacy shape.
+    Read-only by itself: it never migrates, never renames — migration is a write's job (D6).
+    """
+    def _read(open_store):
+        doc = {"tasks": open_store.tasks_all()}
+        blocks = {**_legacy_stop_blocks(), **open_store.stop_blocks()}
+        if blocks:
+            doc[STOP_BLOCKS_KEY] = blocks
+        return doc
+
+    if store is not None:
+        return _read(store)
+    with closing(_open_store()) as open_store:
+        return _read(open_store)
+
+
+def save_tasks(store, doc: dict) -> None:
+    """Persist the executed-tasks doc inside a held transaction: upsert per entry.
+
+    Rows are written by explicit UPDATE or plain INSERT keyed on task_id — never INSERT OR
+    REPLACE, which deletes the session's other ACTIVE row (P0.6a MUST-2). Task entries are
+    never deleted, so a partial doc cannot prune the store; the doc-level block budget is
+    written when present.
+    """
+    for entry in doc.get("tasks", []):
+        store.task_upsert(entry)
+    blocks = doc.get(STOP_BLOCKS_KEY)
+    if isinstance(blocks, dict):
+        store.meta_set(STOP_BLOCKS_KEY, blocks)
+
+
+def save_tasks_doc(doc: dict) -> None:
+    """save_tasks for callers without a held transaction (one-shot whole-doc writes)."""
+    with tracking_transaction() as store:
+        save_tasks(store, doc)
+
+
+def load_usage(store=None) -> dict:
+    """Token-usage doc, dual-read: DB rows win per task id, legacy-only entries merge (D5a)."""
+    if store is not None:
+        return {"tasks": store.usage_all()}
+    with closing(_open_store()) as open_store:
+        return {"tasks": open_store.usage_all()}
+
+
+def save_usage(store, doc: dict) -> None:
+    """Persist the token-usage doc inside a held transaction (upsert per entry)."""
+    for entry in doc.get("tasks", []):
+        store.usage_upsert(entry)
+
+
+def save_usage_doc(doc: dict) -> None:
+    """save_usage for callers without a held transaction."""
+    with tracking_transaction() as store:
+        save_usage(store, doc)
+
+
+def load_statusline_state(store=None) -> dict:
+    """The captured statusLine payload (statusline KV row 'state'), dual-read (D5a)."""
+    def _read(open_store):
+        doc = open_store.kv_get("statusline", "state", {})
+        return doc if isinstance(doc, dict) else {}
+
+    if store is not None:
+        return _read(store)
+    with closing(_open_store()) as open_store:
+        return _read(open_store)
+
+
+def save_statusline_state(state: dict) -> None:
+    """Persist the captured statusLine payload (one atomic KV row upsert)."""
+    with closing(_open_store()) as open_store:
+        open_store.kv_set("statusline", "state", state)
+
+
+def load_statusline_delegate() -> dict:
+    """The statusline delegate record (statusline KV row 'delegate'), dual-read (D5a)."""
+    with closing(_open_store()) as open_store:
+        record = open_store.kv_get("statusline", "delegate", {})
+        return record if isinstance(record, dict) else {}
+
+
+def load_config() -> dict:
+    """Project profile from `.ai-badger/config.json` (see schemas/config.schema.json).
+
+    Returns {} if the project hasn't scaffolded ai-badger config yet (or it's unreadable) —
+    callers must treat every key as optional and fall back to a clear no-op message rather
+    than assume a stack-specific default.
+    """
+    return load_json(CONFIG_JSON, {})
+
+
+def find_entry(doc: dict, task_id: str):
+    for entry in doc["tasks"]:
+        if entry.get("taskId") == task_id:
+            return entry
+    return None
+
+
+def find_other_entry_with_session(doc: dict, session_id: str, exclude_task_id: str):
+    """Another task already attached to session_id, if any (used to catch cross-task collisions).
+
+    Scans every entry rather than stopping at the first: a session can carry more than one row
+    (a FINISHED task, plus a still-active one recorded after it), and the caller's conflict
+    check must see the active one (L5-5). A finished match is still returned when nothing
+    unfinished exists, so the caller's own finished-is-not-a-conflict check is unaffected.
+    """
+    finished = None
+    for entry in doc["tasks"]:
+        if entry.get("taskId") == exclude_task_id or entry.get("sessionId") != session_id:
+            continue
+        if entry.get("state") != STATE_FINISHED:
+            return entry
+        if finished is None:
+            finished = entry
+    return finished
+
+
+def _pid_alive(pid) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, OSError, ValueError):
+        return True  # exists but not ours to signal (or malformed input) — assume alive
+    return True
+
+
+def load_current_sessions() -> dict:
+    """Every currently-known active session, keyed by sessionId (store dual-read, D5a)."""
+    with closing(_open_store()) as store:
+        return store.sessions_map()
+
+
+def live_session_ids() -> set:
+    """Ids of recorded sessions whose process is still running (signal-0 probe, linux and macOS)."""
+    return {sid for sid, info in load_current_sessions().items() if _pid_alive(info.get("pid"))}
+
+
+def save_current_session(session_id: str, transcript_path: str, cwd: str = "") -> None:
+    """Record this session into the shared multi-session index (one store transaction).
+
+    The BEGIN IMMEDIATE transaction is the old flock's replacement: concurrent SessionStart /
+    UserPromptSubmit hooks serialize, so no session's entry can be lost. Also opportunistically
+    prunes entries whose process no longer exists, so the index self-cleans without a GC job.
+    """
+    with tracking_transaction() as store:
+        sessions = store.sessions_map()
+        for sid in list(sessions):
+            if sid != session_id and not _pid_alive(sessions[sid].get("pid")):
+                store.session_delete(sid)
+        store.session_upsert(session_id, {
+            "transcriptPath": transcript_path,
+            "cwd": cwd or str(PROJECT_ROOT),
+            "pid": os.getppid(),  # the long-lived Claude Code process that spawned this hook
+            "recordedAt": now_iso(),
+        })
+
+
+def _own_pid_ancestry(max_depth: int = 12) -> list[int]:
+    """PIDs of this process and its ancestors, nearest first (best-effort via `ps`)."""
+    chain = []
+    pid = os.getpid()
+    for _ in range(max_depth):
+        chain.append(pid)
+        result = subprocess.run(
+            ["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True, check=False
+        )
+        ppid_str = result.stdout.strip()
+        if not ppid_str:
+            break
+        try:
+            ppid = int(ppid_str)
+        except ValueError:
+            break
+        if ppid <= 1 or ppid == pid:
+            break
+        pid = ppid
+    return chain
+
+
+def resolve_own_session() -> dict:
+    """Ask every registered session source to identify the session invoking this process.
+
+    Two passes. Pass 1 is exact identity only: sources whose env var is set in this
+    process (PI_SESSION_ID, HERMES_SESSION_ID, CLAUDE_CODE_SESSION_ID) are asked
+    first, in registration order — an exact env claim always beats a fuzzy guess.
+    Pass 2 is the fuzzy fallbacks (pid ancestry, unique cwd) for harnesses with no
+    env identity in this process. The split exists because pass 2 once shadowed
+    pass 1: the claude source's unique-cwd fallback returned a stale recorded
+    session while PI_SESSION_ID named the real one, so `start` attached (or
+    refused) on the wrong identity and the agent worked untracked — invisible to
+    status. When env claims exist but none resolves, return {} rather than falling
+    through to a guess: a wrong session is worse than none (callers then require
+    explicit --session-id). Returns {} when nothing resolves.
+    """
+    claimants = [name for name, source in SESSION_SOURCES.items()
+                 if source.get("env_var") and os.environ.get(source["env_var"])]
+    if claimants:
+        for name in claimants:
+            resolved = SESSION_SOURCES[name]["resolve"]()
+            if resolved.get("sessionId"):
+                resolved["source"] = name
+                return resolved
+        return {}
+    for name, source in SESSION_SOURCES.items():
+        resolved = source["resolve"]()
+        if resolved.get("sessionId"):
+            resolved["source"] = name
+            return resolved
+    return {}
+
+
+def parse_transcript_usage(transcript_path: str) -> dict:
+    """Aggregate token usage from a Claude Code transcript (JSONL).
+
+    contextTokens  — context-window occupancy of the latest main-chain assistant
+                     message (input + cache_read + cache_creation).
+    cumulative     — sums over every assistant message in the main transcript *and* in
+                     `<dir>/<session-id>/subagents/*.jsonl`, which is where Claude Code
+                     writes dispatched work. No record carries `isSidechain: true`, so a
+                     branch on it counted nothing (#235 follow-up).
+    dispatches     — count, agent types and how many named no model, read from the
+                     `agent-<id>.meta.json` beside each subagent transcript.
+    """
+    cumulative = {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheCreationTokens": 0,
+    }
+    by_model: dict = {}
+    context_tokens = 0
+    messages = 0
+    no_dispatches = {"count": 0, "undeclaredModel": 0, "byAgentType": {}}
+    path = Path(transcript_path) if transcript_path else None
+    if path is None or not path.exists():
+        return {
+            "contextTokens": 0, "assistantMessages": 0, "byModel": {},
+            "dispatches": no_dispatches,
+            "cumulative": cumulative, "transcriptFound": False,
+        }
+
+    def tally(source: Path, main_chain: bool) -> None:
+        """Fold one transcript's assistant messages into the running totals."""
+        nonlocal context_tokens, messages
+        with open(source, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if record.get("type") != "assistant":
+                    continue
+                usage = (record.get("message") or {}).get("usage")
+                if not isinstance(usage, dict):
+                    continue
+                messages += 1
+                inp = usage.get("input_tokens") or 0
+                out = usage.get("output_tokens") or 0
+                cr = usage.get("cache_read_input_tokens") or 0
+                cc = usage.get("cache_creation_input_tokens") or 0
+                cumulative["inputTokens"] += inp
+                cumulative["outputTokens"] += out
+                cumulative["cacheReadTokens"] += cr
+                cumulative["cacheCreationTokens"] += cc
+                # `<synthetic>` and absent both key as unknown, so the split stays a
+                # partition of `cumulative` rather than a second opinion.
+                model = (record.get("message") or {}).get("model") or "unknown"
+                slot = by_model.setdefault(model, {
+                    "inputTokens": 0, "outputTokens": 0,
+                    "cacheReadTokens": 0, "cacheCreationTokens": 0, "assistantMessages": 0,
+                })
+                slot["inputTokens"] += inp
+                slot["outputTokens"] += out
+                slot["cacheReadTokens"] += cr
+                slot["cacheCreationTokens"] += cc
+                slot["assistantMessages"] += 1
+                # Context occupancy is a property of the main conversation; a subagent has
+                # its own window and never occupies this one.
+                if main_chain:
+                    context_tokens = inp + cr + cc
+
+    tally(path, main_chain=True)
+
+    dispatches = {"count": 0, "undeclaredModel": 0, "byAgentType": {}}
+    for sub in sorted((path.parent / path.stem / "subagents").glob("*.jsonl")):
+        tally(sub, main_chain=False)
+        dispatches["count"] += 1
+        # meta.json is an undocumented CLI artefact: a format change must degrade to
+        # "unknown", never to a count of zero, or it reads as a delegation collapse.
+        try:
+            meta = json.loads(sub.with_suffix(".meta.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        agent_type = meta.get("agentType") or "unknown"
+        dispatches["byAgentType"][agent_type] = dispatches["byAgentType"].get(agent_type, 0) + 1
+        if not meta.get("model"):
+            dispatches["undeclaredModel"] += 1
+
+    return {
+        "contextTokens": context_tokens,
+        "assistantMessages": messages,
+        "byModel": by_model,
+        "dispatches": dispatches,
+        "cumulative": cumulative,
+        "transcriptFound": True,
+    }
+
+
+def is_empty_checkpoint(checkpoint) -> bool:
+    """True when a checkpoint carries no measurement at all.
+
+    Shared by stop_hook's per-turn checkpointing and finish's own checkpoint, so neither can
+    overwrite a populated checkpoint with one that measures nothing (R32). `assistantMessages`
+    is not consulted: `contextTokens: 0, assistantMessages: 3` with an all-zero `cumulative` is
+    a message count with no tokens behind it, which measures nothing.
+    """
+    if not isinstance(checkpoint, dict):
+        return True
+    if checkpoint.get("contextTokens"):
+        return False
+    return not any((checkpoint.get("cumulative") or {}).values())
+
+
+def make_checkpoint(transcript_path: str) -> dict:
+    usage = parse_transcript_usage(transcript_path)
+    return {
+        "timestamp": now_iso(),
+        "contextTokens": usage["contextTokens"],
+        "assistantMessages": usage["assistantMessages"],
+        "byModel": usage["byModel"],
+        "cumulative": usage["cumulative"],
+    }
+
+
+def register_session_source(name: str, *, env_var: str, resolve, checkpoint, resume,
+                            delegation_usage=None, transcript: bool = False) -> None:
+    """Register a session source (called by an agent adjustment's session source module).
+
+    `resolve()` identifies the invoking session for this agent, returning
+    {"sessionId", "transcriptPath"} or {}; `checkpoint(session)` returns the checkpoint
+    dict for a session; `resume(session_id)` returns the resume command;
+    `delegation_usage(delegation_id)` returns a delegation's token record or None;
+    `transcript=True` marks the source that reads JSONL transcripts (the one an explicit
+    --session-id is attributed to).
+    """
+    SESSION_SOURCES[name] = {
+        "env_var": env_var,
+        "resolve": resolve,
+        "checkpoint": checkpoint,
+        "resume": resume,
+        "delegation_usage": delegation_usage,
+        "transcript": transcript,
+    }
+
+
+def session_source(name: str):
+    """Descriptor for a registered session source; None when no such source is registered."""
+    return SESSION_SOURCES.get(name)
+
+
+def transcript_source():
+    """Name of the registered source that reads transcripts, or None.
+
+    An explicit --session-id is a transcript id: the CLI attributes it to this source so the
+    right checkpoint maker is chosen. None when nothing transcript-capable is registered.
+    """
+    for name, source in SESSION_SOURCES.items():
+        if source.get("transcript"):
+            return name
+    return None
+
+
+def compute_usage(start_cp: dict, finish_cp: dict, subagents: list) -> dict:
+    """Delta between two checkpoints of the same session, plus reported subagent tokens."""
+
+    def delta(key: str) -> int:
+        return max(0, finish_cp["cumulative"].get(key, 0) - start_cp["cumulative"].get(key, 0))
+
+    subagent_tokens = sum(entry.get("totalTokens", 0) for entry in subagents)
+    input_d = delta("inputTokens")
+    output_d = delta("outputTokens")
+    cache_read_d = delta("cacheReadTokens")
+    cache_creation_d = delta("cacheCreationTokens")
+    # Main-session cache health: fraction of cacheable input served from cache (~0.1x) vs.
+    # freshly written (~1.25x). None when nothing cacheable ran. Main-session only because the
+    # deltas above come from checkpoints, whose `cumulative` sums sidechains in; a
+    # main-vs-sidechain split is available from parse_transcript_usage (it branches on
+    # isSidechain already), but a per-subagent one is not — that needs parentUuid attribution
+    # nothing here implements, and the completion notification carries only totalTokens.
+    cacheable = cache_read_d + cache_creation_d
+    cache_efficiency = round(cache_read_d / cacheable, 3) if cacheable else None
+    # Which model did this task's work. `cacheEfficiency` above sits at 0.98 on essentially
+    # every real session, so it cannot separate a cheap task from an expensive one; the model
+    # mix can, and it is the thing the skill's delegation policy actually steers. No prices
+    # here — they change, and output tokens per model is the durable half of the answer.
+    output_by_model = {}
+    for model, totals in (finish_cp.get("byModel") or {}).items():
+        was = ((start_cp.get("byModel") or {}).get(model) or {}).get("outputTokens", 0)
+        spent = max(0, totals.get("outputTokens", 0) - was)
+        if spent:
+            output_by_model[model] = spent
+    mix_total = sum(output_by_model.values())
+    model_mix = ({model: round(spent / mix_total, 3)
+                  for model, spent in output_by_model.items()} if mix_total else {})
+    return {
+        "outputByModel": output_by_model,
+        "modelMix": model_mix,
+        "inputTokens": input_d,
+        "outputTokens": output_d,
+        "cacheReadTokens": cache_read_d,
+        "cacheCreationTokens": cache_creation_d,
+        "cacheEfficiency": cache_efficiency,
+        "subagentTokens": subagent_tokens,
+        "contextTokensAtStart": start_cp.get("contextTokens", 0),
+        "contextTokensAtFinish": finish_cp.get("contextTokens", 0),
+        "contextGrowth": finish_cp.get("contextTokens", 0) - start_cp.get("contextTokens", 0),
+        "mainSessionTotal": input_d + output_d + cache_read_d + cache_creation_d,
+        # Not `+ subagent_tokens`: the transcript now reads `subagents/*.jsonl` directly, so
+        # the checkpoint delta already contains that work. `subagentTokens` stays reported —
+        # it is what dispatches said about themselves, useful to compare against.
+        "grandTotal": input_d + output_d + cache_read_d + cache_creation_d,
+    }
+
+
+def _positive_int(value, fallback: int) -> int:
+    """A budget override is only honoured when it is a positive int. Typos fail safe."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return fallback
+    return value
+
+
+def doc_budget() -> tuple:
+    """The (chars, lines) budget for agent discovery files.
+
+    Overridable per project via `agentDocs` in config.json, because the files being measured
+    are generated: a project that selects many invariants pays lines it did not author and
+    cannot shorten without dropping policy.
+    """
+    config = load_config()
+    override = config.get("agentDocs") if isinstance(config, dict) else None
+    if not isinstance(override, dict):
+        return CLAUDE_MD_MAX_CHARS, CLAUDE_MD_MAX_LINES
+    return (_positive_int(override.get("maxChars"), CLAUDE_MD_MAX_CHARS),
+            _positive_int(override.get("maxLines"), CLAUDE_MD_MAX_LINES))
+
+
+def doc_stats(path, max_chars=None, max_lines=None) -> dict:
+    """Size + budget verdict for one agent discovery file.
+
+    `max_chars`/`max_lines`, when given, win over `doc_budget()` — an explicit caller
+    (e.g. a CLI flag) must be able to override a project's own `agentDocs` config.
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, IsADirectoryError):
+        text = ""
+    budget_chars, budget_lines = doc_budget()
+    max_chars = budget_chars if max_chars is None else max_chars
+    max_lines = budget_lines if max_lines is None else max_lines
+    chars = len(text)
+    lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+    return {
+        "path": str(path),
+        "chars": chars,
+        "lines": lines,
+        "maxChars": max_chars,
+        "maxLines": max_lines,
+        "overBudget": chars > max_chars or lines > max_lines,
+    }
+
+
+def claude_md_stats(max_chars=None, max_lines=None) -> dict:
+    return doc_stats(CLAUDE_MD, max_chars, max_lines)
+
+
+def over_budget_docs() -> list:
+    """Every agent discovery file that exists and exceeds the budget.
+
+    The budget is a context-window cost every agent pays, not a Claude-only concern —
+    HERMES.md and copilot-instructions.md were unchecked by anything (F-36).
+    """
+    over = []
+    for rel in AGENT_DOC_FILES:
+        path = PROJECT_ROOT / rel
+        if not path.is_file():
+            continue
+        stats = doc_stats(path)
+        if stats["overBudget"]:
+            over.append(stats)
+    return over
+
+
+def state_json_updated_since(started_at: str) -> bool:
+    try:
+        mtime = datetime.fromtimestamp(STATE_JSON.stat().st_mtime, tz=timezone.utc)
+    except FileNotFoundError:
+        return False
+    return mtime > parse_iso(started_at)
+
+
+# Optional agent-specific session sources. Agent adjustments (features/<agent>/adjustments/)
+# install a `<agent>_session_source.py` module beside this file (e.g. claude_session_source.py,
+# hermes_session_source.py); each exposes register() that wires that agent's source into the
+# registry above. Discovery by filename pattern rather than a fixed name, so any number of
+# agents can coexist — and absent all of them, the tracker has no session source at all. The
+# import must never fail the tracker over a module that was never installed.
+try:
+    for _path in sorted(SCRIPT_DIR.glob("*_session_source.py")):
+        importlib.import_module(_path.stem)
+        sys.modules[_path.stem].register(sys.modules[__name__])
+except ImportError:
+    pass

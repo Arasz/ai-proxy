@@ -1,0 +1,346 @@
+"""Template rendering, one of the scaffold's collaborators.
+
+Computes document slots for CLAUDE.md/HERMES.md/delegation.md templates, renders
+template files, and assembles agent discovery documents.
+"""
+from __future__ import annotations
+
+import re
+import shutil
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence
+
+import frontmatter as fm
+from _shared import MANAGED_HEADER, _MANAGED_PREFIX
+from scaffold_context import ScaffoldContext
+from tool_catalog import tool_instructions
+
+# The lane a persona that names no `model:` runs in — whatever model the session already uses.
+SESSION_DEFAULT_LANE = "session default"
+
+# Routing intents a persona may declare in `level:`. Case-sensitive lowercase.
+# Canonical owner is PKG-1's model_groups.VALID_LEVELS; this read-only copy exists
+# because the generator is stdlib-only and must render with no registry present.
+VALID_LEVELS = ("low", "medium", "high")
+
+DELEGATION_TEMPLATE = "delegation.md.tmpl"
+
+# The config keys the scaffolder renders verbatim as free-form prose, with the template slot
+# each fills. compute_doc_slots is the only writer. Every other slot is structured and
+# fingerprinted; this prose is the one thing a scaffold re-renders faithfully while it goes
+# stale, which is why drift.py surfaces exactly this list for staleness review.
+PROSE_SLOTS: Dict[str, str] = {"summary": "PROJECT_SUMMARY", "domain": "PROJECT_DOMAIN"}
+
+# Slots that stand alone on their line and take the line with them when empty, so a project
+# that enables nothing renders the same bytes as before the slot existed.
+LINE_SLOTS = ("TOOLS_INSTRUCTIONS",)
+
+
+def fill_slots(text: str, slots: Dict[str, str]) -> str:
+    """Replace every ``{{SLOT}}`` in *text*; a LINE_SLOTS slot replaces its line's newline too."""
+    for name in LINE_SLOTS:
+        if name in slots:
+            text = text.replace("{{" + name + "}}\n", str(slots[name]))
+    for k, v in slots.items():
+        text = text.replace("{{" + k + "}}", str(v))
+    return text
+
+
+def frontmatter_fields(text: str) -> Dict[str, str]:
+    """Each top-level frontmatter key mapped to its value, a folded block joined into one line."""
+    return fm.fields(text)
+
+
+def first_sentence(text: str) -> str:
+    """The first sentence of *text*, markdown emphasis and the closing full stop removed."""
+    plain = text.replace("*", "").replace("`", "").strip()
+    return plain.split(". ", 1)[0].rstrip(".").strip()
+
+
+def invariant_summary(text: str, name: str) -> str:
+    """One bullet: the rule's title, its file name, and the sentence that states it.
+
+    Bodies used to be inlined whole and were over half of every agent file. The binding sentence
+    stays in the context an agent always has; the rationale stays in the copy under
+    `.ai-badger/invariants/`, which is a document in its own right.
+    """
+    lines = text.strip().splitlines()
+    title = lines[0].lstrip("#").strip() if lines and lines[0].startswith("#") else name
+    body = "\n".join(lines[1:]).strip()
+    opening = body.split("\n\n", maxsplit=1)[0].strip() if body else ""
+    label = f"- **{title}** (`{name}`)"
+    if _leads_into_a_list(opening):
+        # The list *is* the rule — "Every release must:" alone says nothing. Keep it whole,
+        # indented under the bullet, rather than truncating at the colon.
+        return f"{label} — " + opening.replace("\n", "\n  ")
+    rule = _rule_sentence(opening)
+    return label + (f" — {rule}." if rule else "")
+
+
+_ABBREVIATION = re.compile(r"\b(?:e\.g|i\.e|etc|cf|vs|approx)\.$", re.IGNORECASE)
+
+
+def _rule_sentence(block: str) -> str:
+    """*block*'s first sentence on one line, code spans intact.
+
+    Unlike `first_sentence` this keeps backticks — a rule about `x ?? throw` reads as prose
+    without them — and flattens the source's hard wrapping, which would otherwise break out of
+    the bullet's indentation. A boundary after `e.g.` or its kin is not a sentence end: the
+    partition invariant shipped as "carries the tenant/owner key (e.g." for a release.
+    """
+    flat = " ".join(block.split())
+    for end in re.finditer(r'(?<=[.!?])\s+(?=[A-Z`"*])', flat):
+        if _ABBREVIATION.search(flat[:end.start()]):
+            continue
+        return flat[:end.start()].rstrip(".")
+    return flat.rstrip(".")
+
+
+def _leads_into_a_list(block: str) -> bool:
+    """Whether *block*'s opening line introduces a list that carries the rule's content."""
+    rest = block.splitlines()[1:]
+    return any(re.match(r"\s*(?:[-*+]|\d+[.)])\s", line) for line in rest)
+
+
+def instruction_row(path: Path) -> str:
+    """One bullet naming *when* to read a scoped instruction file, not just that it exists.
+
+    The `applyTo` glob is the trigger; without it the row repeated the file's own basename.
+    """
+    trigger = path.name
+    if path.is_file():
+        trigger = frontmatter_fields(path.read_text(encoding="utf-8")).get(
+            "applyTo", path.name).strip("'\" ") or path.name
+    return f"- `{trigger}` → `.ai-badger/instructions/{path.name}`"
+
+
+def prose_only(text: str) -> str:
+    """*text* with its headings and HTML comments dropped, the rest joined into one line."""
+    kept = [line.strip() for line in text.splitlines()
+            if line.strip() and not line.lstrip().startswith(("#", "<!--"))]
+    return " ".join(kept)
+
+
+# How far into a file the managed marker may sit: line 1, or just below a frontmatter block.
+# Bounded so a document that merely quotes the banner deep in its body is not read as managed.
+_MANAGED_SCAN_LINES = 10
+
+
+def _frontmatter_end(body: str) -> int:
+    """Offset just past the closing fence of `body`'s frontmatter, or -1 when it has none."""
+    split = fm.split(body)
+    return len(split.head) if split.present else -1
+
+
+def _with_managed_header(body: str, name: str) -> str:
+    """`body` with the managed banner on line 1, or below its frontmatter when it opens with one.
+
+    VS Code and Copilot parse an instruction file's frontmatter only at line 1 (#241).
+    """
+    header = MANAGED_HEADER.format(name=name)
+    close = _frontmatter_end(body)
+    if close == -1:
+        return header + body
+    newline = "\r\n" if body.startswith("---\r\n") else "\n"
+    return body[:close] + newline + header + body[close:]
+
+
+def _is_managed(text: str) -> bool:
+    """True when `text` carries the managed marker at line 1 or just below its frontmatter."""
+    head = text.lstrip().splitlines()[:_MANAGED_SCAN_LINES]
+    return any(line.startswith(_MANAGED_PREFIX) for line in head)
+
+
+class TemplateRendering:
+    """Computes the document slots and renders the templates every agent file is made of."""
+
+    def __init__(self, ctx: ScaffoldContext):
+        self.ctx = ctx
+
+    @staticmethod
+    def _render_instruction_blocks(entries: list) -> str:
+        """Join each entry's `instructions` into one slot value, or '' when none has any."""
+        blocks = [instr for instr in
+                  ((e.get("instructions") or "").strip() for e in entries) if instr]
+        return "\n\n".join(blocks) + "\n\n" if blocks else ""
+
+    def compute_doc_slots(self, invariants: List[str], instr_paths: List[Path],
+                            source_of_truth: str = "CLAUDE.md") -> Dict[str, str]:
+        """Compute the template slots shared by CLAUDE.md and HERMES.md assembly.
+
+        `source_of_truth` is the .ai-badger/ file this render is the copy of — every agent
+        renders the same template, so the self-reference cannot be hardcoded (F-08).
+        """
+        project = self.ctx.config.get("project", {})
+        commands = self.ctx.config.get("commands", {})
+        routing = self.ctx.config.get("personaRouting", [])
+
+        inv_md = "\n".join(invariants) if invariants else "_None yet._"
+        cmd_md = "\n".join(f"- `{k}`: `{v}`" for k, v in commands.items()) or "_None configured._"
+        route_md = "\n".join(f"- {r['work']} → `{r['agent']}`" for r in routing) or (
+            "_None configured — work is not dispatched to a persona. Add entries to "
+            "`personaRouting` in `.ai-badger/config.json` to route it._"
+        )
+        instr_md = "\n".join(instruction_row(p) for p in instr_paths) or "_None._"
+        slots = {
+            "PROJECT_NAME": project.get("name", ""),
+            "STACKS": ", ".join(self.ctx.config.get("stacks", [])),
+            "INVARIANTS": inv_md,
+            "COMMANDS": cmd_md,
+            "PERSONA_ROUTING": route_md,
+            "PATH_INSTRUCTIONS": instr_md,
+            "MCP_INSTRUCTIONS": self._render_instruction_blocks(self.ctx.mcp_described),
+            "TOOLS_INSTRUCTIONS": self._render_instruction_blocks(tool_instructions(self.ctx)),
+            "FRAMEWORK_VERSION": self.ctx.index["frameworkVersion"],
+            "SOURCE_OF_TRUTH": source_of_truth,
+        }
+        # The prose slots, from the list drift.py reviews against — one writer, one list.
+        slots.update({slot: project.get(key, "") for key, slot in PROSE_SLOTS.items()})
+        return slots
+
+    def _render_template(self, tmpl_name: str, slots: Dict[str, str]) -> str:
+        """Render a template file from features/common/templates/ with the given slots."""
+        tmpl_path = self.ctx.root / "features" / "common" / "templates" / tmpl_name
+        if tmpl_path.exists():
+            return fill_slots(tmpl_path.read_text(encoding="utf-8"), slots)
+        # fallback minimal doc if template missing
+        return (f"# {slots['PROJECT_NAME']}\n\n{slots['PROJECT_SUMMARY']}\n\n"
+                f"## Invariants\n\n{slots['INVARIANTS']}\n\n## Commands\n\n{slots['COMMANDS']}\n")
+
+    def assemble_instructions_doc(self, invariants: List[str], instr_paths: List[Path]) -> str:
+        """Render the CLAUDE.md.tmpl template with this config's project/commands/invariants."""
+        return self._render_template("CLAUDE.md.tmpl",
+                                     self.compute_doc_slots(invariants, instr_paths))
+
+    def assemble_hermes_doc(self, invariants: List[str], instr_paths: List[Path]) -> str:
+        """Render the HERMES.md.tmpl template with this config's project/commands/invariants."""
+        return self._render_template(
+            "HERMES.md.tmpl",
+            self.compute_doc_slots(invariants, instr_paths, source_of_truth="HERMES.md"))
+
+    # -- the delegation map ---------------------------------------------------------
+
+    def _persona_lines(self) -> str:
+        """One line per persona in `.ai-badger/agents/`: intent, summary, and lane.
+
+        Read from the scaffolded copies rather than the catalog, so a persona this project
+        added by hand is on the map too. Dual-key (ADR-0027): a valid `level:` renders
+        as `Level: <level>` beside the existing `Lane: <model>`, unconditionally — every
+        line names intent, not just the ones a registry resolves. A missing `level:`
+        renders the legacy bare-lane shape (grandfather); an unknown one renders a loud
+        `UNKNOWN LEVEL` marker naming the bad value and the closed set, plus a scaffold
+        note — the run still renders (M5: loud marker + note, never a hard abort).
+        """
+        lines: List[str] = []
+        for path in sorted((self.ctx.aib / "agents").glob("*.md"), key=lambda p: p.stem):
+            fields = frontmatter_fields(path.read_text(encoding="utf-8", errors="ignore"))
+            name = fields.get("name") or path.stem
+            summary = first_sentence(fields.get("description", ""))
+            lane = fields.get("model") or SESSION_DEFAULT_LANE
+            head = f"- `{name}`" + (f" — {summary}." if summary else " —")
+            raw_level = fields.get("level")
+            level = raw_level.strip() if isinstance(raw_level, str) else ""
+            if not level:
+                lines.append(head + f" Lane: {lane}.")
+                continue
+            if level not in VALID_LEVELS:
+                lines.append(head + f" Level: UNKNOWN LEVEL {level!r} "
+                             f"(valid: {', '.join(VALID_LEVELS)}). Lane: {lane}.")
+                self.ctx.notes.append(
+                    f"agents/{path.name} declares unknown level {level!r} "
+                    f"(valid: {', '.join(VALID_LEVELS)}) — rendered as a marker, not aborted")
+                continue
+            lines.append(head + f" Level: {level}, Lane: {lane}.")
+        return "\n".join(lines) or "_None scaffolded._"
+
+    def _mcp_server_lines(self, names: Sequence[str]) -> str:
+        """One line per named server, blurbed from the `server.md` its catalog entry ships."""
+        blurbs = {entry.get("name"): first_sentence(prose_only(entry.get("instructions") or ""))
+                  for entry in self.ctx.mcp_described}
+        lines = [f"- `{name}`" + (f" — {blurbs.get(name)}" if blurbs.get(name) else "")
+                 for name in sorted(names)]
+        return "\n".join(lines) or "_None indexed._"
+
+    def write_delegation_map(self, invariants: List[str], instr_paths: List[Path],
+                               mcp_servers: Sequence[str]) -> None:
+        """Write `.ai-badger/delegation.md`: who this project can delegate to, and through what.
+
+        Called once the personas are scaffolded — their frontmatter is what names each lane.
+        """
+        src = self.ctx.root / "features" / "common" / "templates" / DELEGATION_TEMPLATE
+        if not src.is_file():
+            self.ctx.notes.append(f"common/templates/{DELEGATION_TEMPLATE} missing — skipped")
+            return
+        slots = self.compute_doc_slots(invariants, instr_paths, source_of_truth="delegation.md")
+        slots["PERSONAS"] = self._persona_lines()
+        slots["MCP_SERVERS"] = self._mcp_server_lines(mcp_servers)
+        dest = self.ctx.aib / "delegation.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(self._render_template(DELEGATION_TEMPLATE, slots), encoding="utf-8")
+        self.ctx.record_template(src, dest)
+
+    # -- agent-discovery copies -----------------------------------------------------
+
+    def render_template_file(self, source: Path, instr_paths: List[Path],
+                               invariants: List[str], source_of_truth: str = "CLAUDE.md") -> str:
+        """Render a .tmpl file with the standard scaffold slots."""
+        slots = self.compute_doc_slots(invariants, instr_paths, source_of_truth)
+        return fill_slots(source.read_text(encoding="utf-8"), slots)
+
+    def carried_body(self, dest: Path, body: str) -> Optional[str]:
+        """`body` plus dest's preserved regions, or None when dest's markers are malformed."""
+        from _shared import carry_keep_regions, MalformedKeepRegion  # pylint: disable=import-outside-toplevel
+
+        if not dest.exists():
+            return body
+        rel = dest.relative_to(self.ctx.target).as_posix()
+        try:
+            carried = carry_keep_regions(dest.read_text(encoding="utf-8", errors="ignore"), body)
+        except MalformedKeepRegion as exc:
+            self.ctx.notes.append(
+                f"{rel} left untouched — {exc}; fix the markers and re-run to refresh it"
+            )
+            return None
+        if carried != body:
+            self.ctx.notes.append(f"carried preserved regions into {rel}")
+        return carried
+
+    def copy_with_header(self, dest: Path, name: str, body: str) -> bool:
+        """Write body to dest with managed header, preserving hand-authored files.
+
+        Returns whether this call actually wrote dest — False when an existing
+        hand-authored file was preserved instead, so a caller recording provenance
+        (L3-6) knows not to claim a target it left untouched as generated.
+        """
+        if (not self.ctx.overwrite and dest.exists()
+                and not _is_managed(dest.read_text(encoding="utf-8", errors="ignore"))):
+            self.ctx.notes.append(
+                f"preserved hand-authored {dest.relative_to(self.ctx.target).as_posix()} "
+                "(source written to .ai-badger/; pass --overwrite-agent-files to replace)"
+            )
+            return False
+        carried = self.carried_body(dest, body)
+        if carried is None:
+            return False
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(_with_managed_header(carried, name), encoding="utf-8")
+        return True
+
+    def copy_carrying_regions(self, src: Path, dest_dir: Path) -> Optional[Path]:
+        """Copy `src` into `dest_dir`, carrying whatever preserved regions `dest` already had.
+
+        Returns the written path, or None when dest's markers are malformed and it was left
+        untouched (the note says so). Nothing carried means a byte-for-byte copy, so the common
+        case keeps exactly the bytes the framework ships.
+        """
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+        body = src.read_text(encoding="utf-8")
+        carried = self.carried_body(dest, body)
+        if carried is None:
+            return None
+        if carried == body:
+            shutil.copyfile(src, dest)
+        else:
+            dest.write_text(carried, encoding="utf-8")
+        return dest
