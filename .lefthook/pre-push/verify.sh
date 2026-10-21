@@ -73,6 +73,12 @@ lane_workflows() {
   echo "every action reference is pinned to a full SHA"
 }
 
+lane_required_checks() {
+  # A required status check whose job does not exist in any workflow blocks
+  # every pull request forever, waiting for a check that will never report.
+  python3 scripts/check-required-checks.py .
+}
+
 changed_files() {
   # The files this push would carry. With an upstream to diff against, that is
   # the commit range; without one (a first push, or a branch with no upstream)
@@ -101,13 +107,14 @@ select_lanes() {
     *docs/*) want_docs=1 ;;
   esac
   case "$files" in
-    *.github/workflows/*) want_workflows=1 ;;
+    *.github/workflows/*) want_workflows=1; want_checks=1 ;;
   esac
 
   [ "$want_build" = 1 ] && echo "build"
   [ "$want_test" = 1 ] && echo "test"
   [ "$want_docs" = 1 ] && echo "docs-index"
   [ "$want_workflows" = 1 ] && echo "workflows"
+  [ "$want_checks" = 1 ] && echo "required-checks"
   return 0
 }
 
@@ -137,6 +144,7 @@ main() {
       run_lane test lane_test || return $?
       run_lane docs-index lane_docs_index || return $?
       run_lane workflows lane_workflows || return $?
+      run_lane required-checks lane_required_checks || return $?
       return 0
       ;;
     pre-push) ;;
@@ -152,6 +160,7 @@ main() {
   fi
 
   local files lanes lane
+  local want_build=0 want_test=0 want_docs=0 want_workflows=0 want_checks=0
   files="$(changed_files)"
   lanes="$(select_lanes "$files")"
   if [ -z "$lanes" ]; then
@@ -166,6 +175,7 @@ main() {
       test) run_lane test lane_test || return $? ;;
       docs-index) run_lane docs-index lane_docs_index || return $? ;;
       workflows) run_lane workflows lane_workflows || return $? ;;
+      required-checks) run_lane required-checks lane_required_checks || return $? ;;
     esac
   done
   return 0
