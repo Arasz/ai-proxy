@@ -1,2 +1,20 @@
 # changelog/
-Directory exists. Nothing yet — content will land here per the docs convention.
+
+One file per release, `{version}-{slug}.md`, written in the same PR that bumps the root
+`VERSION` file. Each entry says what changed for a user of the installed tool, and names the
+PRs it ships.
+
+A PR that leaves `VERSION` alone cuts no release and adds no file: the entry of the release
+that next bumps `VERSION` describes and names it, so several PRs can ship as one release.
+
+The root `VERSION` file is the version source of truth. The build reads it
+(`Directory.Build.props`), and the release workflow tags on it. This directory holds the
+per-release entries and nothing else — it has no `VERSION` file of its own, because a second
+copy of the version is a second thing to keep in step.
+
+## Index
+
+Newest first; add each release's line in the same PR that adds its file.
+
+| Version | What changed | PRs |
+|---|---|---|

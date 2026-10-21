@@ -1,2 +1,6 @@
 # how-to/
-Directory exists. Nothing yet — content will land here per the docs convention.
+
+Task-oriented recipes: the reader has a goal (point an agent at the proxy, read the usage
+stats) and follows the steps. Filenames start with an imperative verb.
+
+## Contents

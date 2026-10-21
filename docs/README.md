@@ -15,7 +15,7 @@ Local proxy that detects the LLM provider dialect of an inbound request and forw
 | `meta/` | Machine state / ledger |
 | `notes/` | Standing notes not yet folded |
 | `features/` | Feature dossiers |
-| `changelog/` | One file per release; VERSION is truth |
+| `changelog/` | One file per release; the root `VERSION` is the version of truth |
 | `assets/` | Images / diagrams |
 
 ## Conventions
@@ -25,3 +25,7 @@ Local proxy that detects the LLM provider dialect of an inbound request and forw
 - A directory's README is a complete map: every file, one line of purpose.
 - Depth cap: three path segments below `docs/`.
 - `adr/` never moved, renamed, or reformatted.
+- The root `VERSION` file is the only copy of the version. `changelog/` holds the per-release
+  entries and has no `VERSION` of its own.
+- Four quadrants of the sibling project are not here yet, because nothing belongs in them:
+  `plans/`, `research/`, `reviews/` and `qa-sessions/`. A quadrant joins when it has a file.

@@ -1,2 +1,6 @@
 # assets/
-Directory exists. Nothing yet — content will land here per the docs convention.
+
+Images and diagrams the documentation embeds. A file here is referenced by the document that
+uses it, not the other way round.
+
+## Contents
