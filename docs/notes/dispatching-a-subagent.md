@@ -33,6 +33,23 @@ The real decision is made one rank down, by the persona's `level:`.
 So the id a lane runs on is set by the registry of whichever project the **session** is
 running in.
 
+## The queue's group `level:` beats the persona's own `level:`
+
+The queue tool's group parameter outranks the persona file:
+
+```ts
+...(groupLevel ?? persona.level) !== undefined ? { level: (groupLevel ?? persona.level) as string } : {},
+```
+
+Dispatching a group with `level: "medium"` therefore sends **every** lane in it to the medium
+tier, including lanes whose persona asks for `high`. In the first dispatch here, the two
+`architect` lanes — whose persona says `model: opus` / `level: high` — ran on the medium id
+(`claude-sonnet-5.5`) rather than opus. That is the harness working as documented, and it is
+worth knowing when a lane's model does not match the tier you expected.
+
+The rule that follows: when a dispatch mixes personas of different tiers, do not set a group
+`level:` and let each persona choose its own.
+
 ## What broke it
 
 At dispatch time the session project's registry was the older ai-badger scaffold, whose
