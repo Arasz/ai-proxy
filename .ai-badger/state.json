@@ -1,5 +1,5 @@
 {
-  "lastUpdated": null,
-  "next": null,
+  "lastUpdated": "2026-10-21",
+  "next": "Implement v1 of ai-proxy, per docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md: the router (provider upstream, path-prefix pass-through, refusal for an unroutable request), the forwarder (hop-by-hop headers dropped, SSE relayed chunk by chunk), the credential rule (a path-named provider keeps the caller's credential, a body-detected provider gets the proxy's own or is refused with routing_credential_ambiguous, a path/body conflict is refused), and the pass-through (an ai-raccoon MCP server behind the same listener, unchanged). The research record's Still open questions carry into it: no live client request has been captured and replayed, the conflict refusal may be wrong for a translating gateway, the credential substitution may not be what an operator wants, an MCP server's session handling behind a connection-reusing proxy is untested, and the compression question (F10) is untouched.",
   "completedTasks": []
 }
