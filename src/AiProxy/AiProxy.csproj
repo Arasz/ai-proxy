@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>AiProxy</RootNamespace>
+        <AssemblyName>AiProxy</AssemblyName>
+        <IsPackable>true</IsPackable>
+        <PackAsTool>true</PackAsTool>
+        <PackageType>DotnetTool</PackageType>
+        <PackageId>ai-proxy</PackageId>
+        <ToolCommandName>ai-proxy</ToolCommandName>
+        <PackageTags>llm proxy anthropic openai gemini ai agent developer-tool dotnet-tool global-tool tool cli</PackageTags>
+        <Authors>Rafał Araszkiewicz</Authors>
+        <Copyright>Copyright (c) 2026 Rafał Araszkiewicz</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/Arasz/ai-proxy</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/Arasz/ai-proxy</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <Description>A local proxy that detects the LLM provider dialect of an inbound request, forwards it to that provider's upstream, and passes other local traffic through.</Description>
+        <RuntimeIdentifiers>win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64</RuntimeIdentifiers>
+        <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="AiProxy.Tests"/>
+    </ItemGroup>
+
+</Project>
