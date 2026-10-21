@@ -64,11 +64,26 @@ The rule the whole proxy is shaped around, and the part most likely to be got wr
   `routing_credential_ambiguous`, not forwarded.
 - A **path/body conflict** is refused with the same care, before any upstream is chosen.
 
+The detector already carries the fact this rule needs, and the router must read it from
+there rather than re-derive it:
+
+```csharp
+var detection = DialectDetector.Detect(path, headers, body);
+if (!detection.CredentialBelongsToCaller) { /* substitute the proxy's own credential */ }
+```
+
+`Detection.Source` says which signal named the provider — `Path`, `Body`, `Header` or
+`None` — and `CredentialBelongsToCaller` is true only for `Path`. A header names a
+provider the caller never addressed either, so it is treated like a body: the credential's
+provenance is no better established, and the proxy's own credential is used.
+
 **Done when:** all four cases are covered by tests, and the body-detected case is shown
 reaching the upstream with the proxy's key, never the caller's.
 
 **Evidence:** F3 measured the leak in the sibling implementation; F4 measured all three
-behaviours of the corrected rule.
+behaviours of the corrected rule. The detector's provenance was added after a review
+found the rule unimplementable on the earlier `Detection` shape, which carried the dialect
+and a reason but not where the dialect came from.
 
 ### 4. The pass-through
 

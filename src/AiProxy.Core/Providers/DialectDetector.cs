@@ -35,8 +35,22 @@ public static class DialectDetector
 
     /// <summary>What the detector concluded, and the evidence behind it.</summary>
     /// <param name="Dialect">The detected dialect, or <see cref="Dialect.Unknown"/>.</param>
+    /// <param name="Source">Which signal named the provider.</param>
     /// <param name="Reason">The human-readable evidence trail.</param>
-    public sealed record Detection(Dialect Dialect, string Reason);
+    public sealed record Detection(Dialect Dialect, DialectSource Source, string Reason)
+    {
+        /// <summary>
+        /// Whether the caller's own credential may be forwarded with this request.
+        /// </summary>
+        /// <remarks>
+        /// True only when the path named the provider, because then the caller addressed
+        /// that provider's endpoint and the credential is theirs. A body or a header names
+        /// a provider the caller never addressed, so the credential's provenance is
+        /// unknown — the research record's F4 rule requires the proxy to substitute its
+        /// own credential in that case, or refuse the request.
+        /// </remarks>
+        public bool CredentialBelongsToCaller => Source == DialectSource.Path;
+    }
 
     /// <summary>Detects the dialect of a request.</summary>
     /// <param name="path">The request path, without a query string.</param>
@@ -55,12 +69,16 @@ public static class DialectDetector
         {
             return new Detection(
                 Dialect.Unknown,
+                DialectSource.None,
                 $"path says {pathDialect} ({path}) but body says {bodyDialect}; refusing to guess");
         }
 
         if (pathDialect is not null)
         {
-            return new Detection(pathDialect.Value, $"path {path} is a {pathDialect} endpoint");
+            return new Detection(
+                pathDialect.Value,
+                DialectSource.Path,
+                $"path {path} is a {pathDialect} endpoint");
         }
 
         if (bodyDialect is not null)
@@ -68,6 +86,7 @@ public static class DialectDetector
             var agrees = headerDialect == bodyDialect;
             return new Detection(
                 bodyDialect.Value,
+                DialectSource.Body,
                 agrees
                     ? $"body shape is {bodyDialect}; headers agree"
                     : $"body shape is {bodyDialect}");
@@ -75,10 +94,13 @@ public static class DialectDetector
 
         if (headerDialect is not null)
         {
-            return new Detection(headerDialect.Value, $"headers say {headerDialect}");
+            return new Detection(headerDialect.Value, DialectSource.Header, $"headers say {headerDialect}");
         }
 
-        return new Detection(Dialect.Unknown, $"no dialect signal in path {path}, headers or body");
+        return new Detection(
+            Dialect.Unknown,
+            DialectSource.None,
+            $"no dialect signal in path {path}, headers or body");
     }
 
     private static Dialect? DetectFromPath(string path)
