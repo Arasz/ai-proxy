@@ -1,0 +1,119 @@
+name: publish
+
+# Manual, human-gated publish to nuget.org via Trusted Publishing (OIDC — no API
+# key stored in the repo). The push job runs under the `production` environment:
+# the required-reviewer rule on it is the manual approval gate. The nuget.org
+# trusted-publishing policy for this repo (owner Arasz, workflow publish.yml,
+# environment production) must be configured before the first publish; the
+# policy is keyed to owner + repo + workflow file, not to the package id.
+#
+# Before dispatching: bump the repo-root VERSION file and merge it — the pack
+# step publishes whatever version the csproj carries, so a second dispatch
+# without a bump is a no-op (--skip-duplicate).
+#
+# Package id: `ai-proxy`. A NuGet reserved prefix rejects submissions from
+# non-owners, and the id is not publicly listable, so the first push is where
+# that shows up: a 409 means the id is reserved, and the fallback is the
+# `arasz.ai-proxy` id with the same ToolCommandName.
+#
+# Note: workflow_dispatch runs from the default branch by definition (no
+# branches key is valid on it); the trusted-publishing policy is repo-scoped.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One release in flight at a time; never cancel a publish that is already pushing.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    strategy:
+      # One job per RID: PackAsTool emits a tool shell plus a per-RID payload
+      # package, and both must be pushed or `dotnet tool install` fails. All
+      # jobs emit the same shell id+version — each job patches its own shell
+      # (patch-tool-shell.py) to list ALL six RuntimeIdentifierPackages, so
+      # whichever shell --skip-duplicate keeps is correct. The patch is
+      # self-gating: it fails the job unless the patched settings list every
+      # RID exactly once.
+      matrix:
+        rid: [win-x64, win-arm64, osx-arm64, linux-x64, linux-arm64, linux-musl-x64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Pack (${{ matrix.rid }})
+        # nuget.config references the gitignored local feed .nupkg-local/; make it
+        # exist on the fresh runner or restore fails with NU1301.
+        #
+        # No --no-build: on a Web-SDK project, `dotnet build -p:RuntimeIdentifiers=X`
+        # does not emit the RID-scoped publish outputs that pack --no-build expects
+        # (MSB3030). Packing without --no-build builds for the RID itself and emits
+        # the tool shell + RID payload in one step.
+        run: mkdir -p .nupkg-local && dotnet pack src/AiProxy/AiProxy.csproj -c Release -p:RuntimeIdentifiers=${{ matrix.rid }} -o artifacts --nologo
+      - name: Patch the tool shell to reference every RID
+        # The SDK writes only the packed RID into the shell's DotnetToolSettings.xml;
+        # a multi-RID tool shell must list every payload package or `dotnet tool
+        # install` rejects all other platforms. The RID list must stay in sync
+        # with the matrix above.
+        run: |
+          VER=$(tr -d '[:space:]' < VERSION)
+          if [ -z "$VER" ]; then echo "::error::VERSION at the repo root is empty or missing." >&2; exit 1; fi
+          python3 scripts/patch-tool-shell.py "artifacts/ai-proxy.$VER.nupkg" win-x64 win-arm64 osx-arm64 linux-x64 linux-arm64 linux-musl-x64
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nupkg-${{ matrix.rid }}
+          path: artifacts/*.nupkg
+
+  publish:
+    needs: pack
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # enable GitHub OIDC token issuance for this job
+    steps:
+      # Checkout for global.json ONLY: this job pushes prebuilt artifacts and needs no
+      # source, but setup-dotnet reads the SDK pin from a file that must be on disk.
+      # Without it: "The specified global.json file 'global.json' does not exist".
+      # Cheaper than duplicating the version here, which would be a second place to
+      # keep in sync with the pin it is supposed to be derived from.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: global.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+      # The publish job runs dotnet nuget push, so the SDK must be installed
+      # explicitly: ubuntu-slim (unlike ubuntu-latest) has no preinstalled dotnet
+      # on PATH. Mirrors the pack job's setup-dotnet step.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: NuGet login (OIDC -> temp API key)
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: login
+        with:
+          user: Arasz
+      - name: Push payloads to nuget.org
+        # Payloads first, then the shells: a shell live before its payloads makes
+        # `dotnet tool install` fail in the window until the payloads land.
+        # Shells match ai-proxy.<version>.nupkg (a digit right after the package
+        # prefix); payloads are ai-proxy.<rid>.<version>.nupkg.
+        run: |
+          find artifacts -type f -name '*.nupkg' ! -name 'ai-proxy.[0-9]*.nupkg' -print0 \
+            | xargs -0 -n1 dotnet nuget push --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Push shells to nuget.org
+        run: |
+          find artifacts -type f -name 'ai-proxy.[0-9]*.nupkg' -print0 \
+            | xargs -0 -n1 dotnet nuget push --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

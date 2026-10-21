@@ -1,0 +1,168 @@
+name: build
+
+# No `paths:`/`paths-ignore:` filter on `pull_request:` below — on purpose.
+#
+# build-fast, build-slow and build-bdd are required status checks (see the
+# repository ruleset). If this workflow were trigger-filtered to skip doc-only
+# PRs, those checks would simply never report on such a PR, and branch
+# protection would block it forever waiting for a check that will never arrive.
+# That is not hypothetical: a trigger-filtered variant of this workflow left a
+# docs-only PR with none of the three required checks in its status rollup, and
+# it merged only because the merging account had ruleset bypass. Anyone
+# without bypass would have been stuck.
+#
+# Instead, the workflow always triggers and each heavy job always runs (see
+# `changes` below): a cheap diff classifies the PR, and build-fast/build-bdd/
+# build-slow skip their expensive steps — but the *job* itself still executes
+# and still reports success, which is what branch protection needs to see.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Superseded PR pushes cancel their in-flight run; main pushes never cancel, so
+# every main run stays a complete record.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  changes:
+    # Single source of truth for "does this diff affect build/test outcome".
+    # build-fast/build-bdd/build-slow each read this job's `code` output and
+    # skip their expensive steps when it is 'false' — see the note on
+    # `pull_request:` above for why this lives in a job instead of a trigger
+    # filter.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Classify the diff
+        id: filter
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          # Mirrors the paths this workflow used to trigger on. Anything not
+          # matched here (docs/**, *.md, etc.) is treated as safe to skip.
+          # VERSION is included because it is the file release.yml triggers on: a
+          # release PR that changes only VERSION would otherwise take all three
+          # required checks green having built nothing, and the commit that cuts a
+          # public release is the last one that should reach main unbuilt.
+          CODE_REGEX='^src/.*\.cs$|^tests/.*\.cs$|\.csproj$|\.slnx$|(^|/)Directory\.Build\.props$|(^|/)Directory\.Packages\.props$|^nuget\.config$|^VERSION$|^docs/adr/|^docs/reference/|^docs/how-to/'
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "No usable base commit (new branch or force-push); treating as a code change."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if echo "$CHANGED" | grep -qE "$CODE_REGEX"; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-fast:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_DbgEnableMiniDump: 1
+      DOTNET_DbgMiniDumpType: 2
+      DOTNET_DbgMiniDumpName: ${{ github.workspace }}/dumps/coredump.%p.dmp
+      # A crashed build/test step must not leave MSBuild node-reuse processes
+      # spinning on the runner for the rest of the run.
+      MSBUILDDISABLENODEREUSE: 1
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Skip (doc-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changed; skipping the build."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          global-json-file: global.json
+      - name: Build
+        if: needs.changes.outputs.code == 'true'
+        run: dotnet build --configuration Release --nologo
+      - name: Test
+        if: needs.changes.outputs.code == 'true'
+        run: dotnet test --configuration Release --no-build --nologo
+
+  build-slow:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_DbgEnableMiniDump: 1
+      DOTNET_DbgMiniDumpType: 2
+      DOTNET_DbgMiniDumpName: ${{ github.workspace }}/dumps/coredump.%p.dmp
+      MSBUILDDISABLENODEREUSE: 1
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Skip (doc-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changed; skipping the build."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          global-json-file: global.json
+      - name: Build for every shipped runtime identifier
+        if: needs.changes.outputs.code == 'true'
+        run: dotnet build --configuration Release --nologo -p:RuntimeIdentifiers="win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64"
+      - name: Test
+        if: needs.changes.outputs.code == 'true'
+        run: dotnet test --configuration Release --no-build --nologo
+
+  build-bdd:
+    # The behaviour-contract lane. It runs the same test suite through the
+    # Microsoft Testing Platform runner rather than the VSTest runner, which is
+    # the path the agent-facing suite actually uses. It is a separate required
+    # check because a runner-level failure (a test that the VSTest path never
+    # surfaces) is exactly the kind of defect that reaches a release.
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      MSBUILDDISABLENODEREUSE: 1
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Skip (doc-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changed; skipping the build."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          global-json-file: global.json
+      - name: Test through the Microsoft Testing Platform runner
+        if: needs.changes.outputs.code == 'true'
+        run: dotnet test --configuration Release --nologo
