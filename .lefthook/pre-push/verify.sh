@@ -33,11 +33,15 @@ run_lane() {
   if "$@" >"$logfile" 2>&1; then
     log "    PASS $name"
     return 0
+  else
+    # The status has to be captured inside the else branch: an `if` with no
+    # else that takes the false path exits 0, so reading $? after the `fi`
+    # would report the failed lane as a pass and the push would go through.
+    local code=$?
+    log "    FAIL $name (exit $code) — see $logfile"
+    tail -n 40 "$logfile" >&2 || true
+    return "$code"
   fi
-  local code=$?
-  log "    FAIL $name (exit $code) — see $logfile"
-  tail -n 40 "$logfile" >&2 || true
-  return "$code"
 }
 
 lane_build() {
@@ -70,15 +74,17 @@ lane_workflows() {
 }
 
 changed_files() {
-  # The files this push would carry. Falls back to the working tree when there
-  # is no upstream to diff against (a first push, or a new branch).
+  # The files this push would carry. With an upstream to diff against, that is
+  # the commit range; without one (a first push, or a branch with no upstream)
+  # there is no range, so every tracked file counts — a first push carries the
+  # whole repository, and treating it as "nothing changed" would let an
+  # unbuilt repository reach the remote.
   local base
   base="$(git rev-parse --verify --quiet '@{upstream}' 2>/dev/null || true)"
   if [ -n "$base" ]; then
     git diff --name-only "$base" HEAD 2>/dev/null || true
   else
-    git diff --name-only HEAD 2>/dev/null || true
-    git diff --cached --name-only 2>/dev/null || true
+    git ls-files 2>/dev/null || true
   fi
 }
 
