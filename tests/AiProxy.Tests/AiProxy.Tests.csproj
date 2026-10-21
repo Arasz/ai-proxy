@@ -16,6 +16,12 @@
 
     <ItemGroup>
         <ProjectReference Include="../../src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <ProjectReference Include="../../src/AiProxy/AiProxy.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The integration tests start the real host, so they need the web stack. -->
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
     </ItemGroup>
 
     <ItemGroup>
