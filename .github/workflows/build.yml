@@ -107,7 +107,9 @@ jobs:
           global-json-file: global.json
       - name: Build
         if: needs.changes.outputs.code == 'true'
-        run: dotnet build --configuration Release --nologo
+        # nuget.config references the gitignored local feed .nupkg-local/; make it
+        # exist on the fresh runner or restore fails with NU1301.
+        run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo
@@ -135,7 +137,9 @@ jobs:
           global-json-file: global.json
       - name: Build for every shipped runtime identifier
         if: needs.changes.outputs.code == 'true'
-        run: dotnet build --configuration Release --nologo -p:RuntimeIdentifiers="win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64"
+        # nuget.config references the gitignored local feed .nupkg-local/; make it
+        # exist on the fresh runner or restore fails with NU1301.
+        run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo -p:RuntimeIdentifiers="win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64"
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo
@@ -165,4 +169,6 @@ jobs:
           global-json-file: global.json
       - name: Test through the Microsoft Testing Platform runner
         if: needs.changes.outputs.code == 'true'
-        run: dotnet test --configuration Release --nologo
+        # nuget.config references the gitignored local feed .nupkg-local/; make it
+        # exist on the fresh runner or restore fails with NU1301.
+        run: mkdir -p .nupkg-local && dotnet test --configuration Release --nologo
