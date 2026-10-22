@@ -23,7 +23,7 @@ public class ContentCompositorTests
     {
         var decomposition = Decompositor.Decompose(Mixed, "request");
         var parts = decomposition.Parts
-            .Select(part => new CompressedPart(part.ChunkId, part.Type, part.Text, "test", 1.0))
+            .Select(part => new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, "test", 1.0))
             .ToList();
 
         var composed = Compositor.Compose(decomposition, parts);
@@ -36,7 +36,7 @@ public class ContentCompositorTests
     {
         var decomposition = Decompositor.Decompose(Mixed, "request");
         var parts = decomposition.Parts
-            .Select(part => new CompressedPart(part.ChunkId, part.Type, part.Text, "test", 1.0))
+            .Select(part => new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, "test", 1.0))
             .ToList();
         parts[1] = parts[1] with { Text = "src/foo.cs:12: matched line" };
 
@@ -52,7 +52,7 @@ public class ContentCompositorTests
         var decomposition = Decompositor.Decompose(Mixed, "request");
         var parts = new List<CompressedPart>
         {
-            new(1, ContentType.DirectoryListing, "only the first part", "test", 0.5),
+            new(1, ContentType.DirectoryListing, "only the first part", "the first part", "test", 0.5),
         };
 
         var composed = Compositor.Compose(decomposition, parts);

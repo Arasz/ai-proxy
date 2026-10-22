@@ -143,7 +143,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         {
             if (part.Text.Length < _options.MinimumFor(part.Type))
             {
-                reduced.Add(new CompressedPart(part.ChunkId, part.Type, part.Text, "below-minimum", 1.0));
+                reduced.Add(new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, "below-minimum", 1.0));
                 continue;
             }
 
