@@ -75,7 +75,7 @@ Summarization runs from 60M (`Falconsai/text_summarization`, 0.03) to 3.8B
 `Qwen/Qwen2.5-0.5B-Instruct` at 494M (0.23) in the useful band. Feature extraction is the only
 family with a genuine small end: 22.7M (`sentence-transformers/all-MiniLM-L6-v2`, 0.01), 33.4M
 (`BAAI/bge-small-en-v1.5`, 0.02), 47.7M (`ibm-granite/granite-embedding-small-english-r2`, 0.02,
-32k context), up to 596M (`Qwen/Qwen3-Embedding-0.6B`, 0.28). Typed-decision models start at 1.5B:
+8192-token context), up to 596M (`Qwen/Qwen3-Embedding-0.6B`, 0.28). Typed-decision models start at 1.5B:
 `JackKozmo29/codeguard-jev-style-1.5b` is 0.72 GiB at 4 bits and 3.4 GB as downloaded,
 `autotrust/JEV-9B` is 4.17 GiB, `autotrust/JEV-Gemma4-26B-A4B` is 26B total with 4B active at
 12.02 GiB.
