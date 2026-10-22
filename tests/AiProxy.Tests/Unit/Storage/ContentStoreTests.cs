@@ -140,15 +140,13 @@ public class ContentStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task A_writer_and_a_reader_at_the_same_time_do_not_throw()
+    public async Task A_reader_is_never_locked_out_by_a_writer()
     {
-        // The worker writes the content tables while a request reads them. A command waits
-        // for the write lock, and a reader does not take one, so neither of them throws.
-        //
-        // The producer is not in this test on purpose: it stands between a request and
-        // its provider, so it gives the lock a second and gives up, and that is the
-        // behaviour the test beside this one pins.
+        // A reader does not take the write lock, so a request reading the store is never
+        // refused because the worker is writing. The writers are in the same test because
+        // they are what a reader has to be indifferent to.
         var work = new List<Task>();
+        var readers = new List<Task>();
 
         for (var index = 0; index < 10; index++)
         {
@@ -159,11 +157,53 @@ public class ContentStoreTests : IDisposable
                 TestContext.Current.CancellationToken),
                 TestContext.Current.CancellationToken));
 
-            work.Add(Task.Run(async () => await _store.GetAsync(requestId, TestContext.Current.CancellationToken),
+            readers.Add(Task.Run(async () => await _store.GetAsync(requestId, TestContext.Current.CancellationToken),
                 TestContext.Current.CancellationToken));
         }
 
-        await Task.WhenAll(work);
+        await Task.WhenAll(readers);
+
+        Assert.All(readers, reader => Assert.True(reader.IsCompletedSuccessfully));
+    }
+
+    [Fact]
+    public async Task A_writer_that_loses_the_lock_says_so_and_nothing_else()
+    {
+        // Two writers that each hold a read snapshot and then want to write are a
+        // deadlock, and SQLite breaks it by refusing one of them straight away rather
+        // than by waiting. The worker is built for that: the job stays in the queue and
+        // the next pass writes it. What the store must not do is fail in some other way.
+        var work = new List<Task>();
+
+        for (var index = 0; index < 10; index++)
+        {
+            var requestId = $"request-{index}";
+
+            work.Add(Task.Run(async () => await _store.PersistAsync(
+                Record() with { RequestId = requestId },
+                TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
+        }
+
+        var failures = new List<Exception>();
+
+        foreach (var write in work)
+        {
+            try
+            {
+                await write;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        Assert.All(failures, failure =>
+        {
+            var locked = Assert.IsType<SqliteException>(failure);
+            Assert.Contains("locked", locked.Message, StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     [Fact]

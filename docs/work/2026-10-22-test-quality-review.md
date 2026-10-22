@@ -72,6 +72,18 @@ its file. What follows is the union of the two.
   then looks at the `content_request` row itself.
 - The fix: applied.
 
+### F4 — The concurrency test asserted more than the design promises [MAJOR]
+
+- The claim: nothing throws when a writer and a reader meet.
+- What a green run hides: it was green on a quiet machine and red on the CI runner, which
+  is the worst kind of test. SQLite breaks a deadlock between two writers by refusing one
+  of them straight away rather than by waiting, so a writer can lose the lock and fail.
+  The design promises that the job stays in the queue and the next pass writes it, not
+  that the write never fails.
+- The check that would catch it: the readers are never locked out, and a writer that
+  loses the lock fails with a lock error and with nothing else.
+- The fix: applied. The test is now two tests, one for each promise.
+
 ### F5 — The retrieval endpoint and the middleware have no test of their own [MINOR]
 
 - The promise: the original is served back under the id in the response header, and an
