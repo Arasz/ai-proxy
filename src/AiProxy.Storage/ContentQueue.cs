@@ -6,6 +6,25 @@ using Microsoft.Data.Sqlite;
 
 namespace AiProxy.Storage;
 
+/// <summary>The queue the worker drains.</summary>
+public interface IContentQueue
+{
+    /// <summary>Reads the records waiting to be written.</summary>
+    /// <param name="limit">How many to read at a time.</param>
+    /// <param name="cancellationToken">The token that stops the read.</param>
+    Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken);
+
+    /// <summary>Takes a job out of the queue, once it has been written.</summary>
+    /// <param name="jobId">The queue row's number.</param>
+    /// <param name="cancellationToken">The token that stops the delete.</param>
+    ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken);
+
+    /// <summary>The value of the pragma that tells whether another connection committed.</summary>
+    /// <param name="connection">The connection to read it on.</param>
+    /// <param name="cancellationToken">The token that stops the read.</param>
+    Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken);
+}
+
 /// <summary>A record waiting to be written to the content tables.</summary>
 /// <param name="JobId">The queue row's number.</param>
 /// <param name="Record">The record the row carries.</param>
@@ -19,7 +38,7 @@ public sealed record ContentJob(long JobId, ContentRecord Record);
 /// because the pragma that tells it whether anything changed does not move for a
 /// connection's own commits.
 /// </remarks>
-public sealed class ContentQueue
+public sealed class ContentQueue : IContentQueue
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -112,7 +131,7 @@ public sealed class ContentQueue
     /// <summary>The value of the pragma that tells whether another connection committed.</summary>
     /// <param name="connection">The connection to read it on.</param>
     /// <param name="cancellationToken">The token that stops the read.</param>
-    public static async Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    public async Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
 

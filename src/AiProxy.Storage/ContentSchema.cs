@@ -51,18 +51,48 @@ public static class ContentSchema
         connection.Open();
 
         Execute(connection, "PRAGMA busy_timeout = 5000;");
-        Execute(connection, "PRAGMA journal_mode = WAL;");
+
+        // The journal mode is a property of the file, so it is set when the file is not
+        // in it yet and left alone after that. Setting it again is a write, and a write
+        // moves the change counter that the worker's poll reads.
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA journal_mode;";
+            var mode = Convert.ToString(command.ExecuteScalar());
+            if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+            {
+                Execute(connection, "PRAGMA journal_mode = WAL;");
+            }
+        }
 
         return connection;
     }
 
+    /// <summary>The version of the schema this build writes.</summary>
+    private const int SchemaVersion = 1;
+
     /// <summary>Makes the tables, when they are not there yet.</summary>
+    /// <remarks>
+    /// The check is a read of the file's user version, and not a run of the create
+    /// statements on every connection. The create statements take a write lock, and a
+    /// write moves the change counter that the worker's poll reads, so running them on
+    /// every read would make the poll read every time and defeat the gate.
+    /// </remarks>
     /// <param name="connection">The connection to prepare.</param>
     public static void Ensure(SqliteConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        var version = Convert.ToInt64(command.ExecuteScalar());
+        if (version >= SchemaVersion)
+        {
+            return;
+        }
+
         Execute(connection, Statements);
+        Execute(connection, $"PRAGMA user_version = {SchemaVersion};");
     }
 
     /// <summary>Runs a statement that returns nothing.</summary>

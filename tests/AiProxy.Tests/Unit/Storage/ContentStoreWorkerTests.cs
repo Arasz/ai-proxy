@@ -1,6 +1,7 @@
 using AiProxy.Core.Content;
 using AiProxy.Hosting;
 using AiProxy.Storage;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -47,6 +48,13 @@ public class ContentStoreWorkerTests : IDisposable
         1,
         [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
 
+    /// <summary>Makes the tables, as the host does when the store starts.</summary>
+    private void EnsureSchema()
+    {
+        using var connection = ContentSchema.Open(_databasePath);
+        ContentSchema.Ensure(connection);
+    }
+
     private ContentStoreWorker Worker(IContentWriter writer) =>
         new(writer, _queue, _options, NullLogger<ContentStoreWorker>.Instance, _time);
 
@@ -67,6 +75,7 @@ public class ContentStoreWorkerTests : IDisposable
     [Fact]
     public async Task A_job_that_fails_stays_in_the_queue_and_is_tried_again()
     {
+        EnsureSchema();
         await _store.StoreAsync(Record(), CancellationToken.None);
         var writer = new RecordingWriter { Failures = 1 };
         var worker = Worker(writer);
@@ -82,13 +91,67 @@ public class ContentStoreWorkerTests : IDisposable
     [Fact]
     public async Task A_second_pass_with_nothing_new_reads_nothing()
     {
-        var writer = new RecordingWriter();
-        var worker = Worker(writer);
+        // The poll is gated on the pragma that says whether another connection committed,
+        // so the second pass with nothing new must not read the queue at all. Counting
+        // the writes would not prove it: there is nothing to write either way.
+        EnsureSchema();
+        var queue = new CountingQueue(_queue);
+        var worker = new ContentStoreWorker(
+            new RecordingWriter(),
+            queue,
+            _options,
+            NullLogger<ContentStoreWorker>.Instance,
+            _time);
 
         await worker.RunOnceAsync(CancellationToken.None);
+        var readsAfterTheFirstPass = queue.Reads;
         await worker.RunOnceAsync(CancellationToken.None);
 
-        Assert.Equal(0, writer.Calls);
+        Assert.Equal(1, readsAfterTheFirstPass);
+        Assert.Equal(1, queue.Reads);
+    }
+
+    [Fact]
+    public async Task A_pass_after_the_producer_committed_reads_again()
+    {
+        EnsureSchema();
+        var queue = new CountingQueue(_queue);
+        var worker = new ContentStoreWorker(
+            new RecordingWriter(),
+            queue,
+            _options,
+            NullLogger<ContentStoreWorker>.Instance,
+            _time);
+
+        await worker.RunOnceAsync(CancellationToken.None);
+        await _store.StoreAsync(Record(), CancellationToken.None);
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(2, queue.Reads);
+    }
+
+    private sealed class CountingQueue : IContentQueue
+    {
+        private readonly IContentQueue _inner;
+
+        public CountingQueue(IContentQueue inner)
+        {
+            _inner = inner;
+        }
+
+        public int Reads { get; private set; }
+
+        public Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken)
+        {
+            Reads++;
+            return _inner.ReadAsync(limit, cancellationToken);
+        }
+
+        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken) =>
+            _inner.RemoveAsync(jobId, cancellationToken);
+
+        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
+            _inner.ReadDataVersionAsync(connection, cancellationToken);
     }
 
     private sealed class RecordingWriter : IContentWriter

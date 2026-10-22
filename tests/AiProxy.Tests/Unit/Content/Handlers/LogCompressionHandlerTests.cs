@@ -46,6 +46,46 @@ public class LogCompressionHandlerTests
     }
 
     [Fact]
+    public async Task A_line_at_error_level_survives_even_when_its_message_carries_no_signal()
+    {
+        // The measured rule keeps a line on its level as well as on its message, and the
+        // level is the only reason this line survives: "boom" says nothing.
+        var text = string.Join("\n",
+        [
+            "2026-03-12 10:00:00 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:01 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:03 ERROR worker=api-2 boom",
+            "2026-03-12 10:00:04 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:05 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:06 INFO worker=api-1 nothing to see",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("boom", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_last_two_lines_are_anchors_and_survive()
+    {
+        var text = string.Join("\n",
+        [
+            "2026-03-12 10:00:00 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:01 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:03 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:04 INFO worker=api-1 the second to last line",
+            "2026-03-12 10:00:05 INFO worker=api-1 the last line",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("the last line", result.Text, StringComparison.Ordinal);
+        Assert.Contains("the second to last line", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_repeated_line_is_dropped_after_the_first()
     {
         // The measured rule says a line repeated on every request is the cheapest byte to lose.
