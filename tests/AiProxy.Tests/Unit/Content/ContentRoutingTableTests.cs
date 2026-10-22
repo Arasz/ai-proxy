@@ -96,14 +96,24 @@ public class ContentRoutingTableTests
             var result = await handler.HandleAsync(new ContentPart("request", 1, kind, text), CancellationToken.None);
             var input = text.Split('\n');
 
-            foreach (var line in result.Text.Split('\n'))
-            {
-                if (line.Length == 0 || line.StartsWith("[retained identifiers]", StringComparison.Ordinal))
-                {
-                    continue;
-                }
+            var kept = result.Text
+                .Split('\n')
+                .Where(line => line.Length > 0 && !line.StartsWith("[retained identifiers]", StringComparison.Ordinal))
+                .ToArray();
 
+            foreach (var line in kept)
+            {
                 Assert.Contains(line, input, StringComparer.Ordinal);
+            }
+
+            // The kept lines are the input's lines in the input's order: a reduction
+            // drops lines, it does not shuffle them.
+            var position = 0;
+            foreach (var line in kept)
+            {
+                var found = Array.FindIndex(input, position, candidate => string.Equals(candidate, line, StringComparison.Ordinal));
+                Assert.True(found >= 0, $"the line '{line}' is not in the input after the line before it");
+                position = found + 1;
             }
         }
     }
