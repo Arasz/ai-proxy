@@ -1,7 +1,23 @@
 {
-  "lastUpdated": "2026-10-21",
-  "next": "Finish v1 of ai-proxy, per docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md. Phase 1 landed the structure, the composite detection, the compression seam, the router with the credential rule, and the forwarder, with the plan in docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md. What is left: the questions the research record left open, and they are questions rather than code. Capture one real client request per provider and replay it through the detector, because the 12-case matrix is synthetic (the hook is one log line). Decide whether the conflict refusal is right for a translating gateway, and whether the credential substitution is what an operator wants. Test an MCP server's session handling behind a connection-reusing proxy, which the pass-through has never been measured against. And answer the compression question (F10), which is the question about what this project is for; the seam exists and does nothing. A second phase may also want the operator-facing surface: the environment variables are the whole configuration surface today.",
+  "lastUpdated": "2026-10-22",
+  "next": "The compression stage is in and off by default. What is left is the measurement nobody has done: whether an agent that reads the reduced context answers as well as one that reads the original. The tests prove that the facts survive a reduction, not that the agent still answers. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the one thing the compression record leaves open. The model path is the second piece: PROXY_COMPRESSION_MODEL points at an artifact the proxy does not read yet, and the prose path is the rule-based one until it does. The research record's other open questions stand: whether the log reducer's signal list is general beyond the one log shape it was tuned against, and whether the deduplication the measured script performed was the no-op it turned out to be. After that, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy.",
   "completedTasks": [
+    {
+      "taskId": "aip-content-compression-pipeline-store",
+      "date": "2026-10-22",
+      "title": "v1 phase 2: the content compression pipeline",
+      "pr": 4,
+      "version": "0.3.0",
+      "summary": "The proxy now shrinks the tool output in a request before the provider sees it, and keeps what it dropped. A region finder reads the body twice, once through the parsed document to learn which string values carry a tool output and once through the raw bytes to learn where they are, so a region is found by position and a message the client wrote that repeats the tool's words is left alone. A decomposer splits a region by structure, a router lets each handler claim the kinds it handles, and nine reducers keep a subset of the text they were given. The must-keep overlay re-attaches what a reduction dropped, with a ceiling of five percent, and five new rules cover the decisions class the measured pattern missed. A SQLite store keeps the original, the compressed text, the ratio and the path that was taken, through a queue table that is committed before the request is forwarded, and the original is served back from /content/{id}. The stage is off until PROXY_COMPRESSION=on. 188 tests.",
+      "decisions": [
+        "The stage implements the existing ICompressionPipeline seam, so the host registers exactly one pipeline and the pass-through stays the one used when the stage is off.",
+        "A region is found by its position in the body, not by its content, because a value-set match would rewrite a string the client wrote that happened to repeat the tool's words.",
+        "The store is its own adapter project, and SQLite is the queue that carries a record from the request path to the writer. ADR 0002, draft.",
+        "The must-keep overlay may cost at most five percent of the reduction, and the decisions-class tokens are the ones that survive that ceiling.",
+        "The measured script's deduplication kept every copy of a repeated line, because it zeroed the counter of a line it had already kept. The port keeps the first copy, which is what the script's docstring said it did, and the record says so.",
+        "The stage is off by default, because it changes what the provider is sent."
+      ]
+    },
     {
       "taskId": "aip-v1-structure-detection-compression-forward",
       "date": "2026-10-21",
