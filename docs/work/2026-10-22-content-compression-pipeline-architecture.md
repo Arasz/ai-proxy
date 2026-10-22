@@ -258,3 +258,32 @@ the proxy has to say what it changed.
    wait for the model?
 5. The overlay's five new rules widen what is protected. A wide overlay eats the savings. What is
    the ceiling?
+
+## What the implementation changed
+
+This is the design as it was written, and the review that followed it changed three things.
+The rulings are in
+[2026-10-22-compression-design-gate-audit.md](2026-10-22-compression-design-gate-audit.md),
+and the code follows them.
+
+The minimum is per kind rather than one number. A single threshold of 512 characters would
+have skipped a 300 character log that the log reducer would have reduced by a quarter, so
+each kind has its own minimum and the operator's variable overrides them all.
+
+The region finder matches by position rather than by content. The design said the finder
+would key on the value of the tool output, and the audit showed that a string elsewhere in
+the body with the same words would be rewritten with it. The finder counts the string
+values in the parsed document and the string tokens in the raw bytes, and the two counts
+agree, so a region is found by where it is and not by what it says.
+
+The overlay has a ceiling, and the decisions-class tokens are the ones that survive it. The
+five new rules protect a failure verdict, an exit status, a lowercase state transition, an
+absolute path and an explicit directive, and those tokens are kept whatever the ceiling
+says, because they are the facts the record calls the highest-value class. The other tokens
+are kept while the block stays inside five percent of the reduction.
+
+One thing the implementation found that the design did not know: the measured script's
+deduplication kept every copy of a repeated line. It zeroed the counter of a line it had
+already kept, and the next copy then read a counter of zero, which is not more than one.
+The port keeps the first copy and drops the repeats, which is what the script's own
+docstring said it did.
