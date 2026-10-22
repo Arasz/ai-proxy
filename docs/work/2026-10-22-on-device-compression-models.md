@@ -155,6 +155,14 @@ branch it predicted (F20 of the source record).
 **Evidence:** `~/kompress-work/notes/pipeline-design-architect.md` and
 `~/kompress-work/notes/decision-matrix-delegator.md`; `models-conversion` record F18, F19, F20.
 
+The two agents disagree on one point, and the record leaves the disagreement visible. The matrix
+ranked the typed-decision model third to build, for selective structured payloads, on the strength
+of its typed output; the judge for the same model dropped it from chunk selection as "an
+expensive judge for cheap token". The cost is measured (0.8 s and 3.4 GB a chunk against 0.05 s
+for a 47.7M ranker) and the benefit is not, because nobody measured whether the judge's verdict
+is right on more than one chunk. The orchestrator's judgement sides with the judge, and the
+matrix's own refusal criterion, log ERROR and FATAL retention, is the one both agree on.
+
 ### F9 — The two agents whose first attempt failed wrote nothing, and the record says so [READ]
 
 The first architect and delegator attempts ended without producing a file: the architect on a
