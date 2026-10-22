@@ -12,12 +12,10 @@ public abstract record RouteDecision
     /// <summary>The request belongs to a provider, and goes to that provider's upstream.</summary>
     /// <param name="Dialect">The provider's dialect.</param>
     /// <param name="Upstream">The upstream the request goes to.</param>
-    /// <param name="Credential">Whose credential travels with the request.</param>
     /// <param name="Reason">The evidence trail behind the decision.</param>
     public sealed record ProviderRoute(
         Dialect Dialect,
         Uri Upstream,
-        CredentialSource Credential,
         string Reason) : RouteDecision;
 
     /// <summary>The request is not provider traffic, and is carried to a configured upstream unchanged.</summary>

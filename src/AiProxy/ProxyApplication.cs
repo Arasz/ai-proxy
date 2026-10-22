@@ -43,7 +43,6 @@ public static class ProxyApplication
             builder.Services.AddSingleton<ICompressionPipeline, PassThroughCompressionPipeline>();
         }
         builder.Services.AddSingleton<IPassThroughCatalog>(new PassThroughCatalog(options.PassThrough));
-        builder.Services.AddSingleton<ICredentialProvider>(new ConfiguredCredentialProvider(options));
         builder.Services.AddSingleton<UpstreamCatalog>(new UpstreamCatalog(options.Upstreams));
         builder.Services.AddSingleton<ProviderRequestRouter>();
         builder.Services.AddSingleton<PassThroughRequestRouter>();

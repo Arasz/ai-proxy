@@ -7,17 +7,6 @@ namespace AiProxy.Core.Providers;
 /// <param name="Outcome">Whether a signal named a provider, whether signals disagreed, or whether none was found.</param>
 public sealed record Detection(Dialect Dialect, DialectSource Source, string Reason, DetectionOutcome Outcome)
 {
-    /// <summary>
-    /// Whether the caller's own credential may be forwarded with this request.
-    /// </summary>
-    /// <remarks>
-    /// True only when the path named the provider, because then the caller addressed
-    /// that provider's endpoint and the credential is theirs. A body or a header names
-    /// a provider the caller never addressed, so the credential's provenance is
-    /// unknown, and the proxy must substitute its own credential or refuse.
-    /// </remarks>
-    public bool CredentialBelongsToCaller => Source == DialectSource.Path;
-
     /// <summary>Whether two signals named different providers, which is a refusal rather than a guess.</summary>
     public bool IsConflicted => Outcome == DetectionOutcome.Conflicted;
 

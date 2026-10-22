@@ -5,19 +5,17 @@ namespace AiProxy.Configuration;
 
 /// <summary>What the operator configured, read from the environment once at startup.</summary>
 /// <param name="Upstreams">The upstream of each provider dialect that is configured.</param>
-/// <param name="Credentials">The proxy's own credential for each dialect that has one.</param>
 /// <param name="PassThrough">The operator's path-prefix rules.</param>
 public sealed record ProxyOptions(
     IReadOnlyDictionary<Dialect, Uri> Upstreams,
-    IReadOnlyDictionary<Dialect, string> Credentials,
     IReadOnlyList<PassThroughUpstream> PassThrough)
 {
     /// <summary>The upstream variable of each dialect.</summary>
-    private static readonly (Dialect Dialect, string UpstreamVariable, string CredentialVariable)[] Variables =
+    private static readonly (Dialect Dialect, string UpstreamVariable)[] Variables =
     [
-        (Dialect.Anthropic, "PROXY_ANTHROPIC_UPSTREAM", "PROXY_ANTHROPIC_KEY"),
-        (Dialect.OpenAi, "PROXY_OPENAI_UPSTREAM", "PROXY_OPENAI_KEY"),
-        (Dialect.Gemini, "PROXY_GEMINI_UPSTREAM", "PROXY_GEMINI_KEY"),
+        (Dialect.Anthropic, "PROXY_ANTHROPIC_UPSTREAM"),
+        (Dialect.OpenAi, "PROXY_OPENAI_UPSTREAM"),
+        (Dialect.Gemini, "PROXY_GEMINI_UPSTREAM"),
     ];
 
     /// <summary>Reads the configuration, and leaves out whatever the operator did not set.</summary>
@@ -26,24 +24,16 @@ public sealed record ProxyOptions(
         ArgumentNullException.ThrowIfNull(configuration);
 
         var upstreams = new Dictionary<Dialect, Uri>();
-        var credentials = new Dictionary<Dialect, string>();
-
-        foreach (var (dialect, upstreamVariable, credentialVariable) in Variables)
+        foreach (var (dialect, upstreamVariable) in Variables)
         {
             var upstream = configuration[upstreamVariable];
             if (!string.IsNullOrWhiteSpace(upstream))
             {
                 upstreams[dialect] = new Uri(upstream.Trim(), UriKind.Absolute);
             }
-
-            var credential = configuration[credentialVariable];
-            if (!string.IsNullOrWhiteSpace(credential))
-            {
-                credentials[dialect] = credential.Trim();
-            }
         }
 
-        return new ProxyOptions(upstreams, credentials, ParsePassThrough(configuration["PROXY_PASSTHROUGH"]));
+        return new ProxyOptions(upstreams, ParsePassThrough(configuration["PROXY_PASSTHROUGH"]));
     }
 
     private static IReadOnlyList<PassThroughUpstream> ParsePassThrough(string? configured)

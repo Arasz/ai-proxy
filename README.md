@@ -54,16 +54,14 @@ dotnet tool install -g ai-proxy
 
 ## Configuration
 
-The environment holds the configuration, and the credentials live there and nowhere else.
+The environment holds the upstream and pass-through configuration. Provider credentials
+come from the caller's request and are forwarded as supplied.
 
 | Variable | What it is |
 |---|---|
 | `PROXY_ANTHROPIC_UPSTREAM` | the Anthropic upstream, for example `https://api.anthropic.com` |
 | `PROXY_OPENAI_UPSTREAM` | the OpenAI upstream |
 | `PROXY_GEMINI_UPSTREAM` | the Gemini upstream |
-| `PROXY_ANTHROPIC_KEY` | the proxy's own Anthropic credential |
-| `PROXY_OPENAI_KEY` | the proxy's own OpenAI credential |
-| `PROXY_GEMINI_KEY` | the proxy's own Gemini credential |
 | `PROXY_PASSTHROUGH` | comma-separated `prefix=upstream` pairs, for example `/mcp=http://127.0.0.1:7801` |
 | `PROXY_COMPRESSION` | `on` turns the compression stage on. It is off by default |
 | `PROXY_COMPRESSION_DB` | where the store keeps what the proxy compressed. The default is `~/.ai-proxy/content.db` |
@@ -97,20 +95,12 @@ see that it ran, and how to get the original back. The rules come from measureme
 which. The storage and the queue are in
 [ADR 0002](docs/adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md).
 
-## The credential rule
+## Credentials
 
-This proxy forwards the caller's own provider credential upstream, so where that credential
-ends up is the whole security question.
-
-A request whose path names a provider keeps the caller's credential, because the caller
-addressed that provider's endpoint and the credential is theirs. A request whose provider was
-detected from the *body* carries a credential of unknown provenance — it may belong to the
-other provider — so the proxy sends its own credential for that dialect, or refuses the
-request outright. It never forwards a caller's credential to a provider it guessed.
-
-The reason is measured, not assumed. The sibling Rust implementation was run against fake
-upstreams with an OpenAI credential on an Anthropic path, and the credential arrived at the
-Anthropic host. That is finding F3 in the record, and the rule that follows is F4.
+The proxy does not hold provider credentials. It forwards credential headers from the
+incoming request unchanged, including when the provider is identified from the body or
+headers. Requests where the path and body identify different providers are refused, so a
+credential is never sent to a provider that conflicts with the addressed path.
 
 ## How the provider is detected
 
@@ -121,8 +111,7 @@ Three signals, in order of authority:
 3. **The headers.** `anthropic-version` means Anthropic, `x-goog-api-key` means Gemini.
 
 A path and a body that name different providers resolve to *nothing*. The request is not
-routed to either, because a request whose provider was guessed must not carry a caller's
-credential to a host the proxy chose.
+routed to either, because the signals disagree about the destination.
 
 A path the operator named for another server, such as `/mcp`, is carried to that server
 before the body is even read. The operator's prefix is a stronger statement than a body

@@ -44,7 +44,6 @@ public class ProxyingTests
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["PROXY_ANTHROPIC_UPSTREAM"] = upstream.BaseAddress.ToString(),
-            ["PROXY_ANTHROPIC_KEY"] = "PROXY-KEY",
         });
 
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
@@ -61,13 +60,13 @@ public class ProxyingTests
     }
 
     [Fact]
-    public async Task The_upstream_received_the_proxys_credential_for_a_body_detected_provider()
+    public async Task The_upstream_received_the_callers_credentials_for_a_body_detected_provider()
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["PROXY_ANTHROPIC_UPSTREAM"] = upstream.BaseAddress.ToString(),
-            ["PROXY_ANTHROPIC_KEY"] = "PROXY-KEY",
+            ["PROXY_ANTHROPIC_KEY"] = "IGNORED-PROXY-KEY",
         });
 
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
@@ -81,12 +80,12 @@ public class ProxyingTests
         await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         var received = Assert.Single(upstream.Requests);
-        Assert.Equal("PROXY-KEY", received.Headers["x-api-key"]);
-        Assert.False(received.Headers.ContainsKey("authorization"));
+        Assert.Equal("CALLER-KEY", received.Headers["x-api-key"]);
+        Assert.Equal("Bearer CALLER-TOKEN", received.Headers["authorization"]);
     }
 
     [Fact]
-    public async Task A_body_detected_provider_with_no_proxy_credential_is_refused()
+    public async Task A_body_detected_provider_is_forwarded_without_proxy_credentials()
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
@@ -95,11 +94,12 @@ public class ProxyingTests
         });
 
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
-        var response = await client.PostAsync("/gateway/invoke", Body(AnthropicBody), TestContext.Current.CancellationToken);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/gateway/invoke") { Content = Body(AnthropicBody) };
+        request.Headers.TryAddWithoutValidation("x-api-key", "CALLER-KEY");
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Contains("routing_credential_ambiguous", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
-        Assert.Empty(upstream.Requests);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("CALLER-KEY", Assert.Single(upstream.Requests).Headers["x-api-key"]);
     }
 
     [Fact]
@@ -109,7 +109,6 @@ public class ProxyingTests
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["PROXY_ANTHROPIC_UPSTREAM"] = upstream.BaseAddress.ToString(),
-            ["PROXY_ANTHROPIC_KEY"] = "PROXY-KEY",
         });
 
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };

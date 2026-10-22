@@ -1,6 +1,4 @@
 using System.Net.Http.Headers;
-using AiProxy.Core.Providers;
-using AiProxy.Core.Routing;
 
 namespace AiProxy.Forwarding;
 
@@ -23,26 +21,14 @@ public sealed class HttpUpstreamForwarder : IUpstreamForwarder
         "accept-encoding",
     };
 
-    /// <summary>The headers that carry a credential, which the proxy takes over when it substitutes its own.</summary>
-    private static readonly HashSet<string> CredentialHeaders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "authorization",
-        "x-api-key",
-        "x-goog-api-key",
-        "api-key",
-    };
-
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ICredentialProvider _credentials;
 
-    /// <summary>Holds the client factory and the proxy's own credentials.</summary>
-    public HttpUpstreamForwarder(IHttpClientFactory httpClientFactory, ICredentialProvider credentials)
+    /// <summary>Holds the client factory.</summary>
+    public HttpUpstreamForwarder(IHttpClientFactory httpClientFactory)
     {
         ArgumentNullException.ThrowIfNull(httpClientFactory);
-        ArgumentNullException.ThrowIfNull(credentials);
 
         _httpClientFactory = httpClientFactory;
-        _credentials = credentials;
     }
 
     /// <summary>Relays the request, and writes the response onto the caller's connection.</summary>
@@ -74,12 +60,6 @@ public sealed class HttpUpstreamForwarder : IUpstreamForwarder
 
         CopyHeaders(call, request);
 
-        if (call.SubstitutesCredential && call.Dialect is { } dialect &&
-            _credentials.TryGetCredential(dialect, out var credential))
-        {
-            ApplyCredential(request, dialect, credential);
-        }
-
         var client = _httpClientFactory.CreateClient("upstreams");
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
@@ -95,36 +75,10 @@ public sealed class HttpUpstreamForwarder : IUpstreamForwarder
                 continue;
             }
 
-            if (call.SubstitutesCredential && CredentialHeaders.Contains(name))
-            {
-                continue;
-            }
-
-            if (request.Content is not null)
+            if (!request.Headers.TryAddWithoutValidation(name, value) && request.Content is not null)
             {
                 request.Content.Headers.TryAddWithoutValidation(name, value);
-                continue;
             }
-
-            request.Headers.TryAddWithoutValidation(name, value);
-        }
-    }
-
-    private static void ApplyCredential(HttpRequestMessage request, Dialect dialect, string credential)
-    {
-        switch (dialect)
-        {
-            case Dialect.Anthropic:
-                request.Headers.TryAddWithoutValidation("x-api-key", credential);
-                break;
-            case Dialect.OpenAi:
-                request.Headers.TryAddWithoutValidation("authorization", $"Bearer {credential}");
-                break;
-            case Dialect.Gemini:
-                request.Headers.TryAddWithoutValidation("x-goog-api-key", credential);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(dialect), dialect, "Unknown dialect.");
         }
     }
 

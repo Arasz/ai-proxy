@@ -123,7 +123,6 @@ public class CompositeDialectDetectorTests
         var detection = Detector.Detect(new DetectionRequest("/v1/messages", Headers(), null));
 
         Assert.Equal(DialectSource.Path, detection.Source);
-        Assert.True(detection.CredentialBelongsToCaller);
     }
 
     [Fact]
@@ -137,31 +136,6 @@ public class CompositeDialectDetectorTests
     }
 
     [Fact]
-    public void A_body_detected_providers_credential_does_not_belong_to_the_caller()
-    {
-        // The record's F4 rule: a body-detected provider may not receive the caller's
-        // credential, because the caller addressed no provider endpoint and the
-        // credential's provenance is unknown.
-        var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
-
-        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
-
-        Assert.False(detection.CredentialBelongsToCaller);
-    }
-
-    [Fact]
-    public void A_header_detected_provider_does_not_treat_the_credential_as_the_callers()
-    {
-        // The headers are the last resort, and a header names a provider without the
-        // caller having addressed that provider's endpoint, so the credential's
-        // provenance is no better established than a body's.
-        var detection = Detector.Detect(new DetectionRequest("/anything", Headers(("anthropic-version", "2023-06-01")), null));
-
-        Assert.Equal(DialectSource.Header, detection.Source);
-        Assert.False(detection.CredentialBelongsToCaller);
-    }
-
-    [Fact]
     public void A_conflict_names_no_source()
     {
         var body = """{"model":"gpt-4o","max_completion_tokens":5,"messages":[]}""";
@@ -170,7 +144,6 @@ public class CompositeDialectDetectorTests
 
         Assert.Equal(Dialect.Unknown, detection.Dialect);
         Assert.Equal(DialectSource.None, detection.Source);
-        Assert.False(detection.CredentialBelongsToCaller);
     }
 
     [Fact]
@@ -179,7 +152,6 @@ public class CompositeDialectDetectorTests
         var detection = Detector.Detect(new DetectionRequest("/whatever", Headers(), """{"foo":1}"""));
 
         Assert.Equal(DialectSource.None, detection.Source);
-        Assert.False(detection.CredentialBelongsToCaller);
     }
 
     [Fact]
