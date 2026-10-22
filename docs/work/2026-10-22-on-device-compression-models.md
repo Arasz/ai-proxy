@@ -154,11 +154,15 @@ parameters, about 87 MiB at fp32, is the figure to trust.
 
 The design agent's three decisions, D1 the rule-based log reducer first and no neural summarizer
 on logs, D2 the embedding models stay at prototype stage with no drop threshold, D3 kompress runs
-on prose and not on logs or code, are the routing table in F1. The matrix agent ranked the same
-three pipelines in the same order and refused one trade: log ERROR and FATAL retention, "because
-any pipeline that repeats that failure mode is out regardless of compression". Its one named
-measurement, kompress on a JSON payload, has since been made and settled the ranking in the
-branch it predicted (F20 of the source record).
+on prose and not on logs or code, are the routing table in F1, and its stage sequence is that
+table in code order: classify, rule-reduce, embed-and-rank as a prototype with no threshold, then
+kompress on prose only, with fallbacks to rule-reduce plus head-truncation when a model is
+missing. The matrix agent ranked the same three pipelines in the same order and refused one
+trade: log ERROR and FATAL retention, "because any pipeline that repeats that failure mode is
+out regardless of compression". Its one named measurement, kompress on a JSON payload, has since
+been made and settled the ranking in the branch it predicted (F20 of the source record). The
+architect's note caught the same card error the judge did, the granite context length of 8192
+tokens rather than 32k, which is the figure the orchestrator's own copy had wrong.
 
 **Evidence:** `~/kompress-work/notes/pipeline-design-architect.md` and
 `~/kompress-work/notes/decision-matrix-delegator.md`; `models-conversion` record F18, F19, F20.
