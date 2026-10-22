@@ -36,6 +36,17 @@ public static class ContentSchema
         );
         """;
 
+    /// <summary>How long a command waits for the write lock, in seconds.</summary>
+    public const int DefaultCommandTimeoutSeconds = 30;
+
+    /// <summary>How long the request path waits for the write lock, in seconds.</summary>
+    /// <remarks>
+    /// The producer's write stands between a request and its provider, so it gives up
+    /// quickly and lets the request go out without the record. The worker, which runs
+    /// with nothing in front of it, waits the long way and retries.
+    /// </remarks>
+    public const int RequestCommandTimeoutSeconds = 1;
+
     /// <summary>Opens a connection with the settings the store needs.</summary>
     /// <param name="path">The path of the database file.</param>
     public static SqliteConnection Open(string path)
@@ -50,7 +61,11 @@ public static class ContentSchema
         var connection = new SqliteConnection(builder.ToString());
         connection.Open();
 
-        Execute(connection, "PRAGMA busy_timeout = 5000;");
+        // There is no busy timeout pragma here on purpose. The managed stack sets the
+        // busy handler from the timeout of the command that runs, so a pragma on the
+        // connection is overridden by every command and only says what it does not do.
+        // The wait is bounded by the command timeout instead, and the two paths that
+        // write set it to the bound they need.
 
         // The journal mode is a property of the file, so it is set when the file is not
         // in it yet and left alone after that. Setting it again is a write, and a write
@@ -79,7 +94,8 @@ public static class ContentSchema
     /// every read would make the poll read every time and defeat the gate.
     /// </remarks>
     /// <param name="connection">The connection to prepare.</param>
-    public static void Ensure(SqliteConnection connection)
+    /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
+    public static void Ensure(SqliteConnection connection, int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -91,19 +107,21 @@ public static class ContentSchema
             return;
         }
 
-        Execute(connection, Statements);
-        Execute(connection, $"PRAGMA user_version = {SchemaVersion};");
+        Execute(connection, Statements, commandTimeoutSeconds);
+        Execute(connection, $"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
     }
 
     /// <summary>Runs a statement that returns nothing.</summary>
     /// <param name="connection">The connection to run it on.</param>
     /// <param name="statement">The statement to run.</param>
-    public static void Execute(SqliteConnection connection, string statement)
+    /// <param name="commandTimeoutSeconds">How long the statement waits for the write lock.</param>
+    public static void Execute(SqliteConnection connection, string statement, int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
         using var command = connection.CreateCommand();
         command.CommandText = statement;
+        command.CommandTimeout = commandTimeoutSeconds;
         command.ExecuteNonQuery();
     }
 }
