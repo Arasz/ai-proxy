@@ -104,7 +104,13 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             failure = exception.Message;
         }
 
-        return new CompressionResult(compressed, true, failure);
+        var summary = new CompressionSummary(
+            requestId,
+            string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal)),
+            parts.Count,
+            original.Length == 0 ? 1.0 : (double)compressedText.Length / original.Length);
+
+        return new CompressionResult(compressed, true, failure, summary);
     }
 
     private static byte[] Rebuild(byte[] body, List<(int Start, int Length, byte[] Bytes)> replacements)
