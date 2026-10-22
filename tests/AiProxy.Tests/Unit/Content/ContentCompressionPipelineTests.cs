@@ -109,6 +109,15 @@ public class ContentCompressionPipelineTests
         Assert.True(record.Ratio < 1.0);
         Assert.Contains("log.signal-filter", record.Path, StringComparison.Ordinal);
         Assert.Equal(record.Parts.Count, record.ChunkCount);
+
+        // The ratio is checked against the record's own texts and not against the
+        // number the pipeline computed, so a ratio that is wrong in both places at once
+        // is still caught.
+        Assert.Equal(
+            (double)Encoding.UTF8.GetByteCount(record.Compressed) /
+            Encoding.UTF8.GetByteCount(record.Original),
+            record.Ratio,
+            6);
     }
 
     [Fact]
