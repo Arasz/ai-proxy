@@ -64,7 +64,7 @@ public sealed class ContentQueue : IContentQueue
         ArgumentNullException.ThrowIfNull(record);
 
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection);
+        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
 
         const string insert = """
             INSERT INTO content_queue (request_id, created_at, payload)
@@ -79,6 +79,7 @@ public sealed class ContentQueue : IContentQueue
                 CreatedAt = record.CreatedAt.ToString("O"),
                 Payload = JsonSerializer.Serialize(record, SerializerOptions),
             },
+            commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -88,7 +89,7 @@ public sealed class ContentQueue : IContentQueue
     public async Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection);
+        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
             SELECT job_id AS JobId, payload AS Payload

@@ -38,7 +38,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         ArgumentNullException.ThrowIfNull(requestId);
 
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection);
+        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
             SELECT request_id      AS RequestId,

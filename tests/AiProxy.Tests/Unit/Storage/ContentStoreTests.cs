@@ -140,6 +140,64 @@ public class ContentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_writer_and_a_reader_at_the_same_time_do_not_throw()
+    {
+        // The worker writes the content tables while a request reads them. A command waits
+        // for the write lock, and a reader does not take one, so neither of them throws.
+        //
+        // The producer is not in this test on purpose: it stands between a request and
+        // its provider, so it gives the lock a second and gives up, and that is the
+        // behaviour the test beside this one pins.
+        var work = new List<Task>();
+
+        for (var index = 0; index < 10; index++)
+        {
+            var requestId = $"request-{index}";
+
+            work.Add(Task.Run(async () => await _store.PersistAsync(
+                Record() with { RequestId = requestId },
+                TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
+
+            work.Add(Task.Run(async () => await _store.GetAsync(requestId, TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
+        }
+
+        await Task.WhenAll(work);
+    }
+
+    [Fact]
+    public async Task The_producer_gives_up_quickly_when_another_connection_holds_the_lock()
+    {
+        // The producer's write stands between a request and its provider, so it waits a
+        // second and not the half minute a command waits by default. A request must not
+        // hang on a locked database: the record is lost, the request goes out, and the
+        // pipeline logs that the store failed.
+        // The schema exists before the lock is taken, as it does in the host: a schema
+        // change cannot wait for the write lock, so creating the tables under a held
+        // lock is a different thing from writing a row under one.
+        using (var setup = ContentSchema.Open(_databasePath))
+        {
+            ContentSchema.Ensure(setup);
+        }
+
+        await using var holder = ContentSchema.Open(_databasePath);
+        ContentSchema.Execute(holder, "BEGIN IMMEDIATE;");
+
+        var started = DateTimeOffset.UtcNow;
+
+        await Assert.ThrowsAnyAsync<SqliteException>(async () =>
+            await _store.StoreAsync(Record(), TestContext.Current.CancellationToken));
+
+        var waited = DateTimeOffset.UtcNow - started;
+        Assert.True(
+            waited < TimeSpan.FromSeconds(10),
+            $"the producer waited {waited.TotalSeconds:F1} seconds for the lock");
+
+        ContentSchema.Execute(holder, "COMMIT;");
+    }
+
+    [Fact]
     public async Task The_stored_ratio_agrees_with_the_stored_texts()
     {
         var record = Record();

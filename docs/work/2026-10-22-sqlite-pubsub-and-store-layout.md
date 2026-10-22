@@ -104,6 +104,18 @@ the last being 10.0.13) and for `dapper` (the last being 2.1.89), both read 2026
 `Directory.Packages.props` centralises versions and `src/AiProxy/AiProxy.csproj` declares the six
 `RuntimeIdentifiers`. Whether the published binary needs `DapperAot` is not settled here.
 
+**A correction the implementation found.** A `PRAGMA busy_timeout` on the connection does not
+bound the wait for the write lock. The managed stack sets the busy handler from the timeout of
+the command that runs, so the pragma is overridden by every command and says only what it does
+not do. The wait is bounded by the command's own timeout, which is thirty seconds by default,
+and the two paths that write set it to the bound they need: the producer's insert, which
+stands between a request and its provider, waits a second and gives up, and the worker's
+write waits the long way and is retried.
+
+A second thing the implementation found: a schema change cannot wait for the write lock at
+all, so the tables have to exist before the lock is contended for. The store makes them once,
+guarded by the file's user version, and a read never writes.
+
 ## What this means for the pipeline
 
 - SQLite is the pub/sub channel as a work table, and the poll is gated on `PRAGMA data_version`
