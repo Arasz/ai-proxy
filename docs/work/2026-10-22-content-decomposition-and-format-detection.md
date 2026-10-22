@@ -99,6 +99,11 @@ JSON, XML, TOML, YAML, CSV, HTML and Markdown are cheap to prove by parsing, and
 succeeds is proof. A directory listing, a shell transcript and a run of log lines cannot be
 proved: they are recognised by shape, and the detection is a guess with a confidence, not a fact.
 
+The pipeline recognises the kinds it has a reducer for: JSON, XML, TOML, Markdown, source code,
+a directory listing, a log, a shell transcript and prose. YAML, CSV and HTML are parseable and
+would be cheap to add, and they are not in this release, so a payload in one of them arrives
+as prose.
+
 The consequence for the pipeline is that a failed parse is not an error. A block that starts with
 `{` and does not parse is text, and the pipeline treats it as text.
 
@@ -124,8 +129,13 @@ structured payloads, which means a model cannot be used to find the structure ei
 
 The proxy sits in front of several agents and cannot assume one envelope. The formats in the wild
 are a JSON envelope, an XML-ish tool block, and plain text with separators, and the agent CLIs do
-not agree on any of them. The pipeline therefore keys on the content of the region, not on a
-marker.
+not agree on any of them.
+
+What the pipeline does is narrower than "no envelope, so read the text": the finder recognises
+the four shapes the dialects actually use for a tool's output, which is a Anthropic
+`tool_result` block, an OpenAI message with the role `tool`, an OpenAI `function_call_output`, and
+a Gemini `functionResponse`. It finds the tool output by where it sits in the body, and it does
+not need a marker convention to do that.
 
 **Evidence:** the repository holds no agent-CLI tool-output specification, and the compression
 record's payloads are raw `ls`, `grep` and log text with no envelope around them
@@ -138,6 +148,8 @@ record's payloads are raw `ls`, `grep` and log text with no envelope around them
 - The decomposer splits by structure, and a part it cannot prove stays whole.
 - The overlay grows five rules, and the decisions class stops being a hole.
 - The model is used for prose only, if at all, and never to find structure.
+- The finder recognises the dialects' tool-output shapes and finds the output by position, so
+  no envelope convention has to be agreed on and no marker has to be looked for.
 
 ## Still open
 
