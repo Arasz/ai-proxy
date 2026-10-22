@@ -1,5 +1,19 @@
 {
   "lastUpdated": "2026-10-21",
-  "next": "Implement v1 of ai-proxy, per docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md: the router (provider upstream, path-prefix pass-through, refusal for an unroutable request), the forwarder (hop-by-hop headers dropped, SSE relayed chunk by chunk), the credential rule (a path-named provider keeps the caller's credential, a body-detected provider gets the proxy's own or is refused with routing_credential_ambiguous, a path/body conflict is refused), and the pass-through (an ai-raccoon MCP server behind the same listener, unchanged). The research record's Still open questions carry into it: no live client request has been captured and replayed, the conflict refusal may be wrong for a translating gateway, the credential substitution may not be what an operator wants, an MCP server's session handling behind a connection-reusing proxy is untested, and the compression question (F10) is untouched.",
-  "completedTasks": []
+  "next": "Finish v1 of ai-proxy, per docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md. Phase 1 landed the structure, the composite detection, the compression seam, the router with the credential rule, and the forwarder, with the plan in docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md. What is left: the questions the research record left open, and they are questions rather than code. Capture one real client request per provider and replay it through the detector, because the 12-case matrix is synthetic (the hook is one log line). Decide whether the conflict refusal is right for a translating gateway, and whether the credential substitution is what an operator wants. Test an MCP server's session handling behind a connection-reusing proxy, which the pass-through has never been measured against. And answer the compression question (F10), which is the question about what this project is for; the seam exists and does nothing. A second phase may also want the operator-facing surface: the environment variables are the whole configuration surface today.",
+  "completedTasks": [
+    {
+      "taskId": "aip-v1-structure-detection-compression-forward",
+      "date": "2026-10-21",
+      "title": "v1 phase 1: the structure and the proxy skeleton",
+      "pr": 2,
+      "version": "0.2.0",
+      "summary": "The proxy detects the provider of an inbound request, routes it through an ICompressionPipeline (pass-through for now) to that provider's upstream, and carries everything else through unchanged. The static detector became a composite of the path, body and header signals behind IDialectDetector; the router applies the credential rule and refuses with routing_unknown or routing_credential_ambiguous; the host is a minimal API with a middleware pipeline, a hop-by-hop-stripping forwarder that relays a streamed response chunk by chunk, and a DI composition where every collaborator is a singleton. 84 tests.",
+      "decisions": [
+        "The core project holds the interfaces and the rules and depends on nothing; the host project holds the middleware, the forwarder and the composition. ADR 0001, draft.",
+        "The pass-through rule is checked after the path signal and before the body signal, so a request to an operator's prefix cannot be captured by a body shape. This corrects the v1 plan's wording.",
+        "A body larger than 8 MiB is refused rather than forwarded unread."
+      ]
+    }
+  ]
 }

@@ -12,3 +12,4 @@ the moment the file exists, and it becomes frozen only when it reaches `Accepted
 
 | ADR | Decision | Amended |
 |-----|----------|---------|
+| [0001-core-holds-the-rules-and-the-host-holds-the-http.md](0001-core-holds-the-rules-and-the-host-holds-the-http.md) | The core project holds the interfaces and the rules and depends on nothing; the host project holds the middleware, the forwarder and the composition. | Draft |

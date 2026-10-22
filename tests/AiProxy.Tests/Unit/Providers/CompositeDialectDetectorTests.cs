@@ -6,8 +6,15 @@ namespace AiProxy.Tests.Unit.Providers;
 /// The detector's contract, stated as behaviour rather than as a description of the code:
 /// which provider does this request belong to?
 /// </summary>
-public class DialectDetectorTests
+public class CompositeDialectDetectorTests
 {
+    private static readonly CompositeDialectDetector Detector = new(
+    [
+        new PathDialectDetector(),
+        new BodyDialectDetector(),
+        new HeaderDialectDetector(),
+    ]);
+
     private static Dictionary<string, string> Headers(params (string Name, string Value)[] headers) =>
         headers.ToDictionary(header => header.Name, header => header.Value, StringComparer.OrdinalIgnoreCase);
 
@@ -20,7 +27,7 @@ public class DialectDetectorTests
     [InlineData("/v1beta/models/gemini-2.5-flash:generateContent", Dialect.Gemini)]
     public void A_path_that_names_a_provider_decides_it(string path, Dialect expected)
     {
-        var detection = DialectDetector.Detect(path, Headers(), null);
+        var detection = Detector.Detect(new DetectionRequest(path, Headers(), null));
 
         Assert.Equal(expected, detection.Dialect);
     }
@@ -30,7 +37,7 @@ public class DialectDetectorTests
     {
         var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.Equal(Dialect.Anthropic, detection.Dialect);
     }
@@ -40,7 +47,7 @@ public class DialectDetectorTests
     {
         var body = """{"model":"gpt-4o","max_completion_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.Equal(Dialect.OpenAi, detection.Dialect);
     }
@@ -50,7 +57,7 @@ public class DialectDetectorTests
     {
         var body = """{"contents":[{"parts":[{"text":"hi"}]}]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.Equal(Dialect.Gemini, detection.Dialect);
     }
@@ -58,7 +65,7 @@ public class DialectDetectorTests
     [Fact]
     public void The_anthropic_version_header_resolves_a_path_that_names_nothing()
     {
-        var detection = DialectDetector.Detect("/anything", Headers(("anthropic-version", "2023-06-01")), null);
+        var detection = Detector.Detect(new DetectionRequest("/anything", Headers(("anthropic-version", "2023-06-01")), null));
 
         Assert.Equal(Dialect.Anthropic, detection.Dialect);
     }
@@ -66,7 +73,7 @@ public class DialectDetectorTests
     [Fact]
     public void The_goog_api_key_header_resolves_a_path_that_names_nothing()
     {
-        var detection = DialectDetector.Detect("/anything", Headers(("x-goog-api-key", "key")), null);
+        var detection = Detector.Detect(new DetectionRequest("/anything", Headers(("x-goog-api-key", "key")), null));
 
         Assert.Equal(Dialect.Gemini, detection.Dialect);
     }
@@ -78,15 +85,16 @@ public class DialectDetectorTests
         // name different providers, so the request must not be routed to either.
         var body = """{"model":"gpt-4o","max_completion_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/v1/messages", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/v1/messages", Headers(), body));
 
         Assert.Equal(Dialect.Unknown, detection.Dialect);
+        Assert.True(detection.IsConflicted);
     }
 
     [Fact]
     public void A_request_with_no_signal_resolves_to_nothing()
     {
-        var detection = DialectDetector.Detect("/whatever", Headers(), """{"foo":1}""");
+        var detection = Detector.Detect(new DetectionRequest("/whatever", Headers(), """{"foo":1}"""));
 
         Assert.Equal(Dialect.Unknown, detection.Dialect);
     }
@@ -94,7 +102,7 @@ public class DialectDetectorTests
     [Fact]
     public void A_body_that_is_not_json_resolves_to_nothing_rather_than_throwing()
     {
-        var detection = DialectDetector.Detect("/whatever", Headers(), "not json at all");
+        var detection = Detector.Detect(new DetectionRequest("/whatever", Headers(), "not json at all"));
 
         Assert.Equal(Dialect.Unknown, detection.Dialect);
     }
@@ -104,7 +112,7 @@ public class DialectDetectorTests
     {
         var body = """{"model":"claude-haiku-4-5","messages":[],"tools":[{"name":"t","cache_control":{"type":"ephemeral"}}]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.Equal(Dialect.Anthropic, detection.Dialect);
     }
@@ -112,7 +120,7 @@ public class DialectDetectorTests
     [Fact]
     public void A_path_named_provider_reports_the_path_as_its_source()
     {
-        var detection = DialectDetector.Detect("/v1/messages", Headers(), null);
+        var detection = Detector.Detect(new DetectionRequest("/v1/messages", Headers(), null));
 
         Assert.Equal(DialectSource.Path, detection.Source);
         Assert.True(detection.CredentialBelongsToCaller);
@@ -123,7 +131,7 @@ public class DialectDetectorTests
     {
         var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.Equal(DialectSource.Body, detection.Source);
     }
@@ -136,7 +144,7 @@ public class DialectDetectorTests
         // credential's provenance is unknown.
         var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/gateway/invoke", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/gateway/invoke", Headers(), body));
 
         Assert.False(detection.CredentialBelongsToCaller);
     }
@@ -147,7 +155,7 @@ public class DialectDetectorTests
         // The headers are the last resort, and a header names a provider without the
         // caller having addressed that provider's endpoint, so the credential's
         // provenance is no better established than a body's.
-        var detection = DialectDetector.Detect("/anything", Headers(("anthropic-version", "2023-06-01")), null);
+        var detection = Detector.Detect(new DetectionRequest("/anything", Headers(("anthropic-version", "2023-06-01")), null));
 
         Assert.Equal(DialectSource.Header, detection.Source);
         Assert.False(detection.CredentialBelongsToCaller);
@@ -158,7 +166,7 @@ public class DialectDetectorTests
     {
         var body = """{"model":"gpt-4o","max_completion_tokens":5,"messages":[]}""";
 
-        var detection = DialectDetector.Detect("/v1/messages", Headers(), body);
+        var detection = Detector.Detect(new DetectionRequest("/v1/messages", Headers(), body));
 
         Assert.Equal(Dialect.Unknown, detection.Dialect);
         Assert.Equal(DialectSource.None, detection.Source);
@@ -168,9 +176,58 @@ public class DialectDetectorTests
     [Fact]
     public void A_request_with_no_signal_names_no_source()
     {
-        var detection = DialectDetector.Detect("/whatever", Headers(), """{"foo":1}""");
+        var detection = Detector.Detect(new DetectionRequest("/whatever", Headers(), """{"foo":1}"""));
 
         Assert.Equal(DialectSource.None, detection.Source);
         Assert.False(detection.CredentialBelongsToCaller);
+    }
+
+    [Fact]
+    public void A_path_that_names_a_provider_wins_over_a_body_that_names_the_same_one()
+    {
+        var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
+
+        var detection = Detector.Detect(new DetectionRequest("/v1/messages", Headers(), body));
+
+        Assert.Equal(Dialect.Anthropic, detection.Dialect);
+        Assert.Equal(DialectSource.Path, detection.Source);
+        Assert.Equal(DetectionOutcome.Resolved, detection.Outcome);
+    }
+
+    [Fact]
+    public void A_header_that_disagrees_with_the_body_does_not_conflict()
+    {
+        // A header is a hint about the client, not a statement about the body, so it
+        // never turns a disagreement into a refusal.
+        var body = """{"model":"gpt-4o","max_completion_tokens":5,"messages":[]}""";
+
+        var detection = Detector.Detect(
+            new DetectionRequest("/gateway/invoke", Headers(("anthropic-version", "2023-06-01")), body));
+
+        Assert.Equal(Dialect.OpenAi, detection.Dialect);
+        Assert.Equal(DialectSource.Body, detection.Source);
+        Assert.False(detection.IsConflicted);
+    }
+
+    [Fact]
+    public void A_header_that_agrees_with_the_body_says_so_in_the_reason()
+    {
+        var body = """{"model":"claude-haiku-4-5","max_tokens":5,"messages":[]}""";
+
+        var detection = Detector.Detect(
+            new DetectionRequest("/gateway/invoke", Headers(("anthropic-version", "2023-06-01")), body));
+
+        Assert.Equal(Dialect.Anthropic, detection.Dialect);
+        Assert.Contains("headers agree", detection.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_request_with_no_signal_is_unresolved_rather_than_conflicted()
+    {
+        var detection = Detector.Detect(new DetectionRequest("/whatever", Headers(), """{"foo":1}"""));
+
+        Assert.Equal(Dialect.Unknown, detection.Dialect);
+        Assert.Equal(DetectionOutcome.Unresolved, detection.Outcome);
+        Assert.False(detection.IsConflicted);
     }
 }

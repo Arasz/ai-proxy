@@ -87,11 +87,20 @@ and a reason but not where the dialect came from.
 
 ### 4. The pass-through
 
-A path-prefix rule set, checked after provider detection, carrying non-provider traffic.
+A path-prefix rule set, carrying non-provider traffic.
 
 `/mcp` is the worked example: an MCP server such as ai-raccoon on the same listener. The
 traffic must arrive unchanged — the handshake, the tool list, the tool results and the
 token gate all behave exactly as they do without the proxy in front.
+
+**Correction, 2026-10-21, from the phase 1 implementation.** This section originally said
+the rule was checked *after* provider detection. It is checked after the path signal and
+before the body signal, and the difference is not cosmetic. Under the original wording a
+request to `/mcp` whose body happened to carry a dialect shape — a tool argument called
+`contents`, say — would be detected as a Gemini request and sent to the Gemini upstream with
+the caller's credential. The operator's prefix is a stronger statement than a body shape, so
+the prefix wins, and a pass-through request is carried without the proxy reading its body at
+all. The phase 1 plan records the reasoning in full.
 
 **Done when:** an ai-raccoon server behind the proxy answers an `initialize`, a `tools/list`
 and a tool call with the same payloads it answers directly.

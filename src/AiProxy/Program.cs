@@ -1,9 +1,7 @@
-using AiProxy.Core.Providers;
+using AiProxy;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
-
-app.MapGet("/health", () => Results.Json(new { status = "ok" }));
+var app = ProxyApplication.Create(builder);
 
 app.Run();
