@@ -132,10 +132,18 @@ the query and nothing else. The judge named the consequence: "ERROR lines score 
 few query terms". A chunk must be dropped by a domain filter, never by a relevance score. Its
 runner measured a whole-payload logit of 1.46 (sigmoid 0.81) for a grep payload against a matched
 query and negative logits for the same payload against an unrelated one, which is the separation
-it can offer and the limit of it.
+it can offer and the limit of it. The runner's numbers sharpen the verdict in both directions:
+separation is excellent for prose, a matched query scoring 8.16 (0.9997) against -11.3 to -11.45
+(sigmoid about 1e-05) for obviously irrelevant text, at 0.009 to 0.035 s a payload and 0.212 s
+for 20 chunks batched. What it cannot do is route: the directory listing scored -6.75 (0.0012)
+against a perfectly matched query about that directory, and its 512-token window truncated the
+1079-token grep payload, so every payload has to be split before scoring. It is a good relevance
+gate for prose, a poor one for structured payloads, and never an answer to "what kind of thing
+is this", which is the question the routing table asks.
 
-**Evidence:** `~/kompress-work/notes/ms-marco-minilm-judge.md` and
-`~/kompress-work/notes/ms-marco-minilm-runner.md`; card
+**Evidence:** `models-conversion` record F7, F13a; `~/kompress-work/notes/ms-marco-minilm-judge.md`
+and `~/kompress-work/notes/ms-marco-minilm-runner.md`, with the raw results in
+`~/kompress-work/scratch-ms-marco-minilm-runner/results*.json`; card
 `cross-encoder/ms-marco-MiniLM-L-6-v2` → `README.md` and `config.json` for the training domain
 and the 512-token limit. The two agents' disk figures for one cache directory differ by three
 orders of magnitude, 944 KB against 940 MiB apparent and 175 MiB dereferenced, because `du` on a
