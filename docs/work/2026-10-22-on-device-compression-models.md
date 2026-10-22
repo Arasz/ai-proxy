@@ -137,7 +137,10 @@ it can offer and the limit of it.
 **Evidence:** `~/kompress-work/notes/ms-marco-minilm-judge.md` and
 `~/kompress-work/notes/ms-marco-minilm-runner.md`; card
 `cross-encoder/ms-marco-MiniLM-L-6-v2` → `README.md` and `config.json` for the training domain
-and the 512-token limit.
+and the 512-token limit. The two agents' disk figures for one cache directory differ by three
+orders of magnitude, 944 KB against 940 MiB apparent and 175 MiB dereferenced, because `du` on a
+symlinked cache measures the links and the agents looked at different moments; the card's 22.7M
+parameters, about 87 MiB at fp32, is the figure to trust.
 
 ### F8 — Two independent agents designed the same pipeline the measurements produced [READ]
 
