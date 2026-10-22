@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-10-22",
-  "next": "The compression stage is in and off by default. What is left is the measurement nobody has done: whether an agent that reads the reduced context answers as well as one that reads the original. The tests prove that the facts survive a reduction, not that the agent still answers. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the one thing the compression record leaves open. The model path is the second piece: PROXY_COMPRESSION_MODEL points at an artifact the proxy does not read yet, and the prose path is the rule-based one until it does. The research record's other open questions stand: whether the log reducer's signal list is general beyond the one log shape it was tuned against, and whether the deduplication the measured script performed was the no-op it turned out to be. After that, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy. The planning panel's drafts are worth keeping in the repository: three of them were deleted as working material, and the three that arrived afterwards each found a rule the suite did not pin, a write that defeated the poll gate, and a wait for the write lock that was half a minute long. The four records that are in the tree now are the ones that shipped with a file; the drafts are in the task graph.",
+  "next": "Measure whether an agent that reads the reduced context answers as well as one that reads the original. The stage proves that the facts survive a reduction; the answer retention the compression research measured is a proxy, and the record names this as its first open question. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the measurement that says whether the stage is worth running at all. The model path waits for that answer: the artifact is 274 MB, the numbers for it are measured, and the owner ruled that the rule-based path ships meanwhile. The two corrections to the merged research records land as a follow-up to pull request #3. After the measurement, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy.",
   "completedTasks": [
     {
       "taskId": "aip-content-compression-pipeline-store",
@@ -15,7 +15,11 @@
         "The store is its own adapter project, and SQLite is the queue that carries a record from the request path to the writer. ADR 0002, draft.",
         "The must-keep overlay may cost at most five percent of the reduction, and the decisions-class tokens are the ones that survive that ceiling.",
         "The measured script's deduplication kept every copy of a repeated line, because it zeroed the counter of a line it had already kept. The port keeps the first copy, which is what the script's docstring said it did, and the record says so.",
-        "The stage is off by default, because it changes what the provider is sent."
+        "The stage is off by default, because it changes what the provider is sent.",
+        "The owner ruled that the rule-based prose reducer ships and the measurements are corrected rather than the feature dropped: the measured deduplication was a no-op, so the rule path's size figures came from the signal filter and the anchors alone.",
+        "The owner ruled that the store stays in its own project, src/AiProxy.Storage, and ADR 0002 stands. A panel lane had preferred the web host.",
+        "The owner ruled that the four corrections are folded into the two research records now in main, as a follow-up pull request.",
+        "The owner ruled that the next task measures whether an agent answers as well from the reduced context, and the model path waits for that answer."
       ]
     },
     {

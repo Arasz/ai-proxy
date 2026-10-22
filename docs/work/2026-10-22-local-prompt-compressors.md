@@ -334,6 +334,19 @@ The hosting path already exists. The Core ML provider is reachable from .NET thr
 the provider options this model needs (F9). The NVIDIA side is the simpler half, one package and
 one provider option, and it is also the half nobody has measured yet (F15).
 
+## What the implementation changed
+
+The model is not in the first release of the proxy. The 274 MB artifact cannot live in the
+repository, and the numbers in this record are the model's, so the rule-based path runs until
+the artifact is delivered. The rule-based path's own measurements are in
+[2026-10-22-on-device-compression-models.md](2026-10-22-on-device-compression-models.md), and
+the correction to them is in that record: the measured deduplication was a no-op, so the rule
+path's size figures came from the signal filter and the anchors alone.
+
+The rest of this record stands, and it is the case for the model when it arrives: a content
+router in front of it, a deadline with a pass-through fallback, a deliberate chunk policy, and
+observability on every request the proxy changes.
+
 ## Still open
 
 - Whether the Intel plus NVIDIA box loads and runs the int8 artifact, and whether it beats fp32
