@@ -25,21 +25,24 @@ The design comes from a research record written before any of this code existed:
 [detecting the provider and forwarding to the right upstream](docs/work/2026-10-21-detecting-the-provider-and-forwarding-to-the-right-upstream.md).
 Every decision below traces to a finding in it.
 
-## Status: the proxy works, the compression does not
+## Status: the proxy works, and so does the compression
 
 The provider is detected, the request is forwarded to the right upstream, and other traffic
-is carried through unchanged. What is here:
+is carried through unchanged. The tool output in a request is reduced before the provider
+sees it, and the original is kept. What is here:
 
 | Piece | State |
 |---|---|
 | The provider dialect detector | Implemented, as a composite of the path, body and header signals, in `src/AiProxy.Core/Providers/` |
 | The router and the credential rule | Implemented, in `src/AiProxy.Core/Routing/` |
 | The host, the forwarder and the pass-through | Implemented, in `src/AiProxy/` |
-| The compression pipeline | A seam with a pass-through implementation. Whether this project should compress at all is an open question in the research record (F10) |
+| The compression stage | Implemented, in `src/AiProxy.Core/Content/`, with the store in `src/AiProxy.Storage/`. Off until the operator sets `PROXY_COMPRESSION=on` |
+| The model-based path | Not here. The rule-based reducers are the ones the measurements kept, and the model arrives behind the same seam |
 
 The design and the reasoning are in the
-[v1 phase 1 plan](docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md) and
-the [v1 plan](docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md).
+[v1 phase 1 plan](docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md), the
+[v1 plan](docs/work/2026-10-21-ai-proxy-v1-implementation-plan.md) and the
+[compression design](docs/work/2026-10-22-content-compression-pipeline-architecture.md).
 
 ## Install
 
@@ -62,9 +65,36 @@ The environment holds the configuration, and the credentials live there and nowh
 | `PROXY_OPENAI_KEY` | the proxy's own OpenAI credential |
 | `PROXY_GEMINI_KEY` | the proxy's own Gemini credential |
 | `PROXY_PASSTHROUGH` | comma-separated `prefix=upstream` pairs, for example `/mcp=http://127.0.0.1:7801` |
+| `PROXY_COMPRESSION` | `on` turns the compression stage on. It is off by default |
+| `PROXY_COMPRESSION_DB` | where the store keeps what the proxy compressed. The default is `~/.ai-proxy/content.db` |
 
 The [environment variable reference](docs/reference/environment-variables.md) has the
 detail, including what happens when a variable is missing.
+
+## The compression stage
+
+The tool output an agent sends back to the provider is the part of the context that grows
+without bound. The stage reduces it before the provider sees it, and keeps what it dropped.
+
+A log keeps the lines that carry a signal, plus two anchors at each end. A JSON document is
+compacted, and every value in it survives. A directory listing passes through untouched,
+because nothing compresses a listing without losing file names. A mixed payload, an `ls`
+result and a grep result and a JSON blob in one tool output, is split by structure and each
+part is reduced by the rule that fits it.
+
+Nothing is rewritten. Every reducer keeps a subset of the text it was given, so a fact that
+survives is intact, and a fact that does not survive is in the store. The bytes outside the
+tool output are what the client sent, byte for byte.
+
+Every request the proxy changes is written to a SQLite database, with the original, the
+compressed text, the ratio and the path of the reducer that ran. The record is committed
+before the request is forwarded, the response carries the id in the
+`x-ai-proxy-content-id` header, and the original is served back from `/content/{id}`.
+
+The rules come from measurements, and the
+[research record](docs/work/2026-10-22-content-decomposition-and-format-detection.md) says
+which. The storage and the queue are in
+[ADR 0002](docs/adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md).
 
 ## The credential rule
 
