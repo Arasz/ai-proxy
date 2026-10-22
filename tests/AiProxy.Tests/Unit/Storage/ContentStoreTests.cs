@@ -128,6 +128,10 @@ public class ContentStoreTests : IDisposable
             "SELECT original AS Original, compressed AS Compressed, ratio AS Ratio FROM content_request WHERE request_id = @RequestId;",
             new { record.RequestId });
 
-        Assert.Equal((double)row.Compressed.Length / row.Original.Length, row.Ratio, 6);
+        Assert.Equal(
+            (double)System.Text.Encoding.UTF8.GetByteCount(row.Compressed) /
+            System.Text.Encoding.UTF8.GetByteCount(row.Original),
+            row.Ratio,
+            6);
     }
 }

@@ -108,7 +108,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             requestId,
             string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal)),
             parts.Count,
-            original.Length == 0 ? 1.0 : (double)compressedText.Length / original.Length);
+            body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length);
 
         return new CompressionResult(compressed, true, failure, summary);
     }
