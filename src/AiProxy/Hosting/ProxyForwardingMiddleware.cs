@@ -118,7 +118,7 @@ public sealed partial class ProxyForwardingMiddleware
                     Log.StoreFailed(_logger, failure);
                 }
 
-                Log.Proxied(_logger, path, provider.Dialect.ToString(), provider.Upstream.Host, provider.Credential.ToString());
+                Log.Proxied(_logger, path, provider.Dialect.ToString(), provider.Upstream.Host);
                 await _forwarder.ForwardAsync(
                     context,
                     Call(provider, context, headers, compressed.Body, contentType),
@@ -163,8 +163,6 @@ public sealed partial class ProxyForwardingMiddleware
             Headers = headers,
             Body = body,
             ContentType = contentType,
-            Dialect = route.Dialect,
-            Credential = route.Credential,
         };
 
     private static IReadOnlyDictionary<string, string> SnapshotHeaders(HttpRequest request)
@@ -223,8 +221,8 @@ public sealed partial class ProxyForwardingMiddleware
     private static partial class Log
     {
         [LoggerMessage(EventId = 1101, Level = LogLevel.Information,
-            Message = "proxied {Path} to {Upstream} as {Dialect} with the {Credential} credential")]
-        public static partial void Proxied(ILogger logger, string path, string dialect, string upstream, string credential);
+            Message = "proxied {Path} to {Upstream} as {Dialect}")]
+        public static partial void Proxied(ILogger logger, string path, string dialect, string upstream);
 
         [LoggerMessage(EventId = 1102, Level = LogLevel.Information,
             Message = "carried {Path} to {Upstream} unchanged")]

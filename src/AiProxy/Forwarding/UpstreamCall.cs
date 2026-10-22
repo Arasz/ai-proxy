@@ -1,6 +1,3 @@
-using AiProxy.Core.Providers;
-using AiProxy.Core.Routing;
-
 namespace AiProxy.Forwarding;
 
 /// <summary>One request on its way to an upstream.</summary>
@@ -27,12 +24,4 @@ public sealed record UpstreamCall
     /// <summary>The content type of the body.</summary>
     public string? ContentType { get; init; }
 
-    /// <summary>The provider dialect, when the request belongs to a provider.</summary>
-    public Dialect? Dialect { get; init; }
-
-    /// <summary>Whose credential travels with the request.</summary>
-    public CredentialSource Credential { get; init; } = CredentialSource.Caller;
-
-    /// <summary>Whether the proxy's own credential replaces the caller's.</summary>
-    public bool SubstitutesCredential => Dialect is not null && Credential == CredentialSource.Proxy;
 }

@@ -1,11 +1,7 @@
 namespace AiProxy.Core.Providers;
 
 /// <summary>Names the provider from the request headers, which is the last resort.</summary>
-/// <remarks>
-/// A header names a provider the caller never addressed, so a header-detected
-/// provider is treated like a body-detected one: the credential's provenance is no
-/// better established, and the proxy substitutes its own credential.
-/// </remarks>
+/// <remarks>A header is the last provider signal when path and body provide none.</remarks>
 public sealed class HeaderDialectDetector : IDialectDetector
 {
     /// <summary>Detects the dialect from the headers alone.</summary>

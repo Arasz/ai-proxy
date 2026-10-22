@@ -4,9 +4,7 @@ using AiProxy.Core.Routing;
 namespace AiProxy.Tests.Unit.Routing;
 
 /// <summary>
-/// The credential rule, which is the rule the whole proxy is shaped around: a path-named
-/// provider keeps the caller's credential, and a provider named by the body or the headers
-/// gets the proxy's own, or a refusal.
+/// Provider routing does not replace or require credentials configured by the proxy.
 /// </summary>
 public class ProviderRequestRouterTests
 {
@@ -14,9 +12,9 @@ public class ProviderRequestRouterTests
     private static readonly Uri OpenAiUpstream = new("https://api.openai.com");
 
     [Fact]
-    public void A_path_named_provider_keeps_the_callers_credential()
+    public void A_path_named_provider_is_routed_without_a_proxy_credential()
     {
-        var router = Router(credentials: []);
+        var router = Router();
 
         var route = router.Route(Request(
             "/v1/messages",
@@ -25,53 +23,48 @@ public class ProviderRequestRouterTests
         var provider = Assert.IsType<RouteDecision.ProviderRoute>(route);
         Assert.Equal(Dialect.Anthropic, provider.Dialect);
         Assert.Equal(AnthropicUpstream, provider.Upstream);
-        Assert.Equal(CredentialSource.Caller, provider.Credential);
     }
 
     [Fact]
-    public void A_body_detected_provider_gets_the_proxys_credential()
+    public void A_body_detected_provider_is_routed_without_a_proxy_credential()
     {
-        var router = Router(credentials: [(Dialect.Anthropic, "PROXY-KEY")]);
+        var router = Router();
 
         var route = router.Route(Request(
             "/gateway/invoke",
             Detection.Resolved(Dialect.Anthropic, DialectSource.Body, "body shape is Anthropic")));
 
         var provider = Assert.IsType<RouteDecision.ProviderRoute>(route);
-        Assert.Equal(CredentialSource.Proxy, provider.Credential);
     }
 
     [Fact]
-    public void A_header_detected_provider_gets_the_proxys_credential()
+    public void A_header_detected_provider_is_routed_without_a_proxy_credential()
     {
-        var router = Router(credentials: [(Dialect.Anthropic, "PROXY-KEY")]);
+        var router = Router();
 
         var route = router.Route(Request(
             "/gateway/invoke",
             Detection.Resolved(Dialect.Anthropic, DialectSource.Header, "headers say Anthropic")));
 
         var provider = Assert.IsType<RouteDecision.ProviderRoute>(route);
-        Assert.Equal(CredentialSource.Proxy, provider.Credential);
     }
 
     [Fact]
-    public void A_body_detected_provider_with_no_proxy_credential_is_refused()
+    public void A_body_detected_provider_does_not_require_a_proxy_credential()
     {
-        var router = Router(credentials: []);
+        var router = Router();
 
         var route = router.Route(Request(
             "/gateway/invoke",
             Detection.Resolved(Dialect.Anthropic, DialectSource.Body, "body shape is Anthropic")));
 
-        var refusal = Assert.IsType<RouteDecision.RefusedRoute>(route);
-        Assert.Equal(RefusalReason.CredentialAmbiguous, refusal.Refusal);
-        Assert.Equal("routing_credential_ambiguous", refusal.Code);
+        Assert.IsType<RouteDecision.ProviderRoute>(route);
     }
 
     [Fact]
     public void A_conflicted_detection_is_refused_before_an_upstream_is_chosen()
     {
-        var router = Router(credentials: [(Dialect.Anthropic, "PROXY-KEY")]);
+        var router = Router();
 
         var route = router.Route(Request(
             "/v1/messages",
@@ -85,9 +78,7 @@ public class ProviderRequestRouterTests
     [Fact]
     public void A_provider_with_no_configured_upstream_is_refused()
     {
-        var router = new ProviderRequestRouter(
-            new UpstreamCatalog(new Dictionary<Dialect, Uri>()),
-            new FakeCredentialProvider((Dialect.Anthropic, "PROXY-KEY")));
+        var router = new ProviderRequestRouter(new UpstreamCatalog(new Dictionary<Dialect, Uri>()));
 
         var route = router.Route(Request(
             "/v1/messages",
@@ -102,7 +93,7 @@ public class ProviderRequestRouterTests
     [Fact]
     public void A_request_that_names_no_provider_is_refused()
     {
-        var router = Router(credentials: [(Dialect.Anthropic, "PROXY-KEY")]);
+        var router = Router();
 
         var route = router.Route(Request(
             "/whatever",
@@ -113,14 +104,13 @@ public class ProviderRequestRouterTests
         Assert.Equal("routing_unknown", refusal.Code);
     }
 
-    private static ProviderRequestRouter Router(params (Dialect Dialect, string Credential)[] credentials) =>
+    private static ProviderRequestRouter Router() =>
         new(
             new UpstreamCatalog(new Dictionary<Dialect, Uri>
             {
                 [Dialect.Anthropic] = AnthropicUpstream,
                 [Dialect.OpenAi] = OpenAiUpstream,
-            }),
-            new FakeCredentialProvider(credentials));
+            }));
 
     private static RoutingRequest Request(string path, Detection detection) =>
         new(path, new Dictionary<string, string>(), null, detection);

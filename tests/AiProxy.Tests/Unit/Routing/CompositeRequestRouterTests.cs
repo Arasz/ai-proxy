@@ -20,7 +20,6 @@ public class CompositeRequestRouterTests
 
         var provider = Assert.IsType<RouteDecision.ProviderRoute>(route);
         Assert.Equal(AnthropicUpstream, provider.Upstream);
-        Assert.Equal(CredentialSource.Caller, provider.Credential);
     }
 
     [Fact]
@@ -33,7 +32,6 @@ public class CompositeRequestRouterTests
             Detection.Resolved(Dialect.Anthropic, DialectSource.Body, "body shape is Anthropic")));
 
         var provider = Assert.IsType<RouteDecision.ProviderRoute>(route);
-        Assert.Equal(CredentialSource.Proxy, provider.Credential);
     }
 
     [Fact]
@@ -81,8 +79,7 @@ public class CompositeRequestRouterTests
     private static CompositeRequestRouter Router() =>
         new(
             new ProviderRequestRouter(
-                new UpstreamCatalog(new Dictionary<Dialect, Uri> { [Dialect.Anthropic] = AnthropicUpstream }),
-                new FakeCredentialProvider((Dialect.Anthropic, "PROXY-KEY"))),
+                new UpstreamCatalog(new Dictionary<Dialect, Uri> { [Dialect.Anthropic] = AnthropicUpstream })),
             new PassThroughRequestRouter(
                 new PassThroughCatalog([new PassThroughUpstream("/mcp", McpUpstream)])));
 

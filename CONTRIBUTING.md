@@ -134,9 +134,9 @@ a change that breaks one of them is a change that breaks a gate.
 
 If you find a security problem, do not open a public issue. Read [`SECURITY.md`](SECURITY.md).
 
-That document is not a formality for this project. The proxy forwards the caller's own provider
-credential upstream, so a routing mistake is a credential leak. The credential substitution rule
-in `SECURITY.md` is the single most important behaviour in the codebase.
+That document is not a formality for this project. The proxy forwards provider credentials from
+the caller's request, so a routing mistake can expose a credential to the wrong upstream. The
+refusal for conflicting provider signals in `SECURITY.md` is a key security behavior.
 
 ## Licence
 

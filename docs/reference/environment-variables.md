@@ -1,7 +1,7 @@
 # environment variables
 
-The proxy is configured through the environment, and the credentials live there and nowhere
-else. Nothing in this list is written into a tracked file, and nothing in it is logged.
+The proxy is configured through the environment. Provider credentials come from each
+incoming request and are forwarded as supplied; the proxy does not configure or store them.
 
 ## Provider upstreams
 
@@ -17,21 +17,6 @@ the wrong host.
 
 The upstream is a base address. The caller's path and query string travel with the request,
 so `/v1/messages` reaches the Anthropic upstream as `/v1/messages`.
-
-## The proxy's own credentials
-
-A request that names its provider by its body or its headers does not get the caller's
-credential. It gets the proxy's own, and if the proxy holds none for that dialect the
-request is refused with `routing_credential_ambiguous`.
-
-| Variable | What it is |
-|---|---|
-| `PROXY_ANTHROPIC_KEY` | the proxy's own Anthropic credential, sent as `x-api-key` |
-| `PROXY_OPENAI_KEY` | the proxy's own OpenAI credential, sent as `Authorization: Bearer` |
-| `PROXY_GEMINI_KEY` | the proxy's own Gemini credential, sent as `x-goog-api-key` |
-
-A request that names its provider by its path keeps the caller's own credential, so these
-variables matter only for the generic-path case.
 
 ## Pass-through rules
 
