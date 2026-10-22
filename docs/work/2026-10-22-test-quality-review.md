@@ -62,7 +62,7 @@ its file. What follows is the union of the two.
 - The fix: applied. The shell transcript was the one that found a real gap: no handler
   claimed it.
 
-### F4 — The integration test proved the request path and not the writer [MAJOR]
+### F5 — The integration test proved the request path and not the writer [MAJOR]
 
 - The claim: the record reaches the content tables.
 - What a green run hides: the retrieval is served from the queue while the record is
@@ -72,7 +72,7 @@ its file. What follows is the union of the two.
   then looks at the `content_request` row itself.
 - The fix: applied.
 
-### F4 — The concurrency test asserted more than the design promises [MAJOR]
+### F6 — The concurrency test asserted more than the design promises [MAJOR]
 
 - The claim: nothing throws when a writer and a reader meet.
 - What a green run hides: it was green on a quiet machine and red on the CI runner, which
@@ -84,7 +84,7 @@ its file. What follows is the union of the two.
   loses the lock fails with a lock error and with nothing else.
 - The fix: applied. The test is now two tests, one for each promise.
 
-### F5 — The retrieval endpoint and the middleware have no test of their own [MINOR]
+### F7 — The retrieval endpoint and the middleware have no test of their own [MINOR]
 
 - The promise: the original is served back under the id in the response header, and an
   unknown id is a problem details response.
@@ -95,13 +95,26 @@ its file. What follows is the union of the two.
   retrieval, so this is a shape of the suite rather than a hole in it.
 - The fix: left as it is, and recorded here.
 
-### F6 — The worker's loop test counts invocations, not side effects [NIT]
+### F8 — The worker's loop test counts invocations, not side effects [NIT]
 
 - The promise: the worker's pass drains the queue, and a failed job is retried.
 - What a green run hides: nothing. The worker test counts the writer's calls, which is
   the shape the repo's own hosted-service guidance asks for, and the second pass with
   nothing new is asserted to make no read.
 - The fix: none needed.
+
+## The fakes, and what each one has to model
+
+| Fake | It stands in for | What it must model | The test that proves it models it |
+|---|---|---|---|
+| `RecordingContentStore` in `ContentCompressionPipelineTests` | the store port | that the pipeline hands over a record with the original, the compressed text, the ratio, the path and one part per chunk | `The_record_carries_the_original_the_compressed_the_ratio_and_the_path` asserts every field against the body's own texts |
+| `RecordingWriter` in `ContentStoreWorkerTests` | the writer that fills the content tables | that a write which fails leaves the job in the queue | `A_job_that_fails_stays_in_the_queue_and_is_tried_again` counts the calls and reads the queue |
+| `CountingQueue` in `ContentStoreWorkerTests` | the queue the worker drains | that the poll reads only when another connection committed | `A_second_pass_with_nothing_new_reads_nothing` counts the reads |
+| the real `SqliteContentStore` in `ContentStoreTests` | nothing — it is the thing | the ratio, the chunk count, the journal mode and the atomic write | `The_stored_ratio_agrees_with_the_stored_texts` and `A_record_whose_chunks_cannot_be_written_leaves_no_request_row` |
+
+The one thing a fake cannot model is the adapter's own arithmetic, and that is what the
+last row is for: the adapter is tested against a real file, so a ratio that is wrong in
+the adapter fails there and not in the pipeline's test.
 
 ## Coverage map
 
