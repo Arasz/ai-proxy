@@ -221,5 +221,8 @@ changes.
 The orchestrator's own measurements are in `~/kompress-work`: `hf_inventory.py` (52 models),
 `sanity.py` (per-family runs on four payloads), `reducer.py` (the rule-based reducers and the
 overlays), `bench_reducers.py` (the 45-row reducer benchmark over five payloads) and
-`reducer_benchmark.json`. The eleven agent notes are in `~/kompress-work/notes`. The two agents
-whose first attempt failed wrote nothing and were re-dispatched offline; the record says so.
+`reducer_benchmark.json`. The eleven agent notes are in `~/kompress-work/notes`. Every one of the
+fifteen agent runs carries a provider billing-exhaustion router fallback, so the agents' numbers
+are direction rather than benchmark, and the orchestrator's own runs are the ones quoted with
+conditions. The two agents whose first attempt failed wrote nothing and were re-dispatched
+offline; the record says so.
