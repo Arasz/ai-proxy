@@ -15,8 +15,16 @@ public sealed class TomlCompressionHandler : ICompressionHandler
         ArgumentNullException.ThrowIfNull(part);
 
         var kept = new List<string>();
-        foreach (var line in part.Text.Split('\n'))
+        foreach (var segment in LiteralBlocks.TomlStrings(part.Text))
         {
+            var line = segment.Text.TrimEnd('\n');
+
+            if (segment.IsLiteral)
+            {
+                kept.Add(line);
+                continue;
+            }
+
             var trimmed = line.Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith('#'))
             {

@@ -15,9 +15,11 @@ public sealed class SourceCodeCompressionHandler : ICompressionHandler
         ArgumentNullException.ThrowIfNull(part);
 
         var kept = new List<string>();
-        foreach (var line in part.Text.Split('\n'))
+        foreach (var segment in LiteralBlocks.SourceCodeLiterals(part.Text))
         {
-            if (line.Trim().Length == 0)
+            var line = segment.Text.TrimEnd('\n');
+
+            if (!segment.IsLiteral && line.Trim().Length == 0)
             {
                 continue;
             }

@@ -288,6 +288,13 @@ fell back to the line rule, so it deduplicated instead of compacting. The whites
 formats a document and the whitespace that is its content are now told apart, and a test
 pins that every reducer takes its own path rather than its fallback.
 
+The same class of defect was in three more places, and it is the one the design's own
+promise forbids: a reducer that changes the client's words. A Markdown reducer removed an
+HTML comment from inside a code fence, a configuration reducer removed a comment line from
+inside a multi-line string, and a source reducer removed a blank line from inside a raw
+string. A comment in code is code, a hash in a multi-line string is the value, and a blank
+line in a raw string is the value, so each reducer now leaves the literal blocks alone.
+
 One thing the implementation found that the design did not know: the measured script's
 deduplication kept every copy of a repeated line. It zeroed the counter of a line it had
 already kept, and the next copy then read a counter of zero, which is not more than one.

@@ -92,6 +92,42 @@ public class TextCompressionHandlerTests
     }
 
     [Fact]
+    public async Task An_html_comment_inside_a_code_fence_stays()
+    {
+        // The fence holds code, and a comment in code is code. Reducing inside the
+        // fence would change what the agent is shown.
+        var markdown = "before\n\n```html\n<!-- a comment in the code -->\n```\n\nafter";
+
+        var result = await Markdown.HandleAsync(Part(ContentType.Markdown, markdown), CancellationToken.None);
+
+        Assert.Contains("<!-- a comment in the code -->", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_comment_line_inside_a_multi_line_string_stays()
+    {
+        // A hash at the start of a line is a comment in a configuration file and part of
+        // the value in a multi-line string.
+        var toml = "text = \"\"\"\n# not a comment\n\"\"\"\n";
+
+        var result = await Toml.HandleAsync(Part(ContentType.Toml, toml), CancellationToken.None);
+
+        Assert.Contains("# not a comment", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_blank_line_inside_a_raw_string_stays()
+    {
+        // A blank line inside a raw string is part of the value, and dropping it changes
+        // what the file says.
+        var code = "var text = \"\"\"\nline one\n\nline two\n\"\"\";";
+
+        var result = await SourceCode.HandleAsync(Part(ContentType.SourceCode, code), CancellationToken.None);
+
+        Assert.Contains("\n\n", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Every_reducer_takes_its_own_path_and_not_the_fallback()
     {
         // A reducer that falls back to the line rule is not a reducer that failed loudly.
