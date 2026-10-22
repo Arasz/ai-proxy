@@ -62,6 +62,16 @@ its file. What follows is the union of the two.
 - The fix: applied. The shell transcript was the one that found a real gap: no handler
   claimed it.
 
+### F4 — The integration test proved the request path and not the writer [MAJOR]
+
+- The claim: the record reaches the content tables.
+- What a green run hides: the retrieval is served from the queue while the record is
+  still waiting there, so the integration test passed even if the worker never wrote
+  anything. The request path was proven and the writer was not.
+- The check that would catch it: the integration test waits for the worker to drain and
+  then looks at the `content_request` row itself.
+- The fix: applied.
+
 ### F5 — The retrieval endpoint and the middleware have no test of their own [MINOR]
 
 - The promise: the original is served back under the id in the response header, and an
@@ -104,4 +114,9 @@ its file. What follows is the union of the two.
 - Whether an agent answers as well from the reduced context is still the open question
   the compression record names. The tests here prove that the facts survive, not that the
   agent still answers.
+- The pipeline's own ratio is now checked against the record's texts, and the store's ratio
+  is checked against the texts it stored, so a ratio that is wrong in both places at once
+  would still be caught. What is not checked is the ratio against a measurement of what
+  the provider actually saved, because the provider's own accounting is not in this
+  repository.
 - The model's path is not in this release, so there is no test lane for it.

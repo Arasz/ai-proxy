@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using AiProxy.Core.Content;
+using Dapper;
 
 namespace AiProxy.Tests.Integration;
 
@@ -119,6 +120,56 @@ public class ContentCompressionTests : IDisposable
         Assert.True(response.Headers.TryGetValues("x-ai-proxy-content-id", out var values));
         Assert.NotEmpty(values!);
     }
+
+    [Fact]
+    public async Task The_worker_writes_the_record_to_the_content_tables()
+    {
+        // The retrieval above is served from the queue while the record is still
+        // waiting there, so it proves the request path and not the writer. This one
+        // waits for the worker to drain and looks at the table the writer fills.
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(Configuration(upstream.BaseAddress));
+
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var response = await client.PostAsync(
+            "/v1/messages",
+            Payload(Body(ToolOutput)),
+            TestContext.Current.CancellationToken);
+        var id = response.Headers.GetValues("x-ai-proxy-content-id").First();
+
+        var written = await WaitForTheWorkerAsync(id);
+
+        Assert.NotNull(written);
+        Assert.Equal(Body(ToolOutput), written.Original);
+    }
+
+    private async Task<StoredRow?> WaitForTheWorkerAsync(string requestId)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            await using var connection = AiProxy.Storage.ContentSchema.Open(_databasePath);
+            var row = await connection.QuerySingleOrDefaultAsync<StoredRow>(
+                new CommandDefinition(
+                    """
+                    SELECT original AS Original, compressed AS Compressed
+                    FROM content_request
+                    WHERE request_id = @RequestId;
+                    """,
+                    new { RequestId = requestId },
+                    cancellationToken: TestContext.Current.CancellationToken));
+
+            if (row is not null)
+            {
+                return row;
+            }
+
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        return null;
+    }
+
+    private sealed record StoredRow(string Original, string Compressed);
 
     [Fact]
     public async Task The_original_is_served_back_under_that_id()
