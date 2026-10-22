@@ -66,7 +66,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         var parts = new List<CompressedPart>();
         var replacements = new List<(int Start, int Length, byte[] Bytes)>();
 
-        foreach (var region in regions.OrderBy(region => region.Start))
+        foreach (var region in WithoutOverlaps(regions))
         {
             var reduced = await ReduceAsync(region.Text, requestId, parts, cancellationToken).ConfigureAwait(false);
             if (reduced is null)
@@ -109,6 +109,35 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
         return new CompressionResult(compressed, true, failure, summary);
+    }
+
+    /// <summary>Keeps the regions that do not overlap the one before them.</summary>
+    /// <remarks>
+    /// The finder returns the string tokens of a body, and the tokens of a body do not
+    /// overlap, so the regions never do either. A region that started inside the one
+    /// before it would make the rebuild write a negative number of bytes, so a region
+    /// that does is left alone rather than trusted.
+    /// </remarks>
+    /// <param name="regions">The regions the finder found.</param>
+    public static IReadOnlyList<ContentRegion> WithoutOverlaps(IReadOnlyList<ContentRegion> regions)
+    {
+        ArgumentNullException.ThrowIfNull(regions);
+
+        var kept = new List<ContentRegion>(regions.Count);
+        var end = 0;
+
+        foreach (var region in regions.OrderBy(candidate => candidate.Start))
+        {
+            if (region.Start < end)
+            {
+                continue;
+            }
+
+            kept.Add(region);
+            end = region.Start + region.Length;
+        }
+
+        return kept;
     }
 
     private static byte[] Rebuild(byte[] body, List<(int Start, int Length, byte[] Bytes)> replacements)

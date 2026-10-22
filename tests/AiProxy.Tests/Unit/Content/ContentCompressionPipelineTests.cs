@@ -143,6 +143,36 @@ public class ContentCompressionPipelineTests
         Assert.False(result.Changed);
     }
 
+    [Fact]
+    public void A_region_that_overlaps_the_one_before_it_is_left_alone()
+    {
+        // The finder returns the string tokens of a body and the tokens do not overlap,
+        // so this cannot happen today. A region that did would make the rebuild write a
+        // negative number of bytes, and the request would fail instead of going out.
+        var regions = new List<ContentRegion>
+        {
+            new(0, 100, "first"),
+            new(50, 100, "overlapping"),
+            new(200, 100, "last"),
+        };
+
+        var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
+
+        Assert.Equal(["first", "last"], kept.Select(region => region.Text));
+    }
+
+    [Fact]
+    public void The_regions_the_finder_found_do_not_overlap()
+    {
+        // The promise the guard rests on, checked against the finder itself.
+        var regions = new ToolOutputRegionFinder().Find(System.Text.Encoding.UTF8.GetBytes(
+            """{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""));
+
+        var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
+
+        Assert.Equal(regions.Count, kept.Count);
+    }
+
     private sealed class RecordingContentStore : IContentStore
     {
         public List<ContentRecord> Records { get; } = [];
