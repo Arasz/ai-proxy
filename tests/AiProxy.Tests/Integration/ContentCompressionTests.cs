@@ -17,8 +17,8 @@ public class ContentCompressionTests : IDisposable
         2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
         2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
         2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:05 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:06 INFO worker=api-1 nothing to see here
+        2026-03-12 10:00:05 INFO worker=api-1 the second to last line
+        2026-03-12 10:00:06 INFO worker=api-1 the last line
         """;
 
     private readonly string _databasePath = Path.Combine(
@@ -68,7 +68,29 @@ public class ContentCompressionTests : IDisposable
     }
 
     [Fact]
-    public async Task The_rest_of_the_body_reaches_the_upstream_unchanged()
+    public async Task The_bytes_outside_the_tool_output_are_the_clients_bytes()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(Configuration(upstream.BaseAddress));
+        var body = Body(ToolOutput);
+
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        await client.PostAsync("/v1/messages", Payload(body), TestContext.Current.CancellationToken);
+
+        // The claim is byte for byte, so the bytes are compared: the prefix and the
+        // suffix of the original body are the prefix and the suffix of what arrived.
+        var encoded = System.Text.Json.JsonSerializer.Serialize(ToolOutput);
+        var start = body.IndexOf(encoded, StringComparison.Ordinal);
+        var prefix = body[..start];
+        var suffix = body[(start + encoded.Length)..];
+
+        var received = Assert.Single(upstream.Requests);
+        Assert.True(received.Body.StartsWith(prefix, StringComparison.Ordinal), "the prefix of the body changed");
+        Assert.True(received.Body.EndsWith(suffix, StringComparison.Ordinal), "the suffix of the body changed");
+    }
+
+    [Fact]
+    public async Task The_tool_output_that_arrives_is_the_reduced_one()
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await ProxyHost.StartAsync(Configuration(upstream.BaseAddress));
@@ -78,18 +100,8 @@ public class ContentCompressionTests : IDisposable
         await client.PostAsync("/v1/messages", Payload(body), TestContext.Current.CancellationToken);
 
         var received = Assert.Single(upstream.Requests);
-        Assert.StartsWith(
-            """
-            {"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":"
-            """,
-            received.Body,
-            StringComparison.Ordinal);
-        Assert.EndsWith(
-            """
-            "}]}]}
-            """,
-            received.Body,
-            StringComparison.Ordinal);
+        Assert.Contains("status=503", received.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("nothing to see here", received.Body, StringComparison.Ordinal);
     }
 
     [Fact]

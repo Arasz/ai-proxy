@@ -8,11 +8,8 @@ public sealed class LogCompressionHandler : ICompressionHandler
     /// <summary>The path this handler reports.</summary>
     public const string HandlerPath = "log.signal-filter";
 
-    private const int HeadAnchors = 2;
-    private const int TailAnchors = 2;
-
     private static readonly Regex SignalPattern = new(
-        @"fail|error|timeout|exhaust|refus|denied|fatal|panic|status=[45]\d\d|warn",
+        LogRules.SignalPattern,
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex LevelPattern = new(
@@ -27,22 +24,7 @@ public sealed class LogCompressionHandler : ICompressionHandler
     {
         ArgumentNullException.ThrowIfNull(part);
 
-        var lines = part.Text.Split('\n');
-        var kept = new List<string>(lines.Length);
-
-        for (var index = 0; index < lines.Length; index++)
-        {
-            var line = lines[index];
-            var anchored = index < HeadAnchors || index >= lines.Length - TailAnchors;
-
-            if (!anchored && !CarriesSignal(line))
-            {
-                continue;
-            }
-
-            kept.Add(line);
-        }
-
+        var kept = LogRules.Keep(part.Text, CarriesSignal);
         var reduced = Reduction.DeduplicateLines(string.Join("\n", kept));
         var overlaid = MustKeepOverlay.Apply(reduced, part.Text);
 

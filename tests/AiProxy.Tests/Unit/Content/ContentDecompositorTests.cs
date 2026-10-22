@@ -122,6 +122,38 @@ public class ContentDecompositorTests
     }
 
     [Fact]
+    public void A_shell_transcript_is_a_part_of_its_own()
+    {
+        var payload = "$ ls -la\ntotal 4\n$ echo done";
+
+        var decomposition = Decompositor.Decompose(payload, "request");
+
+        Assert.Equal(ContentType.ShellTranscript, Assert.Single(decomposition.Parts).Type);
+    }
+
+    [Fact]
+    public void A_configuration_file_is_a_part_of_its_own()
+    {
+        var payload = "key = \"value\"\nother = 2\nname = \"thing\"";
+
+        var decomposition = Decompositor.Decompose(payload, "request");
+
+        Assert.Equal(ContentType.Toml, Assert.Single(decomposition.Parts).Type);
+    }
+
+    [Fact]
+    public void A_markdown_document_is_a_part_of_its_own()
+    {
+        // A blank line ends a block, so the heading and the paragraph under it are two
+        // parts, and the heading is the one that says the document is Markdown.
+        var payload = "# Title\n\nSome text under the title.";
+
+        var decomposition = Decompositor.Decompose(payload, "request");
+
+        Assert.Equal(ContentType.Markdown, decomposition.Parts[0].Type);
+    }
+
+    [Fact]
     public void The_decomposition_says_how_many_parts_it_made()
     {
         var decomposition = Decompositor.Decompose(Mixed, "request");

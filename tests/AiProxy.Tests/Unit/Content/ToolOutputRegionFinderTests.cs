@@ -82,6 +82,16 @@ public class ToolOutputRegionFinderTests
     }
 
     [Fact]
+    public void A_body_the_finder_cannot_read_has_no_regions()
+    {
+        // A body nested deeper than the parser reads is a body the finder leaves alone,
+        // rather than a body it reads halfway and guesses about.
+        var body = new string('[', 100) + "\"the tool said this\"" + new string(']', 100);
+
+        Assert.Empty(Find(body));
+    }
+
+    [Fact]
     public void The_regions_come_in_the_order_they_appear_in_the_body()
     {
         var body = """{"messages":[{"role":"tool","content":"first"},{"role":"user","content":"x"},{"role":"tool","content":"second"}]}""";

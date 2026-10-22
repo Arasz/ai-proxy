@@ -125,6 +125,11 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                 (@RequestId, @ChunkId, @ContentType, @OriginalText, @CompressedText, @Path, @Ratio);
             """;
 
+        // The request row and its chunks are one fact, so they are written together or
+        // not at all. A reader that found a request row without its chunks would serve
+        // a record that says how many parts there were and shows none of them.
+        using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
         await connection.ExecuteAsync(new CommandDefinition(
             insertRequest,
             new
@@ -137,6 +142,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                 record.Path,
                 record.ChunkCount,
             },
+            transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         foreach (var part in record.Parts)
@@ -153,7 +159,10 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                     part.Path,
                     part.Ratio,
                 },
+                transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 }

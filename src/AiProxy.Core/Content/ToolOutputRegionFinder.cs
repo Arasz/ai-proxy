@@ -21,16 +21,22 @@ public sealed class ToolOutputRegionFinder
             return [];
         }
 
-        var indexes = FindToolOutputIndexes(body.Span);
+        var (indexes, documentCount) = FindToolOutputIndexes(body.Span);
         if (indexes.Count == 0)
         {
             return [];
         }
 
-        return FindRegions(body.Span, indexes);
+        var (regions, tokenCount) = FindRegions(body.Span, indexes);
+
+        // The two passes count the string values of the body in the same order, with the
+        // same parser, so the counts agree unless one of them stopped early. A reader
+        // that saw MORE strings than the document has would mean the two disagree about
+        // the order, and a region found by position would then be the wrong region.
+        return tokenCount > documentCount ? [] : regions;
     }
 
-    private static HashSet<int> FindToolOutputIndexes(ReadOnlySpan<byte> body)
+    private static (HashSet<int> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
     {
         var indexes = new HashSet<int>();
 
@@ -41,16 +47,15 @@ public sealed class ToolOutputRegionFinder
         }
         catch (JsonException)
         {
-            return indexes;
+            return (indexes, 0);
         }
 
         using (document)
         {
             var counter = 0;
             Walk(document.RootElement, ref counter, indexes);
+            return (indexes, counter);
         }
-
-        return indexes;
     }
 
     private static void Walk(JsonElement element, ref int counter, HashSet<int> indexes)
@@ -171,7 +176,7 @@ public sealed class ToolOutputRegionFinder
             ? value.GetString()
             : null;
 
-    private static List<ContentRegion> FindRegions(ReadOnlySpan<byte> body, HashSet<int> indexes)
+    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, HashSet<int> indexes)
     {
         var regions = new List<ContentRegion>();
         var reader = new Utf8JsonReader(body);
@@ -194,7 +199,7 @@ public sealed class ToolOutputRegionFinder
             counter++;
         }
 
-        return regions;
+        return (regions, counter);
     }
 
     private static int EndOfStringToken(ReadOnlySpan<byte> body, int start)

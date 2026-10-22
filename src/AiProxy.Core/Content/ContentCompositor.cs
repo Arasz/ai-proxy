@@ -22,38 +22,22 @@ public sealed class ContentCompositor : ICompositor
 
         var template = decomposition.Template;
         var composed = new StringBuilder(template.Length);
-        var index = 0;
+        var position = 0;
 
-        while (index < template.Length)
+        foreach (var part in placeholders)
         {
-            var matched = false;
-
-            foreach (var part in placeholders)
-            {
-                if (index + part.Placeholder.Length > template.Length)
-                {
-                    continue;
-                }
-
-                if (string.CompareOrdinal(template, index, part.Placeholder, 0, part.Placeholder.Length) != 0)
-                {
-                    continue;
-                }
-
-                composed.Append(part.Text);
-                index += part.Placeholder.Length;
-                matched = true;
-                break;
-            }
-
-            if (matched)
+            var index = template.IndexOf(part.Placeholder, position, StringComparison.Ordinal);
+            if (index < 0)
             {
                 continue;
             }
 
-            composed.Append(template[index]);
-            index++;
+            composed.Append(template, position, index - position);
+            composed.Append(part.Text);
+            position = index + part.Placeholder.Length;
         }
+
+        composed.Append(template, position, template.Length - position);
 
         return composed.ToString();
     }
