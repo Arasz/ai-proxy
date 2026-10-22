@@ -50,9 +50,12 @@ verifiable answers it kept 0 of 8, 0 of 8, 0 of 6 and 1 of 6. On a 7.5 KB C# fil
 file to 0.1% of its size and kept none of the identifiers.
 
 **Evidence:** `models-conversion` record F2 and F8; `~/kompress-work/sanity.py flan-t5-small` and
-`bench_reducers.py` on the M4. The agent judge agreed independently: "The model kept the least
-actionable line (a generic 503 failure) and discarded the root cause"
-(`~/kompress-work/notes/flan-t5-small-judge.md`).
+`bench_reducers.py` on the M4. The agent judge agreed independently, and named the failure
+better than the orchestrator did: "This is not data loss; it's signal inversion" ("~/kompress-work/notes/flan-t5-small-judge.md"). The model's own contract is the cause, the card's
+`task_specific_params.summarization.prefix = "summarize: "`, which trains it as a prose
+summarizer; the judge named the one situation where that is acceptable, a presentation layer for
+a human reading prose with a separate lossless path for structured diagnostics, and there is no
+such path in an agent pipeline.
 
 ### F3 — A 0.5B instruct model is no better and 12 times slower [MEASURED]
 
