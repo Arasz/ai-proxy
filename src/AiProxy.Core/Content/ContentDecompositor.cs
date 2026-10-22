@@ -34,6 +34,20 @@ public sealed class ContentDecompositor : IDecompositor
         @"^\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// How many times the decomposer may look for a structure that is not there.
+    /// </summary>
+    /// <remarks>
+    /// Looking for a JSON value or an XML element costs a scan to the end of the text,
+    /// because a value that never balances is only known to be unbalanced when the end
+    /// is reached. A payload of lines that each open a value and close none therefore
+    /// costs a scan per line, which is quadratic, and a body of a few megabytes would
+    /// take minutes. A well-formed payload finds its structure on the first try, so a
+    /// small number of failures is enough to tell the two apart: after this many, the
+    /// rest of the text is text.
+    /// </remarks>
+    private const int MaxFailedStructureAttempts = 32;
+
     /// <inheritdoc />
     public Decomposition Decompose(string content, string requestId)
     {
@@ -90,6 +104,7 @@ public sealed class ContentDecompositor : IDecompositor
         var position = 0;
         var blockStart = -1;
         var blockEnd = 0;
+        var failedAttempts = 0;
 
         while (position < content.Length)
         {
@@ -110,27 +125,34 @@ public sealed class ContentDecompositor : IDecompositor
                 }
             }
 
-            if (trimmed.StartsWith('{') || trimmed.StartsWith("["))
+            if (failedAttempts < MaxFailedStructureAttempts)
             {
-                var valueEnd = FindJsonEnd(content, position);
-                if (valueEnd > position && IsJson(content[position..valueEnd]))
+                if (trimmed.StartsWith('{') || trimmed.StartsWith("["))
                 {
-                    Flush(content, spans, ref blockStart, ref blockEnd);
-                    spans.Add(new Span(position, valueEnd - position, ContentType.Json, true));
-                    position = valueEnd;
-                    continue;
-                }
-            }
+                    var valueEnd = FindJsonEnd(content, position);
+                    if (valueEnd > position && IsJson(content[position..valueEnd]))
+                    {
+                        Flush(content, spans, ref blockStart, ref blockEnd);
+                        spans.Add(new Span(position, valueEnd - position, ContentType.Json, true));
+                        position = valueEnd;
+                        continue;
+                    }
 
-            if (trimmed.StartsWith('<') && !trimmed.StartsWith("<!--", StringComparison.Ordinal))
-            {
-                var elementEnd = FindXmlEnd(content, position);
-                if (elementEnd > position && IsXml(content[position..elementEnd]))
+                    failedAttempts++;
+                }
+
+                if (trimmed.StartsWith('<') && !trimmed.StartsWith("<!--", StringComparison.Ordinal))
                 {
-                    Flush(content, spans, ref blockStart, ref blockEnd);
-                    spans.Add(new Span(position, elementEnd - position, ContentType.Xml, true));
-                    position = elementEnd;
-                    continue;
+                    var elementEnd = FindXmlEnd(content, position);
+                    if (elementEnd > position && IsXml(content[position..elementEnd]))
+                    {
+                        Flush(content, spans, ref blockStart, ref blockEnd);
+                        spans.Add(new Span(position, elementEnd - position, ContentType.Xml, true));
+                        position = elementEnd;
+                        continue;
+                    }
+
+                    failedAttempts++;
                 }
             }
 

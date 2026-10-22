@@ -154,6 +154,25 @@ public class ContentDecompositorTests
     }
 
     [Fact]
+    public void A_payload_of_lines_that_open_a_value_and_close_none_is_decomposed_quickly()
+    {
+        // Looking for a JSON value that never balances costs a scan to the end of the
+        // text, so a payload of such lines costs a scan per line. The decomposer gives
+        // up looking after a few failures, and a body of a megabyte must not take
+        // minutes of one request's CPU.
+        var payload = string.Join("\n", Enumerable.Range(0, 48_000).Select(index => $"{{\"unclosed\": {index}"));
+
+        var started = DateTimeOffset.UtcNow;
+        var decomposition = Decompositor.Decompose(payload, "request");
+        var elapsed = DateTimeOffset.UtcNow - started;
+
+        Assert.Single(decomposition.Parts);
+        Assert.True(
+            elapsed < TimeSpan.FromSeconds(5),
+            $"the decomposition of {payload.Length} bytes took {elapsed.TotalSeconds:F1} seconds");
+    }
+
+    [Fact]
     public void The_decomposition_says_how_many_parts_it_made()
     {
         var decomposition = Decompositor.Decompose(Mixed, "request");
