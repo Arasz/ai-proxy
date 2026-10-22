@@ -167,11 +167,15 @@ summarise, it has to be measured on answer retention first, on payloads with ans
 client's text, so a dropped identifier can be re-attached and the original can be served back
 from a store, the way Headroom's retrieval store does.
 
-**A must-keep overlay is cheap insurance.** Re-attaching the identifiers, numbers, paths and
-directive words the extractor dropped cost 0.7% of the payload and lifted must-keep recall on a
-C# file from 0.9487 to 1.0. The overlay restores tokens and not phrases, so a name or a pull
-request number needs its line kept whole, which is a bigger cost and only worth it when the
-reducer dropped a few lines.
+**A must-keep overlay is cheap insurance, and it has a hole.** Re-attaching the identifiers,
+numbers, paths and directive words the extractor dropped cost 0.7% of the payload and lifted
+must-keep recall on a C# file from 0.9487 to 1.0. The overlay restores tokens and not phrases, so
+a name or a pull request number needs its line kept whole, which is a bigger cost and only worth
+it when the reducer dropped a few lines. The hole is the decisions class: the acceptance plan
+calls decisions (a failure verdict, an exit status, a state transition such as "retried" or
+"quarantined") the highest-value class, and the overlay's regex catches ERROR and FATAL only
+because they are capitalised. A lowercase state transition is unprotected, and only the log branch
+protects it, through the signal filter rather than through the overlay.
 
 **Compression changes the request, and the proxy has to say so.** Chunking flips about 19% of the
 keep decisions, the reducer's own measurements are a proxy rather than a downstream answer, and
@@ -186,6 +190,8 @@ changes.
 - Whether the log reducer's signal list is general. It was tuned against one log shape with three
   workers and one error type, and the failure mode is a dropped root cause on a log format it has
   not seen.
+- Whether the must-keep overlay should cover the decisions class, which the acceptance plan calls
+  the highest-value one and the overlay does not cover except through capitalised levels.
 - Whether the prose branch can do better than 0.902 with the facts intact. A larger summarizer
   with a must-keep constraint, or a query-conditioned selection step, might reach 0.5 size with
   the answers kept. Nobody measured that.
