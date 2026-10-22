@@ -10,7 +10,7 @@ public sealed partial class ContentStoreWorker : BackgroundService
     private const int BatchSize = 64;
 
     private readonly IContentWriter _writer;
-    private readonly ContentQueue _queue;
+    private readonly IContentQueue _queue;
     private readonly ContentStoreOptions _options;
     private readonly ILogger<ContentStoreWorker> _logger;
     private readonly TimeProvider _time;
@@ -26,7 +26,7 @@ public sealed partial class ContentStoreWorker : BackgroundService
     /// <param name="time">The clock the worker waits on.</param>
     public ContentStoreWorker(
         IContentWriter writer,
-        ContentQueue queue,
+        IContentQueue queue,
         ContentStoreOptions options,
         ILogger<ContentStoreWorker> logger,
         TimeProvider time)
@@ -79,7 +79,7 @@ public sealed partial class ContentStoreWorker : BackgroundService
     public async Task<int> RunOnceAsync(CancellationToken cancellationToken)
     {
         var connection = _connection ??= ContentSchema.Open(_options.ResolvedDatabasePath);
-        var version = await ContentQueue.ReadDataVersionAsync(connection, cancellationToken).ConfigureAwait(false);
+        var version = await _queue.ReadDataVersionAsync(connection, cancellationToken).ConfigureAwait(false);
 
         if (version == _lastDataVersion)
         {

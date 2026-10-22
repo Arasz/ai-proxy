@@ -82,6 +82,7 @@ public static class ProxyApplication
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton(settings.Store);
         services.AddSingleton<ContentQueue>();
+        services.AddSingleton<IContentQueue>(provider => provider.GetRequiredService<ContentQueue>());
         services.AddSingleton<SqliteContentStore>();
         services.AddSingleton<IContentStore>(provider => provider.GetRequiredService<SqliteContentStore>());
         services.AddSingleton<IContentWriter>(provider => provider.GetRequiredService<SqliteContentStore>());

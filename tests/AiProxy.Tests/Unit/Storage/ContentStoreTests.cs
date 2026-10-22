@@ -117,6 +117,29 @@ public class ContentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_record_whose_chunks_cannot_be_written_leaves_no_request_row()
+    {
+        // The request row and its chunks are one fact. A chunk that cannot be written
+        // takes the request row with it, or a reader would find a record that says how
+        // many parts there were and shows none of them.
+        var record = Record() with
+        {
+            Parts =
+            [
+                new CompressedPart(1, ContentType.Log, "the compressed part", null!, "log.signal-filter", 0.5),
+            ],
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(async () =>
+            await _store.PersistAsync(record, CancellationToken.None));
+
+        await using var connection = ContentSchema.Open(_databasePath);
+        var count = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM content_request;");
+
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
     public async Task The_stored_ratio_agrees_with_the_stored_texts()
     {
         var record = Record();
