@@ -18,5 +18,6 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.3.1](0.3.1-xml-reducer-compacts-again.md) | The XML reducer compacts again: it was falling back to the line rule for every ordinary document, and the whitespace that is content now survives the reduction. | #14 |
 | [0.3.0](0.3.0-content-compression-pipeline.md) | The content compression pipeline: the tool output in a request is reduced before the provider sees it, and the original is kept and served back. | #4 |
 | [0.2.0](0.2.0-v1-phase1-proxy-skeleton.md) | The proxy skeleton: the provider is detected, the request is compressed and forwarded to the right upstream, and other traffic is carried through unchanged. | #2 |

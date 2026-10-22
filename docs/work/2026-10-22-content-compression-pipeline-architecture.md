@@ -282,6 +282,12 @@ absolute path and an explicit directive, and those tokens are kept whatever the 
 says, because they are the facts the record calls the highest-value class. The other tokens
 are kept while the block stays inside five percent of the reduction.
 
+The XML reducer had a bug the design did not foresee: reading an attribute with a prefix
+threw on a document that did not declare the prefix, and the reducer caught the throw and
+fell back to the line rule, so it deduplicated instead of compacting. The whitespace that
+formats a document and the whitespace that is its content are now told apart, and a test
+pins that every reducer takes its own path rather than its fallback.
+
 One thing the implementation found that the design did not know: the measured script's
 deduplication kept every copy of a repeated line. It zeroed the counter of a line it had
 already kept, and the next copy then read a counter of zero, which is not more than one.

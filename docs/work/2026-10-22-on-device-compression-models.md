@@ -219,6 +219,48 @@ keep decisions, the reducer's own measurements are a proxy rather than a downstr
 the proxy should log the reducer, the keep rate and the estimated saving on every request it
 changes.
 
+## What the implementation changed
+
+This is the record as it was written, and the proxy that grew out of it found two things about
+the measurements themselves. The numbers stand; what produced them was not what the record says.
+
+**The measured deduplication was a no-op.** The log reducer in the table above is described as a
+signal filter, a deduplication and a must-keep overlay. The deduplication never fired. The
+script's `dedup_lines` zeroes the counter of a line it has already kept, and the next copy of
+that line then reads a counter of zero, which is not more than one, so the copy is kept too, and
+every copy survives. The measured log reducer was the signal filter and the two anchors at each
+end, and the 0.75 came from those alone. The deduplication in the table is what the script's
+docstring said it did, not what it did.
+
+**Evidence:** the source of `~/kompress-work/reducer.py` no longer exists, but its compiled form
+survives in `~/kompress-work/__pycache__/reducer.cpython-312.pyc`, and running that under
+CPython 3.12 gives the behaviour rather than a reading of it: `dedup_lines("a\nb\na\na\n")`
+returns `'a\nb\na\na\n'`, every copy, while the same call with `keep_first=False` returns
+`'b\n'`. The same recovery of the benchmark script (`bench_reducers.cpython-312.pyc`) is where
+the recipes in `2026-10-22-content-decomposition-and-format-detection.md` came from.
+
+**The proxy's port keeps the first copy and drops the repeats**, which is what the script's
+docstring said it did, so the reducer that shipped is stronger than the one that was measured.
+Nothing in the table above changes, because the measurement never included the deduplication.
+
+**The prose figure is the model's, and the release does not ship the model.** The 0.902 in the
+table is `kompress-v2-base` at 0.36 s a call. The first release of the proxy has no model
+artifact, so its prose path is the rule-based one, and the rule-based prose reduction this
+record measures is the deduplication above, which was a no-op. The prose path that shipped
+therefore has no measured benefit of its own, and the owner ruled that it ships anyway, with the
+measurements corrected rather than the feature dropped.
+
+**The decisions-class hole is closed.** The overlay hole named below was closed in the
+implementation with five rules: a failure verdict, an exit status, a lowercase state transition,
+an absolute path, and an explicit directive. The overlay's own ceiling is five percent of the
+reduction, and the decisions-class tokens are the ones that survive it.
+
+**The tool output is found by position, not by content.** This record's payloads carry no
+envelope, and the proxy found none to key on: the tool output is recognised by the four shapes
+the dialects use for it, and located by where that shape sits in the body, because a region
+matched by its content would rewrite a message the client wrote that happens to repeat the
+tool's words.
+
 ## Still open
 
 - Whether an agent that reads the reduced context answers as well as one that reads the original.

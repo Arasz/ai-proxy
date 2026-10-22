@@ -28,6 +28,37 @@ public class XmlCompressionHandlerTests
     }
 
     [Fact]
+    public async Task The_spaces_in_mixed_content_survive()
+    {
+        // In mixed content the whitespace is the content: "Hello <b>world</b>" reads
+        // differently without the space, and a reducer that drops it has changed the
+        // document rather than the formatting of it.
+        var original = "<p>Hello <b>world</b> !</p>";
+
+        var result = await Handler.HandleAsync(Part(original), CancellationToken.None);
+
+        Assert.Equal(original, result.Text);
+    }
+
+    [Fact]
+    public async Task The_whitespace_marked_preserve_survives()
+    {
+        var original = "<p xml:space=\"preserve\">  spaced  </p>";
+
+        var result = await Handler.HandleAsync(Part(original), CancellationToken.None);
+
+        Assert.Contains("  spaced  ", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_indentation_of_an_element_that_has_only_elements_goes_away()
+    {
+        var result = await Handler.HandleAsync(Part("<root>\n  <a>1</a>\n  <b>2</b>\n</root>"), CancellationToken.None);
+
+        Assert.Equal("<root><a>1</a><b>2</b></root>", result.Text);
+    }
+
+    [Fact]
     public async Task The_values_of_the_document_survive()
     {
         var original = "<root><a>1</a><b>keep me</b></root>";
