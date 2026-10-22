@@ -91,10 +91,21 @@ good for showed up in its runner note: scoring the sixteen lines of a grep resul
 query at 0.05 s a line, with the compression-related lines at the top. That is a ranking layer
 for a query-conditioned pipeline, and a prototype stage at that.
 
-**Evidence:** `models-conversion` record F4, F5, F17; `~/kompress-work/sanity.py bge-small` and
-`sanity.py granite-small` on the M4; `~/kompress-work/notes/granite-small-runner.md` for the
+The embedding runner's results, recovered from its delegation log, sharpen the reason. The
+orchestrator's query was "which files implement provider detection and forwarding?", and neither
+the documented query prefix nor CLS pooling changed the ranking (mean pooling without the prefix:
+0.4747, 0.5679, 0.4840, 0.4802; with it: 0.4343, 0.5234, 0.4360, 0.4281, the same order). A query
+that matched the payload's topic did work: against "which file mentions compression?" the
+ranking was 0.782, 0.6213, 0.6134, 0.5382, the sensible order. A sentence embedder answers
+"which of these is about that topic", which is not the same question as "which of these is
+redundant", and it is not the same question as "which of these implements a feature" either.
+
+**Evidence:** `models-conversion` record F4, F4a, F5, F17; `~/kompress-work/sanity.py bge-small`
+and `sanity.py granite-small` on the M4; `~/kompress-work/notes/granite-small-runner.md` for the
 per-line scores and the 0.05 s a chunk; `~/kompress-work/notes/granite-small-judge.md` for "a hard
-keep/drop threshold is a different claim from ranking".
+keep/drop threshold is a different claim from ranking"; the bge runner's own results file in
+`~/.pi/agent/subagent-logs/projects/ba18c794-bc10-488d-8cca-2e1117eec0ba/d-16.jsonl` (seven timed
+repetitions per configuration, median 0.33 s for four payloads).
 
 ### F6 — The typed-decision model works mechanically as a chunk judge, and is still the wrong tool [READ]
 
