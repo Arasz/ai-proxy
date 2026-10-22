@@ -37,7 +37,7 @@ sees it, and the original is kept. What is here:
 | The router and the credential rule | Implemented, in `src/AiProxy.Core/Routing/` |
 | The host, the forwarder and the pass-through | Implemented, in `src/AiProxy/` |
 | The compression stage | Implemented, in `src/AiProxy.Core/Content/`, with the store in `src/AiProxy.Storage/`. Off until the operator sets `PROXY_COMPRESSION=on` |
-| The model-based path | Not here. The rule-based reducers are the ones the measurements kept, and the model arrives behind the same seam |
+| The model-based path | Not here. The measurements put the model on prose and the rules on logs and JSON, and the model is a 274 MB artifact, so the rule-based prose path runs until it is delivered |
 
 The design and the reasoning are in the
 [v1 phase 1 plan](docs/work/2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md), the
@@ -91,7 +91,8 @@ compressed text, the ratio and the path of the reducer that ran. The record is c
 before the request is forwarded, the response carries the id in the
 `x-ai-proxy-content-id` header, and the original is served back from `/content/{id}`.
 
-The rules come from measurements, and the
+The [how-to](docs/how-to/turning-on-the-compression-stage.md) says how to turn it on, how to
+see that it ran, and how to get the original back. The rules come from measurements, and the
 [research record](docs/work/2026-10-22-content-decomposition-and-format-detection.md) says
 which. The storage and the queue are in
 [ADR 0002](docs/adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md).
