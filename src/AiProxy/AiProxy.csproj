@@ -27,6 +27,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
+        <ProjectReference Include="../AiProxy.Storage/AiProxy.Storage.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
