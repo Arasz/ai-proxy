@@ -84,13 +84,15 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         var compressed = Rebuild(body, replacements);
         var compressedText = Encoding.UTF8.GetString(compressed);
+        var ratio = body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length;
+        var path = string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal));
         var record = new ContentRecord(
             requestId,
             DateTimeOffset.UtcNow,
             original,
             compressedText,
-            original.Length == 0 ? 1.0 : (double)compressedText.Length / original.Length,
-            string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal)),
+            ratio,
+            path,
             parts.Count,
             parts);
 
@@ -104,11 +106,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             failure = exception.Message;
         }
 
-        var summary = new CompressionSummary(
-            requestId,
-            string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal)),
-            parts.Count,
-            body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length);
+        var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
         return new CompressionResult(compressed, true, failure, summary);
     }

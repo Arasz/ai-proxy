@@ -40,9 +40,9 @@ public class ContentStoreTests : IDisposable
     private static ContentRecord Record() => new(
         "request-1",
         new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
-        "the original body",
-        "short",
-        5.0 / 17.0,
+        "the original bödy",
+        "shört",
+        6.0 / 18.0,
         "log.signal-filter",
         1,
         [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
@@ -67,9 +67,9 @@ public class ContentStoreTests : IDisposable
         var stored = await _store.GetAsync("request-1", CancellationToken.None);
 
         Assert.NotNull(stored);
-        Assert.Equal("the original body", stored.Original);
-        Assert.Equal("short", stored.Compressed);
-        Assert.Equal(5.0 / 17.0, stored.Ratio, 6);
+        Assert.Equal("the original bödy", stored.Original);
+        Assert.Equal("shört", stored.Compressed);
+        Assert.Equal(6.0 / 18.0, stored.Ratio, 6);
         Assert.Equal("log.signal-filter", stored.Path);
         Assert.Equal(1, stored.ChunkCount);
         Assert.Equal("the compressed part", Assert.Single(stored.Parts).Text);
@@ -83,7 +83,7 @@ public class ContentStoreTests : IDisposable
         var stored = await _store.GetAsync("request-1", CancellationToken.None);
 
         Assert.NotNull(stored);
-        Assert.Equal("the original body", stored.Original);
+        Assert.Equal("the original bödy", stored.Original);
     }
 
     [Fact]

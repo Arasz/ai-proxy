@@ -40,9 +40,9 @@ public class ContentStoreWorkerTests : IDisposable
     private static ContentRecord Record() => new(
         "request-1",
         new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
-        "the original body",
-        "short",
-        5.0 / 17.0,
+        "the original bödy",
+        "shört",
+        6.0 / 18.0,
         "log.signal-filter",
         1,
         [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
