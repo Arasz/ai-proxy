@@ -4,7 +4,7 @@ A local proxy that detects the LLM provider dialect of an inbound request, forwa
 
 > Domain: Gives AI coding agents one local endpoint to point at: the proxy decides which provider the request belongs to, relays it with the caller's own credential, and carries other agent traffic (an MCP server such as ai-raccoon) to its own upstream without altering it.
 > Stacks: dotnet, github, changelog
-> Scaffolded by ai-badger 0.214.0. Source of truth for this file: `.ai-badger/copilot-instructions.md`.
+> Scaffolded by ai-badger 0.215.0. Source of truth for this file: `.ai-badger/copilot-instructions.md`.
 
 ## Commands
 
