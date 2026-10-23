@@ -11,6 +11,7 @@ Active records:
 | File | What it is |
 |---|---|
 | [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
+| [2026-10-23-compression-and-rtk-replacement-plan-status.md](2026-10-23-compression-and-rtk-replacement-plan-status.md) | Research record: of the active compression and rtk-replacement plan, five steps are done and merged, six are left. Also covers the gaps the whole-request ruling opened and why the routing-defaults plan only needs closing out. |
 | [2026-10-23-agent-client-inventory.md](2026-10-23-agent-client-inventory.md) | Research record: which AI agent clients on this Mac reach a provider, by what route, which local proxy sees them today, and what must keep working when ai-proxy replaces rtk-proxy. |
 | [2026-10-23-system-proxy-crash-recovery.md](2026-10-23-system-proxy-crash-recovery.md) | Research record: reading the system proxy per OS and from .NET, how other tools recover after a crash, and the sidecar spike against Titanium's API. |
 | [2026-10-22-machine-wide-proxy-research.md](2026-10-22-machine-wide-proxy-research.md) | Research record: canonical provider API hosts, provider-only TLS inspection, system proxy lifecycle, and default pass-through. |
