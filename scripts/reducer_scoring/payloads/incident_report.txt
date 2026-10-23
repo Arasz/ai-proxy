@@ -1,0 +1,25 @@
+# Incident report INC-2291: checkout latency after the 2026-03-11 deploy
+
+## Summary
+Between 09:14 and 10:02 UTC on 2026-03-11 the checkout endpoint served a p99 latency of 4.2 seconds
+instead of the 380 milliseconds it served before. The cause was the WebSocket handler in
+/src/checkout/handler.py, which registered a new event listener for every client connection and never
+removed it. The listener registry grew to 12,480 entries by 10:02, and every broadcast walked the
+whole registry.
+
+## Timeline
+- 09:14:02Z deploy of release 2026.3.11 finished; the registry growth began.
+- 09:22:41Z p99 latency crossed 1.0 second. The alert fired on metric checkout_p99_ms.
+- 09:47:10Z the on-call engineer, Dana Okonkwo, identified the registry growth in the profile at
+  /var/log/checkout/handler.log.
+- 10:02:55Z the rollback of release 2026.3.11 was completed and p99 latency returned to 380 ms.
+- 10:41:19Z the fix was merged in PR 8842, which unregisters the listener on connection close.
+
+## Impact
+1,204 checkout requests failed with HTTP 503. No payment was taken twice. The customer support
+queue grew by 318 tickets, of which 291 were answered within 4 hours.
+
+## Fix
+The fix in PR 8842 calls socket_pool.release_listener on the close event. A regression test,
+test_listener_registry_is_bounded, asserts that the registry stays under 64 entries. The fix went out
+in release 2026.3.12 on 2026-03-12 at 08:00 UTC.

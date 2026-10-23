@@ -1,0 +1,469 @@
+{
+ "registered": "2026-10-23",
+ "budget_s": 1.0,
+ "retention_floor": 1.0,
+ "runs": 3,
+ "models": {
+  "qa_reader": "claude-opus-5-5",
+  "qa_effort": "low",
+  "digest": "claude-haiku-5-5",
+  "summarizer": "claude-haiku-5-5"
+ },
+ "void_rules": [
+  "identity QA retention below 1.0 on any payload voids the whole run (that payload's questions are ill-posed)",
+  "summarizer_control passing the retention gate on more than half of the payloads voids the whole run"
+ ],
+ "payloads": {
+  "code_file": {
+   "kind": "code",
+   "source": "models-conversion kompress-v2 kit, payloads/code_payload.txt",
+   "questions": [
+    {
+     "q": "What is the name of the static class that detects the dialect?",
+     "a": "DialectDetector"
+    },
+    {
+     "q": "Which request path is mapped to the Anthropic dialect?",
+     "a": "/v1/messages"
+    },
+    {
+     "q": "Which request path is mapped to the OpenAI dialect?",
+     "a": "/v1/chat/completions"
+    },
+    {
+     "q": "Which Dialect enum member is returned when no provider can be determined?",
+     "a": "Dialect.Unknown"
+    },
+    {
+     "q": "Which request header name is checked to recognise an Anthropic request?",
+     "a": "anthropic-version"
+    },
+    {
+     "q": "Which namespace is imported by the first using directive?",
+     "a": "System.Text.Json"
+    }
+   ]
+  },
+  "incident_report": {
+   "kind": "prose",
+   "source": "models-conversion kompress-v2 kit, bench_reducers.py INCIDENT",
+   "questions": [
+    {
+     "q": "How many entries did the listener registry reach?",
+     "a": "12,480"
+    },
+    {
+     "q": "Which source file contained the faulty WebSocket handler?",
+     "a": "/src/checkout/handler.py"
+    },
+    {
+     "q": "Who was the on-call engineer that identified the registry growth?",
+     "a": "Dana Okonkwo"
+    },
+    {
+     "q": "Which pull request merged the fix?",
+     "a": "PR 8842"
+    },
+    {
+     "q": "How many checkout requests failed?",
+     "a": "1,204"
+    },
+    {
+     "q": "What was the p99 latency during the incident?",
+     "a": "4.2 seconds"
+    },
+    {
+     "q": "Which release shipped the fix?",
+     "a": "2026.3.12"
+    },
+    {
+     "q": "What is the name of the regression test added by the fix?",
+     "a": "test_listener_registry_is_bounded"
+    }
+   ]
+  },
+  "agent_log": {
+   "kind": "log",
+   "source": "models-conversion kompress-v2 kit, bench_reducers.py LOG",
+   "questions": [
+    {
+     "q": "Which file is reported in the pool exhausted errors?",
+     "a": "/srv/app/db/pool.py"
+    },
+    {
+     "q": "At which line of that file is the pool exhausted error raised? Answer in the form line=N.",
+     "a": "line=214"
+    },
+    {
+     "q": "How many waiters were pending when worker api-3 gave up? Answer in the form 'N waiters pending'.",
+     "a": "311 waiters pending"
+    },
+    {
+     "q": "How many waiters were pending when worker api-4 gave up? Answer in the form 'N waiters pending'.",
+     "a": "402 waiters pending"
+    },
+    {
+     "q": "How many waiters were pending when worker api-5 gave up? Answer in the form 'N waiters pending'.",
+     "a": "388 waiters pending"
+    },
+    {
+     "q": "What HTTP status did the failed requests end with? Answer in the form status=N.",
+     "a": "status=503"
+    },
+    {
+     "q": "What trace id did worker api-3's errors carry? Answer in the form trace_id=X.",
+     "a": "trace_id=8f2c1ab4"
+    },
+    {
+     "q": "What trace id did worker api-5's errors carry? Answer in the form trace_id=X.",
+     "a": "trace_id=7c9e1f02"
+    }
+   ]
+  },
+  "dir_listing": {
+   "kind": "listing",
+   "source": "models-conversion kompress-v2 kit, bench_reducers.py LISTING (owner name replaced by dev)",
+   "questions": [
+    {
+     "q": "Which file in the Detection directory has the larger size?",
+     "a": "ProviderDetector.cs"
+    },
+    {
+     "q": "Which file in the Forwarding directory was modified first?",
+     "a": "UpstreamForwarder.cs"
+    },
+    {
+     "q": "Which file in the Forwarding directory is 2210 bytes?",
+     "a": "CredentialRule.cs"
+    },
+    {
+     "q": "Which file in the Detection directory is 1420 bytes?",
+     "a": "Dialect.cs"
+    },
+    {
+     "q": "What is the project file's name?",
+     "a": "AiProxy.csproj"
+    },
+    {
+     "q": "Which JSON file is in the listing?",
+     "a": "appsettings.json"
+    }
+   ]
+  },
+  "json_payload": {
+   "kind": "json",
+   "source": "models-conversion kompress-v2 kit, payloads/json_payload.txt",
+   "questions": [
+    {
+     "q": "What is the order id?",
+     "a": "99182"
+    },
+    {
+     "q": "What is the customer id?",
+     "a": "4471"
+    },
+    {
+     "q": "Which file is named in the failure?",
+     "a": "/srv/app/db/pool.py"
+    },
+    {
+     "q": "At which line did the failure happen? Answer with the number only.",
+     "a": "214"
+    },
+    {
+     "q": "What is the trace id?",
+     "a": "8f2c1ab4"
+    },
+    {
+     "q": "How many waiters were there at the failure? Answer with the number only.",
+     "a": "311"
+    },
+    {
+     "q": "What was the timeout in milliseconds? Answer with the number only.",
+     "a": "5000"
+    },
+    {
+     "q": "What is the shipping tracking number?",
+     "a": "JD00022910099182"
+    },
+    {
+     "q": "What is the payment authorisation code?",
+     "a": "AUTH-77120"
+    },
+    {
+     "q": "What is the shipping ETA date?",
+     "a": "2026-03-13"
+    },
+    {
+     "q": "Which SKU was ordered with quantity 2?",
+     "a": "A-1188"
+    },
+    {
+     "q": "What is the price in EUR of SKU A-1188? Answer with the number exactly as written in the data.",
+     "a": "49.9"
+    },
+    {
+     "q": "Which payment gateway was used?",
+     "a": "stripe-eu-1"
+    },
+    {
+     "q": "Which shipping carrier was used?",
+     "a": "dhl"
+    }
+   ]
+  },
+  "dotnet_build_failure": {
+   "kind": "build",
+   "source": "dotnet build of this repository at 84f413a with LogRules.cs:33 changed to return kept.Count",
+   "questions": [
+    {
+     "q": "Which compiler error code was reported?",
+     "a": "CS0029"
+    },
+    {
+     "q": "Which source file has the error? Give the file name only.",
+     "a": "LogRules.cs"
+    },
+    {
+     "q": "At which line and column is the error? Answer as (line,column).",
+     "a": "(33,16)"
+    },
+    {
+     "q": "Which project failed to build? Give the .csproj file name.",
+     "a": "AiProxy.Core.csproj"
+    }
+   ]
+  },
+  "dotnet_test_failure": {
+   "kind": "test",
+   "source": "dotnet test of this repository at 84f413a with LogRules.cs anchor comparison changed from >= to >",
+   "questions": [
+    {
+     "q": "What is the method name of the failing test?",
+     "a": "The_last_two_lines_are_anchors_and_survive"
+    },
+    {
+     "q": "Which substring was not found by the assertion?",
+     "a": "the second to last line"
+    },
+    {
+     "q": "Which test source file and line is in the stack trace? Answer as File.cs:N.",
+     "a": "LogCompressionHandlerTests.cs:85"
+    },
+    {
+     "q": "How many tests ran in total? Answer with the number only.",
+     "a": "231"
+    },
+    {
+     "q": "How many tests succeeded? Answer with the number only.",
+     "a": "230"
+    }
+   ]
+  },
+  "code_file_large": {
+   "kind": "code",
+   "source": "src/AiProxy.Core/Content/ContentDecompositor.cs at 84f413a",
+   "questions": [
+    {
+     "q": "What is the name of the sealed class declared in the file?",
+     "a": "ContentDecompositor"
+    },
+    {
+     "q": "Which interface does the sealed class implement?",
+     "a": "IDecompositor"
+    },
+    {
+     "q": "What is the name of the constant that limits how often the decomposer looks for a structure that is not there?",
+     "a": "MaxFailedStructureAttempts"
+    },
+    {
+     "q": "What integer value does that limiting constant have? Answer with the number only.",
+     "a": "32"
+    },
+    {
+     "q": "Which Regex field matches key = value configuration lines?",
+     "a": "ConfigurationLinePattern"
+    },
+    {
+     "q": "Which short name string is returned for ContentType.DirectoryListing?",
+     "a": "listing"
+    }
+   ]
+  },
+  "prose_large": {
+   "kind": "prose",
+   "source": "docs/work/2026-10-23-system-proxy-crash-recovery.md at 84f413a",
+   "questions": [
+    {
+     "q": "Which issue number gives the context for the research? Answer as #N.",
+     "a": "#21"
+    },
+    {
+     "q": "Which Titanium.Web.Proxy version was inspected?",
+     "a": "7.0.26"
+    },
+    {
+     "q": "Which type was HttpClient.DefaultProxy with no proxy environment variables set? Give the full type name.",
+     "a": "System.Net.Http.MacProxy"
+    },
+    {
+     "q": "Which field holds the macOS backend's original-settings snapshot? Answer as Type._field.",
+     "a": "MacOsSystemProxyBackend._original"
+    },
+    {
+     "q": "Which NuGet package with about 193k downloads was found?",
+     "a": "Vanara.PInvoke.WinINet"
+    },
+    {
+     "q": "Which environment variable turns off .NET file locking?",
+     "a": "DOTNET_SYSTEM_IO_DISABLEFILELOCKING"
+    }
+   ]
+  },
+  "rtk_proxy_log": {
+   "kind": "log",
+   "source": "rtk-proxy 1.0.1 log from the rtk-probes instance on 18080, ANSI codes stripped, scratch path replaced",
+   "questions": [
+    {
+     "q": "Which address and port was rtk-proxy listening on?",
+     "a": "127.0.0.1:18080"
+    },
+    {
+     "q": "What is the pipeline name in the proxy.request rules line?",
+     "a": "haiku-compaction"
+    },
+    {
+     "q": "Which pipeline stage is listed between normalize and ccr?",
+     "a": "pixel_compress"
+    },
+    {
+     "q": "What was tokens_compressed on the request that compressed two blocks? Answer with the number only.",
+     "a": "2443"
+    },
+    {
+     "q": "What was tokens_in_context on the request whose tokens_compressed was 1419? Answer with the number only.",
+     "a": "1031"
+    }
+   ]
+  },
+  "github_pr_list": {
+   "kind": "json",
+   "source": "gh pr list --state all --limit 25 --json number,title,state,mergedAt,headRefName,additions,deletions on Arasz/ai-proxy, 2026-10-23",
+   "questions": [
+    {
+     "q": "How many lines did the PR on head branch feat/machine-wide-forward-proxy add? Answer with the number only.",
+     "a": "1564"
+    },
+    {
+     "q": "How many lines did the PR on head branch feat/machine-wide-forward-proxy delete? Answer with the number only.",
+     "a": "2568"
+    },
+    {
+     "q": "What is the head branch of the PR titled 'fix: remove proxy-owned provider credentials'?",
+     "a": "fix/remove-proxy-owned-credentials"
+    },
+    {
+     "q": "How many lines did the PR on head branch task/aip-clear-stale-system-proxy-after-crash add? Answer with the number only.",
+     "a": "1269"
+    },
+    {
+     "q": "What is the head branch of the PR titled 'feat: PROXY_CAPTURE keeps every provider request body as sent (0.6.0)'?",
+     "a": "feat/request-capture"
+    }
+   ]
+  },
+  "dotnet_build_failure_verbose": {
+   "kind": "build",
+   "source": "dotnet build src/AiProxy.Core -v n of this repository at 84f413a with two type errors introduced (LogRules.cs, ProviderHostCatalog.cs)",
+   "questions": [
+    {
+     "q": "Which compiler error code is reported?",
+     "a": "CS0029"
+    },
+    {
+     "q": "Besides LogRules.cs, which source file has an error? Give the file name only.",
+     "a": "ProviderHostCatalog.cs"
+    },
+    {
+     "q": "At which line and column is the error in the second file? Answer as (line,column).",
+     "a": "(18,83)"
+    },
+    {
+     "q": "Into which type could 'string' not be converted? Give the full type name.",
+     "a": "AiProxy.Core.Providers.Dialect?"
+    },
+    {
+     "q": "What does the error count line say? Answer in the form 'N Error(s)'.",
+     "a": "2 Error(s)"
+    },
+    {
+     "q": "What elapsed time is reported? Answer as hh:mm:ss.ff.",
+     "a": "00:00:00.42"
+    }
+   ]
+  },
+  "dotnet_test_failures": {
+   "kind": "test",
+   "source": "dotnet test of this repository at 84f413a with LogRules returning no lines",
+   "questions": [
+    {
+     "q": "Which integration test method failed?",
+     "a": "The_provider_upstream_receives_the_tool_output_reduced"
+    },
+    {
+     "q": "Which unit test class has the most failures?",
+     "a": "LogCompressionHandlerTests"
+    },
+    {
+     "q": "How long did the failing integration test run? Answer as Nms.",
+     "a": "512ms"
+    },
+    {
+     "q": "What does the summary say about failures? Answer in the form 'failed: N'.",
+     "a": "failed: 7"
+    },
+    {
+     "q": "What does the summary say about successes? Answer in the form 'succeeded: N'.",
+     "a": "succeeded: 224"
+    }
+   ]
+  }
+ },
+ "budget_sensitivity_s": [
+  0.5,
+  2.0
+ ],
+ "gates": {
+  "extractive": {
+   "candidates": [
+    "shipped_rules",
+    "kompress_int8",
+    "rtk_ccr"
+   ],
+   "retention": "verbatim: every expected answer appears in the output (grading.answered against the output text)"
+  },
+  "abstractive": {
+   "candidates": [
+    "haiku_digest",
+    "summarizer_control",
+    "identity"
+   ],
+   "retention": "qa: the QA reader answers each question 3 times; a question counts as lost only when at least 2 of the 3 replies miss"
+  }
+ },
+ "not_applicable": "a candidate whose output equals its input byte for byte did not run on that payload (under its minimum); the row is reported as n/a, not as a score of 0",
+ "timing": {
+  "identity": "none, 0 s by definition",
+  "shipped_rules": "ICompressionPipeline.CompressAsync wall time inside the .NET process, after one warm-up call per payload",
+  "kompress_int8": "tokenize + ONNX run + decode inside the Python process, model loaded beforehand",
+  "rtk_ccr": "HTTP round trip through a private rtk-proxy (ccr on) minus the median round trip through a second private rtk-proxy with --ccr false, same fake upstream",
+  "haiku_digest": "messages.create wall time",
+  "summarizer_control": "messages.create wall time"
+ },
+ "output_counted": "compression counts every character the model would see, including rtk's preview wrapper and marker",
+ "kompress": {
+  "onnx": "kompress-int8-wo.onnx",
+  "threshold": 0.5,
+  "chunk_tokens": 8192
+ }
+}

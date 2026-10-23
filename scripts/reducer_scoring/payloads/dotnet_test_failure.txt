@@ -1,0 +1,19 @@
+Running tests from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_last_two_lines_are_anchors_and_survive (1ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "2026-03-12 10:00:00 INFO worker=api-1 nothing to s"···
+  Not found: "the second to last line"
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_last_two_lines_are_anchors_and_survive() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:85
+    --- End of stack trace from previous location ---
+/home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64) failed with 1 error(s) (4s 757ms)
+Exit code: 2
+  Error output: ai-proxy guard could not clear the system proxy: networksetup failed
+
+Test run summary: Failed!
+  total: 231
+  failed: 1
+  succeeded: 230
+  skipped: 0
+  duration: 5s 081ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

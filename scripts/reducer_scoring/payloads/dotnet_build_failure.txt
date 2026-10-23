@@ -1,0 +1,14 @@
+  Determining projects to restore...
+  Restored /home/dev/ai-proxy/src/AiProxy.Core/AiProxy.Core.csproj (in 29 ms).
+  Restored /home/dev/ai-proxy/src/AiProxy.Storage/AiProxy.Storage.csproj (in 103 ms).
+  Restored /home/dev/ai-proxy/src/AiProxy/AiProxy.csproj (in 111 ms).
+  Restored /home/dev/ai-proxy/tests/AiProxy.Tests/AiProxy.Tests.csproj (in 121 ms).
+/home/dev/ai-proxy/src/AiProxy.Core/Content/Handlers/LogRules.cs(33,16): error CS0029: Cannot implicitly convert type 'int' to 'System.Collections.Generic.IReadOnlyList<string>' [/home/dev/ai-proxy/src/AiProxy.Core/AiProxy.Core.csproj]
+
+Build FAILED.
+
+/home/dev/ai-proxy/src/AiProxy.Core/Content/Handlers/LogRules.cs(33,16): error CS0029: Cannot implicitly convert type 'int' to 'System.Collections.Generic.IReadOnlyList<string>' [/home/dev/ai-proxy/src/AiProxy.Core/AiProxy.Core.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:00.83
