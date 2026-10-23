@@ -11,7 +11,7 @@ opaque tunnel.
 | Google Gemini | `generativelanguage.googleapis.com` |
 | OpenRouter | `openrouter.ai` |
 
-ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` while it
+ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` (or the port in `PROXY_PORT`) while it
 runs, then restores the prior settings at shutdown. It creates a per-user root certificate
 for HTTPS inspection and asks the operating system to trust it. Clients that do not honor
 system proxy settings or user-root trust are outside this routing path.
@@ -33,4 +33,14 @@ ai-proxy and protect it like other local agent data.
 ## Local health endpoint
 
 `ASPNETCORE_URLS` controls the ASP.NET health and content endpoints (default `http://localhost:5000`).
-The proxy listener itself always binds to loopback port `8080` so its system proxy address stays fixed.
+
+## Proxy port
+
+| Variable | What it is |
+|---|---|
+| `PROXY_PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
+
+A value that is not a whole number from 1 to 65535, including an empty value, stops startup with
+an error naming `PROXY_PORT`; it never falls back to `8080`. A port another program already holds
+also stops startup, before the system proxy setting is changed. Set `PROXY_PORT` to run beside
+another proxy that holds `8080`.

@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.5.0](0.5.0-configurable-proxy-port.md) | `PROXY_PORT` sets the listener and system proxy port; an invalid value or a port in use stops startup. | #27 |
 | [0.4.1](0.4.1-clear-system-proxy-after-crash.md) | The system proxy is cleared after a forced kill, by a guard process or at the next start; a proxy set before the run is not restored in that case. | #23 |
 | [0.4.0](0.4.0-machine-wide-forward-proxy.md) | Machine-wide forward proxy with provider-only HTTPS inspection and default pass-through. | #19 |
 | [0.3.1](0.3.1-the-reducers-change-the-text-not-the-formatting.md) | The reducers change the text and not the formatting: the XML reducer compacts again instead of falling back to the line rule, and the whitespace, the comments and the hash lines that are content now survive the reduction. | #15 |
