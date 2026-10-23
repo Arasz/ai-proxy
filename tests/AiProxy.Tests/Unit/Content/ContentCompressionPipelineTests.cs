@@ -3,6 +3,7 @@ using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
+using Microsoft.Extensions.Time.Testing;
 
 namespace AiProxy.Tests.Unit.Content;
 
@@ -26,12 +27,14 @@ public class ContentCompressionPipelineTests
 
     private static (ContentCompressionPipeline Pipeline, RecordingContentStore Store) Build(
         IContentStore? store = null,
-        CompressionOptions? options = null)
+        CompressionOptions? options = null,
+        TimeProvider? time = null,
+        ICompressionHandler? logHandler = null)
     {
         var recording = store as RecordingContentStore ?? new RecordingContentStore();
         var router = new ContentRouter(
             [
-                new LogCompressionHandler(),
+                logHandler ?? new LogCompressionHandler(),
                 new JsonCompressionHandler(),
                 new ProseCompressionHandler(),
             ],
@@ -43,7 +46,8 @@ public class ContentCompressionPipelineTests
             new CompressionExecutor(router),
             new ContentCompositor(),
             recording,
-            options ?? CompressionOptions.Default);
+            options ?? CompressionOptions.Default,
+            time ?? TimeProvider.System);
 
         return (pipeline, recording);
     }
@@ -180,6 +184,79 @@ public class ContentCompressionPipelineTests
         var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
 
         Assert.Equal(regions.Count, kept.Count);
+    }
+
+    [Fact]
+    public async Task The_record_is_stamped_by_the_time_provider()
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
+        var (pipeline, store) = Build(time: time);
+        var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
+
+        await pipeline.CompressAsync(
+            new CompressionRequest(body, "application/json", Dialect.OpenAi),
+            CancellationToken.None);
+
+        Assert.Equal(time.GetUtcNow(), Assert.Single(store.Records).CreatedAt);
+    }
+
+    [Fact]
+    public async Task A_handler_that_throws_does_not_discard_the_reductions_of_the_other_parts()
+    {
+        var (pipeline, store) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler());
+        var json = "{\n  \"a\": 1,\n  \"b\": [1, 2, 3]\n}";
+        var body = Encoding.UTF8.GetBytes(
+            $$"""{"messages":[{"role":"tool","content":{{System.Text.Json.JsonSerializer.Serialize(ToolOutput)}}},{"role":"tool","content":{{System.Text.Json.JsonSerializer.Serialize(json)}}}]}""");
+
+        var result = await pipeline.CompressAsync(
+            new CompressionRequest(body, "application/json", Dialect.OpenAi),
+            CancellationToken.None);
+
+        Assert.True(result.Changed);
+        var text = Encoding.UTF8.GetString(result.Body.ToArray());
+        Assert.Contains("nothing to see", text, StringComparison.Ordinal);
+        Assert.Contains("""\u0022a\u0022:1,\u0022b\u0022:[1,2,3]""", text, StringComparison.Ordinal);
+        var failed = Assert.Single(Assert.Single(store.Records).Parts, part => part.Path == ContentCompressionPipeline.HandlerFailedPath);
+        Assert.Equal(ContentType.Log, failed.Type);
+        Assert.Equal(failed.OriginalText, failed.Text);
+        Assert.Equal(1.0, failed.Ratio);
+    }
+
+    [Fact]
+    public async Task A_handler_that_throws_is_reported_with_its_part_and_its_exception()
+    {
+        var (pipeline, _) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler());
+        var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
+
+        var result = await pipeline.CompressAsync(
+            new CompressionRequest(body, "application/json", Dialect.OpenAi),
+            CancellationToken.None);
+
+        Assert.False(result.Changed);
+        var failure = Assert.Single(result.PartFailures);
+        Assert.Equal(1, failure.ChunkId);
+        Assert.Equal(nameof(ContentType.Log), failure.ContentType);
+        Assert.Equal("boom", Assert.IsType<InvalidOperationException>(failure.Exception).Message);
+    }
+
+    [Fact]
+    public async Task A_cancelled_request_still_propagates_out_of_a_handler()
+    {
+        var (pipeline, _) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler(cancelled: true));
+        var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
+        using var source = new CancellationTokenSource();
+        await source.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.OpenAi), source.Token));
+    }
+
+    private sealed class ThrowingLogHandler(bool cancelled = false) : ICompressionHandler
+    {
+        public bool CanHandle(ContentType type) => type == ContentType.Log;
+
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) =>
+            cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
     }
 
     private sealed class RecordingContentStore : IContentStore

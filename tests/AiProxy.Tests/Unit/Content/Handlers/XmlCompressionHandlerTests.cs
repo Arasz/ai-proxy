@@ -69,6 +69,16 @@ public class XmlCompressionHandlerTests
     }
 
     [Fact]
+    public async Task The_reduction_is_an_ordered_subsequence_of_the_input()
+    {
+        var original = "<root>\n  <a>1</a>\n  <b>keep me</b>\n</root>";
+
+        var result = await Handler.HandleAsync(Part(original), CancellationToken.None);
+
+        OrderedSubsequence.AssertHolds(result.Text, original);
+    }
+
+    [Fact]
     public async Task A_document_that_does_not_parse_falls_back_to_the_line_rule()
     {
         var result = await Handler.HandleAsync(Part("<root><a>"), CancellationToken.None);

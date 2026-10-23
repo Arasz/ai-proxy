@@ -40,7 +40,8 @@ internal sealed class ProxyHost : IAsyncDisposable
     public static async Task<ProxyHost> StartAsync(
         IReadOnlyDictionary<string, string> configuration,
         ICompressionPipeline? compression = null,
-        IProviderHosts? providerHosts = null)
+        IProviderHosts? providerHosts = null,
+        Action<IServiceCollection>? configure = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -70,6 +71,8 @@ internal sealed class ProxyHost : IAsyncDisposable
                 {
                     services.AddSingleton(providerHosts);
                 }
+
+                configure?.Invoke(services);
             },
             new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 

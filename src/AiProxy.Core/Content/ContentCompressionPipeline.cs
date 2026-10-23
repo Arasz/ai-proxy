@@ -7,12 +7,16 @@ namespace AiProxy.Core.Content;
 /// <summary>Shrinks the tool output in a request body, and keeps what it dropped.</summary>
 public sealed class ContentCompressionPipeline : ICompressionPipeline
 {
+    /// <summary>The path recorded for a part whose reducer threw, so the part kept its original text.</summary>
+    public const string HandlerFailedPath = "compression.handler-failed";
+
     private readonly ToolOutputRegionFinder _finder;
     private readonly IDecompositor _decomposer;
     private readonly ICompressionExecutor _executor;
     private readonly ICompositor _compositor;
     private readonly IContentStore _store;
     private readonly CompressionOptions _options;
+    private readonly TimeProvider _time;
 
     /// <summary>Holds the collaborators the pipeline is composed of.</summary>
     /// <param name="finder">Finds the tool output in the body.</param>
@@ -21,13 +25,15 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
     /// <param name="compositor">Puts the reduced parts back.</param>
     /// <param name="store">Keeps what the pipeline changed.</param>
     /// <param name="options">The operator's settings.</param>
+    /// <param name="time">Stamps the records.</param>
     public ContentCompressionPipeline(
         ToolOutputRegionFinder finder,
         IDecompositor decomposer,
         ICompressionExecutor executor,
         ICompositor compositor,
         IContentStore store,
-        CompressionOptions options)
+        CompressionOptions options,
+        TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(finder);
         ArgumentNullException.ThrowIfNull(decomposer);
@@ -35,6 +41,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         ArgumentNullException.ThrowIfNull(compositor);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(time);
 
         _finder = finder;
         _decomposer = decomposer;
@@ -42,6 +49,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         _compositor = compositor;
         _store = store;
         _options = options;
+        _time = time;
     }
 
     /// <inheritdoc />
@@ -65,10 +73,11 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         var body = request.Body.ToArray();
         var parts = new List<CompressedPart>();
         var replacements = new List<(int Start, int Length, byte[] Bytes)>();
+        var failures = new List<PartFailure>();
 
         foreach (var region in WithoutOverlaps(regions))
         {
-            var reduced = await ReduceAsync(region.Text, requestId, parts, cancellationToken).ConfigureAwait(false);
+            var reduced = await ReduceAsync(region.Text, requestId, parts, failures, cancellationToken).ConfigureAwait(false);
             if (reduced is null)
             {
                 continue;
@@ -79,7 +88,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         if (replacements.Count == 0)
         {
-            return new CompressionResult(request.Body, false);
+            return new CompressionResult(request.Body, false) { PartFailures = failures };
         }
 
         var compressed = Rebuild(body, replacements);
@@ -88,7 +97,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         var path = string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal));
         var record = new ContentRecord(
             requestId,
-            DateTimeOffset.UtcNow,
+            _time.GetUtcNow(),
             original,
             compressedText,
             ratio,
@@ -108,7 +117,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
-        return new CompressionResult(compressed, true, failure, summary);
+        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures };
     }
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>
@@ -161,6 +170,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         string region,
         string requestId,
         List<CompressedPart> parts,
+        List<PartFailure> failures,
         CancellationToken cancellationToken)
     {
         var decomposition = _decomposer.Decompose(region, requestId);
@@ -180,7 +190,17 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
                 continue;
             }
 
-            var compressed = await _executor.ExecuteAsync(part, cancellationToken).ConfigureAwait(false);
+            CompressedPart compressed;
+            try
+            {
+                compressed = await _executor.ExecuteAsync(part, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                failures.Add(new PartFailure(part.ChunkId, part.Type.ToString(), exception));
+                compressed = new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, HandlerFailedPath, 1.0);
+            }
+
             reduced.Add(compressed);
             changed |= compressed.Text.Length < part.Text.Length;
         }

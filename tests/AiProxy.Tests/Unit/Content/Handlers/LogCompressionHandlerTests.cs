@@ -117,6 +117,14 @@ public class LogCompressionHandlerTests
     }
 
     [Fact]
+    public async Task The_reduction_is_an_ordered_subsequence_of_the_input()
+    {
+        var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
+
+        OrderedSubsequence.AssertHolds(result.Text, Log);
+    }
+
+    [Fact]
     public async Task The_handler_claims_the_log_kind_and_nothing_else()
     {
         Assert.True(Handler.CanHandle(ContentType.Log));

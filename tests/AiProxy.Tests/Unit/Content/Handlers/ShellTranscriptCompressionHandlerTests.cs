@@ -51,6 +51,26 @@ public class ShellTranscriptCompressionHandlerTests
     }
 
     [Fact]
+    public async Task The_reduction_is_an_ordered_subsequence_of_the_input()
+    {
+        var text = string.Join("\n",
+        [
+            "$ ls -la",
+            "total 4",
+            "nothing here",
+            "nothing here",
+            "nothing here",
+            "nothing here",
+            "drwxr-xr-x 2 user group 4096 .",
+            "$ echo done",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        OrderedSubsequence.AssertHolds(result.Text, text);
+    }
+
+    [Fact]
     public async Task The_handler_says_which_path_it_took()
     {
         var result = await Handler.HandleAsync(Part("$ echo hi"), CancellationToken.None);
