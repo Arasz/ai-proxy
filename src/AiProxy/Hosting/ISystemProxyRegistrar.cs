@@ -10,4 +10,7 @@ public interface ISystemProxyRegistrar
 
     /// <summary>Restores the settings observed before the proxy was installed.</summary>
     void Restore();
+
+    /// <summary>Turns the HTTP and HTTPS system proxies off without needing a running server; throws when that fails.</summary>
+    void Clear();
 }

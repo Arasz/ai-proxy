@@ -28,5 +28,30 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     }
 
     /// <inheritdoc />
-    public void Restore() => _server.RestoreOriginalProxySettings();
+    public void Restore()
+    {
+        // The macOS backend swallows some of its own errors, so a success result can still hide a partial restore.
+        var result = _server.TryRestoreOriginalProxySettings();
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"The system proxy could not be restored: {result.Message}");
+        }
+    }
+
+    /// <inheritdoc />
+    public void Clear() => ClearSystemProxy();
+
+    /// <summary>
+    /// Turns the HTTP and HTTPS system proxies off through a short-lived server, so no snapshot lands in a long-lived one.
+    /// Titanium snapshots the settings it first touches and restores them at exit; a snapshot of a stale proxy must not outlive the clear.
+    /// </summary>
+    public static void ClearSystemProxy()
+    {
+        using var server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
+        var result = server.TryDisableSystemProxy(ProxyProtocolType.AllHttp);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"The system proxy could not be cleared: {result.Message}");
+        }
+    }
 }

@@ -3,6 +3,18 @@
   "next": "Measure whether an agent that reads the reduced context answers as well as one that reads the original. The stage proves that the facts survive a reduction; the answer retention the compression research measured is a proxy, and the record names this as its first open question. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the measurement that says whether the stage is worth running at all. The model path waits for that answer: the artifact is 274 MB, the numbers for it are measured, and the owner ruled that the rule-based path ships meanwhile. The two corrections to the merged research records land as a follow-up to pull request #3. After the measurement, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy.",
   "completedTasks": [
     {
+      "taskId": "aip-clear-stale-system-proxy-after-crash",
+      "date": "2026-10-23",
+      "title": "Clear the system proxy when ai-proxy dies",
+      "pr": 23,
+      "version": "0.4.1",
+      "summary": "A guard sidecar (same binary, --guard-system-proxy) watches a stdin pipe from the proxy; end-of-file without a 'restored' line means the proxy died, so it clears the system proxy under an exclusive marker lock (~/.ai-proxy/system-proxy.lock). A stale unheld marker at startup clears before Set, covering reboot or a killed guard. Clearing goes through a throwaway ProxyServer so Titanium never snapshots the dead proxy as original. Research showed Titanium cannot snapshot side-effect free on Windows/Linux, so full restore is deferred.",
+      "followUps": [
+        "#24: restore the original proxy (own per-OS snapshot) instead of clearing.",
+        "Manual kill -9 check of the real clear path on macOS; Windows and Linux untested."
+      ]
+    },
+    {
       "taskId": "aip-machine-wide-provider-routing-defaults",
       "date": "2026-10-23",
       "title": "Machine-wide forward proxy with provider-only HTTPS inspection",
