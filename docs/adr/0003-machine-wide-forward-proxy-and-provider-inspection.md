@@ -27,8 +27,14 @@ opt-in.
 
 Provider clients must honor the system proxy and trust the per-user inspection root. Certificate
 pinning or clients that ignore system proxy settings can bypass inspection or fail. MCP traffic
-continues through the proxy without HTTPS body inspection. A forced process termination may
-prevent system proxy restoration, so normal shutdown is required.
+continues through the proxy without HTTPS body inspection. A forced kill no longer leaves the system
+proxy pointing at a dead port. ai-proxy holds `~/.ai-proxy/system-proxy.lock` while the proxy is
+set and starts a guard process (the same executable, `--guard-system-proxy`) that clears the
+system proxy when its pipe to the main process closes without a `restored` message. If the
+guard did not run either (reboot, power loss), the next start finds the non-empty marker and
+clears the proxy before setting it. Both paths clear and do not restore: a proxy the user had
+configured before the killed run is lost, and only a normal shutdown brings it back. A second
+instance fails to start while the marker is held.
 
 ## Dependency provenance
 

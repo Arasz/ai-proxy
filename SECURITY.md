@@ -7,9 +7,10 @@ root `VERSION` file. Only the latest tagged release is supported.
 ## Trust boundary
 
 ai-proxy listens on loopback and changes the current user's system HTTP and HTTPS proxy while
-the process runs. It restores the previous settings during normal shutdown. A forced kill or
-machine crash can prevent that cleanup, so check the system proxy settings if the process did
-not exit normally.
+the process runs. It restores the previous settings during normal shutdown. After a forced
+kill, a small guard process clears the system proxy; after a reboot or power loss, the next
+start clears it before setting it again. In those cases the proxy is cleared and not restored,
+so a proxy you had configured before the run is gone and you must set it again.
 
 The proxy decrypts HTTPS only for `api.openai.com`, `api.anthropic.com`,
 `generativelanguage.googleapis.com`, and `openrouter.ai`. It creates a per-user root certificate
