@@ -60,6 +60,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     internal IReadOnlyList<ProxyEndPoint> EndPoints => _server.ProxyEndPoints;
 
+    internal ProxyServer Server => _server;
+
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {

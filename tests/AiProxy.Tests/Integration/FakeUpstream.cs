@@ -1,3 +1,5 @@
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -40,12 +42,20 @@ internal sealed class FakeUpstream : IAsyncDisposable
     public Func<FakeUpstream, HttpContext, Task> Handler { get; set; } =
         static (_, context) => context.Response.WriteAsync("upstream ok");
 
-    /// <summary>Starts an upstream on a free loopback port.</summary>
-    public static async Task<FakeUpstream> StartAsync()
+    /// <summary>Starts an upstream on a free loopback port, over HTTPS when a server certificate is given.</summary>
+    public static async Task<FakeUpstream> StartAsync(X509Certificate2? certificate = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        if (certificate is null)
+        {
+            builder.WebHost.UseUrls("http://127.0.0.1:0");
+        }
+        else
+        {
+            builder.WebHost.ConfigureKestrel(kestrel =>
+                kestrel.Listen(IPAddress.Loopback, 0, listen => listen.UseHttps(certificate)));
+        }
 
         var app = builder.Build();
         var upstream = new FakeUpstream(app);
