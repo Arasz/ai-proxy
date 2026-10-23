@@ -16,4 +16,8 @@ public sealed record CompressionResult(
     ReadOnlyMemory<byte> Body,
     bool Changed,
     string? Failure = null,
-    CompressionSummary? Summary = null);
+    CompressionSummary? Summary = null)
+{
+    /// <summary>The parts whose reducer threw and that kept their original text; empty when every reducer ran.</summary>
+    public IReadOnlyList<PartFailure> PartFailures { get; init; } = [];
+}

@@ -63,6 +63,11 @@ public sealed partial class ProviderRequestInspector
             return;
         }
 
+        foreach (var failure in compressed.PartFailures)
+        {
+            Log.PartFailed(_logger, failure.ChunkId, failure.ContentType, request.RequestUri.Host, failure.Exception);
+        }
+
         if (compressed.Changed)
         {
             e.SetRequestBody(compressed.Body.ToArray());
@@ -88,5 +93,8 @@ public sealed partial class ProviderRequestInspector
     {
         [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Compression failed for a request to {ProviderHost}; forwarding the original body")]
         public static partial void CompressionFailed(ILogger logger, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1402, Level = LogLevel.Warning, Message = "The reducer for part {ChunkId} ({ContentType}) of a request to {ProviderHost} failed; the part was forwarded with its original text")]
+        public static partial void PartFailed(ILogger logger, int chunkId, string contentType, string providerHost, Exception exception);
     }
 }
