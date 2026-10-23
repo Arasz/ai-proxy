@@ -35,3 +35,11 @@ or fail their HTTPS request.
 Compression is opt-in. When enabled, original request bodies that were changed are stored in
 the local content database and can be retrieved through the local content endpoint. Protect
 that database as agent data.
+
+## Third-party proxy engine
+
+HTTPS interception and system proxy changes are done by `Titanium.Web.Proxy` 7.0.26, an
+unverified NuGet package with no published source repository or license metadata (see
+[ADR 0003](docs/adr/0003-machine-wide-forward-proxy-and-provider-inspection.md#dependency-provenance)).
+It has access to the root CA key and to decrypted provider traffic. Report problems that
+come from it here as well.
