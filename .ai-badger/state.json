@@ -1,7 +1,18 @@
 {
-  "lastUpdated": "2026-10-22",
+  "lastUpdated": "2026-10-23",
   "next": "Measure whether an agent that reads the reduced context answers as well as one that reads the original. The stage proves that the facts survive a reduction; the answer retention the compression research measured is a proxy, and the record names this as its first open question. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the measurement that says whether the stage is worth running at all. The model path waits for that answer: the artifact is 274 MB, the numbers for it are measured, and the owner ruled that the rule-based path ships meanwhile. The two corrections to the merged research records land as a follow-up to pull request #3. After the measurement, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy.",
   "completedTasks": [
+    {
+      "taskId": "aip-machine-wide-provider-routing-defaults",
+      "date": "2026-10-23",
+      "title": "Machine-wide forward proxy with provider-only HTTPS inspection",
+      "pr": 19,
+      "version": "0.4.0",
+      "summary": "Configured reverse routing is replaced by a Titanium.Web.Proxy forward proxy that sets the user's system proxy, decrypts HTTPS only for the four canonical provider hosts, and passes everything else through. The review found the library wrote its root certificate to the login keychain on every start and could change the system proxy from tests; both are now opt-in, the root CA key lives in ~/.ai-proxy (0600, optional password), proxy errors reach the host log, compression failures forward the original body, and end-to-end compression and HTTPS-inspection tests are back. Titanium 7.0.26 traces to the MIT upstream commit 630f018.",
+      "followUps": [
+        "#21: system proxy stays set after a crash and the next start snapshots the stale proxy as original; needs a choice of recovery design."
+      ]
+    },
     {
       "taskId": "aip-content-compression-pipeline-store",
       "date": "2026-10-22",
