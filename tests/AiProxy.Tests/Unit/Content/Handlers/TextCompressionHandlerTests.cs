@@ -156,25 +156,34 @@ public class TextCompressionHandlerTests
         }
     }
 
-    [Fact]
-    public async Task Every_text_reducer_keeps_an_ordered_subsequence_of_its_input()
+    public static TheoryData<ContentType, string> TextReducerInputs => new()
     {
-        var cases = new (ICompressionHandler Handler, ContentType Kind, string Text)[]
+        { ContentType.Toml, "# a comment\nkey = \"value\"\n\n# another\nother = 1" },
+        { ContentType.Markdown, "<!-- hidden -->\n# Title\n\n\n\nbody" },
+        { ContentType.SourceCode, "var a = 1;\n\nvar b = 2;\n\n\nreturn a;" },
+        { ContentType.Prose, "the same line\nthe same line\nanother line" },
+        { ContentType.DirectoryListing, "Dialect.cs\nUpstreamForwarder.cs" },
+        { ContentType.Unknown, "anything at all" },
+    };
+
+    [Theory]
+    [MemberData(nameof(TextReducerInputs))]
+    public async Task Every_text_reducer_keeps_an_ordered_subsequence_of_its_input(ContentType kind, string text)
+    {
+        ICompressionHandler handler = kind switch
         {
-            (new TomlCompressionHandler(), ContentType.Toml, "# a comment\nkey = \"value\"\n\n# another\nother = 1"),
-            (new MarkdownCompressionHandler(), ContentType.Markdown, "<!-- hidden -->\n# Title\n\n\n\nbody"),
-            (new SourceCodeCompressionHandler(), ContentType.SourceCode, "var a = 1;\n\nvar b = 2;\n\n\nreturn a;"),
-            (new ProseCompressionHandler(), ContentType.Prose, "the same line\nthe same line\nanother line"),
-            (new DirectoryListingCompressionHandler(), ContentType.DirectoryListing, "Dialect.cs\nUpstreamForwarder.cs"),
-            (new PassThroughCompressionHandler(), ContentType.Unknown, "anything at all"),
+            ContentType.Toml => new TomlCompressionHandler(),
+            ContentType.Markdown => new MarkdownCompressionHandler(),
+            ContentType.SourceCode => new SourceCodeCompressionHandler(),
+            ContentType.Prose => new ProseCompressionHandler(),
+            ContentType.DirectoryListing => new DirectoryListingCompressionHandler(),
+            ContentType.Unknown => new PassThroughCompressionHandler(),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no text reducer for this kind"),
         };
 
-        foreach (var (handler, kind, text) in cases)
-        {
-            var result = await handler.HandleAsync(Part(kind, text), CancellationToken.None);
+        var result = await handler.HandleAsync(Part(kind, text), CancellationToken.None);
 
-            OrderedSubsequence.AssertHolds(result.Text, text);
-        }
+        OrderedSubsequence.AssertHolds(result.Text, text);
     }
 
     [Fact]
