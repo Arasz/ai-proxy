@@ -56,9 +56,9 @@ public class ForwardProxyTests
             var directory = new TemporaryDirectory();
             var service = new TitaniumProxyService(
                 new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false),
+                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
                 new CanonicalProviderHosts(),
-                NullLogger<TitaniumProxyService>.Instance);
+                NullLoggerFactory.Instance);
             await service.StartAsync(TestContext.Current.CancellationToken);
             return new TestProxy(service, directory);
         }

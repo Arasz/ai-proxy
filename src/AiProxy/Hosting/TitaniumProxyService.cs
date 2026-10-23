@@ -18,6 +18,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private readonly ProxyRuntimeOptions _options;
     private readonly ProviderRequestInspector _inspector;
     private readonly IProviderHosts _providerHosts;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TitaniumProxyService> _logger;
     private ExplicitProxyEndPoint? _endPoint;
     private bool _started;
@@ -28,8 +29,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProxyRuntimeOptions options,
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
-        ILogger<TitaniumProxyService> logger)
-        : this(null, options, inspector, providerHosts, logger)
+        ILoggerFactory loggerFactory)
+        : this(null, options, inspector, providerHosts, loggerFactory)
     {
     }
 
@@ -38,18 +39,19 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProxyRuntimeOptions options,
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
-        ILogger<TitaniumProxyService> logger)
+        ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(inspector);
         ArgumentNullException.ThrowIfNull(providerHosts);
-        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
         _server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(_server);
         _options = options;
         _inspector = inspector;
         _providerHosts = providerHosts;
-        _logger = logger;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         Address = new Uri($"http://{options.ListenAddress}:{options.Port}");
     }
 
@@ -62,6 +64,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     public Task StartAsync(CancellationToken cancellationToken)
     {
         Titanium.Web.Proxy.Network.CertificateManager.SuppressInteractiveRootStoreMutations = !_options.TrustRootCertificate;
+        _server.Logging.LoggerFactory = _loggerFactory;
         _server.EnableHttpInterception = true;
         _server.MaxBufferedBodyBytes = 8 * 1024 * 1024;
         _server.ViaHeaderPseudonym = string.Empty;

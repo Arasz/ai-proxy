@@ -42,7 +42,8 @@ public static class ProxyApplication
         builder.Services.AddSingleton(services => new ProviderRequestInspector(
             services.GetRequiredService<ICompressionPipeline>(),
             services.GetRequiredService<IProviderHosts>(),
-            compression.Enabled));
+            compression.Enabled,
+            services.GetRequiredService<ILogger<ProviderRequestInspector>>()));
         builder.Services.AddSingleton<TitaniumProxyService>();
         builder.Services.AddHostedService(services => services.GetRequiredService<TitaniumProxyService>());
 

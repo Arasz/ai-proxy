@@ -61,9 +61,9 @@ public class TitaniumProxyServiceTests
         new(
             registrar,
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: true, TrustRootCertificate: false, dataDirectory),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
             new CanonicalProviderHosts(),
-            NullLogger<TitaniumProxyService>.Instance);
+            NullLoggerFactory.Instance);
 
     private static int FreePort()
     {
