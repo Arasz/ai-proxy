@@ -78,8 +78,10 @@ internal sealed class FakeUpstream : IAsyncDisposable
 
     private async Task HandleAsync(HttpContext context)
     {
-        using var reader = new StreamReader(context.Request.Body, Encoding.UTF8);
-        var body = await reader.ReadToEndAsync();
+        using var buffer = new MemoryStream();
+        await context.Request.Body.CopyToAsync(buffer);
+        var bytes = buffer.ToArray();
+        var body = Encoding.UTF8.GetString(bytes);
 
         var headers = context.Request.Headers.ToDictionary(
             header => header.Key,
@@ -93,7 +95,8 @@ internal sealed class FakeUpstream : IAsyncDisposable
                 context.Request.Path.Value ?? "/",
                 context.Request.QueryString.Value ?? string.Empty,
                 headers,
-                body));
+                body,
+                bytes));
         }
 
         await Handler(this, context);

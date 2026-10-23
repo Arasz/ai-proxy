@@ -1,4 +1,5 @@
 using AiProxy;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -41,10 +42,16 @@ internal sealed class ProxyHost : IAsyncDisposable
         IReadOnlyDictionary<string, string> configuration,
         ICompressionPipeline? compression = null,
         IProviderHosts? providerHosts = null,
+        IRequestCaptureStore? capture = null,
+        ILoggerProvider? logging = null,
         Action<IServiceCollection>? configure = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
+        if (logging is not null)
+        {
+            builder.Logging.AddProvider(logging);
+        }
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         var portListener = new TcpListener(IPAddress.Loopback, 0);
@@ -72,7 +79,14 @@ internal sealed class ProxyHost : IAsyncDisposable
                     services.AddSingleton(providerHosts);
                 }
 
+<<<<<<< HEAD
                 configure?.Invoke(services);
+=======
+                if (capture is not null)
+                {
+                    services.AddSingleton(capture);
+                }
+>>>>>>> e50f413 (feat: PROXY_CAPTURE keeps every provider request body as sent)
             },
             new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 

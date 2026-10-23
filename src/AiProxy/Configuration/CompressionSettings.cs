@@ -14,9 +14,7 @@ public sealed record CompressionSettings(bool Enabled, ContentStoreOptions Store
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var enabled = configuration["PROXY_COMPRESSION"]?.Trim() is { } switchValue &&
-                      (switchValue.Equals("on", StringComparison.OrdinalIgnoreCase) ||
-                       switchValue.Equals("true", StringComparison.OrdinalIgnoreCase));
+        var enabled = ConfigurationSwitch.IsOn(configuration["PROXY_COMPRESSION"]);
 
         var path = configuration["PROXY_COMPRESSION_DB"]?.Trim();
         var store = new ContentStoreOptions(
