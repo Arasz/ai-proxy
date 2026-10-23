@@ -11,6 +11,7 @@ Active records:
 | File | What it is |
 |---|---|
 | [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
+| [2026-10-23-system-proxy-crash-recovery.md](2026-10-23-system-proxy-crash-recovery.md) | Research record: reading the system proxy per OS and from .NET, how other tools recover after a crash, and the sidecar spike against Titanium's API. |
 | [2026-10-22-machine-wide-proxy-research.md](2026-10-22-machine-wide-proxy-research.md) | Research record: canonical provider API hosts, provider-only TLS inspection, system proxy lifecycle, and default pass-through. |
 | [2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md](2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md) | Historical reverse-proxy implementation plan, superseded by ADR 0003. |
 | [2026-10-22-compression-stage-decisions-review.html](2026-10-22-compression-stage-decisions-review.html) | The review form the owner answered: one card per decision, a verdict and a notes box, and the saved feedback in the file next to it. |
