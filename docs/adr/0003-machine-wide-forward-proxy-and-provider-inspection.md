@@ -33,18 +33,19 @@ prevent system proxy restoration, so normal shutdown is required.
 ## Dependency provenance
 
 The proxy engine is the NuGet package `Titanium.Web.Proxy` 7.0.26 (published 2026-10-19,
-NuGet owner `titanium007`, package id prefix not verified). The upstream GitHub project
-(justcoding121/titanium-web-proxy) was archived at 3.x; the 7.x line has no project URL,
-no repository URL, and no license metadata (no `license`, `licenseUrl` or license file in the
-nuspec or catalog). The nuspec names only git commit `630f01804493a293fade9a48e8ee40387dbd7414`
-with no repository to resolve it against. It depends on `Titanium.Web.Proxy.Abstractions`
-7.0.26 and `BouncyCastle.Cryptography` 2.6.2.
+NuGet owner `titanium007`, package id prefix not verified). The nuspec carries no project
+URL, repository URL or license metadata, but its git commit
+`630f01804493a293fade9a48e8ee40387dbd7414` is the 2026-10-19 merge of the `beta` branch in
+the MIT-licensed upstream project
+[justcoding121/titanium-web-proxy](https://github.com/justcoding121/titanium-web-proxy),
+whose `v7.0.26` release was published the same day. It depends on
+`Titanium.Web.Proxy.Abstractions` 7.0.26 and `BouncyCastle.Cryptography` 2.6.2.
 
-Treat it as unverified third-party code that handles the root CA private key, decrypted
-provider traffic and the system proxy settings. Its behavior was checked by decompiling the
+It is third-party code that handles the root CA private key, decrypted provider traffic and
+the system proxy settings. Its behavior was checked by decompiling the
 assembly rather than assumed from upstream documentation, and that check drove these choices:
 `ProxyServer` is constructed with root trust off (its default adds the root to the user's
 certificate store on every start), it is started without its own system-proxy changes, and
 the system proxy is set through `TrySetAsSystemProxy` with the registered endpoint, because
-`SetAsSystemProxy` only logs a warning on failure. Its license status is unknown; confirm it
-before redistributing ai-proxy in a form that bundles the package.
+`SetAsSystemProxy` only logs a warning on failure. A bundled redistribution carries the MIT
+notice of the upstream project.

@@ -38,8 +38,9 @@ that database as agent data.
 
 ## Third-party proxy engine
 
-HTTPS interception and system proxy changes are done by `Titanium.Web.Proxy` 7.0.26, an
-unverified NuGet package with no published source repository or license metadata (see
+HTTPS interception and system proxy changes are done by `Titanium.Web.Proxy` 7.0.26, built
+from the MIT-licensed justcoding121/titanium-web-proxy repository; its NuGet id prefix is not
+verified and its nuspec carries no repository or license metadata (see
 [ADR 0003](docs/adr/0003-machine-wide-forward-proxy-and-provider-inspection.md#dependency-provenance)).
 It has access to the root CA key and to decrypted provider traffic. Report problems that
 come from it here as well.
