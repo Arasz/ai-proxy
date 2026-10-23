@@ -136,6 +136,64 @@ From F4, F5 and F7 plus the lane's notes:
 Titanium already contains this code privately. Duplicating it is the cost of keeping a corporate
 proxy that a crash overwrote.
 
+### F13 — A child reading a pipe from its parent sees end-of-file the moment the parent is SIGKILLed [MEASURED]
+
+The child was started in its own session and blocked on reading stdin. Its read returned 1.00s
+after it started, which equals the parent's sleep before `SIGKILL`, so there was no detection
+delay. The child was then owned by launchd (`ppid 1`). Pipe end-of-file is therefore a portable
+"parent died" signal that needs no polling and cannot be fooled by PID reuse.
+
+**Evidence:** scratchpad `parent.py`/`child.py` (Python 3.15, macOS 27.0.1).
+- `Popen(stdin=PIPE, start_new_session=True)`.
+- The parent then ran `os.kill(os.getpid(), SIGKILL)`; exit code 137.
+- The child wrote `EOF after 1.00s, ppid now 1`.
+
+Not yet run from a .NET `Process.Start` pipe.
+
+### F14 — Titanium sets the system proxy only for an endpoint registered in the same running `ProxyServer` [READ]
+
+`TrySetAsSystemProxy` calls `ValidateEndPointAsSystemProxy`. That throws "Cannot set endPoints
+not added to proxy as system proxy" unless `ProxyEndPoints.Contains(endPoint)` and
+`ProxyRunning` both hold. A sidecar that does not own the listener cannot call `Set`. Setting
+HTTPS also calls `CertificateManager.EnsureRootCertificate()` and silently drops HTTPS when the
+root is not validated.
+
+**Evidence:** justcoding121/titanium-web-proxy `v7.0.26`:
+- `src/Titanium.Web.Proxy/ProxyServer.cs:1748-1756`
+- `src/Titanium.Web.Proxy/ProxyServer.SystemProxy.cs:108-133`
+
+### F15 — Titanium's backends snapshot only as a side effect of a write, and the side effect differs by OS [READ]
+
+`TryDisableSystemProxy(protocol)` calls the backend's `RemoveProxy`, which snapshots first. With
+`ProxyProtocolType.None`:
+- **macOS:** it snapshots and then writes nothing. Each write is guarded by a protocol flag.
+- **Windows:** it rewrites `ProxyEnable=1` whenever `ProxyServer` holds a value. That turns on a
+  proxy the user had configured but disabled.
+- **Linux:** it disables GNOME, KDE and the env vars whatever the protocol.
+
+So a side-effect-free snapshot through Titanium's public API exists on macOS only.
+`TryDisableSystemProxy` itself needs no registered endpoint and no running server, so a sidecar
+can always *clear*.
+
+The macOS backend also restores its snapshot on `ProcessExit` and `UnhandledException`, and
+writes through `networksetup` with an elevation fallback.
+
+**Evidence:** titanium-web-proxy `v7.0.26`:
+- `Helpers/MacOsSystemProxyBackend.cs:30-38, 82-100, 220-234`
+- `Helpers/SystemProxy.cs:189-219`
+- `Helpers/LinuxSystemProxyBackend.cs:155-222`
+- `ProxyServer.SystemProxy.cs:276-292`
+
+### F16 — A sidecar can restore the true original only if ai-proxy captures the snapshot itself [INFERRED]
+
+From F14 and F15: the sidecar cannot `Set`. On Windows and Linux it cannot snapshot through
+Titanium without changing settings, and the parent's snapshot is private and dies with it. So the
+choice is between:
+- a sidecar that clears, using Titanium's public API on all OSes;
+- a sidecar that restores from ai-proxy's own snapshot. The per-OS reads and writes are F4
+  (macOS), the registry values (Windows) and gsettings/KDE (Linux). Written to `~/.ai-proxy`,
+  that snapshot file can also serve as the crash marker.
+
 ## Still open
 
 - The Windows registry, `DefaultConnectionSettings` and `InternetSetOption` details come from
