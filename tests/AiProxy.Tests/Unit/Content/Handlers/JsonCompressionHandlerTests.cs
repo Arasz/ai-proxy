@@ -47,6 +47,16 @@ public class JsonCompressionHandlerTests
     }
 
     [Fact]
+    public async Task The_reduction_is_an_ordered_subsequence_of_the_input()
+    {
+        var original = "{ \"a\": 1, \"b\": [1, 2], \"c\": { \"d\": \"text\" } }";
+
+        var result = await Handler.HandleAsync(Part(original), CancellationToken.None);
+
+        OrderedSubsequence.AssertHolds(result.Text, original);
+    }
+
+    [Fact]
     public async Task The_handler_says_which_path_it_took()
     {
         var result = await Handler.HandleAsync(Part("""{"a":1}"""), CancellationToken.None);

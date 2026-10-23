@@ -157,6 +157,27 @@ public class TextCompressionHandlerTests
     }
 
     [Fact]
+    public async Task Every_text_reducer_keeps_an_ordered_subsequence_of_its_input()
+    {
+        var cases = new (ICompressionHandler Handler, ContentType Kind, string Text)[]
+        {
+            (new TomlCompressionHandler(), ContentType.Toml, "# a comment\nkey = \"value\"\n\n# another\nother = 1"),
+            (new MarkdownCompressionHandler(), ContentType.Markdown, "<!-- hidden -->\n# Title\n\n\n\nbody"),
+            (new SourceCodeCompressionHandler(), ContentType.SourceCode, "var a = 1;\n\nvar b = 2;\n\n\nreturn a;"),
+            (new ProseCompressionHandler(), ContentType.Prose, "the same line\nthe same line\nanother line"),
+            (new DirectoryListingCompressionHandler(), ContentType.DirectoryListing, "Dialect.cs\nUpstreamForwarder.cs"),
+            (new PassThroughCompressionHandler(), ContentType.Unknown, "anything at all"),
+        };
+
+        foreach (var (handler, kind, text) in cases)
+        {
+            var result = await handler.HandleAsync(Part(kind, text), CancellationToken.None);
+
+            OrderedSubsequence.AssertHolds(result.Text, text);
+        }
+    }
+
+    [Fact]
     public async Task Each_handler_claims_only_its_own_kind()
     {
         Assert.True(new TomlCompressionHandler().CanHandle(ContentType.Toml));
