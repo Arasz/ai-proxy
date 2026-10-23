@@ -1,36 +1,42 @@
 using AiProxy.Core.Compression;
-using AiProxy.Core.Providers;
 using Titanium.Web.Proxy.EventArguments;
 
 namespace AiProxy.Hosting;
 
-/// <summary>Inspects and compresses requests sent to the canonical provider API hosts.</summary>
+/// <summary>Inspects and compresses requests sent to provider API hosts.</summary>
 public sealed class ProviderRequestInspector
 {
-    private readonly ICompressionPipeline _compression;
+    private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
-    /// <summary>Creates an inspector using the configured compression pipeline.</summary>
-    public ProviderRequestInspector(ICompressionPipeline compression)
+    private readonly ICompressionPipeline _compression;
+    private readonly IProviderHosts _providerHosts;
+    private readonly bool _compressionEnabled;
+
+    /// <summary>Creates an inspector; with compression disabled every request passes through untouched.</summary>
+    public ProviderRequestInspector(ICompressionPipeline compression, IProviderHosts providerHosts, bool compressionEnabled)
     {
         ArgumentNullException.ThrowIfNull(compression);
+        ArgumentNullException.ThrowIfNull(providerHosts);
         _compression = compression;
+        _providerHosts = providerHosts;
+        _compressionEnabled = compressionEnabled;
     }
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
+        if (!_compressionEnabled)
+        {
+            return;
+        }
+
         var request = e.HttpClient.Request;
-        if (ProviderHostCatalog.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
+        if (_providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
         {
             return;
         }
 
-        if (_compression is PassThroughCompressionPipeline)
-        {
-            return;
-        }
-
-        if (request.ContentLength > 8 * 1024 * 1024)
+        if (request.ContentLength > MaxInspectedBodyBytes)
         {
             return;
         }

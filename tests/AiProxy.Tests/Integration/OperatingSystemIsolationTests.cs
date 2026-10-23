@@ -23,7 +23,8 @@ public class OperatingSystemIsolationTests
 
         await using (var service = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline()),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false),
+            new CanonicalProviderHosts(),
             NullLogger<TitaniumProxyService>.Instance))
         {
             await service.StartAsync(TestContext.Current.CancellationToken);

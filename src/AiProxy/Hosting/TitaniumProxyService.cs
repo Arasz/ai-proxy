@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
-using AiProxy.Core.Providers;
 
 namespace AiProxy.Hosting;
 
@@ -18,6 +17,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly ProxyRuntimeOptions _options;
     private readonly ProviderRequestInspector _inspector;
+    private readonly IProviderHosts _providerHosts;
     private readonly ILogger<TitaniumProxyService> _logger;
     private ExplicitProxyEndPoint? _endPoint;
     private bool _started;
@@ -27,8 +27,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     public TitaniumProxyService(
         ProxyRuntimeOptions options,
         ProviderRequestInspector inspector,
+        IProviderHosts providerHosts,
         ILogger<TitaniumProxyService> logger)
-        : this(null, options, inspector, logger)
+        : this(null, options, inspector, providerHosts, logger)
     {
     }
 
@@ -36,15 +37,18 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ISystemProxyRegistrar? systemProxyRegistrar,
         ProxyRuntimeOptions options,
         ProviderRequestInspector inspector,
+        IProviderHosts providerHosts,
         ILogger<TitaniumProxyService> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(inspector);
+        ArgumentNullException.ThrowIfNull(providerHosts);
         ArgumentNullException.ThrowIfNull(logger);
         _server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(_server);
         _options = options;
         _inspector = inspector;
+        _providerHosts = providerHosts;
         _logger = logger;
         Address = new Uri($"http://{options.ListenAddress}:{options.Port}");
     }
@@ -175,10 +179,12 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private Task BeforeResponseAsync(object sender, SessionEventArgs e) => _inspector.BeforeResponseAsync(sender, e);
 
-    private static Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
+    private Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
     {
-        var host = e.HttpClient.ConnectRequest?.Host;
-        e.DecryptSsl = host is not null && ProviderHostCatalog.ShouldInspectHttpsAuthority(host);
+        var authority = e.HttpClient.ConnectRequest?.Host;
+        e.DecryptSsl = !string.IsNullOrWhiteSpace(authority) &&
+                       Uri.TryCreate($"https://{authority}", UriKind.Absolute, out var address) &&
+                       _providerHosts.Find(address.Host) is not null;
         return Task.CompletedTask;
     }
 

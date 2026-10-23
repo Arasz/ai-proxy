@@ -27,6 +27,9 @@ internal sealed class ProxyHost : IAsyncDisposable
     /// <summary>The address the proxy listens on.</summary>
     public Uri BaseAddress { get; private set; } = null!;
 
+    /// <summary>The forward-proxy listener clients send provider traffic through.</summary>
+    public Uri ProxyAddress => _app.Services.GetRequiredService<TitaniumProxyService>().Address;
+
     /// <summary>The private data directory the proxy was given.</summary>
     public string DataDirectory => _directory.Path;
 
@@ -36,7 +39,8 @@ internal sealed class ProxyHost : IAsyncDisposable
     /// <summary>Starts the proxy with the given configuration.</summary>
     public static async Task<ProxyHost> StartAsync(
         IReadOnlyDictionary<string, string> configuration,
-        ICompressionPipeline? compression = null)
+        ICompressionPipeline? compression = null,
+        IProviderHosts? providerHosts = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -55,7 +59,18 @@ internal sealed class ProxyHost : IAsyncDisposable
         var directory = new TemporaryDirectory();
         var app = ProxyApplication.Create(
             builder,
-            compression is null ? null : services => services.AddSingleton(compression),
+            services =>
+            {
+                if (compression is not null)
+                {
+                    services.AddSingleton(compression);
+                }
+
+                if (providerHosts is not null)
+                {
+                    services.AddSingleton(providerHosts);
+                }
+            },
             new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 
         await app.StartAsync();

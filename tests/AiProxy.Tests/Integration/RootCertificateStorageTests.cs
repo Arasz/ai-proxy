@@ -89,7 +89,8 @@ public class RootCertificateStorageTests
             {
                 RootCertificatePassword = password,
             },
-            new ProviderRequestInspector(new PassThroughCompressionPipeline()),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false),
+            new CanonicalProviderHosts(),
             NullLogger<TitaniumProxyService>.Instance);
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
