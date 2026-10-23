@@ -50,7 +50,38 @@ public sealed class PartIsolationTests : IDisposable
     {
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await ProxyHost.StartAsync(
+        await using var proxy = await StartProxyAsync(logs);
+        var body = $$"""
+            {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}},{"type":"tool_result","content":{{JsonSerializer.Serialize(Prose)}}}]}]}
+            """;
+
+        await SendAsync(proxy, upstream, body);
+
+        var received = Assert.Single(upstream.Requests).Body;
+        Assert.Contains(JsonSerializer.Serialize(Log), received, StringComparison.Ordinal);
+        Assert.DoesNotContain(JsonSerializer.Serialize(Prose), received, StringComparison.Ordinal);
+        Assert.True(received.Length < body.Length, $"the body was {received.Length} bytes, the original was {body.Length}");
+        AssertOnePartFailureLogged(logs);
+    }
+
+    [Fact]
+    public async Task A_part_failure_is_logged_even_when_nothing_else_in_the_request_changed()
+    {
+        var logs = new RecordingLoggerProvider();
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await StartProxyAsync(logs);
+        var body = $$"""
+            {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}}]}]}
+            """;
+
+        await SendAsync(proxy, upstream, body);
+
+        Assert.Equal(body, Assert.Single(upstream.Requests).Body);
+        AssertOnePartFailureLogged(logs);
+    }
+
+    private Task<ProxyHost> StartProxyAsync(RecordingLoggerProvider logs) =>
+        ProxyHost.StartAsync(
             new Dictionary<string, string>
             {
                 ["PROXY_COMPRESSION"] = "on",
@@ -64,25 +95,23 @@ public sealed class PartIsolationTests : IDisposable
                 services.AddSingleton<ICompressionHandler, ThrowingLogHandler>();
                 services.AddSingleton<ILoggerProvider>(logs);
             });
-        var body = $$"""
-            {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}},{"type":"tool_result","content":{{JsonSerializer.Serialize(Prose)}}}]}]}
-            """;
 
+    private static async Task SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
+    {
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
         using var client = new HttpClient(handler);
         using var response = await client.PostAsync(
             new Uri(upstream.BaseAddress, "/v1/messages"),
             new StringContent(body, Encoding.UTF8, "application/json"),
             TestContext.Current.CancellationToken);
+    }
 
-        var received = Assert.Single(upstream.Requests).Body;
-        Assert.Contains(JsonSerializer.Serialize(Log), received, StringComparison.Ordinal);
-        Assert.DoesNotContain(JsonSerializer.Serialize(Prose), received, StringComparison.Ordinal);
-        Assert.True(received.Length < body.Length, $"the body was {received.Length} bytes, the original was {body.Length}");
-        Assert.Contains(logs.Entries, entry =>
-            entry.Category == typeof(ProviderRequestInspector).FullName &&
-            entry.EventId == 1402 &&
-            entry.Exception is InvalidOperationException);
+    private static void AssertOnePartFailureLogged(RecordingLoggerProvider logs)
+    {
+        var failure = Assert.Single(logs.Entries, entry => entry.EventId == 1402);
+        Assert.Equal(typeof(ProviderRequestInspector).FullName, failure.Category);
+        Assert.Equal(LogLevel.Warning, failure.Level);
+        Assert.Equal("boom", Assert.IsType<InvalidOperationException>(failure.Exception).Message);
     }
 
     private sealed class ThrowingLogHandler : ICompressionHandler
@@ -93,7 +122,7 @@ public sealed class PartIsolationTests : IDisposable
             throw new InvalidOperationException("boom");
     }
 
-    private sealed record LogEntry(string Category, int EventId, Exception? Exception);
+    private sealed record LogEntry(string Category, LogLevel Level, int EventId, Exception? Exception);
 
     private sealed class RecordingLoggerProvider : ILoggerProvider
     {
@@ -116,6 +145,6 @@ public sealed class PartIsolationTests : IDisposable
         public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            entries.Enqueue(new LogEntry(category, eventId.Id, exception));
+            entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, exception));
     }
 }
