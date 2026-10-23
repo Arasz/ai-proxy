@@ -37,10 +37,12 @@ public class ForwardProxyTests
     private sealed class TestProxy : IAsyncDisposable
     {
         private readonly TitaniumProxyService _service;
+        private readonly TemporaryDirectory _directory;
 
-        private TestProxy(TitaniumProxyService service)
+        private TestProxy(TitaniumProxyService service, TemporaryDirectory directory)
         {
             _service = service;
+            _directory = directory;
         }
 
         public Uri Address => _service.Address;
@@ -51,18 +53,20 @@ public class ForwardProxyTests
             portListener.Start();
             var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
             portListener.Stop();
+            var directory = new TemporaryDirectory();
             var service = new TitaniumProxyService(
-                new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false),
+                new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
                 new ProviderRequestInspector(new PassThroughCompressionPipeline()),
                 NullLogger<TitaniumProxyService>.Instance);
             await service.StartAsync(TestContext.Current.CancellationToken);
-            return new TestProxy(service);
+            return new TestProxy(service, directory);
         }
 
         public async ValueTask DisposeAsync()
         {
             await _service.StopAsync(CancellationToken.None);
             await _service.DisposeAsync();
+            _directory.Dispose();
         }
     }
 }

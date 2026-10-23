@@ -16,10 +16,11 @@ public class TitaniumProxyServiceTests
         var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
         portListener.Stop();
 
+        using var directory = new TemporaryDirectory();
         var registrar = new RecordingSystemProxyRegistrar();
         await using var service = new TitaniumProxyService(
             registrar,
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: true, TrustRootCertificate: false),
+            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: true, TrustRootCertificate: false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline()),
             NullLogger<TitaniumProxyService>.Instance);
 

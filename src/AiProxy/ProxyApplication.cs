@@ -23,7 +23,13 @@ public static class ProxyApplication
         var compression = CompressionSettings.FromConfiguration(builder.Configuration);
 
         builder.Services.AddSingleton(compression);
-        builder.Services.AddSingleton(runtimeOptions ?? ProxyRuntimeOptions.Default);
+        var proxyOptions = runtimeOptions ?? ProxyRuntimeOptions.Default;
+        if (builder.Configuration["PROXY_ROOT_CERTIFICATE_PASSWORD"] is { Length: > 0 } rootPassword)
+        {
+            proxyOptions = proxyOptions with { RootCertificatePassword = rootPassword };
+        }
+
+        builder.Services.AddSingleton(proxyOptions);
         if (compression.Enabled)
         {
             AddCompression(builder.Services, compression);

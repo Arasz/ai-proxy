@@ -18,6 +18,14 @@ including credentials, and means the generated root private key must remain prot
 local machine. HTTPS to other hosts stays in a CONNECT tunnel, and other HTTP destinations are
 forwarded without request-body inspection.
 
+The root certificate and its private key are kept in `~/.ai-proxy/root-ca.pfx`. On Linux and
+macOS the directory is created (or tightened) to mode `0700` and the file to `0600`, so file
+permissions are the main protection. Set `PROXY_ROOT_CERTIFICATE_PASSWORD` to also encrypt the
+pfx; changing or removing the password later makes the existing file unreadable, and ai-proxy
+generates a new root that has to be trusted again. Per-host leaf certificates live in memory
+only. ai-proxy adds the root to the operating-system trust store only when root trust is
+enabled; the test suite never touches the trust store or the system proxy settings.
+
 The proxy does not own provider API keys. It forwards the caller's credential headers to the
 addressed provider. There is no host allowlist for other destinations: software using the
 system proxy can send arbitrary HTTP traffic through it. Clients that ignore system proxy

@@ -14,6 +14,7 @@ public class OperatingSystemIsolationTests
     [Fact]
     public async Task Starting_without_trust_opt_in_leaves_the_user_certificate_stores_untouched()
     {
+        using var directory = new TemporaryDirectory();
         var before = CountRootCertificates();
         var portListener = new TcpListener(IPAddress.Loopback, 0);
         portListener.Start();
@@ -21,7 +22,7 @@ public class OperatingSystemIsolationTests
         portListener.Stop();
 
         await using (var service = new TitaniumProxyService(
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false),
+            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline()),
             NullLogger<TitaniumProxyService>.Instance))
         {

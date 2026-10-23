@@ -11,6 +11,9 @@ namespace AiProxy.Hosting;
 /// <summary>Runs the explicit HTTP(S) proxy and restores machine proxy settings on shutdown.</summary>
 public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposable
 {
+    /// <summary>File name of the root CA pfx inside <see cref="ProxyRuntimeOptions.DataDirectory"/>.</summary>
+    public const string RootCertificateFileName = "root-ca.pfx";
+
     private readonly ProxyServer _server;
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly ProxyRuntimeOptions _options;
@@ -58,6 +61,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server.ViaHeaderPseudonym = string.Empty;
         _server.BeforeRequest += BeforeRequestAsync;
         _server.BeforeResponse += BeforeResponseAsync;
+
+        PrepareRootCertificate();
 
         _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, decryptSsl: true);
         _endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequestAsync;
@@ -132,6 +137,37 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         }
         _server.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    private void PrepareRootCertificate()
+    {
+        CreatePrivateDirectory(_options.DataDirectory);
+        var certificates = _server.CertificateManager;
+        certificates.PfxFilePath = Path.GetFullPath(Path.Combine(_options.DataDirectory, RootCertificateFileName));
+        certificates.PfxPassword = _options.RootCertificatePassword ?? string.Empty;
+        certificates.SaveFakeCertificates = false;
+        if (!certificates.CreateRootCertificate())
+        {
+            throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    private static void CreatePrivateDirectory(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(path);
+            return;
+        }
+
+        const UnixFileMode userOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        Directory.CreateDirectory(path, userOnly);
+        File.SetUnixFileMode(path, userOnly);
     }
 
     private Task BeforeRequestAsync(object sender, SessionEventArgs e) => _inspector.BeforeRequestAsync(sender, e);

@@ -16,14 +16,19 @@ namespace AiProxy.Tests.Integration;
 internal sealed class ProxyHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
+    private readonly TemporaryDirectory _directory;
 
-    private ProxyHost(WebApplication app)
+    private ProxyHost(WebApplication app, TemporaryDirectory directory)
     {
         _app = app;
+        _directory = directory;
     }
 
     /// <summary>The address the proxy listens on.</summary>
     public Uri BaseAddress { get; private set; } = null!;
+
+    /// <summary>The private data directory the proxy was given.</summary>
+    public string DataDirectory => _directory.Path;
 
     /// <summary>The host services used by the integration fixture.</summary>
     public IServiceProvider Services => _app.Services;
@@ -47,16 +52,17 @@ internal sealed class ProxyHost : IAsyncDisposable
             builder.Configuration[key] = value;
         }
 
+        var directory = new TemporaryDirectory();
         var app = ProxyApplication.Create(
             builder,
             compression is null ? null : services => services.AddSingleton(compression),
-            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false));
+            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 
         await app.StartAsync();
 
         var addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
 
-        return new ProxyHost(app) { BaseAddress = new Uri(addresses!.Addresses.First()) };
+        return new ProxyHost(app, directory) { BaseAddress = new Uri(addresses!.Addresses.First()) };
     }
 
     /// <summary>Stops the proxy.</summary>
@@ -64,5 +70,6 @@ internal sealed class ProxyHost : IAsyncDisposable
     {
         await _app.StopAsync();
         await _app.DisposeAsync();
+        _directory.Dispose();
     }
 }
