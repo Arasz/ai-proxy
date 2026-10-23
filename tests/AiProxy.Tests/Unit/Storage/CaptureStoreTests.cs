@@ -92,6 +92,28 @@ public class CaptureStoreTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task A_capture_directory_that_was_open_to_others_is_tightened()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file modes do not apply on Windows.");
+        var directory = Path.GetDirectoryName(_databasePath)!;
+        if (!OperatingSystem.IsWindows())
+        {
+            var openToOthers = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+            Directory.CreateDirectory(directory);
+            File.SetUnixFileMode(directory, openToOthers);
+            Assert.Equal(openToOthers, File.GetUnixFileMode(directory));
+        }
+
+        await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory));
+        }
+    }
+
     private static CapturedRequest Capture(string requestId) =>
         new(requestId, DateTimeOffset.UnixEpoch, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", "{}"u8.ToArray());
 
