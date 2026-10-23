@@ -8,10 +8,11 @@
 - Fix: design must require at least one contract test against real SQLite (design-gate-audit F3, F4).
 
 ### F2 — Golden test needed for decomposer port from pyc [MAJOR]
-- The source `reducer.py` is lost; only `~kompress-work/__pycache__/reducer.cpython-312.pyc` survives (`dis` readable, F1 of decomposition doc).
+- The source `reducer.py` is lost; only `~kompress-work/__pycache__/reducer.cpython-312.pyc` survives (`dis` readable, F1 of decomposition doc). (As written; see the annotation below.)
 - What proves port behaves like original: golden fixtures (measured outputs 0.698–0.902) + property tests (subset, dedup order, overlay token order). Golden alone is not enough — property proves structural invariants across fixtures.
 - Check: `DecomposerTests.Golden_Matches_Pyc_Disassembly` against fixtures from `reducer.cpython-312.pyc` + mutation altering split rule (e.g., split on `\n\n` instead of structure) turns red.
 - Fix: design must list fixture sources (`__pycache__` disassembly + measured size table) and require both golden + property.
+- Annotation, 2026-10-23: the premise is out of date. `reducer.py` exists, committed at `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/reducer.py` (the `.pyc` is beside it in `scripts/__pycache__/`; `~kompress-work` is gone). The source gives `dedup_lines("a\nb\na\na\n")` = `'a\nb\na\na\n'`, the same as the `.pyc`. Golden fixtures can come from the source directly; see the correction in `2026-10-22-on-device-compression-models.md`.
 
 ### F3 — Subset property ("never rewrites client's words") needs inclusion proof, not spot checks [MAJOR]
 - Claim: reduced text ⊆ original text (per chunk; overlay rebuilds from subset + retained tokens).
@@ -40,6 +41,7 @@
 (derived from F2 + F1 of both docs; gate honesty)
 - The decomposer depends on regexes from `reducer.cpython-312.pyc` (dis-verified). No `reducer.py` source. A test that assumes the regex is correct cannot fail for the regex being wrong.
 - Fix: design must document that regex source of truth is disassembly of `reducer.cpython-312.pyc`, not reconstructed memory.
+- Annotation, 2026-10-23: superseded. A canonical source exists at `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/reducer.py`; the regex source of truth is that file, with the `.pyc` as a cross-check. See `2026-10-22-on-device-compression-models.md`, "Correction, 2026-10-23".
 
 ## Fakes that are needed, and what each one must model
 
