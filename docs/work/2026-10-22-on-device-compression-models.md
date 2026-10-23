@@ -13,7 +13,11 @@ puts the survivors against each other on four real payloads with verifiable answ
 **Provenance.** The measurements were taken in the sibling project `models-conversion` on the same
 M4 machine. The full record with all 20 findings is at
 `models-conversion/docs/work/2026-10-22-on-device-compression-models.md`; the scripts, the
-downloaded models and the eleven agent notes live outside both repositories, in `~/kompress-work`.
+downloaded models and the eleven agent notes were first kept outside both repositories, in
+`~/kompress-work`, which no longer exists. The scripts, logs and notes are committed in the
+sibling repository at `models-conversion/docs/work/2026-10-21-kompress-v2-kit/`; the downloaded
+models are not in the kit. Every path below that begins `models-conversion/` is relative to the
+directory that holds both checkouts.
 
 ## Findings
 
@@ -37,7 +41,7 @@ Nothing compresses a directory listing without losing file names, and nothing sh
 **Evidence:** `models-conversion` record F12 and F20, measured on the M4 with
 `chopratejas/kompress-v2-base` → `onnx/kompress-int8-wo.onnx` on the CPU provider,
 `google/flan-t5-small` for the summarizer, and the rule reducers in
-`~/kompress-work/reducer.py`; 45 rows over five payloads in `~/kompress-work/reducer_benchmark.json`,
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/reducer.py`; 45 rows over five payloads in `models-conversion/docs/work/2026-10-21-kompress-v2-kit/logs/reducer_benchmark.json`,
 each reducer timed three times, median reported.
 
 ### F2 — The 77M summarizer is disqualified, because it drops the root cause [MEASURED]
@@ -49,9 +53,9 @@ and the trace id was gone. So was the FATAL line with the waiters count. Over fo
 verifiable answers it kept 0 of 8, 0 of 8, 0 of 6 and 1 of 6. On a 7.5 KB C# file it reduced the
 file to 0.1% of its size and kept none of the identifiers.
 
-**Evidence:** `models-conversion` record F2 and F8; `~/kompress-work/sanity.py flan-t5-small` and
-`bench_reducers.py` on the M4. The agent judge agreed independently, and named the failure
-better than the orchestrator did: "This is not data loss; it's signal inversion" ("~/kompress-work/notes/flan-t5-small-judge.md"). The model's own contract is the cause, the card's
+**Evidence:** `models-conversion` record F2 and F8; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/sanity.py flan-t5-small` and
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/bench_reducers.py` on the M4. The agent judge agreed independently, and named the failure
+better than the orchestrator did: "This is not data loss; it's signal inversion" ("models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/flan-t5-small-judge.md"). The model's own contract is the cause, the card's
 `task_specific_params.summarization.prefix = "summarize: "`, which trains it as a prose
 summarizer; the judge named the one situation where that is acceptable, a presentation layer for
 a human reading prose with a separate lossless path for structured diagnostics, and there is no
@@ -64,7 +68,7 @@ reads well ("The engineer encountered a timeout while attempting to connect to t
 `/v1/orders/99182`"), and still loses the file path, the line number and the counts. The same
 loss as the 77M model, at 12 times the latency and three times the bytes.
 
-**Evidence:** `models-conversion` record F6; `~/kompress-work/sanity.py qwen-0.5b` on the M4, three
+**Evidence:** `models-conversion` record F6; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/sanity.py qwen-0.5b` on the M4, three
 timed runs per payload, medians quoted.
 
 ### F4 — The three families do not overlap in size, and the typed-decision family starts 25x higher [READ]
@@ -81,9 +85,9 @@ family with a genuine small end: 22.7M (`sentence-transformers/all-MiniLM-L6-v2`
 12.02 GiB.
 
 **Evidence:** `models-conversion` record F1, computed from the Hub's own `safetensors.total`
-parameter counts for each of the 52 models, saved in `~/kompress-work/hf_inventory.json`; the
+parameter counts for each of the 52 models, saved in `models-conversion/docs/work/2026-10-21-kompress-v2-kit/logs/hf_inventory.json`; the
 agent's own `du -sk` of the 1.5B model's cache directory, 3.4 GB, in
-`~/kompress-work/notes/jev-codeguard-runner.md`.
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/jev-codeguard-runner.md`.
 
 ### F5 — The embedding models are a ranking layer, and their scores are too packed to gate on [MEASURED]
 
@@ -103,9 +107,9 @@ ranking was 0.782, 0.6213, 0.6134, 0.5382, the sensible order. A sentence embedd
 "which of these is about that topic", which is not the same question as "which of these is
 redundant", and it is not the same question as "which of these implements a feature" either.
 
-**Evidence:** `models-conversion` record F4, F4a, F5, F17; `~/kompress-work/sanity.py bge-small`
-and `sanity.py granite-small` on the M4; `~/kompress-work/notes/granite-small-runner.md` for the
-per-line scores and the 0.05 s a chunk; `~/kompress-work/notes/granite-small-judge.md` for "a hard
+**Evidence:** `models-conversion` record F4, F4a, F5, F17; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/sanity.py bge-small`
+and `sanity.py granite-small` on the M4; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/granite-small-runner.md` for the
+per-line scores and the 0.05 s a chunk; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/granite-small-judge.md` for "a hard
 keep/drop threshold is a different claim from ranking"; the bge runner's own results file in
 `~/.pi/agent/subagent-logs/projects/ba18c794-bc10-488d-8cca-2e1117eec0ba/d-16.jsonl` (seven timed
 repetitions per configuration, median 0.33 s for four payloads).
@@ -120,8 +124,8 @@ its published 93.8% F1 is a code-review number, not a relevance number. Its judg
 expensive judge for cheap token" and put it back where it belongs, a review gate on compressed
 output.
 
-**Evidence:** `~/kompress-work/notes/jev-codeguard-runner.md` and
-`~/kompress-work/notes/jev-codeguard-judge.md`; card
+**Evidence:** `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/jev-codeguard-runner.md` and
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/jev-codeguard-judge.md`; card
 `JackKozmo29/codeguard-jev-style-1.5b` → `README.md` for the training set and the benchmark.
 
 ### F7 — The reranker is out of domain, and its failure mode is named [READ]
@@ -141,9 +145,9 @@ against a perfectly matched query about that directory, and its 512-token window
 gate for prose, a poor one for structured payloads, and never an answer to "what kind of thing
 is this", which is the question the routing table asks.
 
-**Evidence:** `models-conversion` record F7, F13a; `~/kompress-work/notes/ms-marco-minilm-judge.md`
-and `~/kompress-work/notes/ms-marco-minilm-runner.md`, with the raw results in
-`~/kompress-work/scratch-ms-marco-minilm-runner/results*.json`; card
+**Evidence:** `models-conversion` record F7, F13a; `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/ms-marco-minilm-judge.md`
+and `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/ms-marco-minilm-runner.md`, with the raw results in
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/scratch/scratch-ms-marco-minilm-runner/results*.json`; card
 `cross-encoder/ms-marco-MiniLM-L-6-v2` → `README.md` and `config.json` for the training domain
 and the 512-token limit. The two agents' disk figures for one cache directory differ by three
 orders of magnitude, 944 KB against 940 MiB apparent and 175 MiB dereferenced, because `du` on a
@@ -164,8 +168,8 @@ been made and settled the ranking in the branch it predicted (F20 of the source 
 architect's note caught the same card error the judge did, the granite context length of 8192
 tokens rather than 32k, which is the figure the orchestrator's own copy had wrong.
 
-**Evidence:** `~/kompress-work/notes/pipeline-design-architect.md` and
-`~/kompress-work/notes/decision-matrix-delegator.md`; `models-conversion` record F18, F19, F20.
+**Evidence:** `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/pipeline-design-architect.md` and
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/decision-matrix-delegator.md`; `models-conversion` record F18, F19, F20.
 
 The two agents disagree on one point, and the record leaves the disagreement visible. The matrix
 ranked the typed-decision model third to build, for selective structured payloads, on the strength
@@ -186,7 +190,7 @@ and a sweep that half failed is part of the result.
 **Evidence:** the delegation logs in
 `~/.pi/agent/subagent-logs/projects/ba18c794-bc10-488d-8cca-2e1117eec0ba/d-1.jsonl` and
 `d-2.jsonl` (zero write calls in both), against the notes that exist in
-`~/kompress-work/notes/`; `models-conversion` record F13.
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes/`; `models-conversion` record F13.
 
 ## What this means for the proxy
 
@@ -232,12 +236,22 @@ every copy survives. The measured log reducer was the signal filter and the two 
 end, and the 0.75 came from those alone. The deduplication in the table is what the script's
 docstring said it did, not what it did.
 
-**Evidence:** the source of `~/kompress-work/reducer.py` no longer exists, but its compiled form
-survives in `~/kompress-work/__pycache__/reducer.cpython-312.pyc`, and running that under
-CPython 3.12 gives the behaviour rather than a reading of it: `dedup_lines("a\nb\na\na\n")`
-returns `'a\nb\na\na\n'`, every copy, while the same call with `keep_first=False` returns
-`'b\n'`. The same recovery of the benchmark script (`bench_reducers.cpython-312.pyc`) is where
-the recipes in `2026-10-22-content-decomposition-and-format-detection.md` came from.
+**Evidence:** as written, the source of `reducer.py` no longer existed, but its compiled form
+survived in `reducer.cpython-312.pyc`, and running that under CPython 3.12 gave the behaviour
+rather than a reading of it: `dedup_lines("a\nb\na\na\n")` returned `'a\nb\na\na\n'`, every copy,
+while the same call with `keep_first=False` returned `'b\n'`. The same recovery of the benchmark
+script (`bench_reducers.cpython-312.pyc`) is where the recipes in
+`2026-10-22-content-decomposition-and-format-detection.md` came from.
+
+**Correction, 2026-10-23.** The source does exist. It is committed in the sibling repository at
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/reducer.py`, with the compiled
+forms beside it in `models-conversion/docs/work/2026-10-21-kompress-v2-kit/scripts/__pycache__/reducer.cpython-312.pyc`
+(and a `cpython-315` build), and `bench_reducers.py` next to it. Running `dedup_lines` from that
+source under python3 gives `dedup_lines("a\nb\na\na\n")` = `'a\nb\na\na\n'` and, with
+`keep_first=False`, `'b\n'`. Both match what the paragraph above reports for the `.pyc`, and the
+cause reads straight off the source: `counts[key] = 0` is followed on the next copy by
+`counts[key] > 1`, which is false, so the copy is appended. The no-op finding stands; only the
+claim that the source was gone is withdrawn.
 
 **The proxy's port keeps the first copy and drops the repeats**, which is what the script's
 docstring said it did, so the reducer that shipped is stronger than the one that was measured.
@@ -280,10 +294,11 @@ tool's words.
 
 ## Method note
 
-The orchestrator's own measurements are in `~/kompress-work`: `hf_inventory.py` (52 models),
-`sanity.py` (per-family runs on four payloads), `reducer.py` (the rule-based reducers and the
-overlays), `bench_reducers.py` (the 45-row reducer benchmark over five payloads) and
-`reducer_benchmark.json`. The eleven agent notes are in `~/kompress-work/notes`. Every one of the
+The orchestrator's own measurements are in `models-conversion/docs/work/2026-10-21-kompress-v2-kit/`
+(first written in `~/kompress-work`, now gone): `scripts/hf_inventory.py` (52 models),
+`scripts/sanity.py` (per-family runs on four payloads), `scripts/reducer.py` (the rule-based reducers and the
+overlays), `scripts/bench_reducers.py` (the 45-row reducer benchmark over five payloads) and
+`logs/reducer_benchmark.json`. The eleven agent notes are in `models-conversion/docs/work/2026-10-21-kompress-v2-kit/notes`. Every one of the
 fifteen agent runs carries a provider billing-exhaustion router fallback, so the agents' numbers
 are direction rather than benchmark, and the orchestrator's own runs are the ones quoted with
 conditions. The two agents whose first attempt failed wrote nothing and were re-dispatched

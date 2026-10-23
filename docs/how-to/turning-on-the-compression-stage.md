@@ -69,5 +69,5 @@ overrides them all.
 `PROXY_COMPRESSION_MODEL` points at the extractive model's artifact. The model is not in this
 release, and the rule-based prose path runs until it is. The measurements that chose the rules
 are in the
-[compression research record](docs/work/2026-10-22-on-device-compression-models.md), and the
+[compression research record](../work/2026-10-22-on-device-compression-models.md), and the
 corrections the implementation found in them are at the end of that record.
