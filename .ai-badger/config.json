@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/config.schema.json",
-  "frameworkVersion": "0.214.0",
+  "frameworkVersion": "0.215.0",
   "project": {
     "name": "ai-proxy",
     "summary": "A local proxy that detects the LLM provider dialect of an inbound request, forwards it to that provider's upstream, and passes other local traffic through.",
