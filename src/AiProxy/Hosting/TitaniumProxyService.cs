@@ -38,7 +38,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(inspector);
         ArgumentNullException.ThrowIfNull(logger);
-        _server = new ProxyServer();
+        _server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(_server);
         _options = options;
         _inspector = inspector;
@@ -72,7 +72,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             }
         }
 
-        _server.Start();
+        _server.Start(changeSystemProxySettings: false);
         _started = true;
         if (_options.ConfigureSystemProxy)
         {
