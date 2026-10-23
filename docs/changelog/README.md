@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.6.0](0.6.0-request-capture.md) | `PROXY_CAPTURE=on` keeps every provider request body, as sent, in a user-only local file; headers and query strings are not stored. | #TBD |
 | [0.5.1](0.5.1-failing-reducer-keeps-its-part.md) | A reducer that throws leaves only its own part unreduced and logs a warning; the other parts in the request are still reduced. | #31 |
 | [0.5.0](0.5.0-configurable-proxy-port.md) | `PROXY_PORT` sets the listener and system proxy port; an invalid value or a port in use stops startup. | #27 |
 | [0.4.1](0.4.1-clear-system-proxy-after-crash.md) | The system proxy is cleared after a forced kill, by a guard process or at the next start; a proxy set before the run is not restored in that case. | #23 |

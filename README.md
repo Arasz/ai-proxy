@@ -23,7 +23,9 @@ listener binds to loopback at `127.0.0.1:8080` (set `PROXY_PORT` to change the p
 
 The proxy forwards the caller's credentials unchanged. It has no provider-owned API keys.
 Compression remains off unless enabled with `PROXY_COMPRESSION=on`; see the
-[compression guide](docs/how-to/turning-on-the-compression-stage.md).
+[compression guide](docs/how-to/turning-on-the-compression-stage.md). `PROXY_CAPTURE=on` keeps a
+local copy of every provider request body to measure what requests are made of; see
+[environment variables](docs/reference/environment-variables.md#request-capture).
 
 ## Install
 

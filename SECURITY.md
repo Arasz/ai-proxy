@@ -41,6 +41,13 @@ Compression is opt-in. When enabled, original request bodies that were changed a
 the local content database and can be retrieved through the local content endpoint. Protect
 that database as agent data.
 
+Request capture is opt-in too. With `PROXY_CAPTURE=on`, the full body of every provider request
+the proxy reads is stored locally in `~/.ai-proxy/capture.db`, whether or not compression changed
+it. That is prompts, code and tool output, and any secret pasted into them. Request headers and
+the query string are not stored, so credentials sent as headers or a `?key=` parameter are not
+kept. The directory is `0700` and the file `0600` on Linux and macOS. Turn capture off and delete
+the file when you no longer need it.
+
 ## Third-party proxy engine
 
 HTTPS interception and system proxy changes are done by `Titanium.Web.Proxy` 7.0.26, built
