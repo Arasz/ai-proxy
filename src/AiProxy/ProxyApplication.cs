@@ -29,6 +29,11 @@ public static class ProxyApplication
             proxyOptions = proxyOptions with { RootCertificatePassword = rootPassword };
         }
 
+        if (builder.Configuration["PROXY_PORT"] is { } portValue)
+        {
+            proxyOptions = proxyOptions with { Port = ParsePort(portValue) };
+        }
+
         builder.Services.AddSingleton(proxyOptions);
         if (compression.Enabled)
         {
@@ -61,6 +66,12 @@ public static class ProxyApplication
 
         return app;
     }
+
+    /// <summary>Reads <c>PROXY_PORT</c>; a value that is not a port number stops startup instead of falling back.</summary>
+    private static int ParsePort(string value) =>
+        int.TryParse(value.Trim(), out var port) && port is >= 1 and <= 65535
+            ? port
+            : throw new InvalidOperationException($"PROXY_PORT must be a port number from 1 to 65535, but was '{value}'.");
 
     /// <summary>Registers the compression stage and everything it is composed of.</summary>
     /// <param name="services">The container to register into.</param>

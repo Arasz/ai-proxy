@@ -228,6 +228,30 @@ public class TitaniumProxyServiceTests
         await service.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task A_port_already_in_use_fails_startup_before_the_system_proxy_or_marker_is_touched()
+    {
+        using var directory = new TemporaryDirectory();
+        var occupier = new TcpListener(IPAddress.Loopback, 0);
+        occupier.Start();
+        try
+        {
+            var port = ((IPEndPoint)occupier.LocalEndpoint).Port;
+            var events = new List<string>();
+            await using var service = CreateService(new RecordingSystemProxyRegistrar(events), port, directory.Path, new RecordingGuardLauncher(events));
+
+            await Assert.ThrowsAnyAsync<Exception>(() => service.StartAsync(TestContext.Current.CancellationToken));
+
+            Assert.Empty(events);
+            Assert.True(!File.Exists(MarkerPath(directory)) || new FileInfo(MarkerPath(directory)).Length == 0);
+            using var reopened = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        finally
+        {
+            occupier.Stop();
+        }
+    }
+
     private static string MarkerPath(TemporaryDirectory directory) => Path.Combine(directory.Path, "system-proxy.lock");
 
     private static TitaniumProxyService CreateService(
