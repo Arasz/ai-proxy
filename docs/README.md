@@ -1,6 +1,6 @@
 # ai-proxy docs
 
-Local proxy that detects the LLM provider dialect of an inbound request and forwards it to that provider's upstream, with pass-through for other local traffic.
+Machine-wide HTTP(S) forward proxy that inspects canonical provider traffic and passes every other destination through.
 
 ## Map
 

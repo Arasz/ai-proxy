@@ -14,3 +14,4 @@ the moment the file exists, and it becomes frozen only when it reaches `Accepted
 |-----|----------|---------|
 | [0001-core-holds-the-rules-and-the-host-holds-the-http.md](0001-core-holds-the-rules-and-the-host-holds-the-http.md) | The core project holds the interfaces and the rules and depends on nothing; the host project holds the middleware, the forwarder and the composition. | Draft |
 | [0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md](0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md) | The store is its own adapter project, and SQLite is the queue that carries a compressed request from the request path to the writer. | Draft |
+| [0003-machine-wide-forward-proxy-and-provider-inspection.md](0003-machine-wide-forward-proxy-and-provider-inspection.md) | Use the current user's system proxy, inspect HTTPS only for canonical provider hosts, and tunnel all other TLS traffic. | Accepted |

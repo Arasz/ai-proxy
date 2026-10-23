@@ -10,8 +10,9 @@ Active records:
 
 | File | What it is |
 |---|---|
-| [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Work record (the continuation step after the scaffold): what v1 adds — the router, the forwarder, the credential rule, the pass-through — with the acceptance evidence for each, and the five questions the research record leaves open. |
-| [2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md](2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md) | Work record (the first implementation phase of v1): the structure, the composite detection, the compression seam, the router and the forwarder, with the test design that came before the first test was written. |
+| [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
+| [2026-10-22-machine-wide-proxy-research.md](2026-10-22-machine-wide-proxy-research.md) | Research record: canonical provider API hosts, provider-only TLS inspection, system proxy lifecycle, and default pass-through. |
+| [2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md](2026-10-21-v1-phase1-structure-and-proxy-skeleton-plan.md) | Historical reverse-proxy implementation plan, superseded by ADR 0003. |
 | [2026-10-22-compression-stage-decisions-review.html](2026-10-22-compression-stage-decisions-review.html) | The review form the owner answered: one card per decision, a verdict and a notes box, and the saved feedback in the file next to it. |
 | [2026-10-22-compression-stage-decisions-feedback.md](2026-10-22-compression-stage-decisions-feedback.md) | Owner review: the four decisions the compression stage left open, with the owner's verdict on each — the prose reducer ships and the measurements are corrected, the store keeps its own project, the corrections go into the merged research records, and the next task is the answer-retention measurement. |
 | [2026-10-22-content-compression-pipeline-architecture.md](2026-10-22-content-compression-pipeline-architecture.md) | Design record: the router, the reducer per payload kind, the decomposer, the compositor and the store, with the five decisions the design needed reviewed. |

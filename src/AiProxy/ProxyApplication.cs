@@ -2,9 +2,6 @@ using AiProxy.Configuration;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
-using AiProxy.Core.Providers;
-using AiProxy.Core.Routing;
-using AiProxy.Forwarding;
 using AiProxy.Hosting;
 using AiProxy.Storage;
 
@@ -16,24 +13,17 @@ public static class ProxyApplication
     /// <summary>Composes the proxy and returns the host.</summary>
     /// <param name="builder">The host under construction.</param>
     /// <param name="configure">Applied after the default registrations, so a test can put something else in its place.</param>
-    public static WebApplication Create(WebApplicationBuilder builder, Action<IServiceCollection>? configure = null)
+    public static WebApplication Create(
+        WebApplicationBuilder builder,
+        Action<IServiceCollection>? configure = null,
+        ProxyRuntimeOptions? runtimeOptions = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        var options = ProxyOptions.FromConfiguration(builder.Configuration);
         var compression = CompressionSettings.FromConfiguration(builder.Configuration);
 
-        builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(compression);
-        builder.Services.AddSingleton<PathDialectDetector>();
-        builder.Services.AddSingleton<BodyDialectDetector>();
-        builder.Services.AddSingleton<HeaderDialectDetector>();
-        builder.Services.AddSingleton<CompositeDialectDetector>(services => new CompositeDialectDetector(
-        [
-            services.GetRequiredService<PathDialectDetector>(),
-            services.GetRequiredService<BodyDialectDetector>(),
-            services.GetRequiredService<HeaderDialectDetector>(),
-        ]));
+        builder.Services.AddSingleton(runtimeOptions ?? ProxyRuntimeOptions.Default);
         if (compression.Enabled)
         {
             AddCompression(builder.Services, compression);
@@ -42,22 +32,15 @@ public static class ProxyApplication
         {
             builder.Services.AddSingleton<ICompressionPipeline, PassThroughCompressionPipeline>();
         }
-        builder.Services.AddSingleton<IPassThroughCatalog>(new PassThroughCatalog(options.PassThrough));
-        builder.Services.AddSingleton<UpstreamCatalog>(new UpstreamCatalog(options.Upstreams));
-        builder.Services.AddSingleton<ProviderRequestRouter>();
-        builder.Services.AddSingleton<PassThroughRequestRouter>();
-        builder.Services.AddSingleton<IRequestRouter>(services => new CompositeRequestRouter(
-            services.GetRequiredService<ProviderRequestRouter>(),
-            services.GetRequiredService<PassThroughRequestRouter>()));
-        builder.Services.AddSingleton<IUpstreamForwarder, HttpUpstreamForwarder>();
-        builder.Services.AddHttpClient("upstreams", client => client.Timeout = Timeout.InfiniteTimeSpan);
+        builder.Services.AddSingleton<ProviderRequestInspector>();
+        builder.Services.AddSingleton<TitaniumProxyService>();
+        builder.Services.AddHostedService(services => services.GetRequiredService<TitaniumProxyService>());
 
         configure?.Invoke(builder.Services);
 
         var app = builder.Build();
 
         app.UseMiddleware<RequestLoggingMiddleware>();
-        app.UseMiddleware<ProxyForwardingMiddleware>();
         app.MapGet("/health", () => Results.Json(new { status = "ok" }));
 
         if (compression.Enabled)

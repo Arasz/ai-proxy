@@ -1,19 +1,29 @@
-# Security policy — ai-proxy
+# Security policy: ai-proxy
 
-**Do not open a public issue for a security problem.** Report through GitHub's private vulnerability reporting, or by email.
+Report security problems through GitHub's private vulnerability reporting or by email. Include
+what an attacker can do, the affected file, a reproduction command, and the version from the
+root `VERSION` file. Only the latest tagged release is supported.
 
-What to include: what an attacker can do, the affected file, a reproduction command, the version (root `VERSION` file or commit). What to expect: one maintainer, no on-call, best effort, fix as a version bump.
+## Trust boundary
 
-Supported versions: only the latest tagged release. There is no shipped version yet — the proxy is not implemented — so there is nothing to report against until `VERSION` is tagged.
+ai-proxy listens on loopback and changes the current user's system HTTP and HTTPS proxy while
+the process runs. It restores the previous settings during normal shutdown. A forced kill or
+machine crash can prevent that cleanup, so check the system proxy settings if the process did
+not exit normally.
 
-## What this project is, security-wise
+The proxy decrypts HTTPS only for `api.openai.com`, `api.anthropic.com`,
+`generativelanguage.googleapis.com`, and `openrouter.ai`. It creates a per-user root certificate
+and asks the operating system to trust it. This lets the proxy read provider request bodies,
+including credentials, and means the generated root private key must remain protected on the
+local machine. HTTPS to other hosts stays in a CONNECT tunnel, and other HTTP destinations are
+forwarded without request-body inspection.
 
-ai-proxy is a local proxy that sits between an agent and its LLM provider, and forwards the caller's own provider credential upstream. That makes credential handling the central concern.
+The proxy does not own provider API keys. It forwards the caller's credential headers to the
+addressed provider. There is no host allowlist for other destinations: software using the
+system proxy can send arbitrary HTTP traffic through it. Clients that ignore system proxy
+settings, pin provider certificates, or do not trust user-installed roots may bypass the proxy
+or fail their HTTPS request.
 
-**Credential handling.** The proxy does not hold provider credentials. It forwards credential headers from the incoming request unchanged, regardless of whether the provider was identified by path, body or headers. If the path and body name different providers, the proxy refuses the request before forwarding it. Operators must configure clients with credentials for the provider the request resolves to.
-
-**F3 (leak measurement).** The sibling `rtk-proxy` 1.0.1 (BUSL-1.1, no code vendored from it) forwards a body that contradicts its path, so the caller's OpenAI credential (`sk-openai-KEY`) lands on the Anthropic host. ai-proxy must refuse that case rather than replicate it.
-
-**F6 (path-prefix rules).** Traffic that belongs to no provider — an MCP server such as ai-raccoon — is carried by an operator-configured path-prefix rule, not by a dialect rule. The operator names the prefix and its upstream, so nothing about the destination is guessed.
-
-The proxy binds loopback (single-operator local process) and holds no account, no hosted service, and no network surface beyond `localhost`. No rtk code is vendored; the design is from the research record only.
+Compression is opt-in. When enabled, original request bodies that were changed are stored in
+the local content database and can be retrieved through the local content endpoint. Protect
+that database as agent data.
