@@ -1,4 +1,3 @@
-using System.Net;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.Models;
 
@@ -17,11 +16,15 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     }
 
     /// <inheritdoc />
-    public void Set(IPAddress address, int port)
+    public void Set(ExplicitProxyEndPoint endPoint)
     {
-        var endPoint = new ExplicitProxyEndPoint(address, port, decryptSsl: true);
-        _server.SetAsSystemHttpProxy(endPoint);
-        _server.SetAsSystemHttpsProxy(endPoint);
+        ArgumentNullException.ThrowIfNull(endPoint);
+        var result = _server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp);
+        if (!result.Succeeded)
+        {
+            _server.TryRestoreOriginalProxySettings();
+            throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
+        }
     }
 
     /// <inheritdoc />

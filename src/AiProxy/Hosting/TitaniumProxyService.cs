@@ -52,6 +52,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// <summary>The listener address used by system proxy settings and local clients.</summary>
     public Uri Address { get; }
 
+    internal IReadOnlyList<ProxyEndPoint> EndPoints => _server.ProxyEndPoints;
+
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -83,12 +85,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         {
             try
             {
-                _systemProxyRegistrar.Set(_options.ListenAddress, _options.Port);
+                _systemProxyRegistrar.Set(_endPoint);
                 _systemProxySet = true;
             }
             catch
             {
-                _systemProxyRegistrar.Restore();
                 _server.Stop();
                 _started = false;
                 throw;
