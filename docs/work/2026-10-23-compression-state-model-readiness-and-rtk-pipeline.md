@@ -46,14 +46,20 @@ the sibling repo. Only the C# integration is missing.
 
 **Evidence:** `ls -la ~/RiderProjects/models-conversion/models/kompress/` on the M4, 2026-10-23.
 
-### F5 — The research record's raw evidence directory is gone [MEASURED]
+### F5 — The research record cites a dead path; the evidence lives on in models-conversion [MEASURED]
 
-The record cites `~/kompress-work` for scripts, `reducer_benchmark.json` and agent notes. The
-directory does not exist, so F1-F2 of that record can no longer be re-derived from local files;
-the `models-conversion` copy of the record is the remaining source.
+The record cites `~/kompress-work` for scripts, `reducer_benchmark.json` and agent notes. That
+directory does not exist. The same evidence is committed in the sibling repo at
+`models-conversion/docs/work/2026-10-21-kompress-v2-kit/`: `scripts/reducer.py`,
+`scripts/bench_reducers.py`, `logs/reducer_benchmark.json` and eleven files in `notes/`. The
+record's claim that the source of `reducer.py` "no longer exists" is out of date too. The fix is
+a path rewrite, not a re-run.
 
-**Evidence:** `ls ~/kompress-work` → "No such file or directory", 2026-10-23.
-Citation: `docs/work/2026-10-22-on-device-compression-models.md:13-16,283-286`.
+**Evidence:** `ls ~/kompress-work` → "No such file or directory"; `ls` of the kit's `scripts/`,
+`logs/` and `notes/` (11 files), last touched by `models-conversion` commit `c3a7ef4`, on the M4,
+2026-10-23. Citations: `docs/work/2026-10-22-on-device-compression-models.md:13-16,235,283-286`.
+An earlier draft of this finding said the evidence was gone; the planning panel's skeptic lane
+found the kit.
 
 ### F6 — rtk-proxy owns 127.0.0.1:8080, the port ai-proxy hard-binds [MEASURED]
 
@@ -141,4 +147,6 @@ ai-proxy sets the macOS system proxy; whether rtk-proxy's HTTP client honours th
   explicitly and compare log counts.
 - Model integration cost: ONNX Runtime package, tokenizer in C#, 0.36 s per prose call on CPU,
   261 MB artifact distribution. None of it is designed yet.
-- Re-creating `~/kompress-work` evidence, or pointing the record at the `models-conversion` copy.
+- Pointing `2026-10-22-on-device-compression-models.md` at the `models-conversion` kit instead
+  of `~/kompress-work`, and fixing the relative link at
+  `docs/how-to/turning-on-the-compression-stage.md:72`, which resolves under `docs/how-to/`.
