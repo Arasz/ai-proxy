@@ -1,4 +1,5 @@
 using AiProxy.Configuration;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
@@ -8,7 +9,7 @@ using AiProxy.Storage;
 namespace AiProxy;
 
 /// <summary>Builds the proxy, so that a test can start the same host a person runs.</summary>
-public static class ProxyApplication
+public static partial class ProxyApplication
 {
     /// <summary>Composes the proxy and returns the host.</summary>
     /// <param name="builder">The host under construction.</param>
@@ -35,6 +36,15 @@ public static class ProxyApplication
         }
 
         builder.Services.AddSingleton(proxyOptions);
+        builder.Services.AddSingleton(TimeProvider.System);
+        var capturePath = ConfigurationSwitch.IsOn(builder.Configuration["PROXY_CAPTURE"])
+            ? Path.Combine(proxyOptions.DataDirectory, SqliteCaptureStore.FileName)
+            : null;
+        if (capturePath is not null)
+        {
+            builder.Services.AddSingleton<IRequestCaptureStore>(new SqliteCaptureStore(capturePath));
+        }
+
         if (compression.Enabled)
         {
             AddCompression(builder.Services, compression);
@@ -48,13 +58,19 @@ public static class ProxyApplication
             services.GetRequiredService<ICompressionPipeline>(),
             services.GetRequiredService<IProviderHosts>(),
             compression.Enabled,
-            services.GetRequiredService<ILogger<ProviderRequestInspector>>()));
+            services.GetRequiredService<ILogger<ProviderRequestInspector>>(),
+            capturePath is null ? null : services.GetRequiredService<IRequestCaptureStore>(),
+            services.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<TitaniumProxyService>();
         builder.Services.AddHostedService(services => services.GetRequiredService<TitaniumProxyService>());
 
         configure?.Invoke(builder.Services);
 
         var app = builder.Build();
+        if (capturePath is not null)
+        {
+            Log.CaptureOn(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(ProxyApplication)), capturePath);
+        }
 
         app.UseMiddleware<RequestLoggingMiddleware>();
         app.MapGet("/health", () => Results.Json(new { status = "ok" }));
@@ -83,7 +99,6 @@ public static class ProxyApplication
             : CompressionOptions.Default;
 
         services.AddSingleton(options);
-        services.AddSingleton(TimeProvider.System);
         services.AddSingleton(settings.Store);
         services.AddSingleton<ContentQueue>();
         services.AddSingleton<IContentQueue>(provider => provider.GetRequiredService<ContentQueue>());
@@ -109,5 +124,11 @@ public static class ProxyApplication
         services.AddSingleton<ICompressionExecutor, CompressionExecutor>();
         services.AddSingleton<ICompressionPipeline, ContentCompressionPipeline>();
         services.AddHostedService<ContentStoreWorker>();
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(EventId = 1501, Level = LogLevel.Information, Message = "Request capture is on: every provider request body is stored in {CapturePath}")]
+        public static partial void CaptureOn(ILogger logger, string capturePath);
     }
 }

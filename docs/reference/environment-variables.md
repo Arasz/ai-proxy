@@ -30,6 +30,26 @@ Compression stays off unless enabled, because it changes provider request bodies
 The database contains the text tools returned to the agent. Keep it on the machine running
 ai-proxy and protect it like other local agent data.
 
+## Request capture
+
+Capture stays off unless enabled. It exists to measure, over real traffic, how a provider request
+is made up (system prompt, tool definitions, turns, tool results, thinking blocks).
+
+| Variable | What it is |
+|---|---|
+| `PROXY_CAPTURE` | `on` or `true` keeps every provider request body the proxy reads, exactly as the client sent it. Anything else, or unset, keeps nothing. |
+
+Each request becomes one row of `capture_request` in `~/.ai-proxy/capture.db`: a request id, the
+time, the provider, the host, the path without its query string, and the body as bytes. The body
+is forwarded unchanged. With `PROXY_COMPRESSION=on` as well, the row holds the body from before
+compression. Bodies over 8 MiB, or sent without a `Content-Length`, are not read and not kept.
+
+Headers and the query string are not stored, so `Authorization`, `x-api-key`, cookies and a
+`?key=` parameter stay out of the file. The body itself is stored in full: prompts, source code,
+file contents and tool output the agent sent, and any secret that sits inside them. On Linux and
+macOS the file is `0600` and its directory `0700`. Nothing removes old rows; delete the file when the
+measurement is over. A failed write is logged as a warning and the request goes out regardless.
+
 ## Local health endpoint
 
 `ASPNETCORE_URLS` controls the ASP.NET health and content endpoints (default `http://localhost:5000`).

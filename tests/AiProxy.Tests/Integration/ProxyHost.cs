@@ -1,4 +1,5 @@
 using AiProxy;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -41,10 +42,17 @@ internal sealed class ProxyHost : IAsyncDisposable
         IReadOnlyDictionary<string, string> configuration,
         ICompressionPipeline? compression = null,
         IProviderHosts? providerHosts = null,
+        IRequestCaptureStore? capture = null,
+        ILoggerProvider? logging = null,
+        TimeProvider? time = null,
         Action<IServiceCollection>? configure = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
+        if (logging is not null)
+        {
+            builder.Logging.AddProvider(logging);
+        }
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         var portListener = new TcpListener(IPAddress.Loopback, 0);
@@ -70,6 +78,16 @@ internal sealed class ProxyHost : IAsyncDisposable
                 if (providerHosts is not null)
                 {
                     services.AddSingleton(providerHosts);
+                }
+
+                if (capture is not null)
+                {
+                    services.AddSingleton(capture);
+                }
+
+                if (time is not null)
+                {
+                    services.AddSingleton(time);
                 }
 
                 configure?.Invoke(services);

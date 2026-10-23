@@ -1,10 +1,12 @@
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
+using AiProxy.Core.Providers;
 using Microsoft.Extensions.Logging;
 using Titanium.Web.Proxy.EventArguments;
 
 namespace AiProxy.Hosting;
 
-/// <summary>Inspects and compresses requests sent to provider API hosts.</summary>
+/// <summary>Inspects, captures and compresses requests sent to provider API hosts.</summary>
 public sealed partial class ProviderRequestInspector
 {
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
@@ -13,13 +15,19 @@ public sealed partial class ProviderRequestInspector
     private readonly IProviderHosts _providerHosts;
     private readonly bool _compressionEnabled;
     private readonly ILogger<ProviderRequestInspector> _logger;
+    private readonly IRequestCaptureStore? _capture;
+    private readonly TimeProvider _time;
 
-    /// <summary>Creates an inspector; with compression disabled every request passes through untouched.</summary>
+    /// <summary>Creates an inspector; with compression disabled and no capture store every request passes through untouched.</summary>
+    /// <param name="capture">Where every provider request body is kept as sent; null leaves capture off.</param>
+    /// <param name="time">The clock that stamps each capture; null uses the system clock.</param>
     public ProviderRequestInspector(
         ICompressionPipeline compression,
         IProviderHosts providerHosts,
         bool compressionEnabled,
-        ILogger<ProviderRequestInspector> logger)
+        ILogger<ProviderRequestInspector> logger,
+        IRequestCaptureStore? capture = null,
+        TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(compression);
         ArgumentNullException.ThrowIfNull(providerHosts);
@@ -28,12 +36,14 @@ public sealed partial class ProviderRequestInspector
         _providerHosts = providerHosts;
         _compressionEnabled = compressionEnabled;
         _logger = logger;
+        _capture = capture;
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
-        if (!_compressionEnabled)
+        if (!_compressionEnabled && _capture is null)
         {
             return;
         }
@@ -50,6 +60,16 @@ public sealed partial class ProviderRequestInspector
         }
 
         var body = await e.GetRequestBody(CancellationToken.None);
+        if (_capture is not null)
+        {
+            await CaptureAsync(_capture, dialect, request.RequestUri, body);
+        }
+
+        if (!_compressionEnabled)
+        {
+            return;
+        }
+
         CompressionResult compressed;
         try
         {
@@ -89,6 +109,21 @@ public sealed partial class ProviderRequestInspector
         return Task.CompletedTask;
     }
 
+    /// <summary>Keeps the body as sent; a failed write is logged and never reaches the request.</summary>
+    private async Task CaptureAsync(IRequestCaptureStore capture, Dialect dialect, Uri uri, byte[] body)
+    {
+        try
+        {
+            await capture.StoreAsync(
+                new CapturedRequest(Guid.NewGuid().ToString("N"), _time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
+                CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            Log.CaptureFailed(_logger, uri.Host, exception);
+        }
+    }
+
     private static partial class Log
     {
         [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Compression failed for a request to {ProviderHost}; forwarding the original body")]
@@ -96,5 +131,8 @@ public sealed partial class ProviderRequestInspector
 
         [LoggerMessage(EventId = 1402, Level = LogLevel.Warning, Message = "The reducer for part {ChunkId} ({ContentType}) of a request to {ProviderHost} failed; the part was forwarded with its original text")]
         public static partial void PartFailed(ILogger logger, int chunkId, string contentType, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1403, Level = LogLevel.Warning, Message = "Capture failed for a request to {ProviderHost}; the request is forwarded unchanged and not captured")]
+        public static partial void CaptureFailed(ILogger logger, string providerHost, Exception exception);
     }
 }

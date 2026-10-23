@@ -6,4 +6,5 @@ internal sealed record RecordedRequest(
     string Path,
     string QueryString,
     IReadOnlyDictionary<string, string> Headers,
-    string Body);
+    string Body,
+    byte[] BodyBytes);
