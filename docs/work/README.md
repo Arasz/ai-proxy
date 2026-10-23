@@ -11,6 +11,7 @@ Active records:
 | File | What it is |
 |---|---|
 | [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
+| [2026-10-23-rtk-proxy-ccr-threshold-and-chaining.md](2026-10-23-rtk-proxy-ccr-threshold-and-chaining.md) | Research record: rtk-proxy previews tool results over about 310 tokens, not the 1,000 its config says, and only `RTK_PROXY_CCR_BULK_MIN_TOKENS` moves that. It ignores the system proxy and rejects ai-proxy's certificate, so the two proxies can't be chained. The probe scripts are in [2026-10-23-rtk-probe-kit/](2026-10-23-rtk-probe-kit/). |
 | [2026-10-23-agent-client-inventory.md](2026-10-23-agent-client-inventory.md) | Research record: which AI agent clients on this Mac reach a provider, by what route, which local proxy sees them today, and what must keep working when ai-proxy replaces rtk-proxy. |
 | [2026-10-23-system-proxy-crash-recovery.md](2026-10-23-system-proxy-crash-recovery.md) | Research record: reading the system proxy per OS and from .NET, how other tools recover after a crash, and the sidecar spike against Titanium's API. |
 | [2026-10-22-machine-wide-proxy-research.md](2026-10-22-machine-wide-proxy-research.md) | Research record: canonical provider API hosts, provider-only TLS inspection, system proxy lifecycle, and default pass-through. |
