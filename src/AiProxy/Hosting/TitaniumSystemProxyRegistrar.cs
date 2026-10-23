@@ -28,7 +28,15 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     }
 
     /// <inheritdoc />
-    public void Restore() => _server.RestoreOriginalProxySettings();
+    public void Restore()
+    {
+        // The macOS backend swallows some of its own errors, so a success result can still hide a partial restore.
+        var result = _server.TryRestoreOriginalProxySettings();
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException($"The system proxy could not be restored: {result.Message}");
+        }
+    }
 
     /// <inheritdoc />
     public void Clear() => ClearSystemProxy();

@@ -11,6 +11,10 @@ the process runs. It restores the previous settings during normal shutdown. Afte
 kill, a small guard process clears the system proxy; after a reboot or power loss, the next
 start clears it before setting it again. In those cases the proxy is cleared and not restored,
 so a proxy you had configured before the run is gone and you must set it again.
+The clear is unconditional: a proxy you set again after the crash and before the next start is
+cleared as well. A restore that fails on shutdown is logged at error level and leaves the
+marker in place, so the guard or the next start clears the proxy; the macOS backend swallows
+some of its own errors, so a few failed restores cannot be seen.
 
 The proxy decrypts HTTPS only for `api.openai.com`, `api.anthropic.com`,
 `generativelanguage.googleapis.com`, and `openrouter.ai`. It creates a per-user root certificate

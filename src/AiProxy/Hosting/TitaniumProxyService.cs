@@ -16,6 +16,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private readonly ProxyServer _server;
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly ISystemProxyGuardLauncher _guardLauncher;
+    private readonly TimeSpan _markerWait;
     private readonly ProxyRuntimeOptions _options;
     private readonly ProviderRequestInspector _inspector;
     private readonly IProviderHosts _providerHosts;
@@ -33,7 +34,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
         ILoggerFactory loggerFactory)
-        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory)
+        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3))
     {
     }
 
@@ -43,7 +44,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
         ISystemProxyGuardLauncher guardLauncher,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        TimeSpan markerWait)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(guardLauncher);
@@ -53,6 +55,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(_server);
         _guardLauncher = guardLauncher;
+        _markerWait = markerWait;
         _options = options;
         _inspector = inspector;
         _providerHosts = providerHosts;
@@ -82,7 +85,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
         {
-            _marker = SystemProxyMarker.Acquire(_options.DataDirectory);
+            _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
         }
 
         _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, decryptSsl: true);
@@ -161,7 +164,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         var marker = _marker!;
         if (marker.PreviousRunDied)
         {
-            Log.PreviousRunDied(_logger);
+            Log.PreviousRunDied(_logger, marker.PreviousEndpoint);
             _systemProxyRegistrar.Clear();
         }
 
@@ -180,7 +183,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _systemProxySet = true;
         try
         {
-            _guard = _guardLauncher.Launch(_options.DataDirectory);
+            _guard = _guardLauncher.Launch(_options.DataDirectory, () => Log.GuardExited(_logger));
         }
         catch
         {
@@ -191,17 +194,56 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private void ReleaseSystemProxy()
     {
+        var restored = true;
         if (_systemProxySet)
         {
-            _systemProxyRegistrar.Restore();
             _systemProxySet = false;
-            _guard?.ReportRestored();
+            try
+            {
+                _systemProxyRegistrar.Restore();
+            }
+            catch (Exception exception)
+            {
+                restored = false;
+                Log.RestoreFailed(_logger, exception);
+            }
         }
 
-        _guard?.Dispose();
+        if (restored)
+        {
+            _marker?.Truncate();
+            TryGuard(guard => guard.ReportRestored());
+        }
+
+        TryGuard(guard => guard.Dispose());
         _guard = null;
-        _marker?.Delete();
+        if (restored)
+        {
+            _marker?.Delete();
+        }
+        else
+        {
+            _marker?.Dispose();
+        }
+
         _marker = null;
+    }
+
+    private void TryGuard(Action<ISystemProxyGuardSession> action)
+    {
+        if (_guard is null)
+        {
+            return;
+        }
+
+        try
+        {
+            action(_guard);
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            Log.GuardUnreachable(_logger, exception);
+        }
     }
 
     private void PrepareRootCertificate()
@@ -253,7 +295,16 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         [LoggerMessage(EventId = 1301, Level = LogLevel.Information, Message = "AI proxy listening at {ProxyAddress}")]
         public static partial void Started(ILogger logger, Uri proxyAddress);
 
-        [LoggerMessage(EventId = 1302, Level = LogLevel.Warning, Message = "A previous ai-proxy run ended with the system proxy set; clearing it before setting it again. A proxy configured before that run is not restored")]
-        public static partial void PreviousRunDied(ILogger logger);
+        [LoggerMessage(EventId = 1302, Level = LogLevel.Warning, Message = "A previous ai-proxy run ended with the system proxy set to {Endpoint}; clearing it before setting it again. A proxy configured before that run is not restored")]
+        public static partial void PreviousRunDied(ILogger logger, string? endpoint);
+
+        [LoggerMessage(EventId = 1303, Level = LogLevel.Warning, Message = "The system proxy guard could not be reached; it has probably ended")]
+        public static partial void GuardUnreachable(ILogger logger, Exception exception);
+
+        [LoggerMessage(EventId = 1304, Level = LogLevel.Warning, Message = "The system proxy guard ended while ai-proxy was still running; a forced kill would now leave the system proxy set until the next start")]
+        public static partial void GuardExited(ILogger logger);
+
+        [LoggerMessage(EventId = 1305, Level = LogLevel.Error, Message = "The system proxy could not be restored; the marker stays, so the guard or the next start clears it")]
+        public static partial void RestoreFailed(ILogger logger, Exception exception);
     }
 }

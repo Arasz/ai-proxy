@@ -30,6 +30,7 @@ public class SystemProxyGuardTests
     [InlineData("garbage\n")]
     [InlineData("restor")]
     [InlineData("Restored extra\n")]
+    [InlineData("restoredX\n")]
     public void Input_that_is_not_exactly_restored_clears_the_system_proxy(string input)
     {
         var clears = 0;
