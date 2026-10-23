@@ -11,6 +11,7 @@ using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 namespace AiProxy.Tests.Integration;
 
@@ -26,6 +27,8 @@ public class RequestCaptureTests : IDisposable
         2026-03-12 10:00:05 INFO worker=api-1 the second to last line
         2026-03-12 10:00:06 INFO worker=api-1 the last line
         """;
+
+    private const int CaptureFailedEventId = 1403;
 
     private readonly string _contentDatabasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.NewGuid():N}.db");
 
@@ -44,15 +47,14 @@ public class RequestCaptureTests : IDisposable
     [Fact]
     public async Task Capture_forwards_the_body_byte_for_byte_and_keeps_it_with_where_it_went()
     {
+        var now = new DateTimeOffset(2026, 10, 23, 12, 30, 15, 250, TimeSpan.Zero);
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(capture: true, time: new FakeTimeProvider(now));
         // Multi-byte characters and odd spacing: a re-serialized or re-encoded body would differ.
         var body = Encoding.UTF8.GetBytes("{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  ");
-        var before = DateTimeOffset.UtcNow;
 
         using var response = await SendAsync(proxy, upstream, body);
 
-        var after = DateTimeOffset.UtcNow;
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
         var row = Assert.Single(await ReadCapturesAsync(proxy));
@@ -62,7 +64,7 @@ public class RequestCaptureTests : IDisposable
         Assert.Equal("/v1/messages", row.Path);
         Assert.False(string.IsNullOrWhiteSpace(row.RequestId));
         var capturedAt = DateTimeOffset.Parse(row.CapturedAt, System.Globalization.CultureInfo.InvariantCulture);
-        Assert.InRange(capturedAt, before, after);
+        Assert.Equal(now, capturedAt);
     }
 
     [Fact]
@@ -70,8 +72,7 @@ public class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(capture: true, compression: true);
-        var body = Encoding.UTF8.GetBytes(
-            $$"""{"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(ToolOutput)}}}]}]}""");
+        var body = ToolResultBody();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -136,10 +137,48 @@ public class RequestCaptureTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("upstream ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
-        var entry = Assert.Single(logs.Entries, entry => entry.EventId == 1402);
+        var entry = Assert.Single(logs.Entries, entry => entry.EventId == CaptureFailedEventId);
         Assert.Equal(typeof(ProviderRequestInspector).FullName, entry.Category);
         Assert.Equal(LogLevel.Warning, entry.Level);
         Assert.IsType<IOException>(entry.Exception);
+    }
+
+    [Fact]
+    public async Task A_failing_capture_store_does_not_stop_compression()
+    {
+        var logs = new RecordingLoggerProvider();
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await StartProxyAsync(capture: true, compression: true, store: new ThrowingCaptureStore(), logs: logs);
+        var body = ToolResultBody();
+
+        using var response = await SendAsync(proxy, upstream, body);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var forwarded = Assert.Single(upstream.Requests).BodyBytes;
+        Assert.True(forwarded.Length < body.Length, $"the upstream got {forwarded.Length} bytes, the client sent {body.Length}: the body was not compressed");
+        var entry = Assert.Single(logs.Entries, entry => entry.EventId == CaptureFailedEventId);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+    }
+
+    [Fact]
+    public async Task Traffic_to_a_host_that_is_not_a_provider_is_never_captured()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string> { ["PROXY_CAPTURE"] = "on" },
+            providerHosts: new SingleProviderHost("127.0.0.1", Dialect.Anthropic));
+        var providerBody = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}""");
+        var otherBody = Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}""");
+        var otherHost = new UriBuilder(upstream.BaseAddress) { Host = "localhost" }.Uri;
+
+        using var providerResponse = await SendAsync(proxy, upstream.BaseAddress, providerBody);
+        using var otherResponse = await SendAsync(proxy, otherHost, otherBody);
+
+        Assert.Equal(HttpStatusCode.OK, otherResponse.StatusCode);
+        Assert.Equal(new[] { providerBody, otherBody }, upstream.Requests.Select(request => request.BodyBytes).ToArray());
+        var row = Assert.Single(await ReadCapturesAsync(proxy));
+        Assert.Equal(providerBody, row.Body);
+        Assert.False(Contains(ReadCaptureFiles(proxy), "pass-through-marker"u8.ToArray()), "the pass-through body was found in the capture files");
     }
 
     [Fact]
@@ -162,7 +201,7 @@ public class RequestCaptureTests : IDisposable
         Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1501);
     }
 
-    private Task<ProxyHost> StartProxyAsync(bool capture, bool compression = false, IRequestCaptureStore? store = null, ILoggerProvider? logs = null)
+    private Task<ProxyHost> StartProxyAsync(bool capture, bool compression = false, IRequestCaptureStore? store = null, ILoggerProvider? logs = null, TimeProvider? time = null)
     {
         var configuration = new Dictionary<string, string>();
         if (capture)
@@ -176,8 +215,12 @@ public class RequestCaptureTests : IDisposable
             configuration["PROXY_COMPRESSION_DB"] = _contentDatabasePath;
         }
 
-        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs);
+        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs, time: time);
     }
+
+    private static byte[] ToolResultBody() =>
+        Encoding.UTF8.GetBytes(
+            $$"""{"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(ToolOutput)}}}]}]}""");
 
     private static ByteArrayContent Json(byte[] body)
     {
@@ -186,11 +229,14 @@ public class RequestCaptureTests : IDisposable
         return content;
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body)
+    private static Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body) =>
+        SendAsync(proxy, upstream.BaseAddress, body);
+
+    private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, Uri upstream, byte[] body)
     {
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
         using var client = new HttpClient(handler);
-        return await client.PostAsync(new Uri(upstream.BaseAddress, "/v1/messages"), Json(body), TestContext.Current.CancellationToken);
+        return await client.PostAsync(new Uri(upstream, "/v1/messages"), Json(body), TestContext.Current.CancellationToken);
     }
 
     private static async Task<IReadOnlyList<CaptureRow>> ReadCapturesAsync(ProxyHost proxy)
@@ -223,6 +269,12 @@ public class RequestCaptureTests : IDisposable
     private static bool Contains(byte[] haystack, byte[] needle) => haystack.AsSpan().IndexOf(needle) >= 0;
 
     private sealed record CaptureRow(string RequestId, string CapturedAt, string Provider, string Host, string Path, byte[] Body);
+
+    /// <summary>Treats one host as a provider and every other host as pass-through traffic.</summary>
+    private sealed class SingleProviderHost(string host, Dialect dialect) : IProviderHosts
+    {
+        public Dialect? Find(string candidate) => string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? dialect : null;
+    }
 
     private sealed class ThrowingCaptureStore : IRequestCaptureStore
     {

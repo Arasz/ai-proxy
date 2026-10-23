@@ -16,15 +16,18 @@ public sealed partial class ProviderRequestInspector
     private readonly bool _compressionEnabled;
     private readonly ILogger<ProviderRequestInspector> _logger;
     private readonly IRequestCaptureStore? _capture;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates an inspector; with compression disabled and no capture store every request passes through untouched.</summary>
     /// <param name="capture">Where every provider request body is kept as sent; null leaves capture off.</param>
+    /// <param name="time">The clock that stamps each capture; null uses the system clock.</param>
     public ProviderRequestInspector(
         ICompressionPipeline compression,
         IProviderHosts providerHosts,
         bool compressionEnabled,
         ILogger<ProviderRequestInspector> logger,
-        IRequestCaptureStore? capture = null)
+        IRequestCaptureStore? capture = null,
+        TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(compression);
         ArgumentNullException.ThrowIfNull(providerHosts);
@@ -34,6 +37,7 @@ public sealed partial class ProviderRequestInspector
         _compressionEnabled = compressionEnabled;
         _logger = logger;
         _capture = capture;
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
@@ -111,7 +115,7 @@ public sealed partial class ProviderRequestInspector
         try
         {
             await capture.StoreAsync(
-                new CapturedRequest(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow, dialect, uri.Host, uri.AbsolutePath, body),
+                new CapturedRequest(Guid.NewGuid().ToString("N"), _time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
                 CancellationToken.None);
         }
         catch (Exception exception)
@@ -128,7 +132,7 @@ public sealed partial class ProviderRequestInspector
         [LoggerMessage(EventId = 1402, Level = LogLevel.Warning, Message = "The reducer for part {ChunkId} ({ContentType}) of a request to {ProviderHost} failed; the part was forwarded with its original text")]
         public static partial void PartFailed(ILogger logger, int chunkId, string contentType, string providerHost, Exception exception);
 
-        [LoggerMessage(EventId = 1402, Level = LogLevel.Warning, Message = "Capture failed for a request to {ProviderHost}; the request is forwarded unchanged and not captured")]
+        [LoggerMessage(EventId = 1403, Level = LogLevel.Warning, Message = "Capture failed for a request to {ProviderHost}; the request is forwarded unchanged and not captured")]
         public static partial void CaptureFailed(ILogger logger, string providerHost, Exception exception);
     }
 }

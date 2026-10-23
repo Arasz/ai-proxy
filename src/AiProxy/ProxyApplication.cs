@@ -36,6 +36,7 @@ public static partial class ProxyApplication
         }
 
         builder.Services.AddSingleton(proxyOptions);
+        builder.Services.AddSingleton(TimeProvider.System);
         var capturePath = ConfigurationSwitch.IsOn(builder.Configuration["PROXY_CAPTURE"])
             ? Path.Combine(proxyOptions.DataDirectory, SqliteCaptureStore.FileName)
             : null;
@@ -58,7 +59,8 @@ public static partial class ProxyApplication
             services.GetRequiredService<IProviderHosts>(),
             compression.Enabled,
             services.GetRequiredService<ILogger<ProviderRequestInspector>>(),
-            capturePath is null ? null : services.GetRequiredService<IRequestCaptureStore>()));
+            capturePath is null ? null : services.GetRequiredService<IRequestCaptureStore>(),
+            services.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<TitaniumProxyService>();
         builder.Services.AddHostedService(services => services.GetRequiredService<TitaniumProxyService>());
 
@@ -97,7 +99,6 @@ public static partial class ProxyApplication
             : CompressionOptions.Default;
 
         services.AddSingleton(options);
-        services.AddSingleton(TimeProvider.System);
         services.AddSingleton(settings.Store);
         services.AddSingleton<ContentQueue>();
         services.AddSingleton<IContentQueue>(provider => provider.GetRequiredService<ContentQueue>());

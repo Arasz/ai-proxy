@@ -44,6 +44,7 @@ internal sealed class ProxyHost : IAsyncDisposable
         IProviderHosts? providerHosts = null,
         IRequestCaptureStore? capture = null,
         ILoggerProvider? logging = null,
+        TimeProvider? time = null,
         Action<IServiceCollection>? configure = null)
     {
         var builder = WebApplication.CreateBuilder();
@@ -79,14 +80,17 @@ internal sealed class ProxyHost : IAsyncDisposable
                     services.AddSingleton(providerHosts);
                 }
 
-<<<<<<< HEAD
-                configure?.Invoke(services);
-=======
                 if (capture is not null)
                 {
                     services.AddSingleton(capture);
                 }
->>>>>>> e50f413 (feat: PROXY_CAPTURE keeps every provider request body as sent)
+
+                if (time is not null)
+                {
+                    services.AddSingleton(time);
+                }
+
+                configure?.Invoke(services);
             },
             new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 
