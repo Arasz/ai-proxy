@@ -6,6 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using System.Net;
+using System.Net.Sockets;
+using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
@@ -13,38 +16,68 @@ namespace AiProxy.Tests.Integration;
 internal sealed class ProxyHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
+    private readonly TemporaryDirectory _directory;
 
-    private ProxyHost(WebApplication app)
+    private ProxyHost(WebApplication app, TemporaryDirectory directory)
     {
         _app = app;
+        _directory = directory;
     }
 
     /// <summary>The address the proxy listens on.</summary>
     public Uri BaseAddress { get; private set; } = null!;
 
+    /// <summary>The forward-proxy listener clients send provider traffic through.</summary>
+    public Uri ProxyAddress => _app.Services.GetRequiredService<TitaniumProxyService>().Address;
+
+    /// <summary>The private data directory the proxy was given.</summary>
+    public string DataDirectory => _directory.Path;
+
+    /// <summary>The host services used by the integration fixture.</summary>
+    public IServiceProvider Services => _app.Services;
+
     /// <summary>Starts the proxy with the given configuration.</summary>
     public static async Task<ProxyHost> StartAsync(
         IReadOnlyDictionary<string, string> configuration,
-        ICompressionPipeline? compression = null)
+        ICompressionPipeline? compression = null,
+        IProviderHosts? providerHosts = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+
+        var portListener = new TcpListener(IPAddress.Loopback, 0);
+        portListener.Start();
+        var proxyPort = ((IPEndPoint)portListener.LocalEndpoint).Port;
+        portListener.Stop();
 
         foreach (var (key, value) in configuration)
         {
             builder.Configuration[key] = value;
         }
 
+        var directory = new TemporaryDirectory();
         var app = ProxyApplication.Create(
             builder,
-            compression is null ? null : services => services.AddSingleton(compression));
+            services =>
+            {
+                if (compression is not null)
+                {
+                    services.AddSingleton(compression);
+                }
+
+                if (providerHosts is not null)
+                {
+                    services.AddSingleton(providerHosts);
+                }
+            },
+            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
 
         await app.StartAsync();
 
         var addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
 
-        return new ProxyHost(app) { BaseAddress = new Uri(addresses!.Addresses.First()) };
+        return new ProxyHost(app, directory) { BaseAddress = new Uri(addresses!.Addresses.First()) };
     }
 
     /// <summary>Stops the proxy.</summary>
@@ -52,5 +85,6 @@ internal sealed class ProxyHost : IAsyncDisposable
     {
         await _app.StopAsync();
         await _app.DisposeAsync();
+        _directory.Dispose();
     }
 }

@@ -51,7 +51,7 @@ The original of every request the stage changed is in the database, and the endp
 back:
 
 ```bash
-curl http://127.0.0.1:8080/content/0198f3c2-1a4b-7c8d-9e0f-2b3c4d5e6f70
+curl http://127.0.0.1:5000/content/0198f3c2-1a4b-7c8d-9e0f-2b3c4d5e6f70
 ```
 
 The body comes back exactly as the client sent it. An id nobody stored is answered with a
