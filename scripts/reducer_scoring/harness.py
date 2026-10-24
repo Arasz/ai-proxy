@@ -4,7 +4,7 @@
   python3 harness.py report [--out DIR]
 
 Candidates: shipped_rules, kompress_int8, rtk_ccr (local); identity, digest_gpt_stand_in,
-summarizer_control (through pi); haiku_digest (claude -p, then the pi reader). Raw runner output lands in DIR/<candidate>.jsonl.
+summarizer_control (through pi); haiku_digest, haiku_digest_checked (claude -p, then the pi reader). Raw runner output lands in DIR/<candidate>.jsonl.
 """
 import argparse
 import datetime
@@ -26,7 +26,11 @@ HOME = Path.home()
 KOMPRESS_PYTHON = os.environ.get("KOMPRESS_PYTHON", str(HOME / "RiderProjects/models-conversion/.venv-kompress/bin/python"))
 KOMPRESS_MODELS = os.environ.get("KOMPRESS_MODELS", str(HOME / "RiderProjects/models-conversion/models/kompress"))
 RULES_DLL = HERE / "rules_runner/bin/Release/net10.0/RulesRunner.dll"
-HAIKU_OUTPUTS = "haiku_digest.digests.ndjson"
+HAIKU = ("haiku_digest", "haiku_digest_checked")
+
+
+def _digests(out: Path, candidate: str) -> Path:
+    return out / f"{candidate}.digests.ndjson"
 
 
 def _fields(candidate: str, row: Row, prereg: dict) -> dict:
@@ -103,9 +107,9 @@ def _command(candidate: str, runs: int, names: list[str], out: Path) -> tuple[li
         return [sys.executable, str(HERE / "rtk_runner.py"), str(runs), *names], None
     if candidate in ("identity", "digest_gpt_stand_in", "summarizer_control"):
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs), *names], None
-    if candidate == "haiku_digest":
+    if candidate in HAIKU:
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs),
-                "--outputs", str(out / HAIKU_OUTPUTS), *names], None
+                "--outputs", str(_digests(out, candidate)), *names], None
     raise SystemExit(f"unknown candidate {candidate}")
 
 
@@ -120,12 +124,13 @@ def run(candidates: list[str], out: Path, runs: int) -> None:
     if "shipped_rules" in candidates:
         subprocess.run(["dotnet", "build", str(HERE / "rules_runner"), "-c", "Release", "-v", "q"], check=True)
     for candidate in candidates:
-        if candidate == "haiku_digest":
-            with (out / HAIKU_OUTPUTS).open("w", encoding="utf-8") as sink:
-                made = subprocess.run([sys.executable, str(HERE / "claude_digest_runner.py"), str(runs), *names],
-                                      cwd=HERE, stdout=sink)
+        if candidate in HAIKU:
+            digests = _digests(out, candidate)
+            with digests.open("w", encoding="utf-8") as sink:
+                made = subprocess.run([sys.executable, str(HERE / "claude_digest_runner.py"), candidate, str(runs),
+                                       *names], cwd=HERE, stdout=sink)
             if made.returncode != 0:
-                raise SystemExit(f"haiku digests failed (exit {made.returncode}); partial output kept in {out / HAIKU_OUTPUTS}")
+                raise SystemExit(f"haiku digests failed (exit {made.returncode}); partial output kept in {digests}")
         command, env = _command(candidate, runs, names, out)
         target = out / f"{candidate}.jsonl"
         with target.open("w", encoding="utf-8") as sink:

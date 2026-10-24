@@ -171,6 +171,27 @@ class RunTests(unittest.TestCase):
             self.assertEqual((out / "haiku_digest.jsonl").read_text(encoding="utf-8"), fresh)
             self.assertEqual((out / "haiku_digest.digests.ndjson").read_text(encoding="utf-8"), fresh)
 
+    def test_each_haiku_candidate_names_itself_to_the_digest_runner_and_keeps_its_own_digests(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            out = Path("results")
+            seen = []
+
+            def runner(command, **kwargs):
+                if Path(command[1]).name == "claude_digest_runner.py":
+                    seen.append(command[2])
+                    kwargs["stdout"].write('{"output": "d", "latency_s": 1}\n')
+                else:
+                    self.assertEqual(Path(command[command.index("--outputs") + 1]).name,
+                                     "haiku_digest_checked.digests.ndjson")
+                return subprocess.CompletedProcess(command, 0)
+
+            with patch("harness._environment", return_value={}), patch("harness.load", return_value=PREREG), \
+                    patch("harness.subprocess.run", side_effect=runner):
+                run(["haiku_digest_checked"], out, 3)
+
+            self.assertEqual(seen, ["haiku_digest_checked"])
+            self.assertTrue((out / "haiku_digest_checked.digests.ndjson").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

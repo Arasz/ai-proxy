@@ -445,6 +445,7 @@
   "abstractive": {
    "candidates": [
     "haiku_digest",
+    "haiku_digest_checked",
     "digest_gpt_stand_in",
     "summarizer_control",
     "identity"
@@ -508,6 +509,25 @@
    "timing": {
     "haiku_digest": "duration_api_ms from the claude -p result: the model's time without CLI startup; the process wall time is kept as wall_s"
    }
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": false,
+   "after": "the haiku_digest run had been seen; nothing already scored is re-scored",
+   "reason": "haiku_digest ran with no pinned effort and inherited the session's CLAUDE_EFFORT=medium, against the pre-registered thinking-off digest; the owner asked for a re-run at low effort with a prompt that finds the facts first and checks them last",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "candidates": {
+    "haiku_digest_checked": "claude-haiku-5-5 at --effort low with CHECKED_SYSTEM (claude_digest_runner.py), CLAUDE_EFFORT cleared from the child environment, graded by the same QA reader",
+    "haiku_digest": "kept as recorded: DIGEST_SYSTEM, no --effort flag, CLAUDE_EFFORT=medium inherited"
+   },
+   "invocation": "claude -p --model claude-haiku-5-5 --tools '' --setting-sources '' --strict-mcp-config --no-session-persistence --output-format json --effort low, payload on stdin, proxy variables and CLAUDE_EFFORT cleared",
+   "thinking": "low is the lowest effort claude -p accepts; thinking cannot be switched off from the CLI"
   }
  ]
 }
