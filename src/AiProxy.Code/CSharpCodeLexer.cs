@@ -12,13 +12,10 @@ public sealed class CSharpCodeLexer : ICodeLexer
     public bool SupportsPath(string? filePath) =>
         filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
-    bool ICodeLexer.IsKeyword(string text) => IsKeyword(text);
+    public bool IsKeyword(string text) =>         SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
+                                                  || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
+                                                  || text is "nint" or "nuint" or "value";
 
-    /// <summary>Whether a spelling is reserved by C# or used as a contextual keyword.</summary>
-    public static bool IsKeyword(string text) =>
-        SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
-        || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
-        || text is "nint" or "nuint" or "value";
 
     /// <inheritdoc />
     public CodeLexResult Lex(string text)

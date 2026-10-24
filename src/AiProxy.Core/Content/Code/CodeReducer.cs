@@ -64,7 +64,7 @@ public sealed class CodeReducer
         }
         foreach (var (shortName, originalName) in map)
         {
-            rendered += shortName + ":" + originalName + newline;
+            rendered += $"{shortName}:{originalName}{newline}";
         }
         rendered += retrievalHint;
         return rendered.Length < text.Length
