@@ -12,6 +12,10 @@ public sealed class CSharpCodeLexer : ICodeLexer
     public CodeLexResult Lex(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        if (text.AsSpan().IndexOfAny('\u0085', '\u2028', '\u2029') >= 0)
+        {
+            return Unsupported();
+        }
         var tokens = new List<CodeToken>();
         var index = 0;
         var line = 1;
@@ -60,6 +64,10 @@ public sealed class CSharpCodeLexer : ICodeLexer
                 if (!ReadLiteral(text, ref index))
                 {
                     return Unsupported();
+                }
+                if (current != '\'' && text.AsSpan(index).StartsWith("u8", StringComparison.Ordinal))
+                {
+                    index += 2;
                 }
                 line += CountNewLines(text.AsSpan(start, index - start));
                 kind = CodeTokenKind.String;

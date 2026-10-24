@@ -181,4 +181,32 @@ public sealed class CodeReducerTests
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
     }
+
+    [Theory]
+    [InlineData("\u0085")]
+    [InlineData("\u2028")]
+    [InlineData("\u2029")]
+    public void Unmodelled_CSharp_newlines_return_the_exact_file(string newline)
+    {
+        var source = "// a long comment that provides more savings than the hint but must not swallow the following code" + newline + "int Important = 42;\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+
+        Assert.False(result.Changed);
+        Assert.False(result.Supported);
+        Assert.Equal(source, result.Text);
+    }
+
+    [Theory]
+    [InlineData("\"first\"u8", "\"second\"u8")]
+    [InlineData("\"\"\"first\"\"\"u8", "\"\"\"second\"\"\"u8")]
+    public void UTF8_string_suffixes_remain_part_of_the_literal(string first, string second)
+    {
+        var source = "// a very long removable comment provides enough savings for the complete hint and map too\nvar first = " + first + ";\nvar second = " + second + ";\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Empty(result.RenameMap);
+        Assert.Contains(first, result.Text, StringComparison.Ordinal);
+        Assert.Contains(second, result.Text, StringComparison.Ordinal);
+    }
 }
