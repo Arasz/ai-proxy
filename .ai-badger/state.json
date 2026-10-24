@@ -1,7 +1,20 @@
 {
-  "lastUpdated": "2026-10-24T18:51:17.735029+00:00",
-  "next": "Next: aip-activate-csharp-reducer-with-retrieval (docs/work/2026-10-24-csharp-reducer-activation.md): CCR prerequisite, trusted call paths, exact-file retrieval and storage-failure fallback, then runtime/model/token acceptance. Tree-sitter language PRs follow activation in order TS/JS, Python, CSS, HTML. Existing backlog: Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
+  "lastUpdated": "2026-10-24",
+  "next": "Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
   "completedTasks": [
+    {
+      "taskId": "aip-measure-sizes-in-provider-tokens",
+      "date": "2026-10-24",
+      "title": "Measure every size in provider tokens, not characters",
+      "pr": 50,
+      "version": null,
+      "summary": "Sizes in scripts and research records are estimated Claude tokens: one ratio, 2.89 chars/token from 116 stateless requests in capture.db, 2.2% holdout error (scripts/tokens.py, calibrate_tokens.py, tokens_calibration.json). No offline Claude tokenizer exists and no API key is available, so a generic BPE count would be exact for the wrong model. Latency budget re-registered per 1,000 provider-reported prompt tokens at the owner's p90, 0.056 s; thread-mode bodies made per-character request sizes wrong. Reducer-fixes plan r3 S4 per-ktoken. No release.",
+      "followUps": [
+        "Capture the response message id so thread differencing can give exact per-turn tokens and per-kind ratios.",
+        "Calibrate on claude-opus-5-5 stateless rows once enough exist.",
+        "C# per-type minimums stay in characters (runtime gate)."
+      ]
+    },
     {
       "taskId": "aip-implement-csharp-code-reducer-safely",
       "date": "2026-10-24",
