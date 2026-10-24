@@ -396,3 +396,12 @@ reader does not retrieve; once it retrieves, the original is charged in full and
 `results/rtk_ccr_retrieval.jsonl` and `results/report.json` (`python3 scripts/reducer_scoring/harness.py report`,
 `rtk_ccr_reader` and `rtk_ccr_retrieval` rows), run with `claude` 2.1.310. Token sizes are estimates.
 Only one run set exists; the reader is the stated stand-in, not the pre-registered route.
+
+**Net tokens, unclipped.** `compression()` floors at 0, so the retrieval arm's zeros hide growth. Summed
+from the `payloads` rows of `results/report.json` (original to sent, preview plus fetched original plus
+tool definition), per kind: code 7028 to 6610 (6% saved), prose 4331 to 5473 (26% more), log 2853 to
+3110 (9% more), listing 199 to 346 (74% more, untouched by rtk, tool definition only), json 2159 to
+2685 (24% more), build 21294 to 22107 (4% more), test 2340 to 3607 (54% more). All payloads: 40,204
+original tokens against 43,938 sent, 9% more than sending the originals uncompressed. With retrieval
+allowed the reader keeps every answer, and rtk's CCR then costs more than it saves on every kind but
+code. Measured on one reader (claude-opus-5-5 at effort low through `claude -p`), 3 runs.
