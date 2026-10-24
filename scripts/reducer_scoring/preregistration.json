@@ -465,5 +465,24 @@
   "onnx": "kompress-int8-wo.onnx",
   "threshold": 0.5,
   "chunk_tokens": 8192
- }
+ },
+ "amendments": [
+  {
+   "date": "2026-10-24",
+   "before_any_run": true,
+   "reason": "no working Anthropic API key; the owner's ChatGPT plan reached through pi accepts only openai/gpt-6.1-sol",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "invocation": "pi -p with --no-tools --no-session --no-context-files --no-extensions --no-skills --no-prompt-templates --no-mcp, proxy variables cleared so the call does not pass through ai-proxy",
+   "timing": {
+    "haiku_digest": "pi process wall time, stand-in: not Haiku's latency",
+    "summarizer_control": "pi process wall time"
+   },
+   "digest_is_stand_in": "retention and compression are reported; the digest's latency and score are labelled stand-in and do not settle digest-verdict"
+  }
+ ]
 }
