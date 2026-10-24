@@ -43,6 +43,15 @@ public sealed class CSharpCodeLexerTests
         Assert.Empty(result.Tokens);
     }
 
+    [Fact]
+    public void Active_preprocessor_directive_is_unsupported_without_partial_tokens()
+    {
+        var result = new CSharpCodeLexer().Lex("#region active\n#endregion\nclass C { }\n");
+
+        Assert.False(result.Supported);
+        Assert.Empty(result.Tokens);
+    }
+
     [Theory]
     [InlineData("\"hello\"u8")]
     [InlineData("\"\"\"hello\"\"\"u8")]
@@ -114,6 +123,7 @@ public sealed class CSharpCodeLexerTests
         Assert.True(result.Supported);
         Assert.Equal(3, result.Tokens.Count(token => token.Kind == CodeTokenKind.Identifier && token.ValueText == "record"));
         Assert.True(CSharpCodeLexer.IsKeyword("record"));
+        Assert.True(CSharpCodeLexer.IsKeyword("value"));
     }
 
     [Fact]

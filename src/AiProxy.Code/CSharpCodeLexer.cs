@@ -18,7 +18,7 @@ public sealed class CSharpCodeLexer : ICodeLexer
     public static bool IsKeyword(string text) =>
         SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
         || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
-        || text is "nint" or "nuint";
+        || text is "nint" or "nuint" or "value";
 
     /// <inheritdoc />
     public CodeLexResult Lex(string text)
@@ -89,7 +89,8 @@ public sealed class CSharpCodeLexer : ICodeLexer
             return CodeTokenKind.String;
         }
 
-        if (token.Parent is InterpolatedStringTextSyntax
+        if (token.IsKind(SyntaxKind.InterpolatedStringTextToken)
+            || token.Parent is InterpolatedStringTextSyntax
             || token.Parent is InterpolatedStringExpressionSyntax
                 && token.Kind().ToString().StartsWith("Interpolated", StringComparison.Ordinal))
         {
@@ -99,37 +100,13 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var kind = token.Kind();
         if (kind == SyntaxKind.IdentifierToken)
         {
-            var contextualKind = SyntaxFacts.GetContextualKeywordKind(token.ValueText);
-            if (contextualKind == SyntaxKind.None || token.Text.StartsWith('@'))
-            {
-                return CodeTokenKind.Identifier;
-            }
-
-            if (IsContextualKeywordUse(token, contextualKind))
-            {
-                return CodeTokenKind.Keyword;
-            }
-
-            return token.Parent is IdentifierNameSyntax or VariableDeclaratorSyntax or ParameterSyntax
-                ? CodeTokenKind.Identifier
-                : CodeTokenKind.Other;
+            return CodeTokenKind.Identifier;
         }
 
         return SyntaxFacts.IsKeywordKind(kind) || SyntaxFacts.IsContextualKeyword(kind)
             ? CodeTokenKind.Keyword
             : CodeTokenKind.Other;
     }
-
-    private static bool IsContextualKeywordUse(SyntaxToken token, SyntaxKind contextualKind) => contextualKind switch
-    {
-        SyntaxKind.VarKeyword => token.Parent is IdentifierNameSyntax { Parent: VariableDeclarationSyntax or ForEachStatementSyntax or DeclarationExpressionSyntax },
-        SyntaxKind.RecordKeyword => token.Parent is RecordDeclarationSyntax,
-        SyntaxKind.AwaitKeyword => token.Parent is AwaitExpressionSyntax,
-        SyntaxKind.YieldKeyword => token.Parent is YieldStatementSyntax,
-        SyntaxKind.WithKeyword => token.Parent is WithExpressionSyntax,
-        SyntaxKind.InitKeyword => token.Parent is AccessorDeclarationSyntax accessor && accessor.IsKind(SyntaxKind.InitAccessorDeclaration),
-        _ => false,
-    };
 
     private static IReadOnlyList<CodeToken>? CompleteCoverage(string text, IReadOnlyList<CodeToken> spans)
     {

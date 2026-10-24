@@ -45,6 +45,52 @@ public sealed class CodeReducerTests
     }
 
     [Fact]
+    public void Interpolation_format_whitespace_is_preserved()
+    {
+        const string format = "var text = $@\"{number:000   \n\n}\";\n";
+        var source = "// a very long comment that makes the complete hinted view smaller than the original source\nint number = 1;\n" + format;
+
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.Contains(format, result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Contextual_and_native_integer_names_are_not_renamed_partially()
+    {
+        var source = "// a very long comment makes room for the hint while preserving all names\nclass @record { }\nclass C { record first; record second; public int @record { get; set; } void P() { record = 1; record++; } void U() { int \\u0072ecord = 0; \\u0072ecord++; } }\nclass D { void record() {} void M() { record(); record(); } }\nclass E { int @nint; void M() { @nint++; nint++; } }\nclass V { public int P { set { int @value = 0; @value++; this.P = value; value = @value; } } }\n";
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.DoesNotContain("record", result.RenameMap.Values);
+        Assert.DoesNotContain("nint", result.RenameMap.Values);
+        Assert.DoesNotContain("value", result.RenameMap.Values);
+        Assert.Contains("class @record", result.Text, StringComparison.Ordinal);
+        Assert.Contains("record first;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("record second;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("int \\u0072ecord = 0; \\u0072ecord++;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("public int @record", result.Text, StringComparison.Ordinal);
+        Assert.Contains("record = 1; record++;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("void record()", result.Text, StringComparison.Ordinal);
+        Assert.Contains("record(); record();", result.Text, StringComparison.Ordinal);
+        Assert.Contains("int @nint;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("@nint++; nint++;", result.Text, StringComparison.Ordinal);
+        Assert.Contains("int @value = 0; @value++; this.P = value; value = @value;", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Active_preprocessor_directive_returns_exact_original()
+    {
+        const string source = "#region active\n#endregion\n// long comment that otherwise would be removed from the compact view\nclass C { }\n";
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
+
+        Assert.False(result.Changed);
+        Assert.False(result.Supported);
+        Assert.Equal(source, result.Text);
+    }
+
+    [Fact]
     public void Inline_comment_removal_keeps_identifier_separation()
     {
         const string source = "// a very long removable comment provides enough savings for the complete hint too\nint/*removed*/value = 1;\n";

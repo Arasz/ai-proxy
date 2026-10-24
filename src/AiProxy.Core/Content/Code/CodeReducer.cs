@@ -81,7 +81,7 @@ public sealed class CodeReducer
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2)
+            if (group.Count() < 2 || _lexer.IsKeyword(group.Key))
             {
                 continue;
             }
