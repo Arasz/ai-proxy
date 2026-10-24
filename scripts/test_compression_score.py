@@ -43,9 +43,6 @@ class ScoreTests(unittest.TestCase):
         self.assertGreater(score(measured(kept=3), budget_s=1.0, retention_floor=0.75), 0.0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class SizeScoreTests(unittest.TestCase):
     def test_same_latency_per_thousand_tokens_scores_the_same_at_any_size(self):
@@ -56,3 +53,12 @@ class SizeScoreTests(unittest.TestCase):
     def test_the_budget_is_per_thousand_tokens(self):
         m = Measurement(original_tokens=2000, reduced_tokens=1000, latency_s=0.112, answers_kept=1, answers_total=1)
         self.assertAlmostEqual(size_score(m, 0.056), score(m, budget_s=0.112))
+
+    def test_the_retention_floor_reaches_the_size_score(self):
+        m = Measurement(original_tokens=1000, reduced_tokens=500, latency_s=0.0, answers_kept=3, answers_total=4)
+        self.assertEqual(size_score(m, 0.056), 0.0)
+        self.assertGreater(size_score(m, 0.056, retention_floor=0.75), 0.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
