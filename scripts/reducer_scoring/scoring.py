@@ -19,6 +19,7 @@ class ReducerRun:
     output: str
     latency_s: float
     added_chars: int = 0
+    judged: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,7 @@ class QaRun:
     output: str
     latency_s: float
     replies: list[list[str]]
+    judged: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -38,14 +40,15 @@ class Row:
     not_applicable: bool = False
 
 
-def qa_kept(replies: list[list[str]], questions: list[dict], match=answered) -> int:
-    """Questions still answered: a question is lost only when at least two of its replies miss."""
+def qa_kept(replies: list[list[str]], questions: list[dict], match=answered, judged: frozenset[str] = frozenset()) -> int:
+    """Questions still answered: a question is lost only when at least two of its replies miss and the judge
+    did not accept its answer."""
     if len(replies) != len(questions):
         raise ValueError(f"{len(replies)} reply sets for {len(questions)} questions")
     kept = 0
     for question, answers in zip(questions, replies):
         misses = sum(not match(reply, question["a"]) for reply in answers)
-        if misses < MISSES_THAT_LOSE:
+        if misses < MISSES_THAT_LOSE or question["a"] in judged:
             kept += 1
     return kept
 
@@ -68,14 +71,14 @@ def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun],
     """
     if not count_untouched and all(run.output == original for run in runs):
         return Row(None, not_applicable=True)
-    kept = [sum(match(run.output, q["a"]) for q in questions) for run in runs]
+    kept = [sum(match(run.output, q["a"]) or q["a"] in run.judged for q in questions) for run in runs]
     lengths = [len(r.output) + r.added_chars for r in runs]
     return _median_row(original, len(questions), lengths, [r.latency_s for r in runs], kept)
 
 
 def qa_row(original: str, questions: list[dict], runs: list[QaRun], match=answered) -> Row:
     """QA retention: an answer is kept when the reader, given the candidate's output, still finds it."""
-    kept = [qa_kept(run.replies, questions, match) for run in runs]
+    kept = [qa_kept(run.replies, questions, match, run.judged) for run in runs]
     return _median_row(original, len(questions), [len(r.output) for r in runs], [r.latency_s for r in runs], kept)
 
 

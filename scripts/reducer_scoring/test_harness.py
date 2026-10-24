@@ -142,6 +142,25 @@ class RelaxedViewTests(unittest.TestCase):
         self.assertEqual(row["score"], 0.0)
         self.assertGreater(row["score_relaxed"], 0.0)
 
+    def judged_report(self, decoys_accepted):
+        recs = records()
+        recs["haiku_digest"] = [r for p in TEXTS for r in runs(p, "short", 0.0, [["Dana Okonkwo"] * 3, ["?"] * 3])]
+        judged = {("haiku_digest", p, r): frozenset({"PR 8842"}) for p in TEXTS for r in range(3)}
+        return build_report(PREREG, recs, TEXTS.__getitem__, (judged, (decoys_accepted, 20)))
+
+    def test_a_judged_answer_counts_in_the_relaxed_view_only(self):
+        row = kind(self.judged_report(0), "haiku_digest", "prose")
+        self.assertEqual((row["answers"], row["answers_relaxed"]), ("2/4", "4/4"))
+
+    def test_a_judge_that_accepts_more_than_a_tenth_of_its_decoys_is_not_used(self):
+        built = self.judged_report(3)
+        self.assertEqual(kind(built, "haiku_digest", "prose")["answers_relaxed"], "2/4")
+        self.assertIn("decoy", " ".join(built["judge"]["void"]))
+
+    def test_a_judge_at_a_tenth_of_its_decoys_is_used(self):
+        built = self.judged_report(2)
+        self.assertEqual((built["judge"]["void"], kind(built, "haiku_digest", "prose")["answers_relaxed"]), ([], "4/4"))
+
     def test_the_table_shows_the_relaxed_score_last(self):
         built = report()
         rules = next(line for line in _table(built["kinds"], "kind").splitlines()

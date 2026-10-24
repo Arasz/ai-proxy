@@ -91,6 +91,16 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(row.measurement.answers_kept, 2)
 
 
+class JudgedTests(unittest.TestCase):
+    def test_a_judged_answer_is_kept_by_an_extractive_run(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana Okonkwo", 0.0, judged=frozenset({"PR 8842"}))] * 3)
+        self.assertEqual(row.measurement.answers_kept, 2)
+
+    def test_a_judged_answer_is_kept_by_a_reader_run(self):
+        run = QaRun("d", 1.0, [["Dana Okonkwo"] * 3, ["UNKNOWN"] * 3], judged=frozenset({"PR 8842"}))
+        self.assertEqual(qa_row(ORIGINAL, QUESTIONS, [run] * 3).measurement.answers_kept, 2)
+
+
 class QaRowTests(unittest.TestCase):
     def test_retention_comes_from_the_reader_not_from_the_text(self):
         # The digest paraphrased the name away, but the reader still answered from it.

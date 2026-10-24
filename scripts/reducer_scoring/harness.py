@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from compression_score import compression, latency_score, retention, score  # noqa: E402
 from preregistration import HERE, load, payload_text  # noqa: E402
 from grading import same_fact  # noqa: E402
+from judge_runner import accepted, lost  # noqa: E402
 from scoring import QaRun, ReducerRun, Row, extractive_row, kind_row, qa_row, void_reasons  # noqa: E402
 
 STAND_IN = {"digest_gpt_stand_in"}
@@ -28,6 +29,7 @@ KOMPRESS_PYTHON = os.environ.get("KOMPRESS_PYTHON", str(HOME / "RiderProjects/mo
 KOMPRESS_MODELS = os.environ.get("KOMPRESS_MODELS", str(HOME / "RiderProjects/models-conversion/models/kompress"))
 RULES_DLL = HERE / "rules_runner/bin/Release/net10.0/RulesRunner.dll"
 HAIKU = ("haiku_digest", "haiku_digest_checked")
+JUDGE_OUTPUTS = "judge.ndjson"
 
 
 def _digests(out: Path, candidate: str) -> Path:
@@ -55,9 +57,32 @@ def _fields(candidate: str, row: Row, prereg: dict, relaxed_row: Row | None = No
     }
 
 
-def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_text) -> dict:
-    """Per payload and per kind rows for every candidate that has records, plus the void verdict."""
+JUDGE_DECOY_LIMIT = 0.1
+
+
+def _judge(prereg: dict, records: dict[str, list[dict]], judge) -> tuple[dict, dict]:
+    """The judged answers to use, and the judge's own check: decoys accepted, and how much of the summarizer it saved."""
+    if judge is None:
+        return {}, {"void": ["the judge did not run"]}
+    judged, (decoys_accepted, decoys) = judge
+    lost_summary = sum(len(q) for k, q in lost(prereg, records).items() if k[0] == "summarizer_control")
+    saved_summary = sum(len(a) for k, a in judged.items() if k[0] == "summarizer_control")
+    void = []
+    if decoys and decoys_accepted / decoys > JUDGE_DECOY_LIMIT:
+        void.append(f"the judge accepted {decoys_accepted} of {decoys} decoys, over {JUDGE_DECOY_LIMIT:.0%}")
+    check = {"decoys_accepted": decoys_accepted, "decoys": decoys,
+             "summarizer_accepted": saved_summary, "summarizer_lost": lost_summary, "void": void}
+    return ({} if void else judged), check
+
+
+def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_text, judge=None) -> dict:
+    """Per payload and per kind rows for every candidate that has records, plus the void verdict.
+
+    judge is (accepted answers per candidate run, (decoys accepted, decoys asked)) from judge_runner.accepted;
+    its answers count in the relaxed view only.
+    """
     extractive = set(prereg["gates"]["extractive"]["candidates"])
+    judged, judge_check = _judge(prereg, records, judge)
     payload_rows, kind_rows, counted_rows, by_candidate = [], [], [], {}
     for candidate, lines in records.items():
         rows, counted, by_fact, counted_by_fact = {}, {}, {}, {}
@@ -67,16 +92,21 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
                 continue
             original = text_of(name)
             if candidate in extractive:
-                reducer_runs = [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0)) for r in mine]
+                def reducer_runs(judging):
+                    return [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0),
+                                       judged.get((candidate, name, r["run"]), frozenset()) if judging else frozenset())
+                            for r in mine]
                 for view, match in ((rows, None), (by_fact, same_fact)):
-                    view[name] = extractive_row(original, payload["questions"], reducer_runs, **_by(match))
+                    view[name] = extractive_row(original, payload["questions"], reducer_runs(match), **_by(match))
                 for view, match in ((counted, None), (counted_by_fact, same_fact)):
-                    view[name] = extractive_row(original, payload["questions"], reducer_runs, count_untouched=True,
-                                                **_by(match))
+                    view[name] = extractive_row(original, payload["questions"], reducer_runs(match),
+                                                count_untouched=True, **_by(match))
             else:
                 qa_runs = [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine]
+                judged_runs = [QaRun(r["output"], r["latency_s"], r["replies"],
+                                     judged.get((candidate, name, r["run"]), frozenset())) for r in mine]
                 rows[name] = counted[name] = qa_row(original, payload["questions"], qa_runs)
-                by_fact[name] = counted_by_fact[name] = qa_row(original, payload["questions"], qa_runs, same_fact)
+                by_fact[name] = counted_by_fact[name] = qa_row(original, payload["questions"], judged_runs, same_fact)
             payload_rows.append(_fields(candidate, rows[name], prereg, by_fact[name])
                                 | {"payload": name, "kind": payload["kind"]})
         by_candidate[candidate] = rows
@@ -92,7 +122,8 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
             void.append(f"{control} did not run, so the controls cannot clear the run")
     if not void:
         void = void_reasons(by_candidate["identity"], by_candidate["summarizer_control"])
-    return {"payloads": payload_rows, "kinds": kind_rows, "kinds_counted": counted_rows, "void": void}
+    return {"payloads": payload_rows, "kinds": kind_rows, "kinds_counted": counted_rows, "void": void,
+            "judge": judge_check}
 
 
 def _by(match) -> dict:
@@ -191,10 +222,16 @@ def report(out: Path) -> None:
     records = {p.stem: [json.loads(line) for line in p.open(encoding="utf-8")] for p in sorted(out.glob("*.jsonl"))}
     recorded = out / "environment.json"
     environments = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else {}
-    built = build_report(load(), records) | {"environment": {c: environments.get(c, "not recorded") for c in records}}
+    judge_path = out / JUDGE_OUTPUTS
+    judge = accepted([json.loads(line) for line in judge_path.open(encoding="utf-8")]) if judge_path.exists() else None
+    built = build_report(load(), records, judge=judge) | {"environment": {c: environments.get(c, "not recorded") for c in records}}
     (out / "report.json").write_text(json.dumps(built, indent=1) + "\n", encoding="utf-8")
     verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
-    md = f"{verdict}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \
+    j = built["judge"]
+    judge_line = ("judge: " + ("; ".join(j["void"]) + ", so the relaxed view is graded by fact only" if j["void"] else
+                  f"{j['decoys_accepted']}/{j['decoys']} decoys accepted, "
+                  f"{j['summarizer_accepted']}/{j['summarizer_lost']} summarizer losses accepted"))
+    md = f"{verdict}\n\n{judge_line}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \
          f"\n## Per kind, untouched payloads counted as nothing removed\n\n{_table(built['kinds_counted'], 'kind')}" \
          f"\n## Per payload\n\n{_table(built['payloads'], 'payload')}"
     (out / "report.md").write_text(md, encoding="utf-8")

@@ -536,6 +536,22 @@
    "after": "every candidate's floor-1.0 scores had been seen, including haiku_digest",
    "reason": "the owner ruled that a small loss is acceptable and that a fact in another wording is kept: most haiku_digest losses were reworded facts, and the few dropped facts were low-value",
    "relaxed_view": "a second score, score_relaxed, with its own answer count answers_relaxed. Answers are graded by fact (grading.same_fact): both sides are rewritten to one spelling first, so a unit written short (4.2s for 4.2 seconds), a count written number first (7 failed for failed: 7), passed for succeeded, errors for Error(s) and a position with spaces still count. Then the same harmonic mean at the 1 s budget, zero when fact-graded retention is under 0.7, otherwise multiplied by that retention so a lossless candidate stays ahead of a lossy one at equal compression and latency. The verbatim floor-1.0 score stays the headline. Recorded replies are re-graded; nothing is re-run."
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": true,
+   "after": "amendment 4's fact-graded relaxed view had been seen; the judge had not run",
+   "reason": "the owner chose a reader judge for facts the spelling rules cannot recover, such as '2 errors' answered UNKNOWN",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "judge": "judge_runner.py: for every answer fact grading still calls lost, the QA reader gets the candidate's output and numbered items (question plus proposed answer) and replies yes or no, three times; two yes accept the answer. Accepted answers count in the relaxed view only, never in the headline.",
+   "decoys": "every judged answer with a number is also asked with its last number raised by one, shuffled in by a seed fixed per candidate run. If the judge accepts more than 10% of decoys, the judge is not used and the relaxed view is graded by fact only.",
+   "control": "summarizer_control losses are judged too; the share it accepts is reported as the judge's leniency"
   }
  ]
 }
