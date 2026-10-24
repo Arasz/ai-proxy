@@ -95,7 +95,7 @@ differs.
 
 ## Findings
 
-### F1: The controls clear the run [MEASURED]
+### F1 — The controls clear the run [MEASURED]
 
 Identity kept every answer on every kind, so each of the 84 questions can be answered from its
 own payload by the reader. Identity also scores 0 everywhere, because it removes nothing. The
@@ -105,7 +105,9 @@ is well under the "more than half" void rule. Neither void rule fired. All 468 r
 including the 117 for the Haiku digest, parsed as an answer array, so no answer was lost to formatting. Every candidate has exactly
 three runs of every payload, and the rules runner recorded no reducer failure.
 
-### F2: The shipped rules lead on code and test output; json and build depend on the view [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py report`: `void` is empty in `results/report.json`; identity and summarizer rows from `results/identity.jsonl` and `results/summarizer_control.jsonl`.
+
+### F2 — The shipped rules lead on code and test output; json and build depend on the view [MEASURED]
 
 On code and test output the shipped rules keep every answer and score 0.30 and 0.40 (0.34 when
 the untouched test payload is counted), removing about 20% in under 3 ms. In the
@@ -115,7 +117,9 @@ JSON and the 60 KB verbose build log. Counting them, json drops to 0.08, behind 
 stand-in's 0.09 and the Haiku digest's 0.27, and build drops to 0.008. Latency barely counts at these speeds, so the
 score is almost all compression.
 
-### F3: The log reducer loses 4 of 5 answers on rtk-proxy's own log [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py report`: `shipped_rules` rows under `kinds` and `kinds_counted` in `results/report.json`, from `results/shipped_rules.jsonl`.
+
+### F3 — The log reducer loses 4 of 5 answers on rtk-proxy's own log [MEASURED]
 
 On `rtk_proxy_log` the rules removed 89% and kept one answer. The output is four of the log's
 lines followed by `[retained identifiers] /home/dev/probe/db-a/mem.db -proxy 18080`. The lines
@@ -124,7 +128,9 @@ summary does not bring them back. On `agent_log`, the other log, the rules kept 
 Why this log is cut so hard is not established here. The payload and its questions now make a
 ready regression case for `LogCompressionHandler`.
 
-### F4: The shipped rules leave 6 of 13 payloads untouched, and 5 are over their minimum [MEASURED]
+**Evidence:** the `rtk_proxy_log` outputs in `results/shipped_rules.jsonl` and its `payloads` row in `results/report.json`.
+
+### F4 — The shipped rules leave 6 of 13 payloads untouched, and 5 are over their minimum [MEASURED]
 
 Both prose payloads, the directory listing, the one-line `github_pr_list` JSON, the 60 KB
 verbose build log and the small test failure came back byte for byte. Only the listing is
@@ -133,7 +139,9 @@ far over theirs (prose 512, json 100, shell 200). On those, the rules ran and fo
 remove. On the verbose build log that took a median 5.5 ms. So the rules have no score at
 all on listings, and score 0 on prose once the untouched payloads count.
 
-### F5: kompress int8 keeps answers but removes little, and it cuts identifiers [MEASURED]
+**Evidence:** `not_applicable` rows for `shipped_rules` under `payloads` in `results/report.json`, from `results/shipped_rules.jsonl`; listing minimum read in `CompressionOptions.cs`.
+
+### F5 — kompress int8 keeps answers but removes little, and it cuts identifiers [MEASURED]
 
 Where it kept every answer, kompress removed 0.05-12.6% and took 0.2-4.9 s. On the 60 KB
 verbose build log it took 69 s per run for 0.4%. It lost answers on build and test output by
@@ -142,7 +150,9 @@ dropping subword tokens inside identifiers. For example, the test name
 `...Tests._last_two_lines_are_anchors_and_survive`. Its best per-kind score is 0.17, on prose.
 Its best per-payload score is 0.18, on `incident_report`.
 
-### F6: rtk's preview loses answers on every kind, by design [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py report`: `kompress_int8` rows in `results/report.json`, outputs and latencies in `results/kompress_int8.jsonl`.
+
+### F6 — rtk's preview loses answers on every kind, by design [MEASURED]
 
 rtk adds a 426-character `rtk_retrieve` tool definition to every request, including the two
 whose tool result it left untouched. Counting those characters, the preview removed 4-97% in
@@ -156,7 +166,9 @@ preview is not head+tail. A 25-item array becomes one schema line,
 does not credit what retrieval would get back. Here a 0 means the agent must call retrieval to
 answer, not that the content is gone.
 
-### F7: The digest stand-in keeps prose, logs and JSON, but not code or build output [MEASURED, stand-in model]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py report`: `rtk_ccr` rows in `results/report.json`; previews and `added_chars` in `results/rtk_ccr.jsonl`.
+
+### F7 — The digest stand-in keeps prose, logs and JSON, but not code or build output on the stand-in model [MEASURED]
 
 On `gpt-6.1-sol` the digest kept every answer on prose, logs and JSON, removing 31-67%. It
 dropped `System.Text.Json` from the code file, a file name from the listing, and the
@@ -164,7 +176,9 @@ dropped `System.Text.Json` from the code file, a file name from the listing, and
 42 s on `prose_large`, holds its best score to 0.12 at 1 s and 0.21 at 2 s. Haiku would be
 faster, so its latency here says nothing about Haiku. F8 has the Haiku run.
 
-### F8: The Haiku digest is fast; word for word it loses answers on 6 of 7 kinds, mostly by rewording [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py report`: `digest_gpt_stand_in` rows in `results/report.json`, digests and reader replies in `results/digest_gpt_stand_in.jsonl`.
+
+### F8 — The Haiku digest is fast; word for word it loses answers on 6 of 7 kinds, mostly by rewording [MEASURED]
 
 On `claude-haiku-5-5` the digest took 3.0-14 s of wall time per payload (3.1-12 s per kind), 1.2
 to 3.6 times faster than the stand-in per kind. Wall time is the boundary `pi_call` times for the
@@ -192,7 +206,9 @@ Graded by fact and judged, Haiku keeps every answer on prose, log and json, and 
 two per kind elsewhere. Under the relaxed view it scores 0.14-0.42 on every kind. It leads log,
 listing and build, and in the counted view json.
 
-### F8a: Asking Haiku to find and re-check the facts first keeps no more of them [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py run haiku_digest`, then report: `haiku_digest` rows in `results/report.json`; digests in `results/haiku_digest.digests.ndjson`, reader replies in `results/haiku_digest.jsonl`.
+
+### F8a — Asking Haiku to find and re-check the facts first keeps no more of them [MEASURED]
 
 `haiku_digest_checked` gave Haiku the find-compress-check prompt at `--effort low`. All 39
 digests came from Haiku at low effort. It thought for a median 239 tokens (0-2,501). Compared
@@ -207,7 +223,9 @@ first run on code, prose, log and listing and slightly lower on json, build and 
 11 of its 28 remaining losses and none of its 17 decoys. The prompt's check step does not
 change what Haiku drops or rewords.
 
-### F9: The judge is strict on numbers; the relaxed view lets the summarizer control score on build and test [MEASURED]
+**Evidence:** `python3 scripts/reducer_scoring/harness.py run haiku_digest_checked`, then report: `haiku_digest_checked` rows in `results/report.json`; effort and thinking tokens in `results/haiku_digest_checked.digests.ndjson`.
+
+### F9 — The judge is strict on numbers; the relaxed view lets the summarizer control score on build and test [MEASURED]
 
 Over the first six candidates, the judge ran over the 383 answers fact grading still called lost, three times each, and every
 one of its 294 replies parsed. It accepted none of the 222 decoys, so a changed number is not
@@ -228,7 +246,9 @@ of 13 (`dotnet_test_failure` and `dotnet_build_failure_verbose`), so the "more t
 rule does not fire. Pooling two payloads into one kind is what lifts it over the floor. On
 build and test, a relaxed score is not evidence that a candidate beats a two-sentence summary.
 
-### F10: What this does not cover [UNVERIFIED]
+**Evidence:** `python3 scripts/reducer_scoring/judge_runner.py scripts/reducer_scoring/results`, then report: verdicts in `results/judge.ndjson`, the `judge` check and `score_relaxed` rows in `results/report.json`.
+
+## Still open
 
 - One machine, one reader model, and 13 payloads, with at least two per kind except listings
   (one).
