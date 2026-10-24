@@ -332,9 +332,11 @@ per 1,000 tokens, not per 1,000 characters.
 definition rtk injects was added to the reduced size. Retrieval was never available, so a lost answer
 meant "the agent must call `rtk_retrieve`", not "the content is gone" (F6).
 
-**Reader-path deviation (stated plainly).** The pre-registered QA reader is `claude-opus-5-5` at effort
-low through `pi`. pi's Anthropic route is out of credit and other pi providers were not used, so both
-new arms use `claude -p` with `claude-opus-5-5`, `--effort low`, isolated as `claude_digest_runner.command()`
+**Reader deviation (stated plainly).** The QA reader in force is the one the latest amendment
+registers, `openai/gpt-6.1-sol` at effort low through `pi` (`amendments[-1].models` in
+`preregistration.json`; the top-level `claude-opus-5-5` was superseded). The pi-read rows of the
+other candidates used it. Neither that route nor pi's Anthropic route had credit, and pi's other
+providers were not used, so this is a different model as well as a different path: both new arms use `claude -p` with `claude-opus-5-5`, `--effort low`, isolated as `claude_digest_runner.command()`
 (no tools, `--setting-sources ""`, `--strict-mcp-config`, `--no-session-persistence`, `--system-prompt`,
 JSON output; proxy variables and `NODE_EXTRA_CA_CERTS` removed). Each reader call checked, when
 `modelUsage` was present, that it named only `claude-opus-5-5`. Both arms read the same saved `rtk_ccr` outputs
