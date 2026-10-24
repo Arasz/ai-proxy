@@ -482,7 +482,10 @@
     "haiku_digest": "pi process wall time, stand-in: not Haiku's latency",
     "summarizer_control": "pi process wall time"
    },
-   "digest_is_stand_in": "retention and compression are reported; the digest's latency and score are labelled stand-in and do not settle digest-verdict"
+   "digest_is_stand_in": "retention and compression are reported; the digest's latency and score are labelled stand-in and do not settle digest-verdict",
+   "reader_calls": "each reader call answers all of a payload's questions as a JSON array, in order; a reply that is not an array of the right length answers every question with nothing (a miss), and the raw reply is kept",
+   "thinking": "reader at low effort; digest and summarizer with thinking off",
+   "identity_runs": "identity's output is the payload itself, so its 3 runs differ only in the reader's replies"
   }
  ]
 }
