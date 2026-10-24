@@ -323,3 +323,76 @@ Because every size is one ratio away from its character figure, compression rati
 within 0.003 of the character figures (largest difference over all rows); the tool definition rtk adds has a token
 estimate that rounds on its own. The token figures matter for the next step: the latency budget is
 per 1,000 tokens, not per 1,000 characters.
+
+## Amendment 2026-10-24: rtk CCR with retrieval allowed
+
+**How `rtk_ccr` was graded before.** It is an extractive candidate (`preregistration.json`, gates
+`extractive`): no reader ran. A question counted as kept when its expected answer appeared verbatim
+(`grading.answered`) in the saved rtk output, the preview plus its `rtk_retrieve` marker. The tool
+definition rtk injects was added to the reduced size. Retrieval was never available, so a lost answer
+meant "the agent must call `rtk_retrieve`", not "the content is gone" (F6).
+
+**Reader-path deviation (stated plainly).** The pre-registered QA reader is `claude-opus-5-5` at effort
+low through `pi`. pi's Anthropic route is out of credit and other pi providers were not used, so both
+new arms use `claude -p` with `claude-opus-5-5`, `--effort low`, isolated as `claude_digest_runner.command()`
+(no tools, `--setting-sources ""`, `--strict-mcp-config`, `--no-session-persistence`, `--system-prompt`,
+JSON output; proxy variables and `NODE_EXTRA_CA_CERTS` removed). Every reader call checked that
+`modelUsage` named only `claude-opus-5-5`. Both arms read the same saved `rtk_ccr` outputs
+(13 payloads, 3 runs, 3 replies per run, same questions). rtk was not re-run. The answers are therefore
+not comparable with the pi-read rows of other candidates in this document; they are comparable with each
+other. No quota or rate-limit error occurred (limit was two).
+
+- `rtk_ccr_reader`: today's `READER_SYSTEM`, no retrieval. Graded by the reader's replies (QA), not verbatim.
+- `rtk_ccr_retrieval`: the reader may reply exactly `RETRIEVE <id>` for an id in an `rtk_retrieve` marker in
+  the text. A valid request gets one more call with preview, the original (`payload_text`) and the
+  questions; a second request is not served. An id not in the text is treated as no answer (none
+  occurred). Marker ids were checked to be one stable id per payload and unique across payloads; the
+  runner cannot read rtk's store, so id-to-content is not independently confirmed beyond that.
+- A run counts as retrieved, for the compression charge, when any of its three reader calls retrieved;
+  the full original is then charged to `reduced_tokens`. Latency is rtk's saved `latency_s` plus the
+  median wall time of the first (retrieval-asking) call of the retrieving calls: the extra round trip.
+  Reader wall time per call is in `reader_wall_s` of each record (median 4.0 s without retrieval;
+  3.3 s first call and 3.5 s second call with it).
+- Retrieval rate is retrieving calls over all reader calls of the kind, including the payloads rtk left
+  untouched (no marker, 0 retrievals): `dir_listing` and `dotnet_build_failure`.
+
+**Per kind, pre-registered view** (untouched payloads left out of compression; `results/report.json`
+`kinds`). Answers kept = questions where fewer than two of three replies miss, median run. Compression
+is 1 - (preview + tool definition + fetched original) / original, floored at 0. Latency is the median
+over the kind's payloads. Retrieval column is `rtk_ccr_retrieval` only.
+
+| kind | answers, no retrieval | answers, retrieval | compression, no retrieval | compression, retrieval | latency s, no retrieval | latency s, retrieval | retrieval rate |
+|---|---|---|---|---|---|---|---|
+| code | 9/12 | 12/12 | 0.69 | 0.06 | 0.0021 | 1.51 | 8/18 (44%) |
+| prose | 0/14 | 14/14 | 0.74 | 0.00 | 0.0006 | 3.31 | 17/18 (94%) |
+| log | 5/13 | 13/13 | 0.22 | 0.00 | 0.0009 | 1.58 | 9/18 (50%) |
+| listing | n/a | n/a | n/a | n/a | n/a | n/a | 0/9 |
+| json | 0/19 | 19/19 | 0.76 | 0.00 | 0.0008 | 2.90 | 18/18 (100%) |
+| build | 6/10 | 10/10 | 0.95 | 0.00 | 0.0029 | 1.64 | 8/18 (44%) |
+| test | 5/10 | 10/10 | 0.46 | 0.00 | 0.0006 | 3.82 | 15/18 (83%) |
+
+The `listing` kind is n/a in the pre-registered view (rtk left `dir_listing` untouched); in the
+counted view both arms keep 6/6 and charge the tool definition (compression 0). The `build` and
+`listing` rows above use the pre-registered view; the counted view (`kinds_counted`) differs only
+there (build no retrieval 6/10, compression 0.95; retrieval arm 10/10). Every score at the 1 s budget
+is 0.0 except `rtk_ccr_retrieval` code (0.10), because compression is 0 or tiny whenever the original
+is fetched. The retrieval arm keeps every answer on every kind.
+
+By payload, retrieval was 0/9 on `code_file` and `rtk_proxy_log` (the preview already held the
+answers: 6/6 and 5/5) and 7-9 of 9 on the other nine marked payloads. Whenever the reader retrieved,
+compression went to 0: the original was fetched whole, plus the preview and tool definition.
+
+**Tool definition against the saving.** rtk injects one `rtk_retrieve` tool definition on every request,
+426 characters, 147 estimated tokens (estimated, not provider-counted). Over the 13 payloads the preview
+saved 33,295 tokens in total against 1,911 tokens of definitions (13 x 147). Per request the saving
+exceeded 147 tokens by a clear margin on 9 payloads (`code_file` 1,552; `code_file_large` 3,591; `prose_large` 3,235;
+`dotnet_build_failure_verbose` 20,463; `github_pr_list` 1,751; `dotnet_test_failures` 1,203;
+`agent_log` 633; `rtk_proxy_log` 279; `incident_report` 248). On `json_payload` (176) and
+`dotnet_test_failure` (164) the saving was 29 and 17 tokens above it, and on the two untouched payloads
+the saving was 0, so the definition was a pure cost of 147 tokens. Those figures hold only when the
+reader does not retrieve; once it retrieves, the original is charged in full and the saving is gone.
+
+**Evidence grade: MEASURED** for everything above, from `results/rtk_ccr_reader.jsonl`,
+`results/rtk_ccr_retrieval.jsonl` and `results/report.json` (`python3 scripts/reducer_scoring/harness.py report`,
+`rtk_ccr_reader` and `rtk_ccr_retrieval` rows), run with `claude` 2.1.310. Token sizes are estimates.
+Only one run set exists; the reader is the stated stand-in, not the pre-registered route.
