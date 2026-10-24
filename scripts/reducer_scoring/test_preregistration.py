@@ -43,6 +43,17 @@ class PreregistrationTests(unittest.TestCase):
                 with self.subTest(kind=kind):
                     self.assertGreaterEqual(count, 2)
 
+    def test_the_size_normalized_budget_is_per_thousand_tokens(self):
+        budget = self.prereg["size_normalized_budget"]
+        sensitivity = budget["budget_per_ktoken_sensitivity_s"]
+        self.assertEqual(len(sensitivity), 3)
+        self.assertEqual(sensitivity, sorted(sensitivity))
+        self.assertEqual(budget["budget_per_ktoken_s"], sensitivity[1])
+        self.assertEqual(budget["token_method"], "scripts/tokens_calibration.json")
+
+    def test_no_budget_is_stated_per_thousand_characters(self):
+        self.assertEqual([k for k in self.prereg["size_normalized_budget"] if "kchar" in k], [])
+
     def test_the_floor_is_the_owner_floor(self):
         self.assertEqual(self.prereg["retention_floor"], 1.0)
 

@@ -436,18 +436,20 @@
  ],
  "size_normalized_budget": {
   "registered": "2026-10-24",
+  "unit_changed": "2026-10-24, from characters to tokens, before any run that uses it",
   "before_any_run": true,
   "applies_to": "the first harness run after step size-normalized-score of plan aip-reducer-fixes-from-scoring-results; runs before it keep budget_s",
-  "budget_per_kchar_s": 0.04,
-  "budget_per_kchar_sensitivity_s": [
-   0.01,
-   0.04,
-   0.11
+  "budget_per_ktoken_s": 0.015,
+  "budget_per_ktoken_sensitivity_s": [
+   0.0064,
+   0.015,
+   0.056
   ],
-  "budget": "budget_per_kchar_s x original_chars / 1000, so latency_score = budget_per_kchar_s / (budget_per_kchar_s + latency_s per 1000 characters)",
+  "token_method": "scripts/tokens_calibration.json",
+  "budget": "budget_per_ktoken_s x original_tokens / 1000, so latency_score = budget_per_ktoken_s / (budget_per_ktoken_s + latency_s per 1000 tokens)",
   "kind_pooling": "a kind's score is the equal-weight mean of its payloads' scores; the summed view is reported only as a labelled secondary column",
-  "source": "docs/work/2026-10-24-latency-budget-per-kchar.md: median, p10 and p90 of provider time to first byte per 1,000 request characters, 93 /v1/messages requests through ai-proxy on 2026-10-24",
-  "ruling": "owner, 2026-10-24: score relative to payload size; value accepted as recommended"
+  "source": "docs/work/2026-10-24-latency-budget-per-kchar.md, amendment 2026-10-24: p10, p50 and p90 of provider time to first byte per 1,000 prompt tokens (input + cache_read + cache_creation), 440 /v1/messages status-200 requests through ai-proxy on 2026-10-24",
+  "ruling": "owner, 2026-10-24: score relative to payload size. The 0.04 per 1,000 characters accepted then was restated in tokens by the coordinator task; the per-ktoken value is not yet separately confirmed by the owner"
  },
  "gates": {
   "extractive": {
