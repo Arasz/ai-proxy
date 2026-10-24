@@ -323,3 +323,112 @@ Because every size is one ratio away from its character figure, compression rati
 within 0.003 of the character figures (largest difference over all rows); the tool definition rtk adds has a token
 estimate that rounds on its own. The token figures matter for the next step: the latency budget is
 per 1,000 tokens, not per 1,000 characters.
+
+## Amendment 2026-10-24: rtk CCR with retrieval allowed
+
+**How `rtk_ccr` was graded before.** It is an extractive candidate (`preregistration.json`, gates
+`extractive`): no reader ran. A question counted as kept when its expected answer appeared verbatim
+(`grading.answered`) in the saved rtk output, the preview plus its `rtk_retrieve` marker. The tool
+definition rtk injects was added to the reduced size. Retrieval was never available, so a lost answer
+meant "the agent must call `rtk_retrieve`", not "the content is gone" (F6).
+
+**Reader deviation (stated plainly).** The QA reader in force is the one the latest amendment
+registers, `openai/gpt-6.1-sol` at effort low through `pi` (`amendments[-1].models` in
+`preregistration.json`; the top-level `claude-opus-5-5` was superseded). The pi-read rows of the
+other candidates used it. Neither that route nor pi's Anthropic route had credit, and pi's other
+providers were not used, so this is a different model as well as a different path: both new arms use `claude -p` with `claude-opus-5-5`, `--effort low`, isolated as `claude_digest_runner.command()`
+(no tools, `--setting-sources ""`, `--strict-mcp-config`, `--no-session-persistence`, `--system-prompt`,
+JSON output; proxy variables and `NODE_EXTRA_CA_CERTS` removed). Each reader call checked, when
+`modelUsage` was present, that it named only `claude-opus-5-5`. Both arms read the same saved `rtk_ccr` outputs
+(13 payloads, 3 runs, 3 replies per run, same questions). rtk was not re-run. The answers are therefore
+not comparable with the pi-read rows of other candidates in this document; they are comparable with each
+other. No quota or rate-limit error occurred, per the run log (limit was two); the saved files do not
+record it [UNVERIFIED from files].
+
+- `rtk_ccr_reader`: today's `READER_SYSTEM`, no retrieval. Graded by the reader's replies (QA), not verbatim.
+- `rtk_ccr_retrieval`: the reader may reply exactly `RETRIEVE <id>` for an id in an `rtk_retrieve` marker in
+  the text. A valid request gets one more call with preview, the original (`payload_text`) and the
+  questions; a second request is not served. An id not in the text is treated as no answer (none
+  occurred). Marker ids were checked to be one stable id per payload and unique across payloads; the
+  runner cannot read rtk's store, so id-to-content is not independently confirmed beyond that.
+- A run counts as retrieved, for the compression charge, when any of its three reader calls retrieved;
+  the full original is then charged to `reduced_tokens` once per run, even when only 1 or 2 of its 3
+replies retrieved (for example `dotnet_test_failure`, 7 of 9), so the retrieval arm's token cost is
+slightly overstated against an agent that asks once. Latency is rtk's saved `latency_s` plus the
+  median wall time of the first (retrieval-asking) call of the retrieving calls: the extra round trip.
+  Reader wall time per call is in `reader_wall_s` of each record (median 4.0 s without retrieval;
+  3.3 s first call and 3.5 s second call with it).
+- Retrieval rate is retrieving calls over all reader calls of the kind, including the payloads rtk left
+  untouched (no marker, 0 retrievals): `dir_listing` and `dotnet_build_failure`.
+
+**Per kind, pre-registered view** (untouched payloads left out of compression; `results/report.json`
+`kinds`). Answers kept = questions where fewer than two of three replies miss, median run. Compression
+is 1 - (preview + tool definition + fetched original) / original, floored at 0. Latency is the median
+over the kind's payloads. Retrieval column is `rtk_ccr_retrieval` only.
+
+| kind | answers, no retrieval | answers, retrieval | compression, no retrieval | compression, retrieval | latency s, no retrieval | latency s, retrieval | retrieval rate |
+|---|---|---|---|---|---|---|---|
+| code | 9/12 | 12/12 | 0.69 | 0.06 | 0.0021 | 1.51 | 8/18 (44%) |
+| prose | 0/14 | 14/14 | 0.74 | 0.00 | 0.0006 | 3.31 | 17/18 (94%) |
+| log | 5/13 | 13/13 | 0.22 | 0.00 | 0.0009 | 1.58 | 9/18 (50%) |
+| listing | 6/6 | 6/6 | 0 | 0 | 0.0002 | 0.0002 | 0/9 |
+| json | 0/19 | 19/19 | 0.76 | 0.00 | 0.0008 | 2.90 | 18/18 (100%) |
+| build | 6/10 | 10/10 | 0.95 | 0.00 | 0.0029 | 1.64 | 8/18 (44%) |
+| test | 5/10 | 10/10 | 0.46 | 0.00 | 0.0006 | 3.82 | 15/18 (83%) |
+
+The `listing` kind is n/a for the extractive `rtk_ccr` only (rtk left `dir_listing` untouched); both
+QA arms count it as 6/6 with compression 0, and for them `kinds` and `kinds_counted` are identical. Every score at the 1 s budget
+is 0.0 except `rtk_ccr_retrieval` code (0.10), because compression is 0 or tiny whenever the original
+is fetched. The retrieval arm keeps every answer on every kind.
+
+By payload, retrieval was 0/9 on `code_file` and `rtk_proxy_log` (the preview already held the
+answers: 6/6 and 5/5) and 7-9 of 9 on the other nine marked payloads. Whenever the reader retrieved,
+compression went to 0: the original was fetched whole, plus the preview and tool definition.
+
+**Tool definition against the saving.** rtk injects one `rtk_retrieve` tool definition on every request,
+426 characters, 147 estimated tokens (estimated, not provider-counted). Over the 13 payloads the preview
+saved 33,295 tokens in total against 1,911 tokens of definitions (13 x 147). Per request the saving
+exceeded 147 tokens by a clear margin on 9 payloads (`code_file` 1,552; `code_file_large` 3,591; `prose_large` 3,235;
+`dotnet_build_failure_verbose` 20,463; `github_pr_list` 1,751; `dotnet_test_failures` 1,203;
+`agent_log` 633; `rtk_proxy_log` 279; `incident_report` 248). On `json_payload` (176) and
+`dotnet_test_failure` (164) the saving was 29 and 17 tokens above it, and on the two untouched payloads
+the saving was 0, so the definition was a pure cost of 147 tokens. Those figures hold only when the
+reader does not retrieve; once it retrieves, the original is charged in full and the saving is gone.
+
+**Evidence grade: MEASURED** for everything above, from `results/rtk_ccr_reader.jsonl`,
+`results/rtk_ccr_retrieval.jsonl` and `results/report.json` (`python3 scripts/reducer_scoring/harness.py report`,
+`rtk_ccr_reader` and `rtk_ccr_retrieval` rows), run with `claude` 2.1.310. Token sizes are estimates.
+Only one run set exists; the reader is the stated stand-in, not the pre-registered route.
+
+**Net tokens, unclipped.** `compression()` floors at 0, so the retrieval arm's zeros hide growth. Summed
+from the `payloads` rows of `results/report.json` (original to sent, preview plus fetched original plus
+tool definition), per kind: code 7028 to 6610 (6% saved), prose 4331 to 5473 (26% more), log 2853 to
+3110 (9% more), listing 199 to 346 (74% more, untouched by rtk, tool definition only), json 2159 to
+2685 (24% more), build 21294 to 22107 (4% more), test 2340 to 3607 (54% more). All payloads: 40,204
+original tokens against 43,938 sent, 9% more than sending the originals uncompressed. With retrieval
+allowed the reader keeps every answer, and rtk's CCR then costs more than it saves on every kind but
+code. Measured on one reader (claude-opus-5-5 at effort low through `claude -p`), 3 runs.
+
+## Amendment 2026-10-24: log reducer keeps every value
+
+`LogCompressionHandler` no longer drops the lines that carry no signal. Exact repeats are dropped
+first. A line that repeats an earlier line's shape (its tokens with values masked, `key=` kept) is
+then shortened to its `key=value` tokens and the other tokens that changed from the first line of
+that shape; signal lines and the first line of each shape stay whole. Keeping every pair, not only
+the changed ones, keeps a row readable when rows of different shapes interleave. The output is still words of the input in order. Only `shipped_rules` was re-run
+(`python3 scripts/reducer_scoring/harness.py run shipped_rules`, then `report`).
+
+| payload | before | after |
+|---|---|---|
+| `rtk_proxy_log` | 89.4% removed, 1/5 answers | 34.0% removed (1978 to 1305 tokens), 5/5 answers, score 0.51 |
+| `agent_log` | 25.0% removed, 8/8 answers | 3.2% removed (875 to 847 tokens), 8/8 answers, score 0.06 |
+| log kind | 69.7% removed, 9/13, score 0 | 24.6% removed (2853 to 2152 tokens), 13/13, score 0.39 |
+
+The price is compression on `agent_log`: its INFO lines were dropped before and are kept now, and
+most of them differ in several fields, so shortening saves little. The kind score rises from 0
+because retention moved above the floor. A log of free-text lines with no repeated shape would get
+almost nothing removed; no scored payload is like that.
+
+**Evidence:** `results/shipped_rules.jsonl`, the `log` rows of `results/report.json`, and
+`tests/AiProxy.Tests/Unit/Content/Handlers/ScoredLogPayloadTests.cs` (red on the four lost answers
+before the change).

@@ -3,7 +3,8 @@
   python3 harness.py run <candidate>... [--out DIR] [--runs N]
   python3 harness.py report [--out DIR]
 
-Candidates: shipped_rules, kompress_int8, rtk_ccr (local); identity, digest_gpt_stand_in,
+Candidates: shipped_rules, kompress_int8, rtk_ccr (local); rtk_ccr_reader, rtk_ccr_retrieval (claude -p reads
+the saved rtk_ccr previews, the second may retrieve the original); identity, digest_gpt_stand_in,
 summarizer_control (through pi); haiku_digest, haiku_digest_checked (claude -p, then the pi reader). Raw runner output lands in DIR/<candidate>.jsonl.
 """
 import argparse
@@ -11,6 +12,7 @@ import datetime
 import json
 import os
 import platform
+import statistics
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +24,7 @@ from preregistration import HERE, load, payload_text  # noqa: E402
 import tokens  # noqa: E402
 from grading import same_fact  # noqa: E402
 from judge_runner import accepted, lost  # noqa: E402
+from retrieval import retrieval_counts  # noqa: E402
 from scoring import QaRun, ReducerRun, Row, extractive_row, kind_row, qa_row, void_reasons  # noqa: E402
 
 STAND_IN = {"digest_gpt_stand_in"}
@@ -30,6 +33,7 @@ KOMPRESS_PYTHON = os.environ.get("KOMPRESS_PYTHON", str(HOME / "RiderProjects/mo
 KOMPRESS_MODELS = os.environ.get("KOMPRESS_MODELS", str(HOME / "RiderProjects/models-conversion/models/kompress"))
 RULES_DLL = HERE / "rules_runner/bin/Release/net10.0/RulesRunner.dll"
 HAIKU = ("haiku_digest", "haiku_digest_checked")
+RTK_READER = ("rtk_ccr_reader", "rtk_ccr_retrieval")
 JUDGE_OUTPUTS = "judge.ndjson"
 
 
@@ -103,20 +107,25 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
                     view[name] = extractive_row(original, payload["questions"], reducer_runs(match),
                                                 count_untouched=True, **_by(match))
             else:
-                qa_runs = [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine]
+                def charge(r):
+                    return {"added_tokens": _added_tokens(r), "fetched_tokens": _fetched_tokens(r, original)}
+                qa_runs = [QaRun(r["output"], r["latency_s"], r["replies"], **charge(r)) for r in mine]
                 judged_runs = [QaRun(r["output"], r["latency_s"], r["replies"],
-                                     judged.get((candidate, name, r["run"]), frozenset())) for r in mine]
+                                     judged.get((candidate, name, r["run"]), frozenset()), **charge(r)) for r in mine]
                 rows[name] = counted[name] = qa_row(original, payload["questions"], qa_runs)
                 by_fact[name] = counted_by_fact[name] = qa_row(original, payload["questions"], judged_runs, same_fact)
             payload_rows.append(_fields(candidate, rows[name], prereg, by_fact[name])
-                                | {"payload": name, "kind": payload["kind"]})
+                                | {"payload": name, "kind": payload["kind"]}
+                                | _retrieval_fields(mine) | _tool_fields(mine, original))
         by_candidate[candidate] = rows
         kinds = dict.fromkeys(prereg["payloads"][n]["kind"] for n in rows)
         for kind in kinds:
             def pool(view):
                 return kind_row([row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind])
             for view, fact_view, target in ((rows, by_fact, kind_rows), (counted, counted_by_fact, counted_rows)):
-                target.append(_fields(candidate, pool(view), prereg, pool(fact_view)) | {"kind": kind})
+                of_kind = [r for r in lines if prereg["payloads"][r["payload"]]["kind"] == kind]
+                target.append(_fields(candidate, pool(view), prereg, pool(fact_view)) | {"kind": kind}
+                              | _retrieval_fields(of_kind))
     void = _incomplete(prereg, records)
     for control in ("identity", "summarizer_control"):
         if control not in by_candidate:
@@ -130,6 +139,28 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
 def _added_tokens(record: dict) -> int:
     """Tokens a run added outside its output; older records hold characters, converted by the same estimate."""
     return record.get("added_tokens", tokens.from_chars(record.get("added_chars", 0)))
+
+
+def _fetched_tokens(record: dict, original: str) -> int:
+    """The original's tokens when the reader retrieved it on any call of the run; a fetched original is not a saving."""
+    return tokens.estimate(original) if any(record.get("retrievals", ())) else 0
+
+
+def _retrieval_fields(lines: list[dict]) -> dict:
+    """How often the reader retrieved, for candidates whose records say; nothing for the rest."""
+    if not lines or "retrievals" not in lines[0]:
+        return {}
+    retrieved, calls = retrieval_counts(lines)
+    return {"retrievals": f"{retrieved}/{calls}", "retrieval_rate": round(retrieved / calls, 4)}
+
+
+def _tool_fields(lines: list[dict], original: str) -> dict:
+    """The injected tool definition against the saving it buys, for candidates that add tokens outside their output."""
+    if not any("added_tokens" in r or "added_chars" in r for r in lines):
+        return {}
+    shown = statistics.median_low(tokens.estimate(r["output"]) for r in lines)
+    return {"tool_definition_tokens": statistics.median_low(_added_tokens(r) for r in lines),
+            "saving_tokens": tokens.estimate(original) - shown}
 
 
 def _by(match) -> dict:
@@ -157,6 +188,9 @@ def _command(candidate: str, runs: int, names: list[str], out: Path) -> tuple[li
         return [KOMPRESS_PYTHON, str(HERE / "kompress_runner.py"), KOMPRESS_MODELS, str(runs), *names], clean
     if candidate == "rtk_ccr":
         return [sys.executable, str(HERE / "rtk_runner.py"), str(runs), *names], None
+    if candidate in RTK_READER:
+        return [sys.executable, str(HERE / "claude_reader_runner.py"), candidate, str(runs),
+                str(out / "rtk_ccr.jsonl"), *names], None
     if candidate in ("identity", "digest_gpt_stand_in", "summarizer_control"):
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs), *names], None
     if candidate in HAIKU:

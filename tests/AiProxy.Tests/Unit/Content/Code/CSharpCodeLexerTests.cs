@@ -11,8 +11,8 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex("var text = \"// literal\"; // actual\n");
 
         Assert.True(result.Supported);
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.String && token.Text == "\"// literal\"");
-        Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Comment);
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.String, Text: "\"// literal\"" });
+        Assert.Single(result.Tokens, static token => token.Kind == CodeTokenKind.Comment);
     }
     [Theory]
     [InlineData("var text = @\"/* literal */\"; // actual")]
@@ -24,9 +24,9 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.String);
-        Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Comment);
-        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
+        Assert.Contains(result.Tokens, static token => token.Kind == CodeTokenKind.String);
+        Assert.Single(result.Tokens, static token => token.Kind == CodeTokenKind.Comment);
+        Assert.Equal(source, string.Concat(result.Tokens.Select(static token => token.Text)));
     }
     [Theory]
     [InlineData("/* never closed")]
@@ -57,11 +57,11 @@ public sealed class CSharpCodeLexerTests
     [InlineData("\"\"\"hello\"\"\"u8")]
     public void Utf8_string_suffix_stays_inside_a_string_token(string source)
     {
-        var result = new CSharpCodeLexer().Lex("var bytes = " + source + ";");
+        var result = new CSharpCodeLexer().Lex($"var bytes = {source};");
 
         Assert.True(result.Supported);
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.String && token.Text == source);
-        Assert.DoesNotContain(result.Tokens, token => token.Kind == CodeTokenKind.Identifier && token.Text == "u8");
+        Assert.Contains(result.Tokens,  token => token.Kind == CodeTokenKind.String && token.Text == source);
+        Assert.DoesNotContain(result.Tokens, static token => token is { Kind: CodeTokenKind.Identifier, Text: "u8" });
     }
 
     [Fact]
@@ -71,25 +71,26 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.Identifier && token.Text == "item");
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.Identifier && token.Text == "Name");
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.String && token.Text == "Hello ");
-        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Identifier, Text: "item" });
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Identifier, Text: "Name" });
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.String, Text: "Hello " });
+        Assert.Equal(source, string.Concat(result.Tokens.Select(static token => token.Text)));
     }
 
     [Fact]
     public void Escaped_and_unicode_identifiers_are_identifiers_but_keywords_are_not()
     {
         const string source = "int @café = 1; int value = café;";
-        var result = new CSharpCodeLexer().Lex(source);
+        var lexer = new CSharpCodeLexer();
+        var result = lexer.Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Equal(2, result.Tokens.Count(token => token.Kind == CodeTokenKind.Identifier && token.ValueText == "café"));
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.Identifier && token.Text == "@café");
-        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.Keyword && token.Text == "int");
-        Assert.True(CSharpCodeLexer.IsKeyword("as"));
-        Assert.True(CSharpCodeLexer.IsKeyword("nint"));
-        Assert.False(CSharpCodeLexer.IsKeyword("café"));
+        Assert.Equal(2, result.Tokens.Count(static token => token is { Kind: CodeTokenKind.Identifier, ValueText: "café" }));
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Identifier, Text: "@café" });
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Keyword, Text: "int" });
+        Assert.True(lexer.IsKeyword("as"));
+        Assert.True(lexer.IsKeyword("nint"));
+        Assert.False(lexer.IsKeyword("café"));
     }
 
     [Fact]
@@ -100,7 +101,7 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
+        Assert.Equal(source, string.Concat(result.Tokens.Select(static token => token.Text)));
         var identifiers = result.Tokens.Where(static token => token.Kind == CodeTokenKind.Identifier).ToDictionary(static token => token.Text);
         Assert.Equal(1, identifiers["first"].Line);
         Assert.Equal(2, identifiers["second"].Line);
@@ -118,12 +119,13 @@ public sealed class CSharpCodeLexerTests
     {
         const string source = "class C { void M() { int @record=1; @record++; System.Console.WriteLine(record); } }";
 
-        var result = new CSharpCodeLexer().Lex(source);
+        var lexer = new CSharpCodeLexer();
+        var result = lexer.Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Equal(3, result.Tokens.Count(token => token.Kind == CodeTokenKind.Identifier && token.ValueText == "record"));
-        Assert.True(CSharpCodeLexer.IsKeyword("record"));
-        Assert.True(CSharpCodeLexer.IsKeyword("value"));
+        Assert.Equal(3, result.Tokens.Count(static token => token is { Kind: CodeTokenKind.Identifier, ValueText: "record" }));
+        Assert.True(lexer.IsKeyword("record"));
+        Assert.True(lexer.IsKeyword("value"));
     }
 
     [Fact]
@@ -134,11 +136,11 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex(source);
 
         Assert.True(result.Supported);
-        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
-        var comment = Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Comment);
+        Assert.Equal(source, string.Concat(result.Tokens.Select(static token => token.Text)));
+        var comment = Assert.Single(result.Tokens, static token => token.Kind == CodeTokenKind.Comment);
         Assert.Equal(source.IndexOf("///", StringComparison.Ordinal), comment.Offset);
         Assert.Equal(1, comment.Line);
-        var declaration = Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Keyword && token.Text == "class");
+        var declaration = Assert.Single(result.Tokens, static token => token is { Kind: CodeTokenKind.Keyword, Text: "class" });
         Assert.Equal(2, declaration.Line);
         Assert.Equal("class", source.Substring(declaration.Offset, declaration.Text.Length));
     }

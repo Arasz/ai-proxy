@@ -101,6 +101,38 @@ class TokenSizeTests(unittest.TestCase):
         self.assertEqual(counted["reduced_tokens"], tokens.estimate(KEPT) + 100)
 
 
+def retrieval_records(retrievals):
+    """Reader-with-retrieval records for payload a and b: preview KEPT, 7 tokens added, the given retrievals per run."""
+    out = [r | {"added_tokens": 7, "retrievals": list(retrievals), "replies": ALL} for p in ("a", "b") for r in runs(p, KEPT)]
+    return records() | {"rtk_ccr_retrieval": out}
+
+
+class RetrievalArmTests(unittest.TestCase):
+    def test_a_retrieved_original_is_charged_to_the_reduced_size(self):
+        built = report(retrieval_records([True, False, False]))
+        row = next(r for r in built["payloads"] if r["candidate"] == "rtk_ccr_retrieval" and r["payload"] == "a")
+        self.assertEqual(row["reduced_tokens"], tokens.estimate(KEPT) + 7 + tokens.estimate(TEXTS["a"]))
+
+    def test_no_retrieval_charges_only_the_preview_and_the_tool_definition(self):
+        built = report(retrieval_records([False, False, False]))
+        row = next(r for r in built["payloads"] if r["candidate"] == "rtk_ccr_retrieval" and r["payload"] == "a")
+        self.assertEqual(row["reduced_tokens"], tokens.estimate(KEPT) + 7)
+
+    def test_the_kind_row_reports_the_retrieval_rate_over_all_reader_calls(self):
+        built = report(retrieval_records([True, False, False]))
+        row = kind(built, "rtk_ccr_retrieval", "prose")
+        self.assertEqual((row["retrievals"], row["retrieval_rate"]), ("6/18", round(1 / 3, 4)))
+
+    def test_candidates_without_retrieval_have_no_rate(self):
+        self.assertNotIn("retrieval_rate", kind(report(retrieval_records([False] * 3)), "identity", "prose"))
+
+    def test_the_payload_row_states_the_tool_definition_against_the_saving(self):
+        built = report(retrieval_records([False] * 3))
+        row = next(r for r in built["payloads"] if r["candidate"] == "rtk_ccr_retrieval" and r["payload"] == "a")
+        self.assertEqual(row["tool_definition_tokens"], 7)
+        self.assertEqual(row["saving_tokens"], tokens.estimate(TEXTS["a"]) - tokens.estimate(KEPT))
+
+
 class KindAndScoreTests(unittest.TestCase):
     def test_each_kind_pools_only_its_own_payloads(self):
         built = report()

@@ -20,6 +20,11 @@ class CommandTests(unittest.TestCase):
         args = command("p", "low")
         self.assertEqual(args[args.index("--effort") + 1], "low")
 
+    def test_the_model_can_be_chosen_for_the_reader(self):
+        args = command("p", "low", model="claude-opus-5-5")
+        self.assertEqual(args[args.index("--model") + 1], "claude-opus-5-5")
+        self.assertEqual(args[args.index("--tools") + 1], "")
+
     def test_no_effort_flag_when_none_is_pinned(self):
         self.assertNotIn("--effort", command("p"))
 
