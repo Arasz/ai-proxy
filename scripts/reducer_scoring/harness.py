@@ -3,7 +3,8 @@
   python3 harness.py run <candidate>... [--out DIR] [--runs N]
   python3 harness.py report [--out DIR]
 
-Candidates: shipped_rules, kompress_int8, rtk_ccr (local); identity, digest_gpt_stand_in,
+Candidates: shipped_rules, kompress_int8, rtk_ccr (local); rtk_ccr_reader, rtk_ccr_retrieval (claude -p reads
+the saved rtk_ccr previews, the second may retrieve the original); identity, digest_gpt_stand_in,
 summarizer_control (through pi); haiku_digest, haiku_digest_checked (claude -p, then the pi reader). Raw runner output lands in DIR/<candidate>.jsonl.
 """
 import argparse
@@ -32,6 +33,7 @@ KOMPRESS_PYTHON = os.environ.get("KOMPRESS_PYTHON", str(HOME / "RiderProjects/mo
 KOMPRESS_MODELS = os.environ.get("KOMPRESS_MODELS", str(HOME / "RiderProjects/models-conversion/models/kompress"))
 RULES_DLL = HERE / "rules_runner/bin/Release/net10.0/RulesRunner.dll"
 HAIKU = ("haiku_digest", "haiku_digest_checked")
+RTK_READER = ("rtk_ccr_reader", "rtk_ccr_retrieval")
 JUDGE_OUTPUTS = "judge.ndjson"
 
 
@@ -186,6 +188,9 @@ def _command(candidate: str, runs: int, names: list[str], out: Path) -> tuple[li
         return [KOMPRESS_PYTHON, str(HERE / "kompress_runner.py"), KOMPRESS_MODELS, str(runs), *names], clean
     if candidate == "rtk_ccr":
         return [sys.executable, str(HERE / "rtk_runner.py"), str(runs), *names], None
+    if candidate in RTK_READER:
+        return [sys.executable, str(HERE / "claude_reader_runner.py"), candidate, str(runs),
+                str(out / "rtk_ccr.jsonl"), *names], None
     if candidate in ("identity", "digest_gpt_stand_in", "summarizer_control"):
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs), *names], None
     if candidate in HAIKU:
