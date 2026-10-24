@@ -1,4 +1,5 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,7 @@ public sealed partial class ProviderRequestInspector
 
     /// <summary>Creates an inspector; with compression disabled and no capture store every request passes through untouched.</summary>
     /// <param name="capture">Where every provider request body is kept as sent; null leaves capture off.</param>
-    /// <param name="time">The clock that stamps each capture; null uses the system clock.</param>
+    /// <param name="time">The clock that stamps each capture and times its stages; null uses the system clock.</param>
     public ProviderRequestInspector(
         ICompressionPipeline compression,
         IProviderHosts providerHosts,
@@ -39,6 +40,9 @@ public sealed partial class ProviderRequestInspector
         _capture = capture;
         _time = time ?? TimeProvider.System;
     }
+
+    /// <summary>Whether capture is on, so the proxy has to time exchanges and hand over each finished response.</summary>
+    internal bool CapturesResponses => _capture is not null;
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
@@ -59,68 +63,193 @@ public sealed partial class ProviderRequestInspector
             return;
         }
 
+        var started = _time.GetTimestamp();
+        var exchange = new CapturedExchange { Dialect = dialect };
+        var captureId = Guid.NewGuid().ToString("N");
+
+        var stage = _time.GetTimestamp();
         var body = await e.GetRequestBody(CancellationToken.None);
+        exchange.Stages.Add("body-read", _time.GetElapsedTime(stage));
+        exchange.RequestBytes = body.Length;
+        exchange.ForwardedBytes = body.Length;
+
         if (_capture is not null)
         {
-            await CaptureAsync(_capture, dialect, request.RequestUri, body);
-        }
-
-        if (!_compressionEnabled)
-        {
-            return;
-        }
-
-        CompressionResult compressed;
-        try
-        {
-            compressed = await _compression.CompressAsync(
-                new CompressionRequest(body, request.ContentType, dialect),
-                CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            Log.CompressionFailed(_logger, request.RequestUri.Host, exception);
-            return;
-        }
-
-        foreach (var failure in compressed.PartFailures)
-        {
-            Log.PartFailed(_logger, failure.ChunkId, failure.ContentType, request.RequestUri.Host, failure.Exception);
-        }
-
-        if (compressed.Changed)
-        {
-            e.SetRequestBody(compressed.Body.ToArray());
-            if (compressed.Summary is { } summary)
+            stage = _time.GetTimestamp();
+            if (await CaptureAsync(_capture, captureId, dialect, request.RequestUri, body))
             {
-                e.UserData = summary.RequestId;
+                exchange.CaptureId = captureId;
+                e.DataReceived += exchange.OnDataReceived;
+                e.UserData = exchange;
             }
+
+            exchange.Stages.Add("capture-write", _time.GetElapsedTime(stage));
         }
+
+        if (_compressionEnabled)
+        {
+            Apply(e, exchange, await CompressAsync(exchange, dialect, request.ContentType, request.RequestUri.Host, body));
+        }
+
+        exchange.Stages.Add("inspector", _time.GetElapsedTime(started));
     }
 
-    /// <summary>Returns the original-content handle when compression stored a request.</summary>
+    /// <summary>Returns the original-content handle when compression stored a request, and picks what a capture keeps of the body.</summary>
     public Task BeforeResponseAsync(object sender, SessionEventArgs e)
     {
-        if (e.UserData is string requestId)
+        if (e.UserData is not CapturedExchange exchange)
         {
-            e.HttpClient.Response.Headers.AddHeader("x-ai-proxy-content-id", requestId);
+            return Task.CompletedTask;
+        }
+
+        var response = e.HttpClient.Response;
+        if (exchange.CaptureId is not null)
+        {
+            exchange.Response = ResponseBuffer.For(response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+        }
+
+        if (exchange.ContentId is { } contentId)
+        {
+            response.Headers.AddHeader("x-ai-proxy-content-id", contentId);
         }
 
         return Task.CompletedTask;
     }
 
-    /// <summary>Keeps the body as sent; a failed write is logged and never reaches the request.</summary>
-    private async Task CaptureAsync(IRequestCaptureStore capture, Dialect dialect, Uri uri, byte[] body)
+    /// <summary>Keeps the response numbers of a captured request; a failure is logged and never reaches the exchange.</summary>
+    public async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
+        if (_capture is null || e.UserData is not CapturedExchange { CaptureId: { } captureId } exchange)
+        {
+            return;
+        }
+
+        e.DataReceived -= exchange.OnDataReceived;
+        var kept = exchange.Response ?? ResponseBuffer.For(null, null);
         try
         {
-            await capture.StoreAsync(
-                new CapturedRequest(Guid.NewGuid().ToString("N"), _time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
+            var response = e.HttpClient.Response;
+            var stage = _time.GetTimestamp();
+            var reading = exchange.Dialect != Dialect.Anthropic
+                ? new UsageReading(null, ResponseUsageReader.NoUsage)
+                : kept.OverCap
+                    ? new UsageReading(null, ResponseUsageReader.OverCap)
+                    : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+            exchange.Stages.Add("usage-read", _time.GetElapsedTime(stage));
+            AddTitaniumTimings(exchange.Stages, e);
+
+            await _capture.StoreResponseAsync(
+                new CapturedResponse(
+                    captureId,
+                    _time.GetUtcNow(),
+                    response.StatusCode,
+                    exchange.RequestBytes,
+                    exchange.ForwardedBytes,
+                    kept.Length,
+                    reading.Usage,
+                    reading.Error,
+                    exchange.Stages.ToArray()),
                 CancellationToken.None);
         }
         catch (Exception exception)
         {
+            Log.ResponseCaptureFailed(_logger, e.HttpClient.Request.RequestUri.Host, exception);
+        }
+        finally
+        {
+            kept.Release();
+            exchange.Response = null;
+        }
+    }
+
+    /// <summary>Titanium's own measurements of the exchange, prefixed <c>titanium.</c>.</summary>
+    private static void AddTitaniumTimings(StageTimings stages, SessionEventArgs e)
+    {
+        if (e.Timing is not { } timing)
+        {
+            return;
+        }
+
+        Add(stages, "titanium.client-request-read", timing.ClientRequestReadDuration);
+        Add(stages, "titanium.connection-wait", timing.ConnectionWaitDuration);
+        Add(stages, "titanium.request-send", timing.RequestSendDuration);
+        Add(stages, "titanium.ttfb", timing.TimeToFirstByte);
+        Add(stages, "titanium.response-delivery", timing.ResponseDeliveryDuration);
+        Add(stages, "titanium.total", timing.TotalDuration);
+    }
+
+    private static void Add(StageTimings stages, string name, TimeSpan? elapsed)
+    {
+        if (elapsed is { } measured)
+        {
+            stages.Add(name, measured);
+        }
+    }
+
+    private async Task<CompressionResult?> CompressAsync(CapturedExchange exchange, Dialect dialect, string? contentType, string host, byte[] body)
+    {
+        var stage = _time.GetTimestamp();
+        try
+        {
+            var compressed = await _compression.CompressAsync(new CompressionRequest(body, contentType, dialect), CancellationToken.None);
+            exchange.Stages.Add("compression", _time.GetElapsedTime(stage));
+            exchange.Stages.Add("compression.", compressed.Stages);
+            return compressed;
+        }
+        catch (Exception exception)
+        {
+            exchange.Stages.Add("compression", _time.GetElapsedTime(stage));
+            Log.CompressionFailed(_logger, host, exception);
+            return null;
+        }
+    }
+
+    /// <summary>Logs the parts that failed and forwards the compressed body when it changed.</summary>
+    private void Apply(SessionEventArgs e, CapturedExchange exchange, CompressionResult? compressed)
+    {
+        if (compressed is null)
+        {
+            return;
+        }
+
+        var host = e.HttpClient.Request.RequestUri.Host;
+        foreach (var failure in compressed.PartFailures)
+        {
+            Log.PartFailed(_logger, failure.ChunkId, failure.ContentType, host, failure.Exception);
+        }
+
+        if (!compressed.Changed)
+        {
+            return;
+        }
+
+        var stage = _time.GetTimestamp();
+        var forwarded = compressed.Body.ToArray();
+        e.SetRequestBody(forwarded);
+        exchange.Stages.Add("set-body", _time.GetElapsedTime(stage));
+        exchange.ForwardedBytes = forwarded.Length;
+        if (compressed.Summary is { } summary)
+        {
+            exchange.ContentId = summary.RequestId;
+            e.UserData = exchange;
+        }
+    }
+
+    /// <summary>Keeps the body as sent; a failed write is logged and never reaches the request.</summary>
+    /// <returns>Whether the request was kept.</returns>
+    private async Task<bool> CaptureAsync(IRequestCaptureStore capture, string captureId, Dialect dialect, Uri uri, byte[] body)
+    {
+        try
+        {
+            await capture.StoreAsync(
+                new CapturedRequest(captureId, _time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
+                CancellationToken.None);
+            return true;
+        }
+        catch (Exception exception)
+        {
             Log.CaptureFailed(_logger, uri.Host, exception);
+            return false;
         }
     }
 
@@ -134,5 +263,8 @@ public sealed partial class ProviderRequestInspector
 
         [LoggerMessage(EventId = 1403, Level = LogLevel.Warning, Message = "Capture failed for a request to {ProviderHost}; the request is forwarded unchanged and not captured")]
         public static partial void CaptureFailed(ILogger logger, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "Capturing the response from {ProviderHost} failed; the response was relayed and its numbers are not kept")]
+        public static partial void ResponseCaptureFailed(ILogger logger, string providerHost, Exception exception);
     }
 }

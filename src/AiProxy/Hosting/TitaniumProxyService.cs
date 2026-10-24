@@ -81,6 +81,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server.ViaHeaderPseudonym = string.Empty;
         _server.BeforeRequest += BeforeRequestAsync;
         _server.BeforeResponse += BeforeResponseAsync;
+        if (_inspector.CapturesResponses)
+        {
+            _server.EnableRequestTimingCapture = true;
+            _server.AfterResponse += AfterResponseAsync;
+        }
 
         PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
@@ -145,6 +150,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     {
         _server.BeforeRequest -= BeforeRequestAsync;
         _server.BeforeResponse -= BeforeResponseAsync;
+        _server.AfterResponse -= AfterResponseAsync;
         if (_endPoint is not null)
         {
             _endPoint.BeforeTunnelConnectRequest -= BeforeTunnelConnectRequestAsync;
@@ -280,6 +286,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private Task BeforeRequestAsync(object sender, SessionEventArgs e) => _inspector.BeforeRequestAsync(sender, e);
 
     private Task BeforeResponseAsync(object sender, SessionEventArgs e) => _inspector.BeforeResponseAsync(sender, e);
+
+    private Task AfterResponseAsync(object sender, SessionEventArgs e) => _inspector.AfterResponseAsync(sender, e);
 
     private Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
     {
