@@ -16,8 +16,11 @@ cleared as well. A restore that fails on shutdown is logged at error level and l
 marker in place, so the guard or the next start clears the proxy; the macOS backend swallows
 some of its own errors, so a few failed restores cannot be seen.
 
-The proxy decrypts HTTPS only for `api.openai.com`, `api.anthropic.com`,
-`generativelanguage.googleapis.com`, and `openrouter.ai`. It creates a per-user root certificate
+The proxy decrypts HTTPS only for the provider API hosts listed in
+[environment variables](docs/reference/environment-variables.md): `api.openai.com` and its
+documented regional hosts, `api.anthropic.com`, `generativelanguage.googleapis.com`,
+`openrouter.ai` and `eu.openrouter.ai`. Hosts match exactly, so `mcp.openrouter.ai` stays a
+tunnel. It creates a per-user root certificate
 and asks the operating system to trust it. This lets the proxy read provider request bodies,
 including credentials, and means the generated root private key must remain protected on the
 local machine. HTTPS to other hosts stays in a CONNECT tunnel, and other HTTP destinations are
