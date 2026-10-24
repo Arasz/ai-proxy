@@ -32,6 +32,10 @@ formula.
 | time to first byte per kchar (s) | 0.009 | 0.039 | 0.109 |
 | ai-proxy inspector (ms) | 0.27 | 0.37 | 1.08 |
 
+**Superseded 2026-10-24** by F6: most of these requests were Claude Code thread mode, where the body
+carries only the new turn, so request characters understate what the provider read and the per-kchar
+figures are misleading. Kept as the record of what was registered first.
+
 Time to first byte stays nearly flat while request size varies about tenfold.
 
 **Evidence:** `sqlite3 ~/.ai-proxy/capture.db` joining `capture_response` to `capture_request`
@@ -73,11 +77,66 @@ as fast as the provider answers per character of request. The value is recorded 
 `size_normalized_budget` in `scripts/reducer_scoring/preregistration.json`, before any run that
 uses it.
 
+## Amendment 2026-10-24: the budget per 1,000 prompt tokens
+
+The unit moved from characters to tokens. F3 is superseded: thread-mode bodies made characters per
+request misleading, because the provider reads history the body does not carry. The provider's own
+count of prompt tokens (`input + cache_read + cache_creation`) does include it.
+
+### F6 — A provider's time to first byte is 0.015 s per 1,000 prompt tokens at the median [MEASURED]
+
+| | p10 | p50 | p90 |
+|---|---|---|---|
+| time to first byte per 1,000 prompt tokens (s) | 0.0064 | 0.015 | 0.056 |
+
+440 requests, 2026-10-24 13:18 to 18:22 UTC. Models: claude-opus-5-5 258, claude-sonnet-5 87,
+claude-sonnet-5-5 61, claude-haiku-5-5 32, claude-haiku-4-5 2. Mode: 303 thread, 137 stateless. The
+`titanium.ttfb` stage is in microseconds. Prompt tokens are provider-reported, so this figure is
+measured, not estimated.
+
+**Evidence:** Python 3.15.0 (`sqlite3` module on SQLite 3.54.1,
+read-only URI) ran `select ... from capture_request q join capture_response r using(request_id) where
+q.path like '/v1/messages%' and r.status = 200 and r.input_tokens is not null` on
+`~/.ai-proxy/capture.db`, took `stages["titanium.ttfb"] / 1e6 /
+((input_tokens + cache_read_input_tokens + cache_creation_input_tokens) / 1000)` per row and
+`statistics.quantiles(n=100, method="inclusive")` at indexes 9, 49 and 89. Output: `440 ... p10 p50 p90
+6371.8 14863.9 56384.9` in microseconds per 1,000 tokens. Same machine and setup as F3
+(ai-proxy 0.7.0 with `PROXY_CAPTURE=on`).
+
+### F7 — Rule-based reducers cost about 0.0006 s per 1,000 tokens and model reducers 0.9 to 14 s [MEASURED]
+
+```chart:bars
+title: median reducer seconds per 1,000 estimated tokens
+shipped rules: 0.0006
+rtk CCR: 0.0005
+kompress int8: 0.886
+haiku digest checked: 3.16
+haiku digest: 3.40
+summarizer control: 3.46
+digest gpt stand-in: 13.8
+```
+
+Medians over each candidate's scored payloads (identity left out; untouched payloads left out).
+Sizes are estimated tokens, not provider counts.
+
+**Evidence:** `scripts/reducer_scoring/results/report.json` (`payloads[].latency_s /
+(original_tokens / 1000)`, `token_method` in the same file), regenerated from the saved runs in
+the commit that scored sizes in tokens.
+
+### F8 — At 0.015 s per 1,000 tokens the rule reducers score about 0.96 on latency and every model reducer under 0.02 [INFERRED]
+
+Latency score is `budget / (budget + seconds per 1,000 tokens)`. At the p10, p50 and p90 budgets:
+shipped rules 0.91, 0.96, 0.99; rtk CCR 0.92, 0.97, 0.99; kompress int8 0.007, 0.017, 0.059; Haiku
+digest 0.002, 0.004, 0.016. Computed from F7 and F6. The registered budget is 0.015 with
+{0.0064, 0.015, 0.056} as the sensitivity set, in `size_normalized_budget` of
+`scripts/reducer_scoring/preregistration.json`. The earlier owner acceptance covered 0.04 per
+1,000 characters; the restated value awaits the owner's confirmation.
+
 ## Still open
 
 - F3 is one day of traffic, mostly one client in thread mode. The median moves with the size mix;
   re-derive it once `capture_response` holds several days and other clients.
-- Characters, not tokens. A tokenizer-based budget would treat code and prose differently.
+- F6 to F8 use estimated tokens from one calibrated ratio; a per-kind ratio would treat code and prose differently.
 - The real `claude-haiku-5-5` digest latency is in PR #39, not in F4.
 - Whether a reducer's latency adds to time to first byte one for one is assumed, not measured: it
   holds while the proxy reduces before forwarding, as it does today.
