@@ -19,6 +19,17 @@ public sealed class JsonCompressionHandlerTests
         Assert.Equal("""{"a":1,"b":[1,2]}""", result.Text);
     }
 
+    [Theory]
+    [InlineData("""{"title":"fix: don't drop it"}""")]
+    [InlineData("""{"name":"Rafał","note":"a < b && c > d","sum":"1+1"}""")]
+    [InlineData("""{"mood":"shipped 😀"}""")]
+    public async Task Compact_json_is_never_written_back_longer(string compact)
+    {
+        var result = await Handler.HandleAsync(Part(compact), CancellationToken.None);
+
+        Assert.Equal(compact, result.Text);
+    }
+
     [Fact]
     public async Task The_scale_of_a_number_survives()
     {
