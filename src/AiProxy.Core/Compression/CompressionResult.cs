@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+
 namespace AiProxy.Core.Compression;
 
 /// <summary>What the pipeline did, in the numbers the operator reads.</summary>
@@ -20,4 +22,7 @@ public sealed record CompressionResult(
 {
     /// <summary>The parts whose reducer threw and that kept their original text; empty when every reducer ran.</summary>
     public IReadOnlyList<PartFailure> PartFailures { get; init; } = [];
+
+    /// <summary>How long each step of the pipeline took, in the order the steps first ran; empty when not measured.</summary>
+    public IReadOnlyList<StageTiming> Stages { get; init; } = [];
 }

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 
 namespace AiProxy.Core.Content;
@@ -62,10 +63,13 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             return new CompressionResult(request.Body, false);
         }
 
+        var stages = new StageTimings();
+        var started = _time.GetTimestamp();
         var regions = _finder.Find(request.Body);
+        stages.Add("find", _time.GetElapsedTime(started));
         if (regions.Count == 0)
         {
-            return new CompressionResult(request.Body, false);
+            return new CompressionResult(request.Body, false) { Stages = stages.ToList() };
         }
 
         var requestId = Guid.CreateVersion7().ToString();
@@ -77,7 +81,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         foreach (var region in WithoutOverlaps(regions))
         {
-            var reduced = await ReduceAsync(region.Text, requestId, parts, failures, cancellationToken).ConfigureAwait(false);
+            var reduced = await ReduceAsync(region.Text, requestId, parts, failures, stages, cancellationToken).ConfigureAwait(false);
             if (reduced is null)
             {
                 continue;
@@ -88,10 +92,12 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         if (replacements.Count == 0)
         {
-            return new CompressionResult(request.Body, false) { PartFailures = failures };
+            return new CompressionResult(request.Body, false) { PartFailures = failures, Stages = stages.ToList() };
         }
 
+        started = _time.GetTimestamp();
         var compressed = Rebuild(body, replacements);
+        stages.Add("rebuild", _time.GetElapsedTime(started));
         var compressedText = Encoding.UTF8.GetString(compressed);
         var ratio = body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length;
         var path = string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal));
@@ -106,6 +112,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             parts);
 
         string? failure = null;
+        started = _time.GetTimestamp();
         try
         {
             await _store.StoreAsync(record, cancellationToken).ConfigureAwait(false);
@@ -115,9 +122,11 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             failure = exception.Message;
         }
 
+        stages.Add("store", _time.GetElapsedTime(started));
+
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
-        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures };
+        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToList() };
     }
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>
@@ -171,9 +180,12 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         string requestId,
         List<CompressedPart> parts,
         List<PartFailure> failures,
+        StageTimings stages,
         CancellationToken cancellationToken)
     {
+        var started = _time.GetTimestamp();
         var decomposition = _decomposer.Decompose(region, requestId);
+        stages.Add("decompose", _time.GetElapsedTime(started));
         if (decomposition.Parts.Count == 0)
         {
             return null;
@@ -191,6 +203,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             }
 
             CompressedPart compressed;
+            started = _time.GetTimestamp();
             try
             {
                 compressed = await _executor.ExecuteAsync(part, cancellationToken).ConfigureAwait(false);
@@ -201,6 +214,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
                 compressed = new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, HandlerFailedPath, 1.0);
             }
 
+            stages.Add($"reduce.{part.Type}", _time.GetElapsedTime(started));
             reduced.Add(compressed);
             changed |= compressed.Text.Length < part.Text.Length;
         }
@@ -211,6 +225,9 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
             return null;
         }
 
-        return _compositor.Compose(decomposition, reduced);
+        started = _time.GetTimestamp();
+        var composed = _compositor.Compose(decomposition, reduced);
+        stages.Add("compose", _time.GetElapsedTime(started));
+        return composed;
     }
 }
