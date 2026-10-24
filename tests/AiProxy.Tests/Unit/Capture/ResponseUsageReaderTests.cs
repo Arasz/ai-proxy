@@ -10,6 +10,9 @@ public class ResponseUsageReaderTests
     private const string Json = "application/json";
     private const string EventStream = "text/event-stream; charset=utf-8";
 
+    // Written out, not read from the reader, so a changed limit fails here.
+    private const int SixteenMiB = 16 * 1024 * 1024;
+
     private const string MessageBody = """
         {"id":"msg_1","type":"message","content":[{"type":"text","text":"hi"}],
          "usage":{"input_tokens":11,"output_tokens":22,"cache_creation_input_tokens":33,"cache_read_input_tokens":44,
@@ -145,7 +148,7 @@ public class ResponseUsageReaderTests
     [Fact]
     public void A_body_that_decodes_past_the_limit_is_over_the_cap()
     {
-        var huge = new byte[ResponseUsageReader.MaxDecodedBytes + 1];
+        var huge = new byte[SixteenMiB + 1];
         Array.Fill(huge, (byte)' ');
 
         var reading = ResponseUsageReader.Read(Encode(huge, "gzip"), Json, "gzip");
@@ -158,7 +161,7 @@ public class ResponseUsageReaderTests
     public void A_body_that_decodes_to_exactly_the_limit_is_read()
     {
         var body = Encoding.UTF8.GetBytes("""{"usage":{"input_tokens":7}}""");
-        var padded = new byte[ResponseUsageReader.MaxDecodedBytes];
+        var padded = new byte[SixteenMiB];
         Array.Fill(padded, (byte)' ');
         body.CopyTo(padded, 0);
 

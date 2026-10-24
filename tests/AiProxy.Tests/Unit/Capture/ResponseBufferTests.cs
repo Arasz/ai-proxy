@@ -8,11 +8,14 @@ public class ResponseBufferTests
 {
     private const string EventStream = "text/event-stream";
 
+    // Written out, not read from ResponseBuffer, so a changed cap fails here.
+    private const int FourMiB = 4 * 1024 * 1024;
+
     [Fact]
     public void A_body_of_exactly_the_cap_is_kept_whole()
     {
         var buffer = ResponseBuffer.For("application/json", "gzip");
-        var body = new byte[ResponseBuffer.MaxBytes];
+        var body = new byte[FourMiB];
         Random.Shared.NextBytes(body);
 
         Append(buffer, body, 7919);
@@ -27,11 +30,11 @@ public class ResponseBufferTests
     {
         var buffer = ResponseBuffer.For("application/json", null);
 
-        Append(buffer, new byte[ResponseBuffer.MaxBytes + 1], 65536);
+        Append(buffer, new byte[FourMiB + 1], 65536);
         buffer.Append(new byte[10]);
 
         Assert.True(buffer.OverCap);
-        Assert.Equal(ResponseBuffer.MaxBytes + 11, buffer.Length);
+        Assert.Equal(FourMiB + 11, buffer.Length);
         Assert.True(buffer.Body.IsEmpty);
     }
 
@@ -40,7 +43,7 @@ public class ResponseBufferTests
     {
         var buffer = ResponseBuffer.For(EventStream, "gzip");
 
-        Append(buffer, new byte[ResponseBuffer.MaxBytes + 1], 65536);
+        Append(buffer, new byte[FourMiB + 1], 65536);
 
         Assert.True(buffer.OverCap);
     }
@@ -62,7 +65,7 @@ public class ResponseBufferTests
     {
         var buffer = ResponseBuffer.For(EventStream, null);
         var stream = Encoding.UTF8.GetBytes(Stream(events: 60_000));
-        Assert.True(stream.Length > ResponseBuffer.MaxBytes + 1024, $"the stream is {stream.Length} bytes; it must be over the cap");
+        Assert.True(stream.Length > FourMiB + 1024, $"the stream is {stream.Length} bytes; it must be over the cap");
 
         // An odd chunk size cuts events in the middle at both ends of the window.
         Append(buffer, stream, 4093);
