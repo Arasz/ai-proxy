@@ -157,9 +157,9 @@ public sealed class CodeReducer
         {
             tokens = tokens[2..];
         }
-        if (tokens.Length >= 3 && tokens[0].Text == "global" && tokens[1].Text == ":" && tokens[2].Text == ":")
+        if (tokens.Length >= 2 && tokens[0].Text == "global" && tokens[1].Text == "::")
         {
-            tokens = tokens[3..];
+            tokens = tokens[2..];
         }
         if (tokens.Length == 0 || tokens.Length % 2 == 0)
         {
@@ -167,7 +167,7 @@ public sealed class CodeReducer
         }
         for (var index = 0; index < tokens.Length; index++)
         {
-            if (index % 2 == 0 ? tokens[index].Kind != CodeTokenKind.Identifier : tokens[index].Text != ".")
+            if (index % 2 == 0 ? tokens[index].Kind != CodeTokenKind.Identifier : tokens[index].Text is not ("." or "::"))
             {
                 return false;
             }

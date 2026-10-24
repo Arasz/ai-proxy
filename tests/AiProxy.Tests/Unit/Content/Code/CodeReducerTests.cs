@@ -98,6 +98,16 @@ public sealed class CodeReducerTests
         Assert.Contains("using (var scope = Open()) { Work(); }", result.Text, StringComparison.Ordinal);
     }
     [Fact]
+    public void Globally_and_alias_qualified_imports_are_removed()
+    {
+        const string source = "global using global::System.Text;\nusing @record = global::System.Text.StringBuilder;\nusing Path = External::System.IO.Path;\nclass Keep { }\n";
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal("class Keep { }\n" + Hint, result.Text);
+    }
+
+    [Fact]
     public void Renaming_is_lexical_deterministic_and_avoids_existing_short_names()
     {
         const string source = "// a very long removable comment provides enough savings for the complete hint and map too\nint a = 1;\nint VeryLongVariable = 2;\nVeryLongVariable += VeryLongVariable;\nPrint(VeryLongVariable, \"VeryLongVariable\");\n";
