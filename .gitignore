@@ -7,7 +7,7 @@ CLAUDE.local.md
 # END ai-badger managed block
 
 # The worktrees a task creates, one per task
-.ai-badger/worktrees/
+**/worktrees/
 
 # .NET build output
 bin/
