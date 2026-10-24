@@ -64,7 +64,7 @@ jobs:
           # release PR that changes only VERSION would otherwise take all three
           # required checks green having built nothing, and the commit that cuts a
           # public release is the last one that should reach main unbuilt.
-          CODE_REGEX='^src/.*\.cs$|^tests/.*\.cs$|\.csproj$|\.slnx$|(^|/)Directory\.Build\.props$|(^|/)Directory\.Packages\.props$|^nuget\.config$|^VERSION$|^docs/adr/|^docs/reference/|^docs/how-to/'
+          CODE_REGEX='^src/.*\.cs$|^tests/.*\.cs$|\.csproj$|\.slnx$|(^|/)Directory\.Build\.props$|(^|/)Directory\.Packages\.props$|^nuget\.config$|^VERSION$|^docs/adr/|^docs/reference/|^docs/how-to/|^scripts/reducer_scoring/payloads/|^scripts/reducer_scoring/preregistration\.json$'
 
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
             echo "No usable base commit (new branch or force-push); treating as a code change."

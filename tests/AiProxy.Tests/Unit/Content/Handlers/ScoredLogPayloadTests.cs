@@ -45,6 +45,20 @@ public sealed class ScoredLogPayloadTests
         Assert.Contains(answer, Body(result.Text), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("tokens_compressed=1419", "tokens_in_context=1031")]
+    [InlineData("tokens_compressed=2443", "blocks_compressed=2")]
+    public async Task The_answer_stays_on_the_line_of_the_field_that_picks_it(string picked, string answer)
+    {
+        var text = await File.ReadAllTextAsync(Path.Combine(Root, "payloads", "rtk_proxy_log.txt"), TestContext.Current.CancellationToken);
+
+        var result = await new LogCompressionHandler().HandleAsync(
+            new ContentPart("request", 1, ContentType.Log, text),
+            CancellationToken.None);
+
+        Assert.Contains(Body(result.Text).Split('\n'), line => line.Contains(picked, StringComparison.Ordinal) && line.Contains(answer, StringComparison.Ordinal));
+    }
+
     private static string Body(string reduced)
     {
         var overlay = reduced.IndexOf(MustKeepOverlay.BlockLabel, StringComparison.Ordinal);

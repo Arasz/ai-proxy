@@ -4,9 +4,9 @@ namespace AiProxy.Core.Content.Handlers;
 /// <remarks>
 /// A line's shape is its space-separated tokens with every value masked: a <c>key=value</c> token
 /// keeps its key, and a token holding a digit keeps nothing. The first line of a shape stays whole.
-/// A later line of that shape keeps only the tokens that differ from the first, in order, so every
-/// value survives and nothing is written that the input did not hold. A later line that differs in
-/// no token is dropped.
+/// A later line of that shape keeps its <c>key=value</c> tokens and the other tokens that differ
+/// from the first, in order, so every value survives and nothing is written that the input did not
+/// hold. A later line that differs in no token is dropped.
 /// </remarks>
 public static class LineShapes
 {
@@ -29,7 +29,8 @@ public static class LineShapes
                 continue;
             }
 
-            var tokens = line.Split(' ');
+            var ending = line.EndsWith('\r') ? "\r" : string.Empty;
+            var tokens = line[..^ending.Length].Split(' ');
             var shape = Shape(tokens);
             if (!firsts.TryGetValue(shape, out var first))
             {
@@ -38,15 +39,19 @@ public static class LineShapes
                 continue;
             }
 
-            var changed = tokens.Where((token, index) => !string.Equals(token, first[index], StringComparison.Ordinal)).ToArray();
-            if (changed.Length > 0)
+            if (tokens.SequenceEqual(first, StringComparer.Ordinal))
             {
-                kept.Add(string.Join(" ", changed));
+                continue;
             }
+
+            var changed = tokens.Where((token, index) => IsPair(token) || !string.Equals(token, first[index], StringComparison.Ordinal));
+            kept.Add(string.Join(" ", changed) + ending);
         }
 
         return kept;
     }
+
+    private static bool IsPair(string token) => token.IndexOf('=', StringComparison.Ordinal) > 0;
 
     private static string Shape(string[] tokens) => string.Join(" ", tokens.Select(Mask));
 

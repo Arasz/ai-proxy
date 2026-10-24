@@ -24,8 +24,8 @@ public sealed class LogCompressionHandler : ICompressionHandler
     {
         ArgumentNullException.ThrowIfNull(part);
 
-        var kept = LineShapes.Collapse(part.Text, CarriesSignal);
-        var reduced = Reduction.DeduplicateLines(string.Join("\n", kept));
+        var unique = Reduction.DeduplicateLines(part.Text);
+        var reduced = string.Join("\n", LineShapes.Collapse(unique, CarriesSignal));
         var overlaid = MustKeepOverlay.Apply(reduced, part.Text);
 
         return ValueTask.FromResult(new HandledContent(overlaid.Text, HandlerPath));

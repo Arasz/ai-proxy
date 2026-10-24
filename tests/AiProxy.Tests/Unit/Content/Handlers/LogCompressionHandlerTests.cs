@@ -33,12 +33,12 @@ public sealed class LogCompressionHandlerTests
     }
 
     [Fact]
-    public async Task A_line_that_repeats_an_earlier_shape_keeps_only_what_changed()
+    public async Task A_line_that_repeats_an_earlier_shape_keeps_what_changed_and_its_key_pairs()
     {
         var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
 
         Assert.Equal(1, Lines(result.Text).Count(line => line.Contains("nothing to see", StringComparison.Ordinal)));
-        Assert.Contains("10:00:03", Lines(result.Text));
+        Assert.Contains("10:00:03 worker=api-1", Lines(result.Text));
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class LogCompressionHandlerTests
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
-        Assert.Contains("2026-10-23T18:25:25.521939Z session=246079e5 tokens_compressed=1419 tokens_in_context=1031", Lines(result.Text));
+        Assert.Contains("2026-10-23T18:25:25.521939Z session=246079e5 tokens_compressed=1419 tokens_in_context=1031 blocks_compressed=1", Lines(result.Text));
         Assert.Contains("2026-10-23T18:25:25.555186Z session=ebd546fe tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2", Lines(result.Text));
     }
 
@@ -94,6 +94,43 @@ public sealed class LogCompressionHandlerTests
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
         Assert.Equal(text.Split('\n'), Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task Shortened_lines_of_different_shapes_are_not_merged_as_repeats()
+    {
+        var text = string.Join("\n", ["took 41 ms", "took 12 ms", "waited 41 ms", "waited 12 ms"]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Equal(2, Lines(result.Text).Count(line => line == "12"));
+    }
+
+    [Fact]
+    public async Task A_shortened_line_keeps_every_key_and_value_pair()
+    {
+        var text = string.Join("\n",
+        [
+            "t1 job=a state=ok",
+            "t2 job=b state=ok",
+            "t3 ERROR job=b crashed",
+            "t4 job=c state=ok",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("t2 job=b state=ok", Lines(result.Text));
+        Assert.Contains("t4 job=c state=ok", Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task A_shortened_line_keeps_its_carriage_return()
+    {
+        var text = "t1 a=1 b=x\r\nt2 a=2 b=x\r\n";
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("t2 a=2 b=x\r", result.Text.Split('\n'));
     }
 
     [Fact]
