@@ -99,7 +99,8 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
             if candidate in extractive:
                 def reducer_runs(judging):
                     return [ReducerRun(r["output"], r["latency_s"], _added_tokens(r),
-                                       judged.get((candidate, name, r["run"]), frozenset()) if judging else frozenset())
+                                       judged.get((candidate, name, r["run"]), frozenset()) if judging else frozenset(),
+                                       r.get("under_minimum", False))
                             for r in mine]
                 for view, match in ((rows, None), (by_fact, same_fact)):
                     view[name] = extractive_row(original, payload["questions"], reducer_runs(match), **_by(match))

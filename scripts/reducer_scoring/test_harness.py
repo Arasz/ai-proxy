@@ -28,17 +28,18 @@ NONE = [["UNKNOWN"] * 3, ["UNKNOWN"] * 3]
 KEPT = "Dana Okonkwo PR 8842"
 
 
-def runs(payload, outputs, latency=0.1, replies=None):
+def runs(payload, outputs, latency=0.1, replies=None, under_minimum=None):
     if isinstance(outputs, str):
         outputs = [outputs] * 3
     return [{"payload": payload, "run": r, "output": o, "latency_s": latency,
-             **({"replies": replies} if replies is not None else {})} for r, o in enumerate(outputs)]
+             **({"replies": replies} if replies is not None else {}),
+             **({"under_minimum": under_minimum} if under_minimum is not None else {})} for r, o in enumerate(outputs)]
 
 
 def records():
     return {
         # Run 0 loses an answer on payload a; the median run keeps both.
-        "shipped_rules": runs("a", ["Dana Okonkwo", KEPT, KEPT]) + runs("b", TEXTS["b"]) + runs("c", KEPT, 0.25),
+        "shipped_rules": runs("a", ["Dana Okonkwo", KEPT, KEPT]) + runs("b", TEXTS["b"], under_minimum=True) + runs("c", KEPT, 0.25),
         "identity": [r for p in TEXTS for r in runs(p, TEXTS[p], 0.0, ALL)],
         # The summary still contains both answers word for word, but the reader misses them.
         "summarizer_control": [r for p in TEXTS for r in runs(p, KEPT, 2.0, NONE)],
@@ -64,6 +65,13 @@ class GradingTests(unittest.TestCase):
 
     def test_the_summarizer_is_judged_by_the_reader_not_by_its_text(self):
         self.assertEqual(kind(report(), "summarizer_control", "prose")["retention"], 0.0)
+
+    def test_an_unchanged_payload_the_runner_did_not_mark_under_minimum_is_measured(self):
+        recs = records()
+        recs["shipped_rules"] = [r for r in recs["shipped_rules"] if r["payload"] != "b"] + runs("b", TEXTS["b"])
+        row = next(p for p in report(recs)["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")
+        self.assertFalse(row["not_applicable"])
+        self.assertEqual(row["compression"], 0.0)
 
     def test_an_untouched_payload_is_reported_as_not_applicable(self):
         untouched = next(p for p in report()["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")

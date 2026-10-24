@@ -15,12 +15,14 @@ MISSES_THAT_LOSE = 2
 
 @dataclass(frozen=True)
 class ReducerRun:
-    """One run of an extractive candidate: the text it produced, how long that took, and what it added outside it, in estimated tokens."""
+    """One run of an extractive candidate: the text it produced, how long that took, what it added outside it, in
+    estimated tokens, and whether the candidate's own configuration put the payload under its minimum."""
 
     output: str
     latency_s: float
     added_tokens: int = 0
     judged: frozenset[str] = frozenset()
+    under_minimum: bool = False
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ class QaRun:
 
 @dataclass(frozen=True)
 class Row:
-    """The measurement for one candidate on one payload or kind; n/a when the candidate left it untouched."""
+    """The measurement for one candidate on one payload or kind; n/a when the payload was under the candidate's minimum."""
 
     measurement: Measurement | None
     not_applicable: bool = False
@@ -74,9 +76,10 @@ def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun],
                    match=answered) -> Row:
     """Verbatim retention: an answer is kept when it still appears in the candidate's output.
 
-    Untouched output is n/a, as pre-registered, unless count_untouched measures it as nothing removed.
+    A payload every run put under the candidate's minimum is n/a, as pre-registered, unless count_untouched
+    measures it as nothing removed. An unchanged payload over the minimum is measured.
     """
-    if not count_untouched and all(run.output == original for run in runs):
+    if not count_untouched and all(run.under_minimum for run in runs):
         return Row(None, not_applicable=True)
     kept = [sum(match(run.output, q["a"]) or q["a"] in run.judged for q in questions) for run in runs]
     lengths = [estimate(r.output) + r.added_tokens for r in runs]

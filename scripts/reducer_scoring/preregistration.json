@@ -471,7 +471,7 @@
    "retention": "qa: the QA reader answers each question 3 times; a question counts as lost only when at least 2 of the 3 replies miss"
   }
  },
- "not_applicable": "a candidate whose output equals its input byte for byte did not run on that payload (under its minimum); the row is reported as n/a, not as a score of 0",
+ "not_applicable": "a payload that the candidate's own configuration puts under its minimum (every run reports under_minimum: the shipped rules when every part is shorter than CompressionOptions' minimum for its kind, read from the running proxy; rtk when the payload's estimated tokens are at or under the ccr rule's tokens_gt in rtk_pipeline.toml) is reported as n/a, not as a score of 0; a payload over the minimum that comes out unchanged is measured as nothing removed. Candidates without a minimum are never n/a.",
  "timing": {
   "identity": "none, 0 s by definition",
   "shipped_rules": "ICompressionPipeline.CompressAsync wall time inside the .NET process, after one warm-up call per payload",
@@ -569,6 +569,20 @@
    "judge": "judge_runner.py: for every answer fact grading still calls lost, the QA reader gets the candidate's output and numbered items (question plus proposed answer) and replies yes or no, three times; two yes accept the answer. Accepted answers count in the relaxed view only, never in the headline.",
    "decoys": "every judged answer with a number is also asked with its last number raised by one, shuffled in by a seed fixed per candidate run. If the judge accepts more than 10% of decoys, the judge is not used and the relaxed view is graded by fact only.",
    "control": "summarizer_control losses are judged too; the share it accepts is reported as the judge's leniency"
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": true,
+   "after": "the untouched-payloads investigation (docs/work/2026-10-24-untouched-payloads.md) had shown five over-minimum payloads reported as n/a",
+   "reason": "n/a meant output equal to input, which hid reducers that ran and removed nothing; the owner's plan step harness-na-rule changes it to under the candidate's configured minimum",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "not_applicable": "under the candidate's configured minimum, as stated in the top-level not_applicable; records without under_minimum are measured, never n/a"
   }
  ]
 }

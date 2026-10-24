@@ -54,9 +54,18 @@ class ExtractiveRowTests(unittest.TestCase):
         row = extractive_row(ORIGINAL, QUESTIONS, runs)
         self.assertEqual((row.measurement.answers_kept, row.measurement.answers_total), (1, 2))
 
-    def test_output_equal_to_input_is_not_applicable(self):
-        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01)] * 3)
+    def test_a_payload_under_the_candidates_minimum_is_not_applicable(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, under_minimum=True)] * 3)
         self.assertTrue(row.not_applicable)
+
+    def test_one_run_over_the_minimum_keeps_the_payload_measured(self):
+        runs = [ReducerRun(ORIGINAL, 0.01, under_minimum=True)] * 2 + [ReducerRun(ORIGINAL, 0.01)]
+        self.assertFalse(extractive_row(ORIGINAL, QUESTIONS, runs).not_applicable)
+
+    def test_an_unchanged_payload_over_the_minimum_is_measured_as_nothing_removed(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01)] * 3)
+        self.assertFalse(row.not_applicable)
+        self.assertEqual(row.measurement.reduced_tokens, tokens.estimate(ORIGINAL))
 
     def test_one_untouched_run_among_reduced_ones_is_still_measured(self):
         runs = [ReducerRun(ORIGINAL, 0.1), ReducerRun("Dana Okonkwo PR 8842", 0.1),
@@ -69,7 +78,7 @@ class ExtractiveRowTests(unittest.TestCase):
         self.assertEqual(reduced, tokens.estimate("Dana Okonkwo PR 8842") + 400)
 
     def test_counting_untouched_output_measures_it_as_nothing_removed(self):
-        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, added_tokens=5)] * 3,
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, added_tokens=5, under_minimum=True)] * 3,
                              count_untouched=True)
         self.assertFalse(row.not_applicable)
         self.assertEqual((row.measurement.reduced_tokens, row.measurement.answers_kept), (tokens.estimate(ORIGINAL) + 5, 2))
@@ -144,11 +153,11 @@ class KindRowTests(unittest.TestCase):
 
     def test_not_applicable_payloads_are_left_out(self):
         good = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana Okonkwo PR 8842", 0.1)] * 3)
-        untouched = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.0)] * 3)
+        untouched = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.0, under_minimum=True)] * 3)
         self.assertEqual(kind_row([good, untouched]).measurement, good.measurement)
 
     def test_a_kind_with_only_untouched_payloads_is_not_applicable(self):
-        untouched = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.0)] * 3)
+        untouched = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.0, under_minimum=True)] * 3)
         self.assertTrue(kind_row([untouched, untouched]).not_applicable)
 
 
