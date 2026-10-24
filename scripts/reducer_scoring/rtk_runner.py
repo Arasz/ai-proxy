@@ -15,6 +15,7 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -49,6 +50,19 @@ def tool_result_text(body: dict) -> str:
 def added_tokens(body: dict) -> int:
     """Estimated tokens rtk added outside the tool result: the tool definitions it injects into the request."""
     return tokens.estimate(json.dumps(body["tools"])) if body.get("tools") else 0
+
+
+def ccr_threshold(pipeline: str) -> int:
+    """The `tokens_gt` of the ccr tool-result rule in the pipeline file rtk is started with."""
+    with open(pipeline, "rb") as file:
+        rules = tomllib.load(file)["proxy"]["request"]["tool_result"]
+    return next(rule["when"]["tokens_gt"] for rule in rules if rule["name"] == "ccr")
+
+
+def under_minimum(text: str, threshold: int) -> bool:
+    """Whether the payload is at or under rtk's ccr threshold. rtk counts with its own tokenizer, so a
+    payload within a few percent of the threshold can be judged differently by rtk."""
+    return tokens.estimate(text) <= threshold
 
 
 ORDERS = ("ccr_first", "plain_first")
@@ -162,7 +176,9 @@ def main() -> None:
                 for run, (upstream_body, latency) in enumerate(zip(sent, ccr_latencies(ccr_trips, plain_trips))):
                     print(json.dumps({"payload": name, "run": run, "output": tool_result_text(upstream_body),
                                       "added_tokens": added_tokens(upstream_body), "latency_s": latency,
-                                      "order": order_for(run)}), flush=True)
+                                      "order": order_for(run),
+                                      "under_minimum": under_minimum(payload_text(name), ccr_threshold(PIPELINE))}),
+                          flush=True)
         finally:
             for proc in procs:
                 proc.terminate()

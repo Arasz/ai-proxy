@@ -1,5 +1,6 @@
 // Runs the shipped compression rules over each payload as an Anthropic tool result, through the
-// same composition the proxy uses, and prints one JSON line per timed run.
+// same composition the proxy uses, and prints one JSON line per timed run. under_minimum is true
+// when every part of the payload is shorter than the proxy's own minimum for its kind.
 // Usage: dotnet run -- <payloads dir> <runs> <payload name>...
 using System.Diagnostics;
 using System.Text;
@@ -7,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AiProxy;
 using AiProxy.Core.Compression;
+using AiProxy.Core.Content;
 using AiProxy.Core.Providers;
 
 var payloads = args[0];
@@ -26,11 +28,14 @@ try
 {
     await using var app = ProxyApplication.Create(builder);
     var pipeline = app.Services.GetRequiredService<ICompressionPipeline>();
+    var decompositor = app.Services.GetRequiredService<IDecompositor>();
+    var options = app.Services.GetRequiredService<CompressionOptions>();
 
     foreach (var name in args.Skip(2))
     {
         var text = await File.ReadAllTextAsync(Path.Combine(payloads, name + ".txt"), new UTF8Encoding(false));
         var body = Encoding.UTF8.GetBytes(Request(text));
+        var underMinimum = decompositor.Decompose(text, name).Parts.All(part => part.Text.Length < options.MinimumFor(part.Type));
         await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Anthropic), CancellationToken.None);
 
         for (var run = 0; run < runs; run++)
@@ -45,6 +50,7 @@ try
                 output = ToolResultText(result.Body.Span),
                 latency_s = watch.Elapsed.TotalSeconds,
                 failures = result.PartFailures.Count,
+                under_minimum = underMinimum,
             }));
         }
     }

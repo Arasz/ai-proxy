@@ -10,6 +10,12 @@ import tokens  # noqa: E402
 
 
 class ToolResultTextTests(unittest.TestCase):
+    def test_a_payload_at_or_under_the_ccr_threshold_is_under_minimum(self):
+        threshold = rtk_runner.ccr_threshold(rtk_runner.PIPELINE)
+        self.assertEqual(threshold, 1000)
+        self.assertTrue(rtk_runner.under_minimum("x " * 10, threshold))
+        self.assertFalse(rtk_runner.under_minimum("word " * 2000, threshold))
+
     def test_string_content_comes_back_as_sent(self):
         body = json.loads(request_body("plain output"))
         self.assertEqual(tool_result_text(body), "plain output")
