@@ -1,7 +1,18 @@
 {
-  "lastUpdated": "2026-10-23",
-  "next": "Measure whether an agent that reads the reduced context answers as well as one that reads the original. The stage proves that the facts survive a reduction; the answer retention the compression research measured is a proxy, and the record names this as its first open question. That needs a question-and-answering run with a model that can be trusted with the answer, and it is the measurement that says whether the stage is worth running at all. The model path waits for that answer: the artifact is 274 MB, the numbers for it are measured, and the owner ruled that the rule-based path ships meanwhile. The two corrections to the merged research records land as a follow-up to pull request #3. After the measurement, the v1 questions the phase 1 record left open: capture one real client request per provider and replay it through the detector, decide whether the conflict refusal is right for a translating gateway, and test an MCP server's session handling behind a connection-reusing proxy.",
+  "lastUpdated": "2026-10-24",
+  "next": "Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
   "completedTasks": [
+    {
+      "taskId": "aip-provider-api-subdomain-host-matching",
+      "date": "2026-10-24",
+      "title": "Settle whether canonical provider hosts need subdomain matching",
+      "pr": 46,
+      "version": "0.8.0",
+      "summary": "ProviderHostCatalog stays exact-match but now names the documented regional hosts: us/eu/gb/ca/au/jp/kr/sg/in/ae.api.openai.com and eu.openrouter.ai. A wildcard was rejected because it would decrypt mcp.openrouter.ai (an MCP server). Anthropic regions go through the inference_geo body field, Gemini has one host. Sources listed in docs/reference/environment-variables.md; SECURITY.md decryption scope updated.",
+      "followUps": [
+        "Re-check provider host docs when a provider announces a new data-residency region."
+      ]
+    },
     {
       "taskId": "aip-clear-stale-system-proxy-after-crash",
       "date": "2026-10-23",
