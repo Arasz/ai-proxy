@@ -4,12 +4,17 @@ Provider routing needs no environment configuration. ai-proxy recognizes these d
 hosts and sends all other HTTP traffic through unchanged. HTTPS for other hosts remains an
 opaque tunnel.
 
-| Provider | Host |
-|---|---|
-| OpenAI | `api.openai.com` |
-| Anthropic | `api.anthropic.com` |
-| Google Gemini | `generativelanguage.googleapis.com` |
-| OpenRouter | `openrouter.ai` |
+| Provider | Host | Documented in |
+|---|---|---|
+| OpenAI | `api.openai.com`, plus the regional `us.`, `eu.`, `gb.`, `ca.`, `au.`, `jp.`, `kr.`, `sg.`, `in.` and `ae.api.openai.com` | [data controls](https://developers.openai.com/api/docs/guides/your-data) |
+| Anthropic | `api.anthropic.com` | [data residency](https://platform.claude.com/docs/en/manage-claude/data-residency) |
+| Google Gemini | `generativelanguage.googleapis.com` | [API reference](https://ai.google.dev/api) |
+| OpenRouter | `openrouter.ai`, `eu.openrouter.ai` | [quickstart](https://openrouter.ai/docs/quickstart) |
+
+Hosts match exactly; there is no subdomain wildcard. A wildcard on `openrouter.ai` would also
+decrypt `mcp.openrouter.ai`, which is an MCP server and not the chat API. Anthropic picks a
+region with the `inference_geo` request field, so it has no regional host. The list was checked
+against each provider's documentation on 2026-10-24.
 
 ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` (or the port in `PROXY_PORT`) while it
 runs, then restores the prior settings at shutdown. It creates a per-user root certificate
