@@ -161,8 +161,12 @@ faster, so its latency here says nothing about Haiku. F8 has the Haiku run.
 
 ### F8: The Haiku digest is fast; word for word it loses answers on 6 of 7 kinds, mostly by rewording [MEASURED]
 
-On `claude-haiku-5-5` the digest took 1.6-13 s per payload (1.8-11 s per kind), 1.7 to 4.7
-times faster than the stand-in per kind. It kept every answer only on json, removing 37% in 3.7 s, for
+On `claude-haiku-5-5` the digest took 3.0-14 s of wall time per payload (3.1-12 s per kind), 1.2
+to 3.6 times faster than the stand-in per kind. Wall time is the boundary `pi_call` times for the
+stand-in. The scores in the tables use the model's own API duration (`duration_api_ms`), which is
+1.6-13 s per payload (1.8-11 s per kind) and 1.7 to 4.7 times faster than the stand-in; so
+the Haiku latencies in the tables are the API-duration figures, not like-for-like with the
+stand-in. It kept every answer only on json, removing 37% in 3.7 s API time (4.9 s wall), for
 a score of 0.27 at 1 s and 0.36 at 2 s. That is the best json score in the counted view. On
 every other kind the word-for-word check lost one to three answers. Seven of 13 payloads kept
 every answer, with per-payload scores of 0.12-0.47.
