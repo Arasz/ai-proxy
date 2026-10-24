@@ -193,7 +193,7 @@ public sealed class ToolOutputRegionFinder
             {
                 var start = (int)reader.TokenStartIndex;
                 var end = EndOfStringToken(body, start);
-                regions.Add(new ContentRegion(start, end - start, reader.GetString() ?? string.Empty));
+                regions.Add(new ContentRegion(start, end - start, reader.GetString() ?? ""));
             }
 
             counter++;

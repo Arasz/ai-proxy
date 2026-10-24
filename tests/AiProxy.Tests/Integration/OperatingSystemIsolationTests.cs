@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiProxy.Tests.Integration;
 
-public class OperatingSystemIsolationTests
+public sealed class OperatingSystemIsolationTests
 {
     private const string RootName = "Titanium Root Certificate Authority";
 

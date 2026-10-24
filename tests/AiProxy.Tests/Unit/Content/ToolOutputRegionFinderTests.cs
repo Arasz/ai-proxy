@@ -7,7 +7,7 @@ namespace AiProxy.Tests.Unit.Content;
 /// The region finder, stated as behaviour: it finds the tool output in a request body and
 /// nothing else.
 /// </summary>
-public class ToolOutputRegionFinderTests
+public sealed class ToolOutputRegionFinderTests
 {
     private static readonly ToolOutputRegionFinder Finder = new();
 
@@ -86,7 +86,7 @@ public class ToolOutputRegionFinderTests
     {
         // A body nested deeper than the parser reads is a body the finder leaves alone,
         // rather than a body it reads halfway and guesses about.
-        var body = new string('[', 100) + "\"the tool said this\"" + new string(']', 100);
+        var body = $"{new string('[', 100)}\"the tool said this\"{new string(']', 100)}";
 
         Assert.Empty(Find(body));
     }

@@ -2,7 +2,7 @@ using AiProxy.Core.Providers;
 
 namespace AiProxy.Tests.Unit.Providers;
 
-public class ProviderHostCatalogTests
+public sealed class ProviderHostCatalogTests
 {
     [Theory]
     [InlineData("api.openai.com", Dialect.OpenAi)]

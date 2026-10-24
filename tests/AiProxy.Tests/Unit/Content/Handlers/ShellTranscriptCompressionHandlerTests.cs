@@ -4,7 +4,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>The transcript reducer, stated as behaviour: the failure survives, the noise does not.</summary>
-public class ShellTranscriptCompressionHandlerTests
+public sealed class ShellTranscriptCompressionHandlerTests
 {
     private static readonly ShellTranscriptCompressionHandler Handler = new();
 

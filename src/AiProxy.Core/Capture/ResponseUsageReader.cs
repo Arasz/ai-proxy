@@ -296,15 +296,15 @@ public static class ResponseUsageReader
 
     private static uint Adler32(ReadOnlySpan<byte> data)
     {
-        const uint Modulus = 65521;
+        const uint modulus = 65521;
         uint a = 1, b = 0;
         foreach (var value in data)
         {
-            a = (a + value) % Modulus;
-            b = (b + a) % Modulus;
+            a = (a + value) % modulus;
+            b = (b + a) % modulus;
         }
 
-        return (b << 16) | a;
+        return b << 16 | a;
     }
 
     private sealed class OverCapException : Exception;

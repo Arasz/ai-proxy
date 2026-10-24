@@ -2,7 +2,7 @@ using System.Net;
 
 namespace AiProxy.Tests.Integration;
 
-public class ProxyHostTests
+public sealed class ProxyHostTests
 {
     [Fact]
     public async Task The_test_host_answers_health_with_system_proxy_and_certificate_changes_disabled()

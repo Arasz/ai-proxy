@@ -4,7 +4,7 @@ using AiProxy.Tests.Integration;
 
 namespace AiProxy.Tests.Unit;
 
-public class SystemProxyMarkerTests
+public sealed class SystemProxyMarkerTests
 {
     [Fact]
     public void The_endpoint_is_written_and_read_back_by_the_next_owner()

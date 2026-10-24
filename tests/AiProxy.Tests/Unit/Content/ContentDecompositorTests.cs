@@ -6,7 +6,7 @@ namespace AiProxy.Tests.Unit.Content;
 /// The decomposer, stated as behaviour: a mixed payload is split by structure, and the
 /// template keeps everything that is not a part.
 /// </summary>
-public class ContentDecompositorTests
+public sealed class ContentDecompositorTests
 {
     private const string Mixed = """
         ProviderDetector.cs

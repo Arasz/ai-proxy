@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 
 namespace AiProxy.Storage;
 
-/// <summary>The queue the worker drains.</summary>
+/// <summary>The queue is the worker drains.</summary>
 public interface IContentQueue
 {
     /// <summary>Reads the records waiting to be written.</summary>
@@ -16,7 +16,7 @@ public interface IContentQueue
 
     /// <summary>Takes a job out of the queue, once it has been written.</summary>
     /// <param name="jobId">The queue row's number.</param>
-    /// <param name="cancellationToken">The token that stops the delete.</param>
+    /// <param name="cancellationToken">The token that stops the deleted.</param>
     ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken);
 
     /// <summary>The value of the pragma that tells whether another connection committed.</summary>
@@ -56,9 +56,9 @@ public sealed class ContentQueue : IContentQueue
         _databasePath = options.ResolvedDatabasePath;
     }
 
-    /// <summary>Publishes a record, and returns once the row is committed.</summary>
+    /// <summary>Publishes a record and returns once the row is committed.</summary>
     /// <param name="record">The record to publish.</param>
-    /// <param name="cancellationToken">The token that stops the write.</param>
+    /// <param name="cancellationToken">The token that stops the writer.</param>
     public async ValueTask PublishAsync(ContentRecord record, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(record);
@@ -98,16 +98,16 @@ public sealed class ContentQueue : IContentQueue
             LIMIT @Limit;
             """;
 
-        var rows = await connection.QueryAsync<(long JobId, string Payload)>(
-            new CommandDefinition(select, new { Limit = limit }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var getJobPayloadCommand = new CommandDefinition(select, new { Limit = limit }, cancellationToken: cancellationToken);
+        var rows = (await connection.QueryAsync<JobPayload>(getJobPayloadCommand)).ToList();
 
-        var jobs = new List<ContentJob>(rows.Count());
-        foreach (var row in rows)
+        var jobs = new List<ContentJob>(rows.Count);
+        foreach (var jobPayload in rows)
         {
-            var record = JsonSerializer.Deserialize<ContentRecord>(row.Payload, SerializerOptions);
+            var record = JsonSerializer.Deserialize<ContentRecord>(jobPayload.Payload, SerializerOptions);
             if (record is not null)
             {
-                jobs.Add(new ContentJob(row.JobId, record));
+                jobs.Add(new ContentJob(jobPayload.JobId, record));
             }
         }
 
@@ -116,7 +116,7 @@ public sealed class ContentQueue : IContentQueue
 
     /// <summary>Takes a job out of the queue, once it has been written.</summary>
     /// <param name="jobId">The queue row's number.</param>
-    /// <param name="cancellationToken">The token that stops the delete.</param>
+    /// <param name="cancellationToken">The token that stops the deleted.</param>
     public async ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(_databasePath);
@@ -140,4 +140,6 @@ public sealed class ContentQueue : IContentQueue
             "PRAGMA data_version;",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
+
+    private sealed record JobPayload(long JobId, string Payload);
 }

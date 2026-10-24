@@ -7,7 +7,7 @@ using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Tests.Integration;
 
-public class TitaniumProxyServiceTests
+public sealed class TitaniumProxyServiceTests
 {
     [Fact]
     public async Task System_proxy_registration_is_reversed_when_the_proxy_stops()
@@ -280,6 +280,7 @@ public class TitaniumProxyServiceTests
 
     private sealed class RecordingSystemProxyRegistrar(List<string>? events = null) : ISystemProxyRegistrar
     {
+        private readonly List<string>? _events = events;
         public bool FailSet { get; init; }
 
         public bool FailRestore { get; init; }
@@ -295,13 +296,13 @@ public class TitaniumProxyServiceTests
                 throw new InvalidOperationException("networksetup failed");
             }
 
-            events?.Add("set");
+            _events?.Add("set");
             EndPoint = endPoint;
         }
 
         public void Restore()
         {
-            events?.Add("restore");
+            _events?.Add("restore");
             RestoreCount++;
             if (FailRestore)
             {
@@ -309,15 +310,13 @@ public class TitaniumProxyServiceTests
             }
         }
 
-        public void Clear() => events?.Add("clear");
+        public void Clear() => _events?.Add("clear");
     }
 
-    private sealed class RecordingGuardLauncher : ISystemProxyGuardLauncher
+    private sealed class RecordingGuardLauncher(List<string> events) : ISystemProxyGuardLauncher
     {
-        private readonly List<string> _events;
-        private string _markerPath = string.Empty;
-
-        public RecordingGuardLauncher(List<string> events) => _events = events;
+        private readonly List<string> _events = events;
+        private string _markerPath = "";
 
         public bool Fail { get; init; }
 

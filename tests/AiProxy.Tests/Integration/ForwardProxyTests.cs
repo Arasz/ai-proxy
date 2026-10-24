@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiProxy.Tests.Integration;
 
-public class ForwardProxyTests
+public sealed class ForwardProxyTests
 {
     [Fact]
     public async Task An_unknown_http_destination_passes_through_with_its_request_and_response()

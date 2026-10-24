@@ -17,7 +17,7 @@ using Microsoft.Extensions.Time.Testing;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>Capture mode through the real host: what the upstream receives and what the capture file holds.</summary>
-public class RequestCaptureTests : IDisposable
+public sealed class RequestCaptureTests : IDisposable
 {
     private const string ToolOutput = """
         2026-03-12 10:00:00 INFO worker=api-1 request started
@@ -36,7 +36,7 @@ public class RequestCaptureTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _contentDatabasePath, _contentDatabasePath + "-wal", _contentDatabasePath + "-shm" })
+        foreach (var file in new[] { _contentDatabasePath, $"{_contentDatabasePath}-wal", $"{_contentDatabasePath}-shm" })
         {
             if (File.Exists(file))
             {
@@ -123,7 +123,7 @@ public class RequestCaptureTests : IDisposable
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
         Assert.Null(proxy.Services.GetService<IRequestCaptureStore>());
         Assert.False(proxy.Services.GetRequiredService<TitaniumProxyService>().Server.EnableRequestTimingCapture, "capture off must leave Titanium's timing off");
-        Assert.Empty(Directory.GetFiles(proxy.DataDirectory, SqliteCaptureStore.FileName + "*"));
+        Assert.Empty(Directory.GetFiles(proxy.DataDirectory, $"{SqliteCaptureStore.FileName}*"));
     }
 
     [Fact]
@@ -307,7 +307,7 @@ public class RequestCaptureTests : IDisposable
     [Fact]
     public async Task A_response_over_the_cap_is_relayed_whole_and_its_usage_is_not_read()
     {
-        var big = new byte[(5 * 1024 * 1024) + 17];
+        var big = new byte[5 * 1024 * 1024 + 17];
         Array.Fill(big, (byte)'x');
         await using var upstream = await FakeUpstream.StartAsync();
         upstream.Handler = (_, context) =>
@@ -456,7 +456,7 @@ public class RequestCaptureTests : IDisposable
     public async Task A_plain_event_stream_far_over_the_cap_still_gives_its_whole_usage()
     {
         var events = new StringBuilder(StreamStart);
-        while (events.Length < (5 * 1024 * 1024))
+        while (events.Length < 5 * 1024 * 1024)
         {
             events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
         }
@@ -552,7 +552,7 @@ public class RequestCaptureTests : IDisposable
     [Fact]
     public async Task An_upstream_that_drops_the_stream_midway_leaves_a_row_with_what_passed()
     {
-        var head = Encoding.UTF8.GetBytes(StreamStart + "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_to");
+        var head = Encoding.UTF8.GetBytes($"{StreamStart}event: message_delta\ndata: {{\"type\":\"message_delta\",\"usage\":{{\"output_to");
         await using var upstream = await FakeUpstream.StartAsync();
         upstream.Handler = async (_, context) =>
         {
@@ -786,7 +786,7 @@ public class RequestCaptureTests : IDisposable
     private static byte[] ReadCaptureFiles(ProxyHost proxy)
     {
         using var all = new MemoryStream();
-        foreach (var file in Directory.GetFiles(proxy.DataDirectory, SqliteCaptureStore.FileName + "*"))
+        foreach (var file in Directory.GetFiles(proxy.DataDirectory, $"{SqliteCaptureStore.FileName}*"))
         {
             using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             stream.CopyTo(all);

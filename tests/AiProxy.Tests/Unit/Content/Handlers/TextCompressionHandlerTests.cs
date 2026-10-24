@@ -4,7 +4,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>The reducers that work on text rather than on a document format.</summary>
-public class TextCompressionHandlerTests
+public sealed class TextCompressionHandlerTests
 {
     private static readonly TomlCompressionHandler Toml = new();
     private static readonly MarkdownCompressionHandler Markdown = new();

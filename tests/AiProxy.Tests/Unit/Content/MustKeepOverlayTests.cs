@@ -6,7 +6,7 @@ namespace AiProxy.Tests.Unit.Content;
 /// The overlay that re-attaches what a reduction dropped, stated as behaviour: which facts
 /// must survive, and how much the overlay is allowed to cost.
 /// </summary>
-public class MustKeepOverlayTests
+public sealed class MustKeepOverlayTests
 {
     [Fact]
     public void A_failure_verdict_the_reduction_dropped_comes_back()
@@ -136,10 +136,9 @@ public class MustKeepOverlayTests
     [Fact]
     public void A_decision_survives_the_ceiling()
     {
-        var original = string.Join(
+        var original = $"{string.Join(
             " ",
-            Enumerable.Range(0, 400).Select(index => $"/srv/app/file{index}.cs"))
-            + " FAILED";
+            Enumerable.Range(0, 400).Select(index => $"/srv/app/file{index}.cs"))} FAILED";
         var reduced = new string('x', 4000);
 
         var result = MustKeepOverlay.Apply(reduced, original);

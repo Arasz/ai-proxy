@@ -4,7 +4,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>The executor, stated as behaviour: it runs the handler and measures what it did.</summary>
-public class CompressionExecutorTests
+public sealed class CompressionExecutorTests
 {
     private static readonly CompressionExecutor Executor = new(
         new ContentRouter(

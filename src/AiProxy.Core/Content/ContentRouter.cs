@@ -14,7 +14,7 @@ public sealed class ContentRouter : IContentRouter
         ArgumentNullException.ThrowIfNull(handlers);
         ArgumentNullException.ThrowIfNull(fallback);
 
-        _handlers = handlers.ToArray();
+        _handlers = [.. handlers];
         _fallback = fallback;
     }
 

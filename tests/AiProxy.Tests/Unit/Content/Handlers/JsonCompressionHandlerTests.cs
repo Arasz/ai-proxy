@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
@@ -6,7 +5,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>The JSON reducer, stated as behaviour: the document gets smaller and keeps its values.</summary>
-public class JsonCompressionHandlerTests
+public sealed class JsonCompressionHandlerTests
 {
     private static readonly JsonCompressionHandler Handler = new();
 

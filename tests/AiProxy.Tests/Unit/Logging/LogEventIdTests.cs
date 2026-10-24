@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace AiProxy.Tests.Unit.Logging;
 
 /// <summary>An event id names one log line, so two messages in one Log class must never share it.</summary>
-public class LogEventIdTests
+public sealed class LogEventIdTests
 {
     [Fact]
     public void Every_logger_message_in_a_log_class_has_its_own_event_id()

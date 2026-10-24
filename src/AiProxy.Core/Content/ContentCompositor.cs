@@ -18,7 +18,7 @@ public sealed class ContentCompositor : ICompositor
                 Placeholder = ContentDecompositor.Placeholder(part.Type, part.ChunkId),
                 Text = reduced.TryGetValue(part.ChunkId, out var text) ? text : part.Text,
             })
-            .ToArray();
+            .ToList();
 
         var template = decomposition.Template;
         var composed = new StringBuilder(template.Length);

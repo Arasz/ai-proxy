@@ -47,7 +47,7 @@ public static class LiteralBlocks
 
         var segments = new List<LiteralSegment>();
         var inString = false;
-        var delimiter = string.Empty;
+        var delimiter = "";
 
         foreach (var line in SplitLines(text))
         {
@@ -58,7 +58,7 @@ public static class LiteralBlocks
                 if (line.Contains(delimiter, StringComparison.Ordinal))
                 {
                     inString = false;
-                    delimiter = string.Empty;
+                    delimiter = "";
                 }
 
                 continue;
@@ -87,7 +87,7 @@ public static class LiteralBlocks
 
     /// <summary>Marks the raw strings and the block comments of a source file.</summary>
     /// <param name="text">The file to scan.</param>
-    public static IReadOnlyList<LiteralSegment> SourceCodeLiterals(string text)
+    internal static IReadOnlyList<LiteralSegment> SourceCodeLiterals(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
 

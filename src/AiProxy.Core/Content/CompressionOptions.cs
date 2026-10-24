@@ -29,7 +29,6 @@ public sealed record CompressionOptions(IReadOnlyDictionary<ContentType, int> Mi
             pair => pair.Key == ContentType.DirectoryListing ? int.MaxValue : minimum));
 
     /// <summary>The shortest part of the kind that is worth compressing.</summary>
-    /// <param name="type">The kind of a part.</param>
-    public int MinimumFor(ContentType type) =>
-        MinimumLengths.TryGetValue(type, out var minimum) ? minimum : DefaultMinimum;
+    /// <param name="type">The kind of part.</param>
+    public int MinimumFor(ContentType type) => MinimumLengths.GetValueOrDefault(type, DefaultMinimum);
 }

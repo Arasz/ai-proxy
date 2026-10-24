@@ -32,7 +32,7 @@ public sealed class MarkdownCompressionHandler : ICompressionHandler
 
         foreach (var segment in LiteralBlocks.MarkdownFences(part.Text))
         {
-            builder.Append(segment.IsLiteral ? segment.Text : CommentPattern.Replace(segment.Text, string.Empty));
+            builder.Append(segment.IsLiteral ? segment.Text : CommentPattern.Replace(segment.Text, ""));
         }
 
         var reduced = BlankRunPattern.Replace(builder.ToString(), "\n\n").Trim();

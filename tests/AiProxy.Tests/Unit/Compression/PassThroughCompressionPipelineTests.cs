@@ -4,7 +4,7 @@ using AiProxy.Core.Providers;
 namespace AiProxy.Tests.Unit.Compression;
 
 /// <summary>The pipeline that changes nothing, which is the state of the question today.</summary>
-public class PassThroughCompressionPipelineTests
+public sealed class PassThroughCompressionPipelineTests
 {
     private readonly PassThroughCompressionPipeline _pipeline = new();
 

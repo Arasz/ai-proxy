@@ -1,49 +1,16 @@
-using AiProxy.Core.Content;
 using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
 
 namespace AiProxy.Hosting;
 
 /// <summary>Writes the records the proxy compressed, one queue row at a time.</summary>
-public sealed partial class ContentStoreWorker : BackgroundService
+public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQueue queue, ContentStoreOptions options, ILogger<ContentStoreWorker> logger, TimeProvider time) : BackgroundService
 {
     private const int BatchSize = 64;
 
-    private readonly IContentWriter _writer;
-    private readonly IContentQueue _queue;
-    private readonly ContentStoreOptions _options;
-    private readonly ILogger<ContentStoreWorker> _logger;
-    private readonly TimeProvider _time;
-    private readonly TimeSpan _interval;
+    private readonly TimeSpan _interval = TimeSpan.FromMilliseconds(250);
     private SqliteConnection? _connection;
     private long _lastDataVersion = -1;
-
-    /// <summary>Holds the collaborators the worker is composed of.</summary>
-    /// <param name="writer">Writes a record into the content tables.</param>
-    /// <param name="queue">The queue the records wait in.</param>
-    /// <param name="options">Where the store keeps what the proxy compressed.</param>
-    /// <param name="logger">Where the worker says what it did.</param>
-    /// <param name="time">The clock the worker waits on.</param>
-    public ContentStoreWorker(
-        IContentWriter writer,
-        IContentQueue queue,
-        ContentStoreOptions options,
-        ILogger<ContentStoreWorker> logger,
-        TimeProvider time)
-    {
-        ArgumentNullException.ThrowIfNull(writer);
-        ArgumentNullException.ThrowIfNull(queue);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(time);
-
-        _writer = writer;
-        _queue = queue;
-        _options = options;
-        _logger = logger;
-        _time = time;
-        _interval = TimeSpan.FromMilliseconds(250);
-    }
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -60,12 +27,12 @@ public sealed partial class ContentStoreWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                Log.PassFailed(_logger, exception);
+                Log.PassFailed(logger, exception);
             }
 
             try
             {
-                await Task.Delay(_interval, _time, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(_interval, time, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -78,8 +45,8 @@ public sealed partial class ContentStoreWorker : BackgroundService
     /// <param name="cancellationToken">The token that stops the pass.</param>
     public async Task<int> RunOnceAsync(CancellationToken cancellationToken)
     {
-        var connection = _connection ??= ContentSchema.Open(_options.ResolvedDatabasePath);
-        var version = await _queue.ReadDataVersionAsync(connection, cancellationToken).ConfigureAwait(false);
+        var connection = _connection ??= ContentSchema.Open(options.ResolvedDatabasePath);
+        var version = await queue.ReadDataVersionAsync(connection, cancellationToken).ConfigureAwait(false);
 
         if (version == _lastDataVersion)
         {
@@ -88,29 +55,27 @@ public sealed partial class ContentStoreWorker : BackgroundService
 
         _lastDataVersion = version;
 
-        var jobs = await _queue.ReadAsync(BatchSize, cancellationToken).ConfigureAwait(false);
+        var jobs = await queue.ReadAsync(BatchSize, cancellationToken).ConfigureAwait(false);
         var written = 0;
 
         foreach (var job in jobs)
         {
             try
             {
-                await _writer.PersistAsync(job.Record, cancellationToken).ConfigureAwait(false);
-                await _queue.RemoveAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+                await writer.PersistAsync(job.Record, cancellationToken).ConfigureAwait(false);
+                await queue.RemoveAsync(job.JobId, cancellationToken).ConfigureAwait(false);
                 written++;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                // The job stays in the queue, so the next pass has to look again:
-                // nothing else committed, and the pragma would say there is nothing new.
                 _lastDataVersion = -1;
-                Log.JobFailed(_logger, job.JobId, exception);
+                Log.JobFailed(logger, job.JobId, exception);
             }
         }
 
         if (written > 0)
         {
-            Log.Drained(_logger, written);
+            Log.Drained(logger, written);
         }
 
         return written;

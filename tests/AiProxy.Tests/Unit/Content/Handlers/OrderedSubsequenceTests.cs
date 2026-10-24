@@ -1,7 +1,7 @@
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>The subsequence helper, stated as behaviour, so the reducer tests that lean on it can fail.</summary>
-public class OrderedSubsequenceTests
+public sealed class OrderedSubsequenceTests
 {
     [Fact]
     public void Dropped_characters_keep_the_subsequence()

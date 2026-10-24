@@ -11,7 +11,7 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
-csharp_max_line_length = 200
+csharp_max_line_length = 240
 
 # Microsoft .NET properties
 csharp_new_line_before_members_in_object_initializers = false
@@ -45,6 +45,8 @@ indent_size = 4
 
 [*.cs]
 indent_size = 4
+csharp_style_prefer_primary_constructors = true:warning
+dotnet_diagnostic.IDE0290.severity = warning
 
 # ---------------------------------------------------------------------------
 # Build-enforced code style (Directory.Build.props sets EnforceCodeStyleInBuild).
@@ -81,6 +83,3 @@ csharp_style_namespace_declarations = file_scoped:warning
 # `dotnet format whitespace` — means giving that up, which is a separate decision
 # with a repo-wide reformat attached, not a hook.
 dotnet_diagnostic.IDE0055.severity = None
-
-[tests/AiRaccoon.Tests/Retrieval/RetrievalBaselineTests.cs]
-dotnet_diagnostic.IDE0011.severity = none

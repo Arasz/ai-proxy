@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>HTTPS to a provider host is decrypted with the proxy's own root, trusted only inside this process.</summary>
-public class HttpsInspectionTests
+public sealed class HttpsInspectionTests
 {
     private const string Body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}""";
 

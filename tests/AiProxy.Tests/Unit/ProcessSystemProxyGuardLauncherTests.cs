@@ -2,7 +2,7 @@ using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Unit;
 
-public class ProcessSystemProxyGuardLauncherTests
+public sealed class ProcessSystemProxyGuardLauncherTests
 {
     [Theory]
     [InlineData("/usr/local/bin/ai-proxy")]

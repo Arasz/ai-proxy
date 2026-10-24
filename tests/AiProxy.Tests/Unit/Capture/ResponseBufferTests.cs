@@ -4,7 +4,7 @@ using AiProxy.Core.Capture;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>What the capture keeps of a response body as it passes: all of it up to a cap, or a stream's head and tail.</summary>
-public class ResponseBufferTests
+public sealed class ResponseBufferTests
 {
     private const string EventStream = "text/event-stream";
 
@@ -83,12 +83,11 @@ public class ResponseBufferTests
     {
         // Answer text that looks like an event line, with the tail's first byte placed on one of those copies:
         // kept, the partial line would read as a broken event and lose the stream its final usage.
-        var lead = Stream(events: 30_000).Split("event: message_delta", StringSplitOptions.None)[0];
-        var filler = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"" +
-                     string.Concat(Enumerable.Repeat("data: {\\\"type\\\":\\\"x\\\"} ", 40)) + "\"}}\n\n";
+        var lead = Stream(events: 30_000).Split("event: message_delta")[0];
+        var filler = $"event: content_block_delta\ndata: {{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"{string.Concat(Enumerable.Repeat("data: {\\\"type\\\":\\\"x\\\"} ", 40))}\"}}}}\n\n";
         const string end = "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":57,\"cache_read_input_tokens\":301}}\n\n";
-        var fillers = (ResponseBuffer.TailBytes / filler.Length) + 2;
-        var text = lead + string.Concat(Enumerable.Repeat(filler, fillers)) + end;
+        var fillers = ResponseBuffer.TailBytes / filler.Length + 2;
+        var text = $"{lead}{string.Concat(Enumerable.Repeat(filler, fillers))}{end}";
         var cut = Encoding.UTF8.GetByteCount(text) - ResponseBuffer.TailBytes;
         var onCopy = text.IndexOf("data: {\\\"type", cut, StringComparison.Ordinal);
         // Padding after that copy moves the cut forward onto it.

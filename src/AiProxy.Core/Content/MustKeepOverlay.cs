@@ -10,13 +10,13 @@ public sealed record OverlayResult(string Text, int RetainedTokens, bool Ceiling
 
 /// <summary>Re-attaches the facts a reduction dropped, without spending the savings.</summary>
 /// <remarks>
-/// The rules come from the measured reducer: identifiers, numbers, paths and directive words
-/// are the tokens a reduction may never lose, and the overlay puts them back as a trailing
-/// block. The record's open question is the decisions class, a failure verdict, an exit status
-/// or a state transition, which the measured pattern catches only when it is capitalised, so
-/// five more rules cover it and those tokens are the first ones the overlay keeps.
+///     The rules come from the measured reducer: identifiers, numbers, paths and directive words
+///     are the tokens a reduction may never lose, and the overlay puts them back as a trailing
+///     block. The record's open question is the decision class, a failure verdict, an exit status
+///     or a state transition, which the measured pattern catches only when it is capitalised, so
+///     five more rules cover it, and those tokens are the first ones the overlay keeps.
 /// </remarks>
-public static class MustKeepOverlay
+public static partial class MustKeepOverlay
 {
     /// <summary>The most the overlay may add, as a share of the reduced text.</summary>
     public const double MaximumOverhead = 0.05;
@@ -27,17 +27,15 @@ public static class MustKeepOverlay
     /// <summary>The label the block carries, so a reader knows it is an addition.</summary>
     public const string BlockLabel = "\n[retained identifiers] ";
 
-    private static readonly Regex IdentifierPattern = new(
-        @"\b0x[0-9A-Fa-f]+\b|(?<![\w.])\d+(?:\.\d+)?(?![\w.])|[A-Z_]{2,}|[a-z_][a-z0-9_]*\.[a-z0-9_]+|/[a-z0-9/._-]{2,}|\.[a-z]{2,4}\b|--?[a-z][\w-]*|\b[A-Z][a-z]+[A-Z]\w*|(?i:\b(?:not|never|none|cannot|can't|don't|doesn't|didn't|won't|shouldn't|mustn't|isn't|aren't|avoid|refuse|prohibited|forbidden|disallow|unless|except|without|must|should|shall|required|always|only|mandatory|and|or|nor|xor)\b)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex IdentifierPattern = CreateIdentifierPattern();
 
     private static readonly Regex[] DecisionPatterns =
     [
-        new(@"(?i)\b(?:failed|failure|fatal|critical|error|exception|panic)\b", RegexOptions.Compiled | RegexOptions.CultureInvariant),
-        new(@"(?i)\bexit(?:\s+code)?\s+\d{1,3}\b", RegexOptions.Compiled | RegexOptions.CultureInvariant),
-        new(@"(?i)\b(?:retried|requeued|quarantined|aborted|rolled\s+back|timed\s+out|skipped|reverted)\b", RegexOptions.Compiled | RegexOptions.CultureInvariant),
-        new(@"/[A-Za-z0-9_./\-]*[A-Z][A-Za-z0-9_./\-]*", RegexOptions.Compiled | RegexOptions.CultureInvariant),
-        new(@"(?i)\b(?:must-keep|never\s+drop|do\s+not\s+drop|keep\s+this)\b", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+        CreateFailureDecisionPattern(),
+        CreateExitCodeDecisionPattern(),
+        CreateStateTransitionDecisionPattern(),
+        CreateCapitalizedPathDecisionPattern(),
+        CreateMustKeepDecisionPattern()
     ];
 
     /// <summary>Re-attaches the tokens the reduction dropped, as a labelled trailing block.</summary>
@@ -45,9 +43,6 @@ public static class MustKeepOverlay
     /// <param name="originalText">The text the reduction started from.</param>
     public static OverlayResult Apply(string reducedText, string originalText)
     {
-        ArgumentNullException.ThrowIfNull(reducedText);
-        ArgumentNullException.ThrowIfNull(originalText);
-
         var (decisions, others) = Tokens(originalText);
         if (decisions.Count == 0 && others.Count == 0)
         {
@@ -123,4 +118,24 @@ public static class MustKeepOverlay
 
         return set;
     }
+
+    [GeneratedRegex(
+        @"\b0x[0-9A-Fa-f]+\b|(?<![\w.])\d+(?:\.\d+)?(?![\w.])|[A-Z_]{2,}|[a-z_][a-z0-9_]*\.[a-z0-9_]+|/[a-z0-9/._-]{2,}|\.[a-z]{2,4}\b|--?[a-z][\w-]*|\b[A-Z][a-z]+[A-Z]\w*|(?i:\b(?:not|never|none|cannot|can't|don't|doesn't|didn't|won't|shouldn't|mustn't|isn't|aren't|avoid|refuse|prohibited|forbidden|disallow|unless|except|without|must|should|shall|required|always|only|mandatory|and|or|nor|xor)\b)",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex CreateIdentifierPattern();
+
+    [GeneratedRegex(@"(?i)\b(?:failed|failure|fatal|critical|error|exception|panic)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateFailureDecisionPattern();
+
+    [GeneratedRegex(@"(?i)\bexit(?:\s+code)?\s+\d{1,3}\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateExitCodeDecisionPattern();
+
+    [GeneratedRegex(@"(?i)\b(?:retried|requeued|quarantined|aborted|rolled\s+back|timed\s+out|skipped|reverted)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateStateTransitionDecisionPattern();
+
+    [GeneratedRegex(@"/[A-Za-z0-9_./\-]*[A-Z][A-Za-z0-9_./\-]*", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateCapitalizedPathDecisionPattern();
+
+    [GeneratedRegex(@"(?i)\b(?:must-keep|never\s+drop|do\s+not\s+drop|keep\s+this)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateMustKeepDecisionPattern();
 }

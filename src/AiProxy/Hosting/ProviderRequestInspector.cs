@@ -2,7 +2,6 @@ using AiProxy.Core.Capture;
 using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
-using Microsoft.Extensions.Logging;
 using Titanium.Web.Proxy.EventArguments;
 
 namespace AiProxy.Hosting;

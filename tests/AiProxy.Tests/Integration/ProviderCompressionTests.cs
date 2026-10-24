@@ -7,7 +7,7 @@ using AiProxy.Hosting;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>The compression stage over the forward proxy: what a provider upstream receives and what the client gets back.</summary>
-public class ProviderCompressionTests : IDisposable
+public sealed class ProviderCompressionTests : IDisposable
 {
     private const string ToolOutput = """
         2026-03-12 10:00:00 INFO worker=api-1 request started
@@ -24,7 +24,7 @@ public class ProviderCompressionTests : IDisposable
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
         {
             if (File.Exists(file))
             {

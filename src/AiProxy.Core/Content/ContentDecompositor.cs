@@ -1,59 +1,43 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace AiProxy.Core.Content;
 
 /// <summary>Splits a payload by structure: a fence, a JSON value, an XML element, and the rest.</summary>
 /// <remarks>
-/// The split is by structure and not by guess, because a guess that cuts a JSON document in
-/// half produces two invalid halves, while a structure that is not found leaves the text whole.
-/// A block whose kind cannot be established is prose, and a payload with no structure at all
-/// stays one part.
+///     The split is by structure and not by guess, because a guess that cuts a JSON document in
+///     half produces two invalid halves, while a structure that is not found leaves the text whole.
+///     A block whose kind cannot be established is prose, and a payload with no structure at all
+///     stays one part.
 /// </remarks>
-public sealed class ContentDecompositor : IDecompositor
+public sealed partial class ContentDecompositor : IDecompositor
 {
-    private static readonly Regex LogLinePattern = new(
-        @"^\s*\d{4}-\d{2}-\d{2}[T ]\S+\s+(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\b",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex SearchResultPattern = new(
-        @"^\S+:\d+",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex PathLinePattern = new(
-        @"^\S+$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex ConfigurationLinePattern = new(
-        @"^\s*[A-Za-z_][A-Za-z0-9_.\-]*\s*=\s*.+$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex MarkdownLinePattern = new(
-        @"^\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     /// <summary>
-    /// How many times the decomposer may look for a structure that is not there.
+    ///     How many times the decomposer may look for a structure that is not there.
     /// </summary>
     /// <remarks>
-    /// Looking for a JSON value or an XML element costs a scan to the end of the text,
-    /// because a value that never balances is only known to be unbalanced when the end
-    /// is reached. A payload of lines that each open a value and close none therefore
-    /// costs a scan per line, which is quadratic, and a body of a few megabytes would
-    /// take minutes. A well-formed payload finds its structure on the first try, so a
-    /// small number of failures is enough to tell the two apart: after this many, the
-    /// rest of the text is text.
+    ///     Looking for a JSON value or an XML element costs a scan to the end of the text,
+    ///     because a value that never balances is only known to be unbalanced when the end
+    ///     is reached. A payload of lines that each open a value and close none therefore
+    ///     costs a scan per line, which is quadratic, and a body of a few megabytes would
+    ///     take minutes. A well-formed payload finds its structure on the first try, so a
+    ///     small number of failures is enough to tell the two apart: after this many, the
+    ///     rest of the text is text.
     /// </remarks>
     private const int MaxFailedStructureAttempts = 32;
+
+    private static readonly Regex MarkdownLinePattern = CreateMarkdownLinePattern();
+    private static readonly Regex PathLinePattern = CreatePathLinePattern();
+    private static readonly Regex ConfigurationLinePattern = CreateConfigurationLinePattern();
+    private static readonly Regex SearchResultPattern = CreateSearchResultPattern();
+    private static readonly Regex LogLinePattern = CreateLogLinePattern();
 
     /// <inheritdoc />
     public Decomposition Decompose(string content, string requestId)
     {
-        ArgumentNullException.ThrowIfNull(content);
-        ArgumentNullException.ThrowIfNull(requestId);
-
         var spans = FindParts(content);
         var parts = new List<ContentPart>(spans.Count);
         var template = new StringBuilder(content.Length);
@@ -82,21 +66,20 @@ public sealed class ContentDecompositor : IDecompositor
     /// <param name="chunkId">The part's number within the request.</param>
     public static string Placeholder(ContentType type, int chunkId) => $"{{{ShortName(type)}_{chunkId}}}";
 
-    private static string ShortName(ContentType type) => type switch
-    {
-        ContentType.Prose => "prose",
-        ContentType.Log => "log",
-        ContentType.Json => "json",
-        ContentType.Xml => "xml",
-        ContentType.Toml => "toml",
-        ContentType.Markdown => "markdown",
-        ContentType.SourceCode => "code",
-        ContentType.DirectoryListing => "listing",
-        ContentType.ShellTranscript => "shell",
-        _ => "unknown",
-    };
-
-    private readonly record struct Span(int Start, int Length, ContentType Type, bool Structural);
+    private static string ShortName(ContentType type) =>
+        type switch
+        {
+            ContentType.Prose => "prose",
+            ContentType.Log => "log",
+            ContentType.Json => "json",
+            ContentType.Xml => "xml",
+            ContentType.Toml => "toml",
+            ContentType.Markdown => "markdown",
+            ContentType.SourceCode => "code",
+            ContentType.DirectoryListing => "listing",
+            ContentType.ShellTranscript => "shell",
+            _ => "unknown"
+        };
 
     private List<Span> FindParts(string content)
     {
@@ -127,7 +110,7 @@ public sealed class ContentDecompositor : IDecompositor
 
             if (failedAttempts < MaxFailedStructureAttempts)
             {
-                if (trimmed.StartsWith('{') || trimmed.StartsWith("["))
+                if (trimmed.StartsWith('{') || trimmed.StartsWith('['))
                 {
                     var valueEnd = FindJsonEnd(content, position);
                     if (valueEnd > position && IsJson(content[position..valueEnd]))
@@ -216,7 +199,7 @@ public sealed class ContentDecompositor : IDecompositor
 
     private static ContentType Classify(string text)
     {
-        var lines = text.Split('\n').Where(line => line.Trim().Length > 0).ToArray();
+        var lines = text.Split('\n').Where(static line => line.Trim().Length > 0).ToArray();
         if (lines.Length == 0)
         {
             return ContentType.Prose;
@@ -227,32 +210,27 @@ public sealed class ContentDecompositor : IDecompositor
             return ContentType.ShellTranscript;
         }
 
-        if (lines.Count(line => LogLinePattern.IsMatch(line)) >= 2)
+        if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= 2)
         {
             return ContentType.Log;
         }
 
-        if (lines.Count(line => SearchResultPattern.IsMatch(line)) >= 2)
+        if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= 2)
         {
             return ContentType.SourceCode;
         }
 
-        if (lines.Length >= 2 && lines.Count(line => PathLinePattern.IsMatch(line) && line.Contains('.', StringComparison.Ordinal)) >= lines.Length * 0.8)
+        if (lines.Length >= 2 && lines.Count(static line => PathLinePattern.IsMatch(line) && line.Contains('.', StringComparison.Ordinal)) >= lines.Length * 0.8)
         {
             return ContentType.DirectoryListing;
         }
 
-        if (lines.Length >= 2 && lines.Count(line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * 0.8)
+        if (lines.Length >= 2 && lines.Count(static line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * 0.8)
         {
             return ContentType.Toml;
         }
 
-        if (lines.Any(line => MarkdownLinePattern.IsMatch(line)))
-        {
-            return ContentType.Markdown;
-        }
-
-        return ContentType.Prose;
+        return lines.Any(static line => MarkdownLinePattern.IsMatch(line)) ? ContentType.Markdown : ContentType.Prose;
     }
 
     private static int FindFenceEnd(string content, int from, char marker)
@@ -297,13 +275,17 @@ public sealed class ContentDecompositor : IDecompositor
                 {
                     escaped = false;
                 }
-                else if (character == '\\')
+                else
                 {
-                    escaped = true;
-                }
-                else if (character == '"')
-                {
-                    inString = false;
+                    switch (character)
+                    {
+                        case '\\':
+                            escaped = true;
+                            break;
+                        case '"':
+                            inString = false;
+                            break;
+                    }
                 }
 
                 continue;
@@ -326,8 +308,6 @@ public sealed class ContentDecompositor : IDecompositor
                         return index + 1;
                     }
 
-                    break;
-                default:
                     break;
             }
         }
@@ -392,11 +372,35 @@ public sealed class ContentDecompositor : IDecompositor
     {
         try
         {
-            return XElement.Parse(text) is not null;
+            _ = XElement.Parse(text);
+            return true;
         }
-        catch (System.Xml.XmlException)
+        catch (XmlException)
         {
             return false;
         }
     }
+
+    [GeneratedRegex(
+        @"^\s*\d{4}-\d{2}-\d{2}[T ]\S+\s+(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\b",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex CreateLogLinePattern();
+
+
+    [GeneratedRegex(@"^\S+:\d+", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateSearchResultPattern();
+
+
+    [GeneratedRegex(@"^\S+$", RegexOptions.CultureInvariant)]
+    private static partial Regex CreatePathLinePattern();
+
+
+    [GeneratedRegex(@"^\s*[A-Za-z_][A-Za-z0-9_.\-]*\s*=\s*.+$", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateConfigurationLinePattern();
+
+
+    [GeneratedRegex(@"^\s*(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)", RegexOptions.CultureInvariant)]
+    private static partial Regex CreateMarkdownLinePattern();
+
+    private readonly record struct Span(int Start, int Length, ContentType Type, bool Structural);
 }

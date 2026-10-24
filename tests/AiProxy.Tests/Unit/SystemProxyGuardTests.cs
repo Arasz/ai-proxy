@@ -2,14 +2,14 @@ using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Unit;
 
-public class SystemProxyGuardTests
+public sealed class SystemProxyGuardTests
 {
     [Fact]
     public void Input_that_ends_without_restored_clears_the_system_proxy()
     {
         var clears = 0;
 
-        var cleared = new SystemProxyGuard(() => clears++).Run(new StringReader(string.Empty));
+        var cleared = new SystemProxyGuard(() => clears++).Run(new StringReader(""));
 
         Assert.True(cleared);
         Assert.Equal(1, clears);

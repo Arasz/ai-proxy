@@ -1,6 +1,4 @@
 using System.Net;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
@@ -78,7 +76,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server.Logging.LoggerFactory = _loggerFactory;
         _server.EnableHttpInterception = true;
         _server.MaxBufferedBodyBytes = 8 * 1024 * 1024;
-        _server.ViaHeaderPseudonym = string.Empty;
+        _server.ViaHeaderPseudonym = "";
         _server.BeforeRequest += BeforeRequestAsync;
         _server.BeforeResponse += BeforeResponseAsync;
         if (_inspector.CapturesResponses)
@@ -257,7 +255,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         CreatePrivateDirectory(_options.DataDirectory);
         var certificates = _server.CertificateManager;
         certificates.PfxFilePath = Path.GetFullPath(Path.Combine(_options.DataDirectory, RootCertificateFileName));
-        certificates.PfxPassword = _options.RootCertificatePassword ?? string.Empty;
+        certificates.PfxPassword = _options.RootCertificatePassword ?? "";
         certificates.SaveFakeCertificates = false;
         if (!certificates.CreateRootCertificate())
         {

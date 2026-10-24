@@ -36,7 +36,7 @@ public sealed class PartIsolationTests : IDisposable
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
         {
             if (File.Exists(file))
             {

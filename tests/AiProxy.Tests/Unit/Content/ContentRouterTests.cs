@@ -4,7 +4,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>The router, stated as behaviour: the handler decides what it claims.</summary>
-public class ContentRouterTests
+public sealed class ContentRouterTests
 {
     private static readonly ContentRouter Router = new(
         [

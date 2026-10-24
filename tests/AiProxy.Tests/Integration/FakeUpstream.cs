@@ -93,7 +93,7 @@ internal sealed class FakeUpstream : IAsyncDisposable
             _requests.Add(new RecordedRequest(
                 context.Request.Method,
                 context.Request.Path.Value ?? "/",
-                context.Request.QueryString.Value ?? string.Empty,
+                context.Request.QueryString.Value ?? "",
                 headers,
                 body,
                 bytes));

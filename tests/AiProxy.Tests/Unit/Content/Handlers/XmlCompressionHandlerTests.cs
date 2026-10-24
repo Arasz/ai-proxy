@@ -5,7 +5,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>The XML reducer, stated as behaviour: the indentation goes and the text stays.</summary>
-public class XmlCompressionHandlerTests
+public sealed class XmlCompressionHandlerTests
 {
     private static readonly XmlCompressionHandler Handler = new();
 

@@ -11,7 +11,7 @@ namespace AiProxy.Tests.Unit.Content;
 /// The pipeline, stated as behaviour: the tool output is smaller, the rest of the body is
 /// exactly what the client sent, and the record says what happened.
 /// </summary>
-public class ContentCompressionPipelineTests
+public sealed class ContentCompressionPipelineTests
 {
     private const string ToolOutput = """
         2026-03-12 10:00:00 INFO worker=api-1 request started
@@ -142,10 +142,7 @@ public class ContentCompressionPipelineTests
     [Fact]
     public async Task A_part_under_the_minimum_is_left_alone()
     {
-        var options = CompressionOptions.Default with
-        {
-            MinimumLengths = new Dictionary<ContentType, int> { [ContentType.Log] = 10_000 },
-        };
+        var options = new CompressionOptions(MinimumLengths: new Dictionary<ContentType, int> { [ContentType.Log] = 10_000 });
         var (pipeline, _) = Build(options: options);
         var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
 

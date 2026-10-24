@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>What the proxy does when inspection cannot or should not run.</summary>
-public class ProviderInspectionFailureTests
+public sealed class ProviderInspectionFailureTests
 {
     private const string Body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}""";
 

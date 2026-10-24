@@ -8,27 +8,27 @@ namespace AiProxy.Tests.Unit.Storage;
 /// <summary>
 /// The store, tested against a real database file: a fake would pass where the SQL is wrong.
 /// </summary>
-public class ContentStoreTests : IDisposable
+public sealed class ContentStoreTests : IDisposable
 {
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
         $"ai-proxy-store-{Guid.NewGuid():N}.db");
-    private readonly ContentStoreOptions _options;
+
     private readonly ContentQueue _queue;
     private readonly SqliteContentStore _store;
 
     public ContentStoreTests()
     {
-        _options = new ContentStoreOptions(_databasePath);
-        _queue = new ContentQueue(_options);
-        _store = new SqliteContentStore(_options, _queue);
+        var options = new ContentStoreOptions(_databasePath);
+        _queue = new ContentQueue(options);
+        _store = new SqliteContentStore(options, _queue);
     }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
 
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
         {
             if (File.Exists(file))
             {

@@ -4,7 +4,7 @@ using AiProxy.Tests.Integration;
 
 namespace AiProxy.Tests.Unit;
 
-public class GuardCommandTests
+public sealed class GuardCommandTests
 {
     [Fact]
     public void A_parent_that_died_with_a_marker_is_cleared_under_the_lock_and_the_marker_is_deleted()
@@ -19,7 +19,7 @@ public class GuardCommandTests
             lockedDuringClear = Throws(() => new FileStream(MarkerPath(directory), FileMode.Open, FileAccess.ReadWrite, FileShare.None));
         }, TimeSpan.Zero);
 
-        var exitCode = command.Run(new StringReader(string.Empty));
+        var exitCode = command.Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(1, clears);
@@ -36,7 +36,7 @@ public class GuardCommandTests
         owner.Write(new IPEndPoint(IPAddress.Loopback, 8080));
         var clears = 0;
 
-        var exitCode = new GuardCommand(directory.Path, () => clears++, TimeSpan.FromMilliseconds(100)).Run(new StringReader(string.Empty));
+        var exitCode = new GuardCommand(directory.Path, () => clears++, TimeSpan.FromMilliseconds(100)).Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
@@ -47,10 +47,10 @@ public class GuardCommandTests
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
-        File.WriteAllText(MarkerPath(directory), string.Empty);
+        File.WriteAllText(MarkerPath(directory), "");
         var clears = 0;
 
-        new GuardCommand(directory.Path, () => clears++, TimeSpan.Zero).Run(new StringReader(string.Empty));
+        new GuardCommand(directory.Path, () => clears++, TimeSpan.Zero).Run(new StringReader(""));
 
         Assert.Equal(0, clears);
         Assert.False(File.Exists(MarkerPath(directory)));
@@ -76,7 +76,7 @@ public class GuardCommandTests
         LeaveMarker(directory);
         var command = new GuardCommand(directory.Path, () => throw new InvalidOperationException("networksetup failed"), TimeSpan.Zero);
 
-        var exitCode = command.Run(new StringReader(string.Empty));
+        var exitCode = command.Run(new StringReader(""));
 
         Assert.Equal(1, exitCode);
         Assert.True(new FileInfo(MarkerPath(directory)).Length > 0);

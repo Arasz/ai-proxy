@@ -8,7 +8,7 @@ using Microsoft.Data.Sqlite;
 namespace AiProxy.Tests.Unit.Storage;
 
 /// <summary>The capture store, tested against a real database file.</summary>
-public class CaptureStoreTests : IDisposable
+public sealed class CaptureStoreTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.NewGuid().ToString("N"));
     private readonly string _databasePath;

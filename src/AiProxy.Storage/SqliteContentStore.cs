@@ -1,6 +1,5 @@
 using AiProxy.Core.Content;
 using Dapper;
-using Microsoft.Data.Sqlite;
 
 namespace AiProxy.Storage;
 
@@ -154,7 +153,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                     record.RequestId,
                     part.ChunkId,
                     ContentType = part.Type.ToString(),
-                    OriginalText = part.OriginalText,
+                    part.OriginalText,
                     CompressedText = part.Text,
                     part.Path,
                     part.Ratio,

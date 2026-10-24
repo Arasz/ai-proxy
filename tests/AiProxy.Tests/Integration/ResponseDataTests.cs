@@ -4,12 +4,11 @@ using System.Net.Http.Headers;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Titanium.Web.Proxy.EventArguments;
 
 namespace AiProxy.Tests.Integration;
 
 /// <summary>What Titanium's DataReceived hands the proxy while a response streams through it.</summary>
-public class ResponseDataTests
+public sealed class ResponseDataTests
 {
     [Fact]
     public async Task DataReceived_delivers_the_response_body_de_chunked_and_still_content_encoded()

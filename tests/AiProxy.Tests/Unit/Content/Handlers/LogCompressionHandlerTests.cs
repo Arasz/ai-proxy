@@ -6,7 +6,7 @@ namespace AiProxy.Tests.Unit.Content.Handlers;
 /// <summary>
 /// The log reducer, stated as behaviour: which lines survive, and which facts come back.
 /// </summary>
-public class LogCompressionHandlerTests
+public sealed class LogCompressionHandlerTests
 {
     private const string Log = """
         2026-03-12 10:00:00 INFO worker=api-1 request started

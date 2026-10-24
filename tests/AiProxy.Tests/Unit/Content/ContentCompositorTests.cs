@@ -3,7 +3,7 @@ using AiProxy.Core.Content;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>The compositor, stated as behaviour: the parts go back where they came from.</summary>
-public class ContentCompositorTests
+public sealed class ContentCompositorTests
 {
     private const string Mixed = """
         ProviderDetector.cs

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiProxy.Tests.Integration;
 
-public class RootCertificateStorageTests
+public sealed class RootCertificateStorageTests
 {
     [Fact]
     public async Task The_root_certificate_is_written_to_the_configured_directory_and_readable_only_by_the_user()
@@ -53,7 +53,7 @@ public class RootCertificateStorageTests
         var bytes = await File.ReadAllBytesAsync(
             Path.Combine(directory.Path, TitaniumProxyService.RootCertificateFileName),
             TestContext.Current.CancellationToken);
-        Assert.ThrowsAny<CryptographicException>(() => X509CertificateLoader.LoadPkcs12(bytes, string.Empty));
+        Assert.ThrowsAny<CryptographicException>(() => X509CertificateLoader.LoadPkcs12(bytes, ""));
         using var root = X509CertificateLoader.LoadPkcs12(bytes, "correct horse");
         Assert.True(root.HasPrivateKey);
     }
@@ -72,7 +72,7 @@ public class RootCertificateStorageTests
                 TestContext.Current.CancellationToken);
         }
 
-        Assert.ThrowsAny<CryptographicException>(() => X509CertificateLoader.LoadPkcs12(bytes, string.Empty));
+        Assert.ThrowsAny<CryptographicException>(() => X509CertificateLoader.LoadPkcs12(bytes, ""));
         using var root = X509CertificateLoader.LoadPkcs12(bytes, "from config");
         Assert.True(root.HasPrivateKey);
     }

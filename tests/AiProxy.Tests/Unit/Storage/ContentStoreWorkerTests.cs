@@ -8,7 +8,7 @@ using Microsoft.Extensions.Time.Testing;
 namespace AiProxy.Tests.Unit.Storage;
 
 /// <summary>The worker that drains the queue, tested through its pass.</summary>
-public class ContentStoreWorkerTests : IDisposable
+public sealed class ContentStoreWorkerTests : IDisposable
 {
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
@@ -27,9 +27,9 @@ public class ContentStoreWorkerTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        SqliteConnection.ClearAllPools();
 
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
         {
             if (File.Exists(file))
             {
@@ -130,28 +130,21 @@ public class ContentStoreWorkerTests : IDisposable
         Assert.Equal(2, queue.Reads);
     }
 
-    private sealed class CountingQueue : IContentQueue
+    private sealed class CountingQueue(IContentQueue inner) : IContentQueue
     {
-        private readonly IContentQueue _inner;
-
-        public CountingQueue(IContentQueue inner)
-        {
-            _inner = inner;
-        }
-
         public int Reads { get; private set; }
 
         public Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken)
         {
             Reads++;
-            return _inner.ReadAsync(limit, cancellationToken);
+            return inner.ReadAsync(limit, cancellationToken);
         }
 
         public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken) =>
-            _inner.RemoveAsync(jobId, cancellationToken);
+            inner.RemoveAsync(jobId, cancellationToken);
 
         public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
-            _inner.ReadDataVersionAsync(connection, cancellationToken);
+            inner.ReadDataVersionAsync(connection, cancellationToken);
     }
 
     private sealed class RecordingWriter : IContentWriter

@@ -5,7 +5,7 @@ using AiProxy.Core.Capture;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>Reading token usage out of a provider response body, as it arrived on the wire.</summary>
-public class ResponseUsageReaderTests
+public sealed class ResponseUsageReaderTests
 {
     private const string Json = "application/json";
     private const string EventStream = "text/event-stream; charset=utf-8";
@@ -202,7 +202,7 @@ public class ResponseUsageReaderTests
     [Fact]
     public void A_done_marker_ends_a_stream_without_an_error()
     {
-        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream + "data: [DONE]\n\n"), EventStream, null);
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes($"{Stream}data: [DONE]\n\n"), EventStream, null);
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
@@ -224,9 +224,7 @@ public class ResponseUsageReaderTests
     }
 
     private static string LongMessageBody() =>
-        """{"usage":{"input_tokens":11,"output_tokens":22},"content":[""" +
-        string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}""")) +
-        "]}";
+        $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
 
     [Theory]
     [InlineData(Json, "{\"usage\":{\"input_tokens\":1,")]

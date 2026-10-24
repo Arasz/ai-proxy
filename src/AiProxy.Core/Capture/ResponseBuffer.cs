@@ -42,11 +42,13 @@ public sealed class ResponseBuffer
     public void Append(ReadOnlySpan<byte> bytes)
     {
         Length += bytes.Length;
-        if (_strategy is not null && !_strategy.Append(bytes))
+        if (_strategy is null || _strategy.Append(bytes))
         {
-            OverCap = true;
-            _strategy = null;
+            return;
         }
+
+        OverCap = true;
+        _strategy = null;
     }
 
     /// <summary>Lets the kept bytes go once usage has been read.</summary>

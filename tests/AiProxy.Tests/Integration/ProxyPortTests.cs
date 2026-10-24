@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Tests.Integration;
 
-public class ProxyPortTests
+public sealed class ProxyPortTests
 {
     [Fact]
     public void An_unset_port_keeps_the_default_8080()

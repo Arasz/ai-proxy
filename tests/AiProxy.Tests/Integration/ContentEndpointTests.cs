@@ -34,7 +34,7 @@ public sealed class ContentEndpointTests : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
         {
             File.Delete(file);
         }

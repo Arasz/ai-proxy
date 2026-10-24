@@ -4,7 +4,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>The routing table, stated as behaviour: every kind has exactly one handler.</summary>
-public class ContentRoutingTableTests
+public sealed class ContentRoutingTableTests
 {
     private static readonly ICompressionHandler[] Handlers =
     [

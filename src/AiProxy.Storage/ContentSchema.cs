@@ -6,38 +6,38 @@ namespace AiProxy.Storage;
 public static class ContentSchema
 {
     /// <summary>The statements that make the database ready to use.</summary>
-    public const string Statements = """
-        CREATE TABLE IF NOT EXISTS content_request (
-            request_id  TEXT PRIMARY KEY,
-            created_at  TEXT NOT NULL,
-            original    TEXT NOT NULL,
-            compressed  TEXT NOT NULL,
-            ratio       REAL NOT NULL,
-            path        TEXT NOT NULL,
-            chunk_count INTEGER NOT NULL
-        );
+    private const string Statements = """
+                                      CREATE TABLE IF NOT EXISTS content_request (
+                                          request_id  TEXT PRIMARY KEY,
+                                          created_at  TEXT NOT NULL,
+                                          original    TEXT NOT NULL,
+                                          compressed  TEXT NOT NULL,
+                                          ratio       REAL NOT NULL,
+                                          path        TEXT NOT NULL,
+                                          chunk_count INTEGER NOT NULL
+                                      );
 
-        CREATE TABLE IF NOT EXISTS content_chunk (
-            request_id      TEXT NOT NULL,
-            chunk_id        INTEGER NOT NULL,
-            content_type    TEXT NOT NULL,
-            original_text   TEXT NOT NULL,
-            compressed_text TEXT NOT NULL,
-            path            TEXT NOT NULL,
-            ratio           REAL NOT NULL,
-            PRIMARY KEY (request_id, chunk_id)
-        );
+                                      CREATE TABLE IF NOT EXISTS content_chunk (
+                                          request_id      TEXT NOT NULL,
+                                          chunk_id        INTEGER NOT NULL,
+                                          content_type    TEXT NOT NULL,
+                                          original_text   TEXT NOT NULL,
+                                          compressed_text TEXT NOT NULL,
+                                          path            TEXT NOT NULL,
+                                          ratio           REAL NOT NULL,
+                                          PRIMARY KEY (request_id, chunk_id)
+                                      );
 
-        CREATE TABLE IF NOT EXISTS content_queue (
-            job_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-            request_id TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            payload    TEXT NOT NULL
-        );
-        """;
+                                      CREATE TABLE IF NOT EXISTS content_queue (
+                                          job_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                                          request_id TEXT NOT NULL,
+                                          created_at TEXT NOT NULL,
+                                          payload    TEXT NOT NULL
+                                      );
+                                      """;
 
     /// <summary>How long a command waits for the write lock, in seconds.</summary>
-    public const int DefaultCommandTimeoutSeconds = 30;
+    private const int DefaultCommandTimeoutSeconds = 30;
 
     /// <summary>How long the request path waits for the write lock, in seconds.</summary>
     /// <remarks>
