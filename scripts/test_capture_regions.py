@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import tokens
 from capture_regions import read_bodies, regions, render, summarize
 
 
@@ -195,6 +196,33 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn(secret, text)
         self.assertNotIn(secret, json.dumps(s.as_dict()))
         self.assertIn("system", text)
+
+
+class TokenColumnTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        path = os.path.join(directory.name, "cal.json")
+        with open(path, "w") as f:
+            json.dump({"ratio": 2.0, "rows": 9, "models": {"claude-x": 9}, "first": "2026-10-01T00:00:00",
+                       "last": "2026-10-02T00:00:00", "holdout_median_abs_error": 0.05, "method": "t"}, f)
+        self.cal = tokens.load(path)
+        self.lines = render(summarize([body(
+            system="x" * 100,
+            messages=[{"role": "user", "content": [{"type": "image", "source": {"data": "A" * 400}}]}])],
+        ), self.cal).splitlines()
+
+    def test_token_columns_use_the_calibrated_ratio_not_four(self):
+        system = next(line for line in self.lines if line.startswith("system"))
+        self.assertEqual(system.split()[2], "50")
+
+    def test_the_header_carries_the_estimate_method(self):
+        self.assertIn(tokens.method(self.cal), self.lines[0])
+        self.assertNotIn("~4 chars", self.lines[0])
+
+    def test_image_regions_print_na_in_the_token_columns(self):
+        image = next(line for line in self.lines if line.startswith("user.image"))
+        self.assertEqual(image.split().count("n/a"), 2)
 
 
 if __name__ == "__main__":

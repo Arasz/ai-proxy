@@ -20,8 +20,10 @@ from collections import Counter
 from contextlib import closing
 from dataclasses import dataclass, field
 
+import tokens
+
 MESSAGES_PATH = "/v1/messages"
-CHARS_PER_TOKEN = 4
+MEDIA_KINDS = (".image", ".document")
 # Signed thinking is verified upstream; altering a byte rejects the request.
 UNTOUCHABLE = {"assistant.thinking"}
 
@@ -192,21 +194,23 @@ def read_bodies(db_path: str):
             yield raw
 
 
-def render(summary: Summary) -> str:
+def render(summary: Summary, calibration: tokens.Calibration | None = None) -> str:
     sent_total = sum(k.sent_chars for k in summary.kinds.values()) or 1
     new_total = sum(k.new_chars for k in summary.kinds.values()) or 1
     lines = [
         f"requests {summary.requests}, unreadable {summary.unreadable}, "
-        f"cache breakpoints {summary.cache_breakpoints}, ~{CHARS_PER_TOKEN} chars per token",
+        f"cache breakpoints {summary.cache_breakpoints}, {tokens.method(calibration or tokens.load())}",
         "models " + ", ".join(f"{k} {v}" for k, v in summary.models.most_common()),
         "modes  " + ", ".join(f"{k} {v}" for k, v in summary.modes.most_common()),
         f"{'kind':<22}{'regions':>9}{'sent ~tok':>12}{'sent %':>8}{'new ~tok':>11}{'new %':>7}  note",
     ]
     for kind, k in sorted(summary.kinds.items(), key=lambda item: -item[1].sent_chars):
         note = "signed, never touched" if kind in UNTOUCHABLE else ""
+        sent_tok, new_tok = (("n/a", "n/a") if kind.endswith(MEDIA_KINDS)
+                             else (tokens.from_chars(k.sent_chars, calibration), tokens.from_chars(k.new_chars, calibration)))
         lines.append(
-            f"{kind:<22}{k.count:>9}{k.sent_chars // CHARS_PER_TOKEN:>12}"
-            f"{100 * k.sent_chars / sent_total:>7.1f}%{k.new_chars // CHARS_PER_TOKEN:>11}"
+            f"{kind:<22}{k.count:>9}{sent_tok:>12}"
+            f"{100 * k.sent_chars / sent_total:>7.1f}%{new_tok:>11}"
             f"{100 * k.new_chars / new_total:>6.1f}%  {note}".rstrip())
     return "\n".join(lines)
 
