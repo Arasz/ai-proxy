@@ -50,6 +50,25 @@ file contents and tool output the agent sent, and any secret that sits inside th
 macOS the file is `0600` and its directory `0700`. Nothing removes old rows; delete the file when the
 measurement is over. A failed write is logged as a warning and the request goes out regardless.
 
+Each captured request also gets one row of `capture_response`, under the same `request_id`, once
+its response has passed through. The row holds numbers only: the completion time, the status
+code, the request body size as sent and as forwarded, the response body size on the wire, the
+four token counts the provider reported (`input_tokens`, `output_tokens`,
+`cache_creation_input_tokens`, `cache_read_input_tokens`), and `stages`, a JSON object of how many
+microseconds each step took. The stages are the proxy's own (`body-read`, `capture-write`,
+`compression` and its `compression.*` steps, `set-body`, `inspector` for the whole request
+handling, `usage-read`) and Titanium's (`titanium.client-request-read`, `titanium.connection-wait`,
+`titanium.request-send`, `titanium.ttfb`, `titanium.response-delivery`, `titanium.total`).
+
+The response body is not stored, and neither are response headers. The proxy copies the body as
+it streams past to the client, never holding it back, reads the usage from it once the response
+is complete, then drops the copy. The usage is read from a JSON message or an Anthropic event
+stream, gzip, deflate or br encoded. When it cannot be read, the token counts are empty and
+`usage_error` says why: `over-cap` for a body over 4 MiB, `encoding:<name>` for an encoding the
+proxy does not decode, `decode-failed`, `malformed` or `no-usage`. A failed response write is
+logged as a warning and the response is relayed regardless. A `capture.db` from an earlier version
+keeps its rows and gains the new table on the next capture.
+
 ## Local health endpoint
 
 `ASPNETCORE_URLS` controls the ASP.NET health and content endpoints (default `http://localhost:5000`).

@@ -300,6 +300,8 @@ public class RequestCaptureTests : IDisposable
         }
 
         Assert.True(response.Headers.Contains("x-ai-proxy-content-id"), "the content-id header was lost");
+        Assert.Contains("answer-marker", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.False(Contains(ReadCaptureFiles(proxy), "answer-marker"u8.ToArray()), "the response body was found in the capture files");
     }
 
     [Fact]
