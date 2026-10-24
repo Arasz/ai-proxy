@@ -102,15 +102,110 @@ public class ResponseUsageReaderTests
     }
 
     [Theory]
-    [InlineData("gzip")]
-    [InlineData("deflate")]
-    public void A_body_that_does_not_decode_is_an_error_not_an_exception(string encoding)
+    [InlineData("gzip", "ÿþ not an encoded body at all")]
+    [InlineData("deflate", "ÿþ not an encoded body at all")]
+    [InlineData("br", "\u0000\u0001garbage")]
+    [InlineData("gzip", "\u0000\u0001garbage")]
+    public void A_body_that_does_not_decode_is_an_error_not_an_exception(string encoding, string body)
     {
-        var reading = ResponseUsageReader.Read("ÿþ not an encoded body at all"u8.ToArray(), Json, encoding);
+        var reading = ResponseUsageReader.Read(Encoding.Latin1.GetBytes(body), Json, encoding);
 
         Assert.Null(reading.Usage);
-        Assert.Equal("decode-failed", reading.Error);
+        Assert.Equal(ResponseUsageReader.DecodeFailed, reading.Error);
     }
+
+    [Theory]
+    [InlineData("gzip")]
+    [InlineData("deflate")]
+    [InlineData("br")]
+    public void A_compressed_body_cut_short_is_a_decode_failure(string encoding)
+    {
+        var encoded = Encode(Encoding.UTF8.GetBytes(LongMessageBody()), encoding);
+
+        foreach (var cut in new[] { encoded[..(encoded.Length / 2)], encoded[..^2] })
+        {
+            var reading = ResponseUsageReader.Read(cut, Json, encoding);
+
+            Assert.Null(reading.Usage);
+            Assert.Equal(ResponseUsageReader.DecodeFailed, reading.Error);
+        }
+    }
+
+    [Fact]
+    public void A_raw_deflate_body_sent_as_deflate_is_read()
+    {
+        var encoded = Encode(Encoding.UTF8.GetBytes(MessageBody), "raw-deflate");
+
+        var reading = ResponseUsageReader.Read(encoded, Json, "deflate");
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(11, 22, 33, 44), reading.Usage);
+    }
+
+    [Fact]
+    public void A_body_that_decodes_past_the_limit_is_over_the_cap()
+    {
+        var huge = new byte[ResponseUsageReader.MaxDecodedBytes + 1];
+        Array.Fill(huge, (byte)' ');
+
+        var reading = ResponseUsageReader.Read(Encode(huge, "gzip"), Json, "gzip");
+
+        Assert.Null(reading.Usage);
+        Assert.Equal(ResponseUsageReader.OverCap, reading.Error);
+    }
+
+    [Fact]
+    public void A_body_that_decodes_to_exactly_the_limit_is_read()
+    {
+        var body = Encoding.UTF8.GetBytes("""{"usage":{"input_tokens":7}}""");
+        var padded = new byte[ResponseUsageReader.MaxDecodedBytes];
+        Array.Fill(padded, (byte)' ');
+        body.CopyTo(padded, 0);
+
+        var reading = ResponseUsageReader.Read(Encode(padded, "gzip"), Json, "gzip");
+
+        Assert.Equal(new ResponseUsage(7, null, null, null), reading.Usage);
+    }
+
+    [Theory]
+    [InlineData("""{"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}""")]
+    [InlineData("""{"usage":{}}""")]
+    public void A_usage_object_without_anthropic_counts_is_no_usage(string body)
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(body), Json, null);
+
+        Assert.Null(reading.Usage);
+        Assert.Equal(ResponseUsageReader.NoUsage, reading.Error);
+    }
+
+    [Fact]
+    public void A_done_marker_ends_a_stream_without_an_error()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream + "data: [DONE]\n\n"), EventStream, null);
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
+    }
+
+    [Fact]
+    public void A_stream_cut_mid_event_keeps_the_usage_read_so_far_and_says_it_was_truncated()
+    {
+        const string cut = """
+            data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}
+
+            data: {"type":"message_delta","usage":{"output_to
+            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(cut), EventStream, null);
+
+        Assert.Equal(new ResponseUsage(5, 1, null, null), reading.Usage);
+        Assert.Equal(ResponseUsageReader.Truncated, reading.Error);
+    }
+
+    private static string LongMessageBody() =>
+        """{"usage":{"input_tokens":11,"output_tokens":22},"content":[""" +
+        string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}""")) +
+        "]}";
 
     [Theory]
     [InlineData(Json, "{\"usage\":{\"input_tokens\":1,")]
@@ -152,6 +247,7 @@ public class ResponseUsageReaderTests
             "gzip" => new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true),
             "deflate" => new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true),
             "br" => new BrotliStream(output, CompressionLevel.Optimal, leaveOpen: true),
+            "raw-deflate" => new DeflateStream(output, CompressionLevel.Optimal, leaveOpen: true),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding)),
         })
         {

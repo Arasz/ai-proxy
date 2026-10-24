@@ -94,12 +94,23 @@ public sealed partial class ProviderRequestInspector
         exchange.Stages.Add("inspector", _time.GetElapsedTime(started));
     }
 
-    /// <summary>Returns the original-content handle when compression stored a request.</summary>
+    /// <summary>Returns the original-content handle when compression stored a request, and picks what a capture keeps of the body.</summary>
     public Task BeforeResponseAsync(object sender, SessionEventArgs e)
     {
-        if (e.UserData is CapturedExchange { ContentId: { } contentId })
+        if (e.UserData is not CapturedExchange exchange)
         {
-            e.HttpClient.Response.Headers.AddHeader("x-ai-proxy-content-id", contentId);
+            return Task.CompletedTask;
+        }
+
+        var response = e.HttpClient.Response;
+        if (exchange.CaptureId is not null)
+        {
+            exchange.Response = ResponseBuffer.For(response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+        }
+
+        if (exchange.ContentId is { } contentId)
+        {
+            response.Headers.AddHeader("x-ai-proxy-content-id", contentId);
         }
 
         return Task.CompletedTask;
@@ -114,13 +125,14 @@ public sealed partial class ProviderRequestInspector
         }
 
         e.DataReceived -= exchange.OnDataReceived;
+        var kept = exchange.Response ?? ResponseBuffer.For(null, null);
         try
         {
             var response = e.HttpClient.Response;
             var stage = _time.GetTimestamp();
-            var reading = exchange.OverCap
-                ? new UsageReading(null, "over-cap")
-                : ResponseUsageReader.Read(exchange.Response, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+            var reading = kept.OverCap
+                ? new UsageReading(null, ResponseUsageReader.OverCap)
+                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
             exchange.Stages.Add("usage-read", _time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
@@ -131,7 +143,7 @@ public sealed partial class ProviderRequestInspector
                     response.StatusCode,
                     exchange.RequestBytes,
                     exchange.ForwardedBytes,
-                    exchange.ResponseBytes,
+                    kept.Length,
                     reading.Usage,
                     reading.Error,
                     exchange.Stages.ToArray()),
@@ -140,6 +152,11 @@ public sealed partial class ProviderRequestInspector
         catch (Exception exception)
         {
             Log.ResponseCaptureFailed(_logger, e.HttpClient.Request.RequestUri.Host, exception);
+        }
+        finally
+        {
+            kept.Release();
+            exchange.Response = null;
         }
     }
 

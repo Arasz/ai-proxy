@@ -7,11 +7,6 @@ namespace AiProxy.Hosting;
 /// <summary>What the inspector keeps about one exchange between BeforeRequest and AfterResponse.</summary>
 internal sealed class CapturedExchange
 {
-    /// <summary>The most response bytes kept for reading usage; a longer body is counted, not kept.</summary>
-    public const int MaxResponseBytes = 4 * 1024 * 1024;
-
-    private MemoryStream? _response = new();
-
     /// <summary>The handle of the original content when compression stored the request.</summary>
     public string? ContentId { get; set; }
 
@@ -27,31 +22,13 @@ internal sealed class CapturedExchange
     /// <summary>The inspector's own stage timings.</summary>
     public StageTimings Stages { get; } = new();
 
-    /// <summary>Every response body byte that passed, kept or not.</summary>
-    public long ResponseBytes { get; private set; }
-
-    /// <summary>Whether the body outgrew <see cref="MaxResponseBytes"/>, so it was not kept.</summary>
-    public bool OverCap => _response is null;
-
-    /// <summary>The kept response body; empty when <see cref="OverCap"/>.</summary>
-    public ReadOnlySpan<byte> Response => _response is null ? [] : _response.GetBuffer().AsSpan(0, (int)_response.Length);
+    /// <summary>What is kept of the response body; chosen from the response headers, kept whole until they are seen.</summary>
+    public ResponseBuffer? Response { get; set; }
 
     /// <summary>Copies response bytes as they pass on to the client; never holds them back.</summary>
     public void OnDataReceived(object? sender, DataEventArgs data)
     {
-        ResponseBytes += data.Count;
-        if (_response is null)
-        {
-            return;
-        }
-
-        if (_response.Length + data.Count > MaxResponseBytes)
-        {
-            _response.Dispose();
-            _response = null;
-            return;
-        }
-
-        _response.Write(data.Buffer, data.Offset, data.Count);
+        Response ??= ResponseBuffer.For(null, null);
+        Response.Append(data.Buffer.AsSpan(data.Offset, data.Count));
     }
 }
