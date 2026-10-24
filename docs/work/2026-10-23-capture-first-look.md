@@ -57,7 +57,21 @@ would lower `cache_read_input_tokens` on every later turn of the thread, which w
 saving. Nobody has measured it. The capture did not record response usage until
 `aip-capture-usage-and-pipeline-latency` added `capture_response`.
 
-### F6 — Prefix caching makes any byte change invalidate everything after it [INFERRED]
+### F6 — Another agent client on this machine re-sends the full history every turn [READ]
+
+A sibling record measured `pi-coding-agent` 1.4.0 with `pi-ai` 1.4.0: the first request carried 2
+messages and the request after one tool call carried 4 (system, user, assistant tool call, tool
+result). The Anthropic adapter marks `cache_control` on the system prompt, the last tool definition
+and the trailing block. The OpenAI adapter sends the full array plus an optional session-based
+`prompt_cache_key`. So the stateless pattern described in F4 is not hypothetical here. For such a
+client every region already sent comes back each turn, and the byte-for-byte rule binds all of them.
+The same record leaves open how widely agents use delta-only, server-side threads. F1 is one such
+case.
+
+**Evidence:** `pi-badger-integration/docs/work/2026-10-23-caching-across-llm-providers.md:29-49`
+(measurement) and `:73-91` (adapters), sibling repository on the owner's machine.
+
+### F7 — Prefix caching makes any byte change invalidate everything after it [INFERRED]
 
 A provider reuses computed attention state only for a prompt prefix identical from token 0, so a
 change at position *k* forces recomputation from *k* onward. Anthropic marks cache breakpoints with
@@ -72,7 +86,8 @@ documentation and are not used here.
 `aip-whole-request-compression-and-retrieval` revision 1 takes these conclusions in:
 - `cache-stability-probe` starts passive. It reads `cache_read_input_tokens` from `capture_response`
   per thread turn before any billed replay. Its replay arm covers stateless calls and the
-  re-sent system prompt, where byte stability is still at stake (F4).
+  re-sent system prompt, where byte stability is still at stake (F4), and history-resending
+  clients such as pi-agent (F6).
 - `scope-design` treats thread mode as the main case: assistant turns are out of scope, new blocks
   are compressed on first send, and the re-sent system prompt and stateless calls keep the
   byte-for-byte rule.
@@ -88,5 +103,5 @@ documentation and are not used here.
   over a few minutes.
 - How `context_management.edits`, sent on every Opus request, changes what the server keeps. Not
   read yet.
-- The provider numbers in F6: check each against the provider's own documentation before quoting
+- The provider numbers in F7: check each against the provider's own documentation before quoting
   them.
