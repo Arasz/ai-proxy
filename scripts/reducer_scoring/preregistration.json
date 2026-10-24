@@ -434,6 +434,21 @@
   0.5,
   2.0
  ],
+ "size_normalized_budget": {
+  "registered": "2026-10-24",
+  "before_any_run": true,
+  "applies_to": "the first harness run after step size-normalized-score of plan aip-reducer-fixes-from-scoring-results; runs before it keep budget_s",
+  "budget_per_kchar_s": 0.04,
+  "budget_per_kchar_sensitivity_s": [
+   0.01,
+   0.04,
+   0.11
+  ],
+  "budget": "budget_per_kchar_s x original_chars / 1000, so latency_score = budget_per_kchar_s / (budget_per_kchar_s + latency_s per 1000 characters)",
+  "kind_pooling": "a kind's score is the equal-weight mean of its payloads' scores; the summed view is reported only as a labelled secondary column",
+  "source": "docs/work/2026-10-24-latency-budget-per-kchar.md: median, p10 and p90 of provider time to first byte per 1,000 request characters, 93 /v1/messages requests through ai-proxy on 2026-10-24",
+  "ruling": "owner, 2026-10-24: score relative to payload size; value accepted as recommended"
+ },
  "gates": {
   "extractive": {
    "candidates": [

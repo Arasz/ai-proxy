@@ -1,6 +1,7 @@
 using System.Net;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
+using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Hosting;
@@ -25,6 +26,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private bool _systemProxySet;
     private SystemProxyMarker? _marker;
     private ISystemProxyGuardSession? _guard;
+    private readonly Func<HttpWebClient, bool> _upstreamClosed;
+    private volatile bool _upstreamStateUnreadable;
 
     /// <summary>Creates the proxy service without changing system settings until started.</summary>
     public TitaniumProxyService(
@@ -43,7 +46,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         IProviderHosts providerHosts,
         ISystemProxyGuardLauncher guardLauncher,
         ILoggerFactory loggerFactory,
-        TimeSpan markerWait)
+        TimeSpan markerWait,
+        Func<HttpWebClient, bool>? upstreamClosed = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(guardLauncher);
@@ -59,6 +63,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _providerHosts = providerHosts;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
+        _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
         Address = new Uri($"http://{options.ListenAddress}:{options.Port}");
     }
 
@@ -79,11 +84,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server.ViaHeaderPseudonym = "";
         _server.BeforeRequest += BeforeRequestAsync;
         _server.BeforeResponse += BeforeResponseAsync;
-        if (_inspector.CapturesResponses)
-        {
-            _server.EnableRequestTimingCapture = true;
-            _server.AfterResponse += AfterResponseAsync;
-        }
+        _server.AfterResponse += AfterResponseAsync;
+        _server.EnableRequestTimingCapture = _inspector.CapturesResponses;
 
         PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
@@ -285,7 +287,51 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private Task BeforeResponseAsync(object sender, SessionEventArgs e) => _inspector.BeforeResponseAsync(sender, e);
 
-    private Task AfterResponseAsync(object sender, SessionEventArgs e) => _inspector.AfterResponseAsync(sender, e);
+    private async Task AfterResponseAsync(object sender, SessionEventArgs e)
+    {
+        if (_inspector.CapturesResponses)
+        {
+            await _inspector.AfterResponseAsync(sender, e);
+        }
+
+        CloseClientAfterUpstreamClosed(e);
+    }
+
+    /// <summary>
+    /// Ends the client connection once the upstream one has closed. Titanium reads a chunked body
+    /// that stops between chunks as complete and keeps the client waiting for the next chunk.
+    /// </summary>
+    private void CloseClientAfterUpstreamClosed(SessionEventArgs e)
+    {
+        if (_upstreamStateUnreadable)
+        {
+            return;
+        }
+
+        bool closed;
+        try
+        {
+            closed = _upstreamClosed(e.HttpClient);
+        }
+        catch (MissingMemberException exception)
+        {
+            _upstreamStateUnreadable = true;
+            Log.UpstreamStateUnreadable(_logger, exception);
+            return;
+        }
+
+        if (!closed)
+        {
+            return;
+        }
+
+        if (e.HttpClient.Response.IsChunked)
+        {
+            Log.UpstreamClosedMidStream(_logger, e.HttpClient.Request.RequestUri.Host);
+        }
+
+        e.TerminateSession();
+    }
 
     private Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
     {
@@ -312,5 +358,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         [LoggerMessage(EventId = 1305, Level = LogLevel.Error, Message = "The system proxy could not be restored; the marker stays, so the guard or the next start clears it")]
         public static partial void RestoreFailed(ILogger logger, Exception exception);
+
+        [LoggerMessage(EventId = 1306, Level = LogLevel.Warning, Message = "The upstream {ProviderHost} closed its connection before the end of a chunked response; closing the client connection so the client sees the failure")]
+        public static partial void UpstreamClosedMidStream(ILogger logger, string providerHost);
+
+        [LoggerMessage(EventId = 1307, Level = LogLevel.Error, Message = "Titanium's upstream connection state could not be read; a client whose upstream drops a chunked response now waits until its own timeout")]
+        public static partial void UpstreamStateUnreadable(ILogger logger, Exception exception);
     }
 }
