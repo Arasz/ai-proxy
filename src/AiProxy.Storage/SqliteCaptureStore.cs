@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using AiProxy.Core.Capture;
 using Dapper;
 
@@ -5,8 +7,9 @@ namespace AiProxy.Storage;
 
 /// <summary>Keeps captured provider requests in their own SQLite file, readable by the user only.</summary>
 /// <remarks>
-/// The table holds the body and where it was sent, and has no column for headers or the query
-/// string, so a credential the client sent with the request has nowhere to land.
+/// The request table holds the body and where it was sent, and the response table holds only
+/// numbers; neither has a column for headers, the query string or the response body, so a
+/// credential or a model's answer has nowhere to land.
 /// </remarks>
 public sealed class SqliteCaptureStore : IRequestCaptureStore
 {
@@ -22,11 +25,34 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
             path        TEXT NOT NULL,
             body        BLOB NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS capture_response (
+            request_id                  TEXT PRIMARY KEY,
+            completed_at                TEXT NOT NULL,
+            status                      INTEGER,
+            request_bytes               INTEGER,
+            forwarded_bytes             INTEGER,
+            response_bytes              INTEGER,
+            input_tokens                INTEGER,
+            output_tokens               INTEGER,
+            cache_creation_input_tokens INTEGER,
+            cache_read_input_tokens     INTEGER,
+            usage_error                 TEXT,
+            stages                      TEXT NOT NULL
+        );
         """;
 
     private const string Insert = """
         INSERT INTO capture_request (request_id, captured_at, provider, host, path, body)
         VALUES (@RequestId, @CapturedAt, @Provider, @Host, @Path, @Body);
+        """;
+
+    private const string InsertResponse = """
+        INSERT INTO capture_response (
+            request_id, completed_at, status, request_bytes, forwarded_bytes, response_bytes,
+            input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usage_error, stages)
+        VALUES (
+            @RequestId, @CompletedAt, @StatusCode, @RequestBytes, @ForwardedBytes, @ResponseBytes,
+            @InputTokens, @OutputTokens, @CacheCreationInputTokens, @CacheReadInputTokens, @UsageError, @Stages);
         """;
 
     private const UnixFileMode UserOnlyDirectory = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
@@ -68,7 +94,57 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    /// <summary>Creates the directory and the file user-only before SQLite writes a byte, then the table.</summary>
+    /// <inheritdoc />
+    public async ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        if (!_prepared)
+        {
+            Prepare();
+        }
+
+        await using var connection = ContentSchema.Open(_databasePath);
+        await connection.ExecuteAsync(new CommandDefinition(
+            InsertResponse,
+            new
+            {
+                response.RequestId,
+                CompletedAt = response.CompletedAt.ToString("O"),
+                response.StatusCode,
+                response.RequestBytes,
+                response.ForwardedBytes,
+                response.ResponseBytes,
+                response.Usage?.InputTokens,
+                response.Usage?.OutputTokens,
+                response.Usage?.CacheCreationInputTokens,
+                response.Usage?.CacheReadInputTokens,
+                response.UsageError,
+                Stages = StagesJson(response.Stages),
+            },
+            commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>The stages as one JSON object of whole microseconds, in the order they ran.</summary>
+    private static string StagesJson(IReadOnlyList<StageTiming> stages)
+    {
+        using var buffer = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            foreach (var stage in stages)
+            {
+                writer.WriteNumber(stage.Name, (long)stage.Elapsed.TotalMicroseconds);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    /// <summary>Creates the directory and the file user-only before SQLite writes a byte, then the tables.</summary>
     /// <remarks>SQLite gives the journal and WAL files the mode of the database file.</remarks>
     private void Prepare()
     {

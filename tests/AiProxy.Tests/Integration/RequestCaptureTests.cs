@@ -280,6 +280,9 @@ public class RequestCaptureTests : IDisposable
     {
         public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken) =>
             throw new IOException("disk full");
+
+        public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken) =>
+            throw new IOException("disk full");
     }
 
     private sealed record LogEntry(string Category, LogLevel Level, int EventId, string Message, Exception? Exception);
