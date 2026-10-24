@@ -83,8 +83,8 @@ cannot be read they are empty and `usage_error` says why:
 | `truncated` | A stream ended inside an event. The counts read before it are kept, so the output count may be the early one from `message_start`. |
 
 An upstream that drops a stream midway still gets a row, with the bytes that passed and
-`truncated` or the usage read so far. The client is left waiting until its own timeout in that
-case, with capture off as well; that is Titanium's handling of the dropped connection.
+`truncated` or the usage read so far. The client connection is then closed, so the client sees
+the failure at once, with capture off as well.
 
 The row is written once the client has the whole response, in Titanium's `AfterResponse` step.
 On a keep-alive connection that step can delay the next request on the same connection by one

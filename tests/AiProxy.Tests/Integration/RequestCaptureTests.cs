@@ -573,7 +573,7 @@ public sealed class RequestCaptureTests : IDisposable
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
-            // Titanium leaves the client waiting until its own timeout, with capture off as well; the row is what is tested here.
+            // The client sees the drop as a failure; UpstreamDropTests covers that, the row is what is tested here.
         }
 
         var row = Assert.Single(await ReadResponsesAsync(proxy));
