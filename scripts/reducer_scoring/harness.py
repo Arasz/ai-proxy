@@ -224,6 +224,18 @@ def _table(rows: list[dict], label: str) -> str:
     return head + "\n".join(lines) + "\n"
 
 
+def _markdown(built: dict) -> str:
+    verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
+    j = built["judge"]
+    judge_line = ("judge: " + ("; ".join(j["void"]) + ", so the relaxed view is graded by fact only" if j["void"] else
+                  f"{j['decoys_accepted']}/{j['decoys']} decoys accepted, "
+                  f"{j['summarizer_accepted']}/{j['summarizer_lost']} summarizer losses accepted"))
+    return f"{verdict}\n\n{judge_line}\n\nsizes: {built['token_method']}\n\n{json.dumps(built['environment'])}" \
+           f"\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \
+           f"\n## Per kind, untouched payloads counted as nothing removed\n\n{_table(built['kinds_counted'], 'kind')}" \
+           f"\n## Per payload\n\n{_table(built['payloads'], 'payload')}"
+
+
 def report(out: Path) -> None:
     records = {p.stem: [json.loads(line) for line in p.open(encoding="utf-8")] for p in sorted(out.glob("*.jsonl"))}
     recorded = out / "environment.json"
@@ -232,14 +244,7 @@ def report(out: Path) -> None:
     judge = accepted([json.loads(line) for line in judge_path.open(encoding="utf-8")]) if judge_path.exists() else None
     built = build_report(load(), records, judge=judge) | {"environment": {c: environments.get(c, "not recorded") for c in records}}
     (out / "report.json").write_text(json.dumps(built, indent=1) + "\n", encoding="utf-8")
-    verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
-    j = built["judge"]
-    judge_line = ("judge: " + ("; ".join(j["void"]) + ", so the relaxed view is graded by fact only" if j["void"] else
-                  f"{j['decoys_accepted']}/{j['decoys']} decoys accepted, "
-                  f"{j['summarizer_accepted']}/{j['summarizer_lost']} summarizer losses accepted"))
-    md = f"{verdict}\n\n{judge_line}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \
-         f"\n## Per kind, untouched payloads counted as nothing removed\n\n{_table(built['kinds_counted'], 'kind')}" \
-         f"\n## Per payload\n\n{_table(built['payloads'], 'payload')}"
+    md = _markdown(built)
     (out / "report.md").write_text(md, encoding="utf-8")
     print(md)
 

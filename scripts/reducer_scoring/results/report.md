@@ -2,6 +2,8 @@ controls clear the run
 
 judge: 0/239 decoys accepted, 23/199 summarizer losses accepted
 
+sizes: estimated: 2.8916 chars/token from 116 stateless claude requests (claude-sonnet-5 76, claude-haiku-5-5 29, claude-opus-5-5 6, claude-sonnet-5-5 3, claude-haiku-4-5-20251001 2; 2026-10-24 to 2026-10-24), holdout median error 2.2%
+
 {"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest_checked": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "e4b2b82", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
 
 ## Per kind

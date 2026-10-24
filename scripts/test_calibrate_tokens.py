@@ -55,6 +55,16 @@ class FitTests(unittest.TestCase):
         noisy = select([row(1000, 1.0 + (i % 5)) for i in range(40)])
         self.assertGreater(holdout_error(noisy), 0.1)
 
+    def test_fit_is_the_median_so_one_outlier_does_not_move_it(self):
+        samples = select([row(5000, 3.2) for _ in range(9)] + [row(5000, 0.5)])
+        self.assertAlmostEqual(fit_ratio(samples), 3.2, delta=0.032)
+
+    def test_holdout_predicts_each_fold_from_the_other_folds_only(self):
+        # One row per fold, ratios 2, 2, 3, 4, 4: holdout errors are 3/7, 3/7, 0, 0.6, 0.6, so the
+        # median is 3/7; an in-sample fit (ratio 3) would give 1/3.
+        samples = select([row(100_000, r) for r in (2.0, 2.0, 3.0, 4.0, 4.0)])
+        self.assertAlmostEqual(holdout_error(samples, folds=5), 3 / 7, delta=0.005)
+
 
 if __name__ == "__main__":
     unittest.main()

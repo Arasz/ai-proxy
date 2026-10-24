@@ -133,6 +133,12 @@ with {0.0064, 0.015, 0.056} as the sensitivity set, in `size_normalized_budget` 
 2026-10-24, before any run used it. The p90 is lenient to slow reducers, and model reducers
 still score near zero.
 
+The two sides of this score are not the same kind of token. The budget comes from
+provider-counted tokens of whole requests, most of them cache reads. A reducer's cost is per
+estimated token of one raw payload, whose absolute error is unknown (calibration record F7). The
+ranking holds, since rule and model reducers differ by three orders of magnitude, but a
+reducer near the budget should not be judged on this score alone.
+
 ## Still open
 
 - F3 is one day of traffic, mostly one client in thread mode. The median moves with the size mix;

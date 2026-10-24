@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from harness import _fields, _table, build_report, run
+from harness import _fields, _markdown, _table, build_report, run
 from compression_score import Measurement  # noqa: E402  (harness puts scripts/ on the path)
 from scoring import Row
 import tokens  # noqa: E402
@@ -87,10 +87,18 @@ class TokenSizeTests(unittest.TestCase):
     def test_the_report_names_how_tokens_were_estimated(self):
         self.assertEqual(report()["token_method"], tokens.METHOD)
 
+    def test_the_markdown_report_names_how_tokens_were_estimated(self):
+        self.assertIn(f"sizes: {tokens.METHOD}", _markdown(report() | {"environment": {}}))
+
     def test_saved_added_chars_are_converted_to_tokens(self):
         recs = {"shipped_rules": [r | {"added_chars": 300} for r in runs("c", KEPT)]}
         counted = next(r for r in report(recs)["payloads"] if r["payload"] == "c")
         self.assertEqual(counted["reduced_tokens"], tokens.estimate(KEPT) + tokens.from_chars(300))
+
+    def test_added_tokens_from_a_new_run_are_counted_as_recorded(self):
+        recs = {"shipped_rules": [r | {"added_tokens": 100} for r in runs("c", KEPT)]}
+        counted = next(r for r in report(recs)["payloads"] if r["payload"] == "c")
+        self.assertEqual(counted["reduced_tokens"], tokens.estimate(KEPT) + 100)
 
 
 class KindAndScoreTests(unittest.TestCase):
