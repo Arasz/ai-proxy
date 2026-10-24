@@ -323,3 +323,27 @@ Because every size is one ratio away from its character figure, compression rati
 within 0.003 of the character figures (largest difference over all rows); the tool definition rtk adds has a token
 estimate that rounds on its own. The token figures matter for the next step: the latency budget is
 per 1,000 tokens, not per 1,000 characters.
+
+## Amendment 2026-10-24: log reducer keeps every value
+
+`LogCompressionHandler` no longer drops the lines that carry no signal. Exact repeats are dropped
+first. A line that repeats an earlier line's shape (its tokens with values masked, `key=` kept) is
+then shortened to its `key=value` tokens and the other tokens that changed from the first line of
+that shape; signal lines and the first line of each shape stay whole. Keeping every pair, not only
+the changed ones, keeps a row readable when rows of different shapes interleave. The output is still words of the input in order. Only `shipped_rules` was re-run
+(`python3 scripts/reducer_scoring/harness.py run shipped_rules`, then `report`).
+
+| payload | before | after |
+|---|---|---|
+| `rtk_proxy_log` | 89.4% removed, 1/5 answers | 34.0% removed (1978 to 1305 tokens), 5/5 answers, score 0.51 |
+| `agent_log` | 25.0% removed, 8/8 answers | 3.2% removed (875 to 847 tokens), 8/8 answers, score 0.06 |
+| log kind | 69.7% removed, 9/13, score 0 | 24.6% removed (2853 to 2152 tokens), 13/13, score 0.39 |
+
+The price is compression on `agent_log`: its INFO lines were dropped before and are kept now, and
+most of them differ in several fields, so shortening saves little. The kind score rises from 0
+because retention moved above the floor. A log of free-text lines with no repeated shape would get
+almost nothing removed; no scored payload is like that.
+
+**Evidence:** `results/shipped_rules.jsonl`, the `log` rows of `results/report.json`, and
+`tests/AiProxy.Tests/Unit/Content/Handlers/ScoredLogPayloadTests.cs` (red on the four lost answers
+before the change).
