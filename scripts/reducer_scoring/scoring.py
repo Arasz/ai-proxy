@@ -25,12 +25,18 @@ class ReducerRun:
 
 @dataclass(frozen=True)
 class QaRun:
-    """One run of an abstractive candidate: its output, its latency, and the reader's replies per question."""
+    """One run of an abstractive candidate: its output, its latency, and the reader's replies per question.
+
+    added_tokens is what the candidate sent outside its output; fetched_tokens is the original the reader
+    retrieved, which is not a saving.
+    """
 
     output: str
     latency_s: float
     replies: list[list[str]]
     judged: frozenset[str] = frozenset()
+    added_tokens: int = 0
+    fetched_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -80,7 +86,8 @@ def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun],
 def qa_row(original: str, questions: list[dict], runs: list[QaRun], match=answered) -> Row:
     """QA retention: an answer is kept when the reader, given the candidate's output, still finds it."""
     kept = [qa_kept(run.replies, questions, match, run.judged) for run in runs]
-    return _median_row(original, len(questions), [estimate(r.output) for r in runs], [r.latency_s for r in runs], kept)
+    lengths = [estimate(r.output) + r.added_tokens + r.fetched_tokens for r in runs]
+    return _median_row(original, len(questions), lengths, [r.latency_s for r in runs], kept)
 
 
 def kind_row(rows: list[Row]) -> Row:

@@ -28,9 +28,9 @@ DIGESTS = {
 }
 
 
-def command(system: str, effort: str | None = None) -> list[str]:
-    """The isolated call: Haiku, no tools, no settings, no MCP servers, no saved session."""
-    return ["claude", "-p", "--model", MODEL, "--tools", "", "--setting-sources", "",
+def command(system: str, effort: str | None = None, model: str = MODEL) -> list[str]:
+    """The isolated call: the model (Haiku by default), no tools, no settings, no MCP servers, no saved session."""
+    return ["claude", "-p", "--model", model, "--tools", "", "--setting-sources", "",
             "--strict-mcp-config", "--no-session-persistence", "--system-prompt", system,
             "--output-format", "json", *(["--effort", effort] if effort else [])]
 
