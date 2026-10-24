@@ -60,9 +60,12 @@ def _median_row(original: str, total: int, lengths: list[int], latencies: list[f
     ))
 
 
-def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun]) -> Row:
-    """Verbatim retention: an answer is kept when it still appears in the candidate's output."""
-    if all(run.output == original for run in runs):
+def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun], count_untouched: bool = False) -> Row:
+    """Verbatim retention: an answer is kept when it still appears in the candidate's output.
+
+    Untouched output is n/a, as pre-registered, unless count_untouched measures it as nothing removed.
+    """
+    if not count_untouched and all(run.output == original for run in runs):
         return Row(None, not_applicable=True)
     kept = [sum(answered(run.output, q["a"]) for q in questions) for run in runs]
     lengths = [len(r.output) + r.added_chars for r in runs]

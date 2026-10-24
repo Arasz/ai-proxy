@@ -48,6 +48,12 @@ class ExtractiveRowTests(unittest.TestCase):
         reduced = extractive_row(ORIGINAL, QUESTIONS, runs).measurement.reduced_chars
         self.assertEqual(reduced, len("Dana Okonkwo PR 8842") + 400)
 
+    def test_counting_untouched_output_measures_it_as_nothing_removed(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, added_chars=5)] * 3,
+                             count_untouched=True)
+        self.assertFalse(row.not_applicable)
+        self.assertEqual((row.measurement.reduced_chars, row.measurement.answers_kept), (len(ORIGINAL) + 5, 2))
+
     def test_latency_and_length_are_medians_over_runs(self):
         runs = [ReducerRun("Dana Okonkwo PR 8842", 0.9),
                 ReducerRun("Dana Okonkwo PR 8842 xx", 0.1),

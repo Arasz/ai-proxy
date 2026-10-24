@@ -22,32 +22,37 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 });
 builder.Logging.ClearProviders();
 
-await using var app = ProxyApplication.Create(builder);
-var pipeline = app.Services.GetRequiredService<ICompressionPipeline>();
-
-foreach (var name in args.Skip(2))
+try
 {
-    var text = await File.ReadAllTextAsync(Path.Combine(payloads, name + ".txt"), new UTF8Encoding(false));
-    var body = Encoding.UTF8.GetBytes(Request(text));
-    await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Anthropic), CancellationToken.None);
+    await using var app = ProxyApplication.Create(builder);
+    var pipeline = app.Services.GetRequiredService<ICompressionPipeline>();
 
-    for (var run = 0; run < runs; run++)
+    foreach (var name in args.Skip(2))
     {
-        var watch = Stopwatch.StartNew();
-        var result = await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Anthropic), CancellationToken.None);
-        watch.Stop();
-        Console.WriteLine(JsonSerializer.Serialize(new
+        var text = await File.ReadAllTextAsync(Path.Combine(payloads, name + ".txt"), new UTF8Encoding(false));
+        var body = Encoding.UTF8.GetBytes(Request(text));
+        await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Anthropic), CancellationToken.None);
+
+        for (var run = 0; run < runs; run++)
         {
-            payload = name,
-            run,
-            output = ToolResultText(result.Body.Span),
-            latency_s = watch.Elapsed.TotalSeconds,
-            failures = result.PartFailures.Count,
-        }));
+            var watch = Stopwatch.StartNew();
+            var result = await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Anthropic), CancellationToken.None);
+            watch.Stop();
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                payload = name,
+                run,
+                output = ToolResultText(result.Body.Span),
+                latency_s = watch.Elapsed.TotalSeconds,
+                failures = result.PartFailures.Count,
+            }));
+        }
     }
 }
-
-store.Delete(recursive: true);
+finally
+{
+    store.Delete(recursive: true);
+}
 
 static string Request(string toolOutput) => new JsonObject
 {

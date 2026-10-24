@@ -48,33 +48,35 @@ def _fields(candidate: str, row: Row, prereg: dict) -> dict:
 def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_text) -> dict:
     """Per payload and per kind rows for every candidate that has records, plus the void verdict."""
     extractive = set(prereg["gates"]["extractive"]["candidates"])
-    payload_rows, kind_rows, by_candidate = [], [], {}
+    payload_rows, kind_rows, counted_rows, by_candidate = [], [], [], {}
     for candidate, lines in records.items():
-        rows = {}
+        rows, counted = {}, {}
         for name, payload in prereg["payloads"].items():
             mine = sorted((r for r in lines if r["payload"] == name), key=lambda r: r["run"])
             if not mine:
                 continue
             original = text_of(name)
             if candidate in extractive:
-                rows[name] = extractive_row(original, payload["questions"],
-                                            [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0)) for r in mine])
+                reducer_runs = [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0)) for r in mine]
+                rows[name] = extractive_row(original, payload["questions"], reducer_runs)
+                counted[name] = extractive_row(original, payload["questions"], reducer_runs, count_untouched=True)
             else:
-                rows[name] = qa_row(original, payload["questions"],
-                                    [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine])
+                rows[name] = counted[name] = qa_row(original, payload["questions"],
+                                                    [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine])
             payload_rows.append(_fields(candidate, rows[name], prereg) | {"payload": name, "kind": payload["kind"]})
         by_candidate[candidate] = rows
         kinds = dict.fromkeys(prereg["payloads"][n]["kind"] for n in rows)
         for kind in kinds:
-            pooled = kind_row([row for n, row in rows.items() if prereg["payloads"][n]["kind"] == kind])
-            kind_rows.append(_fields(candidate, pooled, prereg) | {"kind": kind})
+            for view, target in ((rows, kind_rows), (counted, counted_rows)):
+                pooled = kind_row([row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind])
+                target.append(_fields(candidate, pooled, prereg) | {"kind": kind})
     void = _incomplete(prereg, records)
     for control in ("identity", "summarizer_control"):
         if control not in by_candidate:
             void.append(f"{control} did not run, so the controls cannot clear the run")
     if not void:
         void = void_reasons(by_candidate["identity"], by_candidate["summarizer_control"])
-    return {"payloads": payload_rows, "kinds": kind_rows, "void": void}
+    return {"payloads": payload_rows, "kinds": kind_rows, "kinds_counted": counted_rows, "void": void}
 
 
 def _incomplete(prereg: dict, records: dict[str, list[dict]]) -> list[str]:
@@ -161,6 +163,7 @@ def report(out: Path) -> None:
     (out / "report.json").write_text(json.dumps(built, indent=1) + "\n", encoding="utf-8")
     verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
     md = f"{verdict}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \
+         f"\n## Per kind, untouched payloads counted as nothing removed\n\n{_table(built['kinds_counted'], 'kind')}" \
          f"\n## Per payload\n\n{_table(built['payloads'], 'payload')}"
     (out / "report.md").write_text(md, encoding="utf-8")
     print(md)

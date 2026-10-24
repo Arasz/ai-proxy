@@ -85,6 +85,25 @@ class KindAndScoreTests(unittest.TestCase):
         self.assertGreater(build["score_at"]["2.0"], build["score_at"]["0.5"])
 
 
+class CountedViewTests(unittest.TestCase):
+    def test_an_untouched_payload_counts_as_nothing_removed_in_the_counted_view(self):
+        counted = next(r for r in report()["kinds_counted"] if r["candidate"] == "shipped_rules" and r["kind"] == "prose")
+        self.assertFalse(counted["not_applicable"])
+        self.assertEqual(counted["original_chars"], len(TEXTS["a"]) + len(TEXTS["b"]))
+        self.assertEqual(counted["reduced_chars"], len(KEPT) + len(TEXTS["b"]))
+
+    def test_the_pre_registered_view_still_leaves_it_out(self):
+        self.assertEqual(kind(report(), "shipped_rules", "prose")["original_chars"], len(TEXTS["a"]))
+
+    def test_a_kind_with_only_untouched_payloads_scores_zero_in_the_counted_view(self):
+        recs = records()
+        recs["shipped_rules"] = [r | {"output": TEXTS[r["payload"]]} if r["payload"] == "c" else r
+                                 for r in recs["shipped_rules"]]
+        counted = next(r for r in report(recs)["kinds_counted"]
+                       if r["candidate"] == "shipped_rules" and r["kind"] == "build")
+        self.assertEqual((counted["not_applicable"], counted["score"]), (False, 0.0))
+
+
 class VoidTests(unittest.TestCase):
     def test_a_clean_run_stands(self):
         self.assertEqual(report()["void"], [])
