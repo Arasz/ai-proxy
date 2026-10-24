@@ -82,6 +82,17 @@ class GradingTests(unittest.TestCase):
         self.assertEqual(len(scores), 2)
         self.assertAlmostEqual(kind(built, "shipped_rules", "prose")["size_score"], sum(scores) / 2, places=4)
 
+    def test_each_sensitivity_budget_gets_its_own_size_score(self):
+        row = next(p for p in report()["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "c")
+        self.assertEqual(set(row["size_score_at"]), {"0.0064", "0.015", "0.056"})
+        self.assertLess(row["size_score_at"]["0.0064"], row["size_score_at"]["0.056"])
+        self.assertEqual(row["size_score_at"]["0.056"], row["size_score"])
+
+    def test_a_not_applicable_payload_stays_out_of_its_kinds_size_score(self):
+        built = report()
+        a = next(p for p in built["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "a")
+        self.assertAlmostEqual(kind(built, "shipped_rules", "prose")["size_score"], a["size_score"], places=4)
+
     def test_the_size_budget_comes_from_the_preregistration(self):
         tight = {**PREREG, "size_normalized_budget": {"budget_per_ktoken_s": 0.0001, "budget_per_ktoken_sensitivity_s": [0.0001]}}
         loose = build_report(PREREG, records(), TEXTS.__getitem__)
