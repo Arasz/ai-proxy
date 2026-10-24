@@ -1,18 +1,15 @@
 using System.Text.Json;
-using AiProxy.Core.Content.Code;
 using AiProxy.Code;
+using AiProxy.Core.Content.Code;
 
-namespace AiProxy.Tools.CodeReducerCore;
+namespace CodeReducerCore;
 
-/// <summary>Runs the offline JSON adapter for a caller-supplied code read view.</summary>
+/// <summary>Runs the offline JSON adapter for a caller-supplied code-read view.</summary>
 public sealed class CodeReducerCommand
 {
     /// <summary>Reads one request and writes a reduced view, or a diagnostic with a nonzero result.</summary>
-    public async Task<int> RunAsync(TextReader input, TextWriter output, TextWriter error)
+    public static async Task<int> RunAsync(TextReader input, TextWriter output, TextWriter error)
     {
-        ArgumentNullException.ThrowIfNull(input);
-        ArgumentNullException.ThrowIfNull(output);
-        ArgumentNullException.ThrowIfNull(error);
         try
         {
             using var document = JsonDocument.Parse(await input.ReadToEndAsync().ConfigureAwait(false));
@@ -22,8 +19,8 @@ public sealed class CodeReducerCommand
             var path = root.TryGetProperty("filePath", out var filePath) ? filePath.GetString() : null;
             var hint = root.TryGetProperty("retrievalHint", out var retrievalHint) ? retrievalHint.GetString() : null;
             var options = new CodeReductionOptions(
-                root.TryGetProperty("removeComments", out var removeComments) ? removeComments.GetBoolean() : true,
-                root.TryGetProperty("removeImports", out var removeImports) ? removeImports.GetBoolean() : true,
+                !root.TryGetProperty("removeComments", out var removeComments) || removeComments.GetBoolean(),
+                !root.TryGetProperty("removeImports", out var removeImports) || removeImports.GetBoolean(),
                 root.TryGetProperty("renameIdentifiers", out var renameIdentifiers) && renameIdentifiers.GetBoolean());
             var result = new CodeReducer(new CSharpCodeLexer()).Reduce(text, path, options, hint);
             await output.WriteLineAsync(JsonSerializer.Serialize(new { text = result.Text, changed = result.Changed, supported = result.Supported })).ConfigureAwait(false);

@@ -5,37 +5,6 @@ namespace AiProxy.Storage;
 /// <summary>The tables the store keeps, and the connections it opens.</summary>
 public static class ContentSchema
 {
-    /// <summary>The statements that make the database ready to use.</summary>
-    private const string Statements = """
-                                      CREATE TABLE IF NOT EXISTS content_request (
-                                          request_id  TEXT PRIMARY KEY,
-                                          created_at  TEXT NOT NULL,
-                                          original    TEXT NOT NULL,
-                                          compressed  TEXT NOT NULL,
-                                          ratio       REAL NOT NULL,
-                                          path        TEXT NOT NULL,
-                                          chunk_count INTEGER NOT NULL
-                                      );
-
-                                      CREATE TABLE IF NOT EXISTS content_chunk (
-                                          request_id      TEXT NOT NULL,
-                                          chunk_id        INTEGER NOT NULL,
-                                          content_type    TEXT NOT NULL,
-                                          original_text   TEXT NOT NULL,
-                                          compressed_text TEXT NOT NULL,
-                                          path            TEXT NOT NULL,
-                                          ratio           REAL NOT NULL,
-                                          PRIMARY KEY (request_id, chunk_id)
-                                      );
-
-                                      CREATE TABLE IF NOT EXISTS content_queue (
-                                          job_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-                                          request_id TEXT NOT NULL,
-                                          created_at TEXT NOT NULL,
-                                          payload    TEXT NOT NULL
-                                      );
-                                      """;
-
     /// <summary>How long a command waits for the write lock, in seconds.</summary>
     private const int DefaultCommandTimeoutSeconds = 30;
 
@@ -49,6 +18,16 @@ public static class ContentSchema
 
     /// <summary>Opens a connection with the settings the store needs.</summary>
     /// <param name="path">The path of the database file.</param>
+    /// <remarks>
+    /// There is no busy timeout pragma here on purpose. The managed stack sets the
+    /// busy handler from the timeout of the command that runs, so a pragma on the
+    /// connection is overridden by every command and only says what it does not do.
+    /// The wait is bounded by the command timeout instead, and the two paths that
+    /// write set it to the bound they need.
+    /// The journal mode is a property of the file, so it is set when the file is not
+    /// in it yet and left alone after that. Setting it again is a write, and a write
+    /// moves the change counter that the worker's poll reads.
+    /// </remarks>
     public static SqliteConnection Open(string path)
     {
         var builder = new SqliteConnectionStringBuilder
@@ -61,23 +40,12 @@ public static class ContentSchema
         var connection = new SqliteConnection(builder.ToString());
         connection.Open();
 
-        // There is no busy timeout pragma here on purpose. The managed stack sets the
-        // busy handler from the timeout of the command that runs, so a pragma on the
-        // connection is overridden by every command and only says what it does not do.
-        // The wait is bounded by the command timeout instead, and the two paths that
-        // write set it to the bound they need.
-
-        // The journal mode is a property of the file, so it is set when the file is not
-        // in it yet and left alone after that. Setting it again is a write, and a write
-        // moves the change counter that the worker's poll reads.
-        using (var command = connection.CreateCommand())
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode;";
+        var mode = Convert.ToString(command.ExecuteScalar());
+        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
         {
-            command.CommandText = "PRAGMA journal_mode;";
-            var mode = Convert.ToString(command.ExecuteScalar());
-            if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
-            {
-                Execute(connection, "PRAGMA journal_mode = WAL;");
-            }
+            connection.Execute("PRAGMA journal_mode = WAL;");
         }
 
         return connection;
@@ -86,42 +54,76 @@ public static class ContentSchema
     /// <summary>The version of the schema this build writes.</summary>
     private const int SchemaVersion = 1;
 
-    /// <summary>Makes the tables, when they are not there yet.</summary>
-    /// <remarks>
-    /// The check is a read of the file's user version, and not a run of the create
-    /// statements on every connection. The create statements take a write lock, and a
-    /// write moves the change counter that the worker's poll reads, so running them on
-    /// every read would make the poll read every time and defeat the gate.
-    /// </remarks>
     /// <param name="connection">The connection to prepare.</param>
-    /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
-    public static void Ensure(SqliteConnection connection, int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
+    extension(SqliteConnection connection)
     {
-        ArgumentNullException.ThrowIfNull(connection);
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version;";
-        var version = Convert.ToInt64(command.ExecuteScalar());
-        if (version >= SchemaVersion)
+        /// <summary>Makes the tables when they are not there yet.</summary>
+        /// <remarks>
+        /// The check is a read of the file's user version, and not a run of the create
+        /// statements on every connection. The create statements take a write lock, and a
+        /// write moves the change counter that the worker's poll reads, so running them on
+        /// every read would make the poll read every time and defeat the gate.
+        /// </remarks>
+        /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
+        public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-            return;
+            ArgumentNullException.ThrowIfNull(connection);
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version;";
+            var version = Convert.ToInt64(command.ExecuteScalar());
+            if (version >= SchemaVersion)
+            {
+                return;
+            }
+
+            connection.Execute(Sql.Statements, commandTimeoutSeconds);
+            connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
         }
 
-        Execute(connection, Statements, commandTimeoutSeconds);
-        Execute(connection, $"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
+        /// <summary>Runs a statement that returns nothing.</summary>
+        /// <param name="statement">The statement to run.</param>
+        /// <param name="commandTimeoutSeconds">How long the statement waits for the write lock.</param>
+        public void Execute(string statement, int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = statement;
+            command.CommandTimeout = commandTimeoutSeconds;
+            command.ExecuteNonQuery();
+        }
     }
 
-    /// <summary>Runs a statement that returns nothing.</summary>
-    /// <param name="connection">The connection to run it on.</param>
-    /// <param name="statement">The statement to run.</param>
-    /// <param name="commandTimeoutSeconds">How long the statement waits for the write lock.</param>
-    public static void Execute(SqliteConnection connection, string statement, int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
+    private static class Sql
     {
-        ArgumentNullException.ThrowIfNull(connection);
+        /// <summary>The statements that make the database ready to use.</summary>
+        public const string Statements = """
+                                          CREATE TABLE IF NOT EXISTS content_request (
+                                              request_id  TEXT PRIMARY KEY,
+                                              created_at  TEXT NOT NULL,
+                                              original    TEXT NOT NULL,
+                                              compressed  TEXT NOT NULL,
+                                              ratio       REAL NOT NULL,
+                                              path        TEXT NOT NULL,
+                                              chunk_count INTEGER NOT NULL
+                                          );
 
-        using var command = connection.CreateCommand();
-        command.CommandText = statement;
-        command.CommandTimeout = commandTimeoutSeconds;
-        command.ExecuteNonQuery();
+                                          CREATE TABLE IF NOT EXISTS content_chunk (
+                                              request_id      TEXT NOT NULL,
+                                              chunk_id        INTEGER NOT NULL,
+                                              content_type    TEXT NOT NULL,
+                                              original_text   TEXT NOT NULL,
+                                              compressed_text TEXT NOT NULL,
+                                              path            TEXT NOT NULL,
+                                              ratio           REAL NOT NULL,
+                                              PRIMARY KEY (request_id, chunk_id)
+                                          );
+
+                                          CREATE TABLE IF NOT EXISTS content_queue (
+                                              job_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                                              request_id TEXT NOT NULL,
+                                              created_at TEXT NOT NULL,
+                                              payload    TEXT NOT NULL
+                                          );
+                                          """;
     }
 }

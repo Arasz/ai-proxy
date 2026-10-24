@@ -1,3 +1,3 @@
-using AiProxy.Tools.CodeReducerCore;
+using CodeReducerCore;
 
-return await new CodeReducerCommand().RunAsync(Console.In, Console.Out, Console.Error);
+return await CodeReducerCommand.RunAsync(Console.In, Console.Out, Console.Error);

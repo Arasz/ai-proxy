@@ -1,5 +1,5 @@
 using System.Text.Json;
-using AiProxy.Tools.CodeReducerCore;
+using CodeReducerCore;
 
 namespace AiProxy.Tests.Unit.Content.CodeAdapter;
 
@@ -12,7 +12,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.NotEqual(0, exit);
         Assert.Equal("", output.ToString());
@@ -27,7 +27,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.Equal(0, exit);
         Assert.Equal("", error.ToString());
@@ -58,7 +58,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.NotEqual(0, exit);
         Assert.Equal("", output.ToString());
@@ -78,7 +78,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.Equal(0, exit);
         Assert.Equal("", error.ToString());
@@ -105,7 +105,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.Equal(0, exit);
         Assert.Equal("", error.ToString());
@@ -122,7 +122,7 @@ public sealed class CodeAdapterTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = await new CodeReducerCommand().RunAsync(input, output, error);
+        var exit = await CodeReducerCommand.RunAsync(input, output, error);
 
         Assert.Equal(0, exit);
         using var document = JsonDocument.Parse(output.ToString());

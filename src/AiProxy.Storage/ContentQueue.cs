@@ -38,23 +38,14 @@ public sealed record ContentJob(long JobId, ContentRecord Record);
 /// because the pragma that tells it whether anything changed does not move for a
 /// connection's own commits.
 /// </remarks>
-public sealed class ContentQueue : IContentQueue
+public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         Converters = { new JsonStringEnumConverter() },
     };
 
-    private readonly string _databasePath;
-
-    /// <summary>Holds the path of the database the queue lives in.</summary>
-    /// <param name="options">Where the store keeps what the proxy compressed.</param>
-    public ContentQueue(ContentStoreOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        _databasePath = options.ResolvedDatabasePath;
-    }
+    private readonly string _databasePath = options.ResolvedDatabasePath;
 
     /// <summary>Publishes a record and returns once the row is committed.</summary>
     /// <param name="record">The record to publish.</param>
@@ -64,7 +55,7 @@ public sealed class ContentQueue : IContentQueue
         ArgumentNullException.ThrowIfNull(record);
 
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
+        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string insert = """
             INSERT INTO content_queue (request_id, created_at, payload)
@@ -89,7 +80,7 @@ public sealed class ContentQueue : IContentQueue
     public async Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
+        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
             SELECT job_id AS JobId, payload AS Payload

@@ -37,7 +37,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         ArgumentNullException.ThrowIfNull(requestId);
 
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection, ContentSchema.RequestCommandTimeoutSeconds);
+        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
             SELECT request_id      AS RequestId,
@@ -108,7 +108,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         ArgumentNullException.ThrowIfNull(record);
 
         await using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection);
+        connection.Ensure();
 
         const string insertRequest = """
             INSERT OR REPLACE INTO content_request
