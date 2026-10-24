@@ -93,7 +93,7 @@ def _incomplete(prereg: dict, records: dict[str, list[dict]]) -> list[str]:
     return reasons
 
 
-def _command(candidate: str, runs: int, names: list[str]) -> tuple[list[str], dict | None]:
+def _command(candidate: str, runs: int, names: list[str], out: Path) -> tuple[list[str], dict | None]:
     clean = {"HOME": str(HOME), "PATH": os.environ["PATH"]}
     if candidate == "shipped_rules":
         return ["dotnet", str(RULES_DLL), str(HERE / "payloads"), str(runs), *names], clean
@@ -105,11 +105,12 @@ def _command(candidate: str, runs: int, names: list[str]) -> tuple[list[str], di
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs), *names], None
     if candidate == "haiku_digest":
         return [sys.executable, str(HERE / "pi_runner.py"), candidate, str(runs),
-                "--outputs", str(HERE / "results" / HAIKU_OUTPUTS), *names], None
+                "--outputs", str(out / HAIKU_OUTPUTS), *names], None
     raise SystemExit(f"unknown candidate {candidate}")
 
 
 def run(candidates: list[str], out: Path, runs: int) -> None:
+    out = out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     recorded = out / "environment.json"
     environments = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else {}
@@ -125,7 +126,7 @@ def run(candidates: list[str], out: Path, runs: int) -> None:
                                       cwd=HERE, stdout=sink)
             if made.returncode != 0:
                 raise SystemExit(f"haiku digests failed (exit {made.returncode}); partial output kept in {out / HAIKU_OUTPUTS}")
-        command, env = _command(candidate, runs, names)
+        command, env = _command(candidate, runs, names, out)
         target = out / f"{candidate}.jsonl"
         with target.open("w", encoding="utf-8") as sink:
             done = subprocess.run(command, cwd=HERE, env=env, stdout=sink)

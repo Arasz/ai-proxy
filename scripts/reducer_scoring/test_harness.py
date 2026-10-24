@@ -1,6 +1,11 @@
+import contextlib
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from harness import _table, build_report
+from harness import _table, build_report, run
 
 FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
 TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
@@ -141,6 +146,30 @@ class TableTests(unittest.TestCase):
         self.assertEqual(cells[2:4] + [cells[5]], [str(row["score"]), str(row["compression"]), str(row["retention"])])
         self.assertTrue(kind(built, "digest_gpt_stand_in", "prose")["stand_in"])
         self.assertFalse(row["stand_in"])
+
+
+class RunTests(unittest.TestCase):
+    def test_haiku_reader_consumes_fresh_digests_from_the_selected_output_directory(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            out = Path("custom-results")
+            fresh = '{"output": "fresh digest", "latency_s": 0.25}\n'
+
+            def runner(command, **kwargs):
+                if Path(command[1]).name == "claude_digest_runner.py":
+                    kwargs["stdout"].write(fresh)
+                else:
+                    source = Path(command[command.index("--outputs") + 1])
+                    if not source.is_absolute():
+                        source = kwargs["cwd"] / source
+                    kwargs["stdout"].write(source.read_text(encoding="utf-8"))
+                return subprocess.CompletedProcess(command, 0)
+
+            with patch("harness._environment", return_value={}), patch("harness.load", return_value=PREREG), \
+                    patch("harness.subprocess.run", side_effect=runner):
+                run(["haiku_digest"], out, 3)
+
+            self.assertEqual((out / "haiku_digest.jsonl").read_text(encoding="utf-8"), fresh)
+            self.assertEqual((out / "haiku_digest.digests.ndjson").read_text(encoding="utf-8"), fresh)
 
 
 if __name__ == "__main__":
