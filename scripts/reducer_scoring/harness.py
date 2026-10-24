@@ -68,13 +68,26 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
         for kind in kinds:
             pooled = kind_row([row for n, row in rows.items() if prereg["payloads"][n]["kind"] == kind])
             kind_rows.append(_fields(candidate, pooled, prereg) | {"kind": kind})
-    void = []
+    void = _incomplete(prereg, records)
     for control in ("identity", "summarizer_control"):
         if control not in by_candidate:
             void.append(f"{control} did not run, so the controls cannot clear the run")
     if not void:
         void = void_reasons(by_candidate["identity"], by_candidate["summarizer_control"])
     return {"payloads": payload_rows, "kinds": kind_rows, "void": void}
+
+
+def _incomplete(prereg: dict, records: dict[str, list[dict]]) -> list[str]:
+    """Reasons the records cannot be scored as they stand: a run missing or repeated, or a reducer that threw."""
+    expected = sorted((name, run) for name in prereg["payloads"] for run in range(prereg["runs"]))
+    reasons = []
+    for candidate, lines in records.items():
+        if sorted((r["payload"], r["run"]) for r in lines) != expected:
+            reasons.append(f"{candidate} does not have exactly {prereg['runs']} runs of every payload")
+        threw = sorted({r["payload"] for r in lines if r.get("failures", 0)})
+        if threw:
+            reasons.append(f"{candidate}: a reducer threw on {', '.join(threw)}, so its untouched output is not n/a")
+    return reasons
 
 
 def _command(candidate: str, runs: int, names: list[str]) -> tuple[list[str], dict | None]:
@@ -92,6 +105,7 @@ def _command(candidate: str, runs: int, names: list[str]) -> tuple[list[str], di
 
 def run(candidates: list[str], out: Path, runs: int) -> None:
     out.mkdir(parents=True, exist_ok=True)
+    (out / "environment.json").write_text(json.dumps(_environment(), indent=1) + "\n", encoding="utf-8")
     names = list(load()["payloads"])
     if "shipped_rules" in candidates:
         subprocess.run(["dotnet", "build", str(HERE / "rules_runner"), "-c", "Release", "-v", "q"], check=True)
@@ -138,7 +152,9 @@ def _table(rows: list[dict], label: str) -> str:
 
 def report(out: Path) -> None:
     records = {p.stem: [json.loads(line) for line in p.open(encoding="utf-8")] for p in sorted(out.glob("*.jsonl"))}
-    built = build_report(load(), records) | {"environment": _environment()}
+    recorded = out / "environment.json"
+    environment = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else _environment()
+    built = build_report(load(), records) | {"environment": environment}
     (out / "report.json").write_text(json.dumps(built, indent=1) + "\n", encoding="utf-8")
     verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
     md = f"{verdict}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \

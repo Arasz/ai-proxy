@@ -51,11 +51,17 @@ class ExtractiveRowTests(unittest.TestCase):
         self.assertEqual(row.measurement.latency_s, 0.2)
         self.assertEqual(row.measurement.reduced_chars, len("Dana Okonkwo PR 8842 xx"))
 
-    def test_runs_that_disagree_on_retention_take_the_median_run(self):
+    def test_answers_kept_is_the_median_count_not_the_best_run(self):
         runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1),
                 ReducerRun("Dana Okonkwo", 0.1),
                 ReducerRun("Dana Okonkwo", 0.1)]
         self.assertEqual(extractive_row(ORIGINAL, QUESTIONS, runs).measurement.answers_kept, 1)
+
+    def test_answers_kept_is_the_median_count_not_the_worst_run(self):
+        runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1),
+                ReducerRun("Dana Okonkwo PR 8842", 0.1),
+                ReducerRun("Dana Okonkwo", 0.1)]
+        self.assertEqual(extractive_row(ORIGINAL, QUESTIONS, runs).measurement.answers_kept, 2)
 
 
 class QaRowTests(unittest.TestCase):
@@ -74,6 +80,14 @@ class KindRowTests(unittest.TestCase):
         bad = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana Okonkwo", 0.1)] * 3)
         pooled = kind_row([good, bad])
         self.assertLess(pooled.measurement.answers_kept, pooled.measurement.answers_total)
+
+    def test_a_kind_sums_characters_and_takes_the_median_payload_latency(self):
+        rows = [extractive_row(ORIGINAL * n, QUESTIONS, [ReducerRun("Dana Okonkwo PR 8842", latency)] * 3)
+                for n, latency in ((1, 0.1), (2, 0.2), (3, 0.9))]
+        pooled = kind_row(rows).measurement
+        self.assertEqual(pooled.original_chars, len(ORIGINAL) * 6)
+        self.assertEqual(pooled.reduced_chars, len("Dana Okonkwo PR 8842") * 3)
+        self.assertEqual(pooled.latency_s, 0.2)
 
     def test_not_applicable_payloads_are_left_out(self):
         good = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana Okonkwo PR 8842", 0.1)] * 3)

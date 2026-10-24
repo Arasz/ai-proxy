@@ -1,73 +1,127 @@
 import unittest
 
-from harness import build_report
+from harness import _table, build_report
 
-TEXT = "Dana Okonkwo merged PR 8842 after the incident. " * 10
+FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
+TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
+QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
 PREREG = {
-    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0,
+    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "runs": 3,
     "gates": {"extractive": {"candidates": ["shipped_rules"]},
               "abstractive": {"candidates": ["haiku_digest", "summarizer_control", "identity"]}},
     "payloads": {
-        "a": {"kind": "prose", "questions": [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]},
-        "b": {"kind": "prose", "questions": [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]},
+        "a": {"kind": "prose", "questions": QUESTIONS},
+        "b": {"kind": "prose", "questions": QUESTIONS},
+        "c": {"kind": "build", "questions": QUESTIONS},
     },
 }
 ALL = [["Dana Okonkwo"] * 3, ["PR 8842"] * 3]
 NONE = [["UNKNOWN"] * 3, ["UNKNOWN"] * 3]
+KEPT = "Dana Okonkwo PR 8842"
 
 
-def runs(payload, output, latency=0.1, replies=None):
-    return [{"payload": payload, "run": r, "output": output, "latency_s": latency,
-             **({"replies": replies} if replies is not None else {})} for r in range(3)]
+def runs(payload, outputs, latency=0.1, replies=None):
+    if isinstance(outputs, str):
+        outputs = [outputs] * 3
+    return [{"payload": payload, "run": r, "output": o, "latency_s": latency,
+             **({"replies": replies} if replies is not None else {})} for r, o in enumerate(outputs)]
 
 
-def records(identity=ALL, rules_output="Dana Okonkwo PR 8842"):
+def records():
     return {
-        "shipped_rules": runs("a", rules_output) + runs("b", TEXT),
-        "identity": runs("a", TEXT, 0.0, identity) + runs("b", TEXT, 0.0, ALL),
-        "summarizer_control": runs("a", "short", 2.0, NONE) + runs("b", "short", 2.0, NONE),
-        "haiku_digest": runs("a", "Dana Okonkwo, PR 8842", 3.0, ALL) + runs("b", "Dana Okonkwo, PR 8842", 3.0, ALL),
+        # Run 0 loses an answer on payload a; the median run keeps both.
+        "shipped_rules": runs("a", ["Dana Okonkwo", KEPT, KEPT]) + runs("b", TEXTS["b"]) + runs("c", KEPT, 0.25),
+        "identity": [r for p in TEXTS for r in runs(p, TEXTS[p], 0.0, ALL)],
+        # The summary still contains both answers word for word, but the reader misses them.
+        "summarizer_control": [r for p in TEXTS for r in runs(p, KEPT, 2.0, NONE)],
+        # The digest paraphrases both answers away, but the reader still finds them.
+        "haiku_digest": [r for p in TEXTS for r in runs(p, "Okonkwo (Dana), pull request 8842", 3.0, ALL)],
     }
 
 
-def row(report, candidate, kind):
-    return next(r for r in report["kinds"] if r["candidate"] == candidate and r["kind"] == kind)
+def report(recs=None):
+    return build_report(PREREG, records() if recs is None else recs, TEXTS.__getitem__)
 
 
-def load_text(name):
-    return TEXT
+def kind(built, candidate, kind_name):
+    return next(r for r in built["kinds"] if r["candidate"] == candidate and r["kind"] == kind_name)
 
 
-class BuildReportTests(unittest.TestCase):
-    def test_extractive_candidates_are_judged_on_their_text(self):
-        report = build_report(PREREG, records(rules_output="Dana Okonkwo"), load_text)
-        self.assertEqual(row(report, "shipped_rules", "prose")["retention"], 0.5)
-        self.assertEqual(row(report, "shipped_rules", "prose")["score"], 0.0)
+class GradingTests(unittest.TestCase):
+    def test_extractive_candidates_are_judged_on_the_median_of_all_runs(self):
+        self.assertEqual(kind(report(), "shipped_rules", "prose")["retention"], 1.0)
+
+    def test_the_digest_is_judged_by_the_reader_not_by_its_text(self):
+        self.assertEqual(kind(report(), "haiku_digest", "prose")["retention"], 1.0)
+
+    def test_the_summarizer_is_judged_by_the_reader_not_by_its_text(self):
+        self.assertEqual(kind(report(), "summarizer_control", "prose")["retention"], 0.0)
 
     def test_an_untouched_payload_is_reported_as_not_applicable(self):
-        report = build_report(PREREG, records(), load_text)
-        untouched = next(p for p in report["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")
+        untouched = next(p for p in report()["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")
         self.assertTrue(untouched["not_applicable"])
 
     def test_identity_keeps_everything_and_scores_zero(self):
-        identity = row(build_report(PREREG, records(), load_text), "identity", "prose")
+        identity = kind(report(), "identity", "prose")
         self.assertEqual((identity["retention"], identity["score"]), (1.0, 0.0))
 
-    def test_scores_are_reported_at_every_budget(self):
-        rules = row(build_report(PREREG, records(), load_text), "shipped_rules", "prose")
-        self.assertEqual(sorted(rules["score_at"]), ["0.5", "1.0", "2.0"])
-        self.assertGreater(rules["score_at"]["2.0"], rules["score_at"]["0.5"])
 
+class KindAndScoreTests(unittest.TestCase):
+    def test_each_kind_pools_only_its_own_payloads(self):
+        built = report()
+        self.assertEqual(kind(built, "identity", "prose")["original_chars"], len(TEXTS["a"]) + len(TEXTS["b"]))
+        self.assertEqual(kind(built, "identity", "build")["original_chars"], len(TEXTS["c"]))
+
+    def test_the_headline_score_is_at_the_pre_registered_budget(self):
+        build = kind(report(), "shipped_rules", "build")
+        c = 1 - len(KEPT) / len(TEXTS["c"])
+        lat = 1.0 / (1.0 + 0.25)
+        self.assertAlmostEqual(build["score"], round(2 * c * lat / (c + lat), 4))
+        self.assertEqual(build["score"], build["score_at"]["1.0"])
+
+    def test_scores_are_reported_at_every_budget(self):
+        build = kind(report(), "shipped_rules", "build")
+        self.assertEqual(sorted(build["score_at"]), ["0.5", "1.0", "2.0"])
+        self.assertGreater(build["score_at"]["2.0"], build["score_at"]["0.5"])
+
+
+class VoidTests(unittest.TestCase):
     def test_a_clean_run_stands(self):
-        self.assertEqual(build_report(PREREG, records(), load_text)["void"], [])
+        self.assertEqual(report()["void"], [])
 
     def test_identity_losing_an_answer_voids_the_run(self):
-        self.assertTrue(build_report(PREREG, records(identity=NONE), load_text)["void"])
+        recs = records()
+        recs["identity"] = [r | {"replies": NONE} if r["payload"] == "a" else r for r in recs["identity"]]
+        self.assertTrue(report(recs)["void"])
 
-    def test_the_digest_is_labelled_a_stand_in(self):
-        digest = row(build_report(PREREG, records(), load_text), "haiku_digest", "prose")
-        self.assertTrue(digest["stand_in"])
-        self.assertFalse(row(build_report(PREREG, records(), load_text), "shipped_rules", "prose")["stand_in"])
+    def test_a_control_that_did_not_run_voids_the_run(self):
+        recs = records()
+        del recs["identity"]
+        self.assertIn("identity", " ".join(report(recs)["void"]))
+
+    def test_a_missing_run_voids_the_run(self):
+        recs = records()
+        recs["shipped_rules"] = [r for r in recs["shipped_rules"] if not (r["payload"] == "c" and r["run"] == 2)]
+        self.assertIn("shipped_rules", " ".join(report(recs)["void"]))
+
+    def test_a_reducer_that_threw_voids_the_run_instead_of_reading_as_untouched(self):
+        recs = records()
+        recs["shipped_rules"] = [r | {"failures": 1} if r["payload"] == "b" else r for r in recs["shipped_rules"]]
+        self.assertIn("threw", " ".join(report(recs)["void"]))
+
+
+class TableTests(unittest.TestCase):
+    def test_the_digest_row_is_labelled_a_stand_in_and_columns_are_in_order(self):
+        built = report()
+        table = _table(built["kinds"], "kind")
+        digest = next(line for line in table.splitlines() if line.startswith("| haiku_digest"))
+        rules = next(line for line in table.splitlines() if line.startswith("| shipped_rules | build"))
+        self.assertIn("(stand-in)", digest)
+        cells = [c.strip() for c in rules.strip("|").split("|")]
+        row = kind(built, "shipped_rules", "build")
+        self.assertEqual(cells[2:4] + [cells[5]], [str(row["score"]), str(row["compression"]), str(row["retention"])])
+        self.assertTrue(kind(built, "haiku_digest", "prose")["stand_in"])
+        self.assertFalse(row["stand_in"])
 
 
 if __name__ == "__main__":
