@@ -17,6 +17,11 @@ import threading
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import tokens  # noqa: E402
 
 CCR_PORT, PLAIN_PORT, CCR_UPSTREAM, PLAIN_UPSTREAM = 18081, 18082, 18997, 18998
 PIPELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rtk_pipeline.toml")
@@ -41,9 +46,9 @@ def tool_result_text(body: dict) -> str:
     return "".join(block.get("text", "") for block in content)
 
 
-def added_chars(body: dict) -> int:
-    """Characters rtk added outside the tool result: the tool definitions it injects into the request."""
-    return len(json.dumps(body["tools"])) if body.get("tools") else 0
+def added_tokens(body: dict) -> int:
+    """Estimated tokens rtk added outside the tool result: the tool definitions it injects into the request."""
+    return tokens.estimate(json.dumps(body["tools"])) if body.get("tools") else 0
 
 
 ORDERS = ("ccr_first", "plain_first")
@@ -156,7 +161,7 @@ def main() -> None:
                         plain_trips.append(_round_trip(PLAIN_PORT, body))
                 for run, (upstream_body, latency) in enumerate(zip(sent, ccr_latencies(ccr_trips, plain_trips))):
                     print(json.dumps({"payload": name, "run": run, "output": tool_result_text(upstream_body),
-                                      "added_chars": added_chars(upstream_body), "latency_s": latency,
+                                      "added_tokens": added_tokens(upstream_body), "latency_s": latency,
                                       "order": order_for(run)}), flush=True)
         finally:
             for proc in procs:

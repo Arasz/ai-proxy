@@ -1,0 +1,15 @@
+{
+  "ratio": 2.8916,
+  "rows": 116,
+  "models": {
+    "claude-sonnet-5": 76,
+    "claude-haiku-5-5": 29,
+    "claude-opus-5-5": 6,
+    "claude-sonnet-5-5": 3,
+    "claude-haiku-4-5-20251001": 2
+  },
+  "first": "2026-10-24T13:19:10.7499660+00:00",
+  "last": "2026-10-24T15:16:15.2975980+00:00",
+  "holdout_median_abs_error": 0.022,
+  "method": "median of per-request chars / prompt tokens (input + cache_read + cache_creation) over stateless requests without image or document blocks; chars = length of the decoded body text; error = 5-fold holdout median absolute percentage error"
+}

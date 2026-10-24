@@ -9,6 +9,7 @@ from scoring import (
     qa_row,
     void_reasons,
 )
+import tokens  # noqa: E402
 
 QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "Which PR?", "a": "PR 8842"}]
 ORIGINAL = "Dana Okonkwo merged PR 8842 after the incident." * 4
@@ -47,16 +48,16 @@ class ExtractiveRowTests(unittest.TestCase):
                 ReducerRun("Dana Okonkwo PR 8842", 0.1)]
         self.assertFalse(extractive_row(ORIGINAL, QUESTIONS, runs).not_applicable)
 
-    def test_characters_added_outside_the_output_count_as_reduced_length(self):
-        runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1, added_chars=400)] * 3
-        reduced = extractive_row(ORIGINAL, QUESTIONS, runs).measurement.reduced_chars
-        self.assertEqual(reduced, len("Dana Okonkwo PR 8842") + 400)
+    def test_tokens_added_outside_the_output_count_as_reduced_length(self):
+        runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1, added_tokens=400)] * 3
+        reduced = extractive_row(ORIGINAL, QUESTIONS, runs).measurement.reduced_tokens
+        self.assertEqual(reduced, tokens.estimate("Dana Okonkwo PR 8842") + 400)
 
     def test_counting_untouched_output_measures_it_as_nothing_removed(self):
-        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, added_chars=5)] * 3,
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, added_tokens=5)] * 3,
                              count_untouched=True)
         self.assertFalse(row.not_applicable)
-        self.assertEqual((row.measurement.reduced_chars, row.measurement.answers_kept), (len(ORIGINAL) + 5, 2))
+        self.assertEqual((row.measurement.reduced_tokens, row.measurement.answers_kept), (tokens.estimate(ORIGINAL) + 5, 2))
 
     def test_latency_and_length_are_medians_over_runs(self):
         runs = [ReducerRun("Dana Okonkwo PR 8842", 0.9),
@@ -64,7 +65,7 @@ class ExtractiveRowTests(unittest.TestCase):
                 ReducerRun("Dana Okonkwo PR 8842 xxxxxx", 0.2)]
         row = extractive_row(ORIGINAL, QUESTIONS, runs)
         self.assertEqual(row.measurement.latency_s, 0.2)
-        self.assertEqual(row.measurement.reduced_chars, len("Dana Okonkwo PR 8842 xx"))
+        self.assertEqual(row.measurement.reduced_tokens, tokens.estimate("Dana Okonkwo PR 8842 xx"))
 
     def test_answers_kept_is_the_median_count_not_the_best_run(self):
         runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1),
@@ -118,12 +119,12 @@ class KindRowTests(unittest.TestCase):
         pooled = kind_row([good, bad])
         self.assertLess(pooled.measurement.answers_kept, pooled.measurement.answers_total)
 
-    def test_a_kind_sums_characters_and_takes_the_median_payload_latency(self):
+    def test_a_kind_sums_tokens_and_takes_the_median_payload_latency(self):
         rows = [extractive_row(ORIGINAL * n, QUESTIONS, [ReducerRun("Dana Okonkwo PR 8842", latency)] * 3)
                 for n, latency in ((1, 0.1), (2, 0.2), (3, 0.9))]
         pooled = kind_row(rows).measurement
-        self.assertEqual(pooled.original_chars, len(ORIGINAL) * 6)
-        self.assertEqual(pooled.reduced_chars, len("Dana Okonkwo PR 8842") * 3)
+        self.assertEqual(pooled.original_tokens, tokens.estimate(ORIGINAL) * 6)
+        self.assertEqual(pooled.reduced_tokens, tokens.estimate("Dana Okonkwo PR 8842") * 3)
         self.assertEqual(pooled.latency_s, 0.2)
 
     def test_not_applicable_payloads_are_left_out(self):

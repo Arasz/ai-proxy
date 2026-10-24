@@ -8,17 +8,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from compression_score import Measurement  # noqa: E402
 from grading import answered  # noqa: E402
+from tokens import estimate  # noqa: E402
 
 MISSES_THAT_LOSE = 2
 
 
 @dataclass(frozen=True)
 class ReducerRun:
-    """One run of an extractive candidate: the text it produced, how long that took, and what it added outside it."""
+    """One run of an extractive candidate: the text it produced, how long that took, and what it added outside it, in estimated tokens."""
 
     output: str
     latency_s: float
-    added_chars: int = 0
+    added_tokens: int = 0
     judged: frozenset[str] = frozenset()
 
 
@@ -55,8 +56,8 @@ def qa_kept(replies: list[list[str]], questions: list[dict], match=answered, jud
 
 def _median_row(original: str, total: int, lengths: list[int], latencies: list[float], kept: list[int]) -> Row:
     return Row(Measurement(
-        original_chars=len(original),
-        reduced_chars=statistics.median_low(lengths),
+        original_tokens=estimate(original),
+        reduced_tokens=statistics.median_low(lengths),
         latency_s=statistics.median(latencies),
         answers_kept=statistics.median_low(kept),
         answers_total=total,
@@ -72,14 +73,14 @@ def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun],
     if not count_untouched and all(run.output == original for run in runs):
         return Row(None, not_applicable=True)
     kept = [sum(match(run.output, q["a"]) or q["a"] in run.judged for q in questions) for run in runs]
-    lengths = [len(r.output) + r.added_chars for r in runs]
+    lengths = [estimate(r.output) + r.added_tokens for r in runs]
     return _median_row(original, len(questions), lengths, [r.latency_s for r in runs], kept)
 
 
 def qa_row(original: str, questions: list[dict], runs: list[QaRun], match=answered) -> Row:
     """QA retention: an answer is kept when the reader, given the candidate's output, still finds it."""
     kept = [qa_kept(run.replies, questions, match, run.judged) for run in runs]
-    return _median_row(original, len(questions), [len(r.output) for r in runs], [r.latency_s for r in runs], kept)
+    return _median_row(original, len(questions), [estimate(r.output) for r in runs], [r.latency_s for r in runs], kept)
 
 
 def kind_row(rows: list[Row]) -> Row:
@@ -90,8 +91,8 @@ def kind_row(rows: list[Row]) -> Row:
     if len(measured) == 1:
         return Row(measured[0])
     return Row(Measurement(
-        original_chars=sum(m.original_chars for m in measured),
-        reduced_chars=sum(m.reduced_chars for m in measured),
+        original_tokens=sum(m.original_tokens for m in measured),
+        reduced_tokens=sum(m.reduced_tokens for m in measured),
         latency_s=statistics.median(m.latency_s for m in measured),
         answers_kept=sum(m.answers_kept for m in measured),
         answers_total=sum(m.answers_total for m in measured),
