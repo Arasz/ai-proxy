@@ -43,7 +43,7 @@ public sealed class CodeReducer
         {
             RemoveImports(view, lexed.Tokens);
         }
-                var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
         var replacements = options.RenameIdentifiers
             ? Rename(view, lexed.Tokens, map)
             : new Dictionary<int, (int Length, string Text)>();

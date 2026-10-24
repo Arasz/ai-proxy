@@ -113,4 +113,72 @@ public sealed class CodeReducerTests
         Assert.Contains("b:VeryLongVariable\n" + Hint, result.Text, StringComparison.Ordinal);
         Assert.Equal(result.Text, again.Text);
     }
+    [Theory]
+    [InlineData("1UL", "2UL")]
+    [InlineData("1e10", "2e10")]
+    [InlineData("0xFF", "0xFF")]
+    public void Numeric_suffixes_are_not_renamed_as_identifiers(string first, string second)
+    {
+        var source = "// a very long removable comment provides enough savings for the complete hint and map too\nvar first = " + first + ";\nvar second = " + second + ";\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Empty(result.RenameMap);
+        Assert.Contains(first, result.Text, StringComparison.Ordinal);
+        Assert.Contains(second, result.Text, StringComparison.Ordinal);
+    }
+    [Fact]
+    public void Options_independently_preserve_comments_imports_and_original_names()
+    {
+        var source = "using System.Text;\n// LongVariable stays readable in this comment\nint LongVariable = 1;\nLongVariable++;\n" + new string('\n', 100);
+        var reducer = new CodeReducer();
+        var keepComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveComments: false), Hint);
+        var keepImports = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveImports: false), Hint);
+        var keepAll = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, false, false), Hint);
+        var renameWithComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, true, true), Hint);
+
+        Assert.True(keepComments.Changed);
+        Assert.Contains("// LongVariable stays readable in this comment", keepComments.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("using System.Text;", keepComments.Text, StringComparison.Ordinal);
+        Assert.True(keepImports.Changed);
+        Assert.Contains("using System.Text;", keepImports.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("//", keepImports.Text, StringComparison.Ordinal);
+        Assert.Contains("using System.Text;", keepAll.Text, StringComparison.Ordinal);
+        Assert.Contains("// LongVariable", keepAll.Text, StringComparison.Ordinal);
+        Assert.Contains("int LongVariable", keepAll.Text, StringComparison.Ordinal);
+        Assert.Empty(keepAll.RenameMap);
+        Assert.Contains("// LongVariable stays readable in this comment", renameWithComments.Text, StringComparison.Ordinal);
+        Assert.Contains("int a = 1;", renameWithComments.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Map_overhead_can_remove_all_apparent_rename_savings()
+    {
+        const string source = "int Abcd; Abcd++;\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(false, false, true), "h");
+
+        Assert.False(result.Changed);
+        Assert.Equal(source, result.Text);
+        Assert.Empty(result.RenameMap);
+    }
+
+    [Fact]
+    public void A_single_unnumbered_line_prevents_stripping_any_prefix()
+    {
+        const string source = "  60\t// a very long removable comment provides enough savings for the complete hint too\n\n  62\t    int value = 1;\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.StartsWith("  60\n  62\t", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Missing_hint_returns_original_even_when_all_lines_are_numbered()
+    {
+        const string source = "1\t// a very long removable comment provides enough savings for a hint\n2\tint value;\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", null, null);
+
+        Assert.False(result.Changed);
+        Assert.Equal(source, result.Text);
+    }
 }
