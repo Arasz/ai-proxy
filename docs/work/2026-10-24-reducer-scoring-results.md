@@ -7,8 +7,8 @@ how much does each remove, and how long does it take?
 This is task-graph step `scoring-harness` of `aip-compression-and-rtk-replacement`. The harness,
 the payloads, the 84 questions and every raw run are in
 [scripts/reducer_scoring/](../../scripts/reducer_scoring/). The rules were committed in
-`preregistration.json` before any run. The one change made after that, also before any run, is
-the dated amendment in the same file.
+`preregistration.json` before any run, and a second amendment was made after the first full run
+of all six candidates; nothing already scored was re-scored.
 
 **Machine:** Apple M4, 24 GB, macOS 27.0.1. **rtk-proxy** 1.0.1, **pi** 1.4.0. Five candidates
 ran at commit `0d7d19b`. rtk was re-run at `1820d4a` after the code review found its injected
@@ -59,7 +59,7 @@ The shipped rules ran in under 3 ms on every kind.
 
 ## Findings
 
-### F1 — The controls clear the run [MEASURED]
+### F1: The controls clear the run [MEASURED]
 
 Identity kept every answer on every kind, so each of the 84 questions can be answered from its
 own payload by the reader. Identity also scores 0 everywhere, because it removes nothing. The
@@ -69,7 +69,7 @@ is well under the "more than half" void rule. Neither void rule fired. All 351 r
 parsed as an answer array, so no answer was lost to formatting. Every candidate has exactly
 three runs of every payload, and the rules runner recorded no reducer failure.
 
-### F2 — The shipped rules lead on code and test output; json and build depend on the view [MEASURED]
+### F2: The shipped rules lead on code and test output; json and build depend on the view [MEASURED]
 
 On code and test output the shipped rules keep every answer and score 0.30 and 0.40 (0.34 when
 the untouched test payload is counted), removing about 20% in under 3 ms. In the
@@ -79,7 +79,7 @@ JSON and the 60 KB verbose build log. Counting them, json drops to 0.08, behind 
 stand-in's 0.09, and build drops to 0.008. Latency barely counts at these speeds, so the
 score is almost all compression.
 
-### F3 — The log reducer loses 4 of 5 answers on rtk-proxy's own log [MEASURED]
+### F3: The log reducer loses 4 of 5 answers on rtk-proxy's own log [MEASURED]
 
 On `rtk_proxy_log` the rules removed 89% and kept one answer. The output is four of the log's
 lines followed by `[retained identifiers] /home/dev/probe/db-a/mem.db -proxy 18080`. The lines
@@ -88,7 +88,7 @@ summary does not bring them back. On `agent_log`, the other log, the rules kept 
 Why this log is cut so hard is not established here. The payload and its questions now make a
 ready regression case for `LogCompressionHandler`.
 
-### F4 — The shipped rules leave 6 of 13 payloads untouched, and 5 are over their minimum [MEASURED]
+### F4: The shipped rules leave 6 of 13 payloads untouched, and 5 are over their minimum [MEASURED]
 
 Both prose payloads, the directory listing, the one-line `github_pr_list` JSON, the 60 KB
 verbose build log and the small test failure came back byte for byte. Only the listing is
@@ -97,7 +97,7 @@ far over theirs (prose 512, json 100, shell 200). On those, the rules ran and fo
 remove. On the verbose build log that took a median 5.5 ms. So the rules have no score at
 all on listings, and score 0 on prose once the untouched payloads count.
 
-### F5 — kompress int8 keeps answers but removes little, and it cuts identifiers [MEASURED]
+### F5: kompress int8 keeps answers but removes little, and it cuts identifiers [MEASURED]
 
 Where it kept every answer, kompress removed 0.05-12.6% and took 0.2-4.9 s. On the 60 KB
 verbose build log it took 69 s per run for 0.4%. It lost answers on build and test output by
@@ -106,7 +106,7 @@ dropping subword tokens inside identifiers. For example, the test name
 `...Tests._last_two_lines_are_anchors_and_survive`. Its best per-kind score is 0.17, on prose.
 Its best per-payload score is 0.18, on `incident_report`.
 
-### F6 — rtk's preview loses answers on every kind, by design [MEASURED]
+### F6: rtk's preview loses answers on every kind, by design [MEASURED]
 
 rtk adds a 426-character `rtk_retrieve` tool definition to every request, including the two
 whose tool result it left untouched. Counting those characters, the preview removed 4-97% in
@@ -120,16 +120,16 @@ preview is not head+tail. A 25-item array becomes one schema line,
 does not credit what retrieval would get back. Here a 0 means the agent must call retrieval to
 answer, not that the content is gone.
 
-### F7 — The digest stand-in keeps prose, logs and JSON, but not code or build output [MEASURED, stand-in model]
+### F7: The digest stand-in keeps prose, logs and JSON, but not code or build output [MEASURED, stand-in model]
 
 On `gpt-6.1-sol` the digest kept every answer on prose, logs and JSON, removing 31-67%. It
 dropped `System.Text.Json` from the code file, a file name from the listing, and the
 `(18,83)` error position from the verbose build log. Its latency, 4-26 s per kind and up to
 42 s on `prose_large`, holds its best score to 0.12 at 1 s and 0.21 at 2 s. Haiku would be
-faster, so its latency here says nothing about Haiku. Settling `digest-verdict` needs one
-Haiku run of `pi_runner.py haiku_digest`.
+faster, so its latency here says nothing about Haiku. Settling `digest-verdict` needs one Haiku
+run through `claude_digest_runner.py`, started by `harness.py run haiku_digest`.
 
-### F8 — What this does not cover [UNVERIFIED]
+### F8: What this does not cover [UNVERIFIED]
 
 - One machine, one reader model, and 13 payloads, with at least two per kind except listings
   (one).

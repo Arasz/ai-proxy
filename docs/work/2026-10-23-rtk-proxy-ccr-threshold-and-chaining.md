@@ -115,9 +115,15 @@ certificate made no difference.
 ### F7 — Chaining Claude Code → rtk-proxy → ai-proxy does not work today [INFERRED]
 
 From F5 and F6: rtk-proxy only uses a proxy it is told about through `HTTPS_PROXY`. Through
-ai-proxy, its TLS client fails exactly where the plain tunnel succeeded, so the failure is in
-certificate trust. The binary links rustls, and `SSL_CERT_FILE` was ignored, which fits a
-built-in root set (webpki roots) that no setting extends. Running both proxies stacked would
+ai-proxy, its TLS client failed in 24 ms with `upstream forward failed ... error sending request`
+and the client was answered 502, while the plain tunnel succeeded and reached Anthropic; setting
+`SSL_CERT_FILE` to ai-proxy's root made no difference.
+
+The failing stage and the cause are not settled here, and the record holds no ai-proxy CONNECT
+response and no nested TLS validation error, so the failure is not attributed to certificate
+trust on that evidence alone. The binary links rustls and ignored `SSL_CERT_FILE`, which fits a
+built-in root set (webpki roots) that no setting extends, but that is inference, not evidence.
+Running both proxies stacked would
 need either a change to rtk-proxy or ai-proxy passing `api.anthropic.com` through uninspected
 for that one client. Neither is worth building, given that ai-proxy is meant to replace
 rtk-proxy outright. Side by side on separate ports (`PROXY_PORT`) is the only arrangement that

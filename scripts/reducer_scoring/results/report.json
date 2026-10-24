@@ -1,7 +1,7 @@
 {
  "payloads": [
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 7509,
@@ -21,7 +21,7 @@
    "kind": "code"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 1416,
@@ -41,7 +41,7 @@
    "kind": "prose"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 2530,
@@ -61,7 +61,7 @@
    "kind": "log"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 575,
@@ -81,7 +81,7 @@
    "kind": "listing"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 880,
@@ -101,7 +101,7 @@
    "kind": "json"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 902,
@@ -121,7 +121,7 @@
    "kind": "build"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 1174,
@@ -141,7 +141,7 @@
    "kind": "test"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 12812,
@@ -161,7 +161,7 @@
    "kind": "code"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 11107,
@@ -181,7 +181,7 @@
    "kind": "prose"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 5721,
@@ -201,7 +201,7 @@
    "kind": "log"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 5363,
@@ -221,7 +221,7 @@
    "kind": "json"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 60672,
@@ -241,7 +241,7 @@
    "kind": "build"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 5592,
@@ -1420,7 +1420,7 @@
  ],
  "kinds": [
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 20321,
@@ -1439,7 +1439,7 @@
    "kind": "code"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 12523,
@@ -1458,7 +1458,7 @@
    "kind": "prose"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 8251,
@@ -1477,7 +1477,7 @@
    "kind": "log"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 575,
@@ -1496,7 +1496,7 @@
    "kind": "listing"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 6243,
@@ -1515,7 +1515,7 @@
    "kind": "json"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 61574,
@@ -1534,7 +1534,7 @@
    "kind": "build"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 6766,
@@ -2168,7 +2168,7 @@
  ],
  "kinds_counted": [
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 20321,
@@ -2187,7 +2187,7 @@
    "kind": "code"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 12523,
@@ -2206,7 +2206,7 @@
    "kind": "prose"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 8251,
@@ -2225,7 +2225,7 @@
    "kind": "log"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 575,
@@ -2244,7 +2244,7 @@
    "kind": "listing"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 6243,
@@ -2263,7 +2263,7 @@
    "kind": "json"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 61574,
@@ -2282,7 +2282,7 @@
    "kind": "build"
   },
   {
-   "candidate": "haiku_digest",
+   "candidate": "digest_gpt_stand_in",
    "not_applicable": false,
    "stand_in": true,
    "original_chars": 6766,
@@ -2968,7 +2968,7 @@
  ],
  "void": [],
  "environment": {
-  "haiku_digest": {
+  "digest_gpt_stand_in": {
    "date": "2026-10-24",
    "machine": "Apple M4, 24 GB, macOS 27.0.1",
    "commit": "0d7d19b",

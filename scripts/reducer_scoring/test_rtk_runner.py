@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import rtk_runner
 
-from rtk_runner import added_chars, ccr_latencies, request_body, tool_result_text
+from rtk_runner import added_chars, ccr_latencies, order_for, request_body, tool_result_text
 
 
 class ToolResultTextTests(unittest.TestCase):
@@ -36,6 +36,14 @@ class CcrLatencyTests(unittest.TestCase):
 
     def test_a_run_faster_than_the_baseline_counts_as_free(self):
         self.assertEqual(ccr_latencies([0.1], [0.2]), [0.0])
+
+
+class RoundTripOrderTests(unittest.TestCase):
+    def test_the_first_run_sends_the_ccr_request_first(self):
+        self.assertEqual(order_for(0), "ccr_first")
+
+    def test_the_order_alternates_between_the_two_proxies(self):
+        self.assertEqual([order_for(run) for run in range(4)], ["ccr_first", "plain_first", "ccr_first", "plain_first"])
 
 
 class StartupCleanupTests(unittest.TestCase):

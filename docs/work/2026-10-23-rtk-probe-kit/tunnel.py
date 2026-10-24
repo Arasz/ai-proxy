@@ -10,7 +10,12 @@ def pipe(a, b):
             except OSError: pass
 def handle(c):
     head = b""
-    while b"\r\n\r\n" not in head: head += c.recv(4096)
+    while b"\r\n\r\n" not in head:
+        chunk = c.recv(4096)
+        if not chunk:
+            c.close()
+            return
+        head += chunk
     target = head.split(b" ")[1].decode()
     print("CONNECT", target, flush=True)
     host, port = target.rsplit(":", 1)

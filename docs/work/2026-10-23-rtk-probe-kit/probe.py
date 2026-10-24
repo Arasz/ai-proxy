@@ -18,7 +18,7 @@ def send(blocks, tag):
         headers={"content-type": "application/json", "x-api-key": "sk-ant-probe-not-a-key", "anthropic-version": "2023-06-01"})
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.open(req, timeout=30) as r: r.read()
-    newest = sorted(bodies.glob("*.json"))[-1]
+    newest = max(bodies.glob("*.json"), key=lambda p: int(p.stem))
     sent = json.loads(newest.read_text())
     out = []
     for m in sent["messages"]:

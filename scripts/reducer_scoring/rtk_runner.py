@@ -46,6 +46,14 @@ def added_chars(body: dict) -> int:
     return len(json.dumps(body["tools"])) if body.get("tools") else 0
 
 
+ORDERS = ("ccr_first", "plain_first")
+
+
+def order_for(run: int) -> str:
+    """The round-trip order for one run; it alternates so neither side can favour connection, cache or clock effects."""
+    return ORDERS[run % len(ORDERS)]
+
+
 def ccr_latencies(ccr_trips: list[float], plain_trips: list[float]) -> list[float]:
     """Each CCR round trip less the median plain round trip, floored at zero."""
     baseline = statistics.median(plain_trips)
@@ -135,16 +143,21 @@ def main() -> None:
                 _round_trip(CCR_PORT, body)
                 _round_trip(PLAIN_PORT, body)
                 ccr_trips, sent, plain_trips = [], [], []
-                for _ in range(runs):
+                for run in range(runs):
                     ccr_upstream.last = None
+                    order = order_for(run)
+                    if order == "plain_first":
+                        plain_trips.append(_round_trip(PLAIN_PORT, body))
                     ccr_trips.append(_round_trip(CCR_PORT, body))
                     if ccr_upstream.last is None:
                         raise RuntimeError(f"rtk-proxy answered {name} without forwarding it upstream")
                     sent.append(ccr_upstream.last)
-                    plain_trips.append(_round_trip(PLAIN_PORT, body))
+                    if order != "plain_first":
+                        plain_trips.append(_round_trip(PLAIN_PORT, body))
                 for run, (upstream_body, latency) in enumerate(zip(sent, ccr_latencies(ccr_trips, plain_trips))):
                     print(json.dumps({"payload": name, "run": run, "output": tool_result_text(upstream_body),
-                                      "added_chars": added_chars(upstream_body), "latency_s": latency}), flush=True)
+                                      "added_chars": added_chars(upstream_body), "latency_s": latency,
+                                      "order": order_for(run)}), flush=True)
         finally:
             for proc in procs:
                 proc.terminate()
