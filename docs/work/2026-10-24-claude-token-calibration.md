@@ -66,6 +66,15 @@ unvalidated.
 
 **Evidence:** `.schema capture_response` in `~/.ai-proxy/capture.db` lists no message id column.
 
+### F7 — The error band holds for whole request bodies, not for a single payload [INFERRED]
+
+The ratio was fitted on JSON request bodies, where newlines and quotes are escaped and the
+system prompt and tool definitions dominate. The harness applies it to the raw text of one
+payload, such as a build log. How such text tokenizes compared with a JSON body was not measured,
+so the 2.2% band does not carry over to per-payload figures. Compression ratios are unaffected,
+because one ratio scales both sides. Absolute token sizes per payload carry an unknown error.
+Reasoned from F1's method and the harness's use of `tokens.estimate`.
+
 ## Still open
 
 - Capture the response message id in `capture_response`, so thread differencing can be validated and
