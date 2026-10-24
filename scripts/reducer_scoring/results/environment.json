@@ -47,5 +47,12 @@
   "commit": "a7fe033",
   "rtk_proxy": "rtk-proxy 1.0.1",
   "pi": "1.4.0"
+ },
+ "haiku_digest_checked": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "e4b2b82",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
  }
 }

@@ -573,6 +573,292 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 7509,
+   "reduced_chars": 1891,
+   "compression": 0.7482,
+   "latency_s": 7.253,
+   "latency_score": 0.1212,
+   "retention": 0.6667,
+   "answers": "4/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.1738,
+   "payload": "code_file",
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 1416,
+   "reduced_chars": 866,
+   "compression": 0.3884,
+   "latency_s": 2.515,
+   "latency_score": 0.2845,
+   "retention": 0.875,
+   "answers": "7/8",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.3284,
+   "payload": "incident_report",
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 2530,
+   "reduced_chars": 1081,
+   "compression": 0.5727,
+   "latency_s": 2.766,
+   "latency_score": 0.2655,
+   "retention": 0.75,
+   "answers": "6/8",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.3628,
+   "payload": "agent_log",
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 226,
+   "compression": 0.607,
+   "latency_s": 2.608,
+   "latency_score": 0.2772,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3171,
+   "payload": "dir_listing",
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 880,
+   "reduced_chars": 441,
+   "compression": 0.4989,
+   "latency_s": 1.701,
+   "latency_score": 0.3702,
+   "retention": 1.0,
+   "answers": "14/14",
+   "score": 0.425,
+   "score_at": {
+    "0.5": 0.3122,
+    "1.0": 0.425,
+    "2.0": 0.5188
+   },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.425,
+   "payload": "json_payload",
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 902,
+   "reduced_chars": 407,
+   "compression": 0.5488,
+   "latency_s": 1.899,
+   "latency_score": 0.3449,
+   "retention": 1.0,
+   "answers": "4/4",
+   "score": 0.4236,
+   "score_at": {
+    "0.5": 0.3021,
+    "1.0": 0.4236,
+    "2.0": 0.5303
+   },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.4236,
+   "payload": "dotnet_build_failure",
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 1174,
+   "reduced_chars": 623,
+   "compression": 0.4693,
+   "latency_s": 3.022,
+   "latency_score": 0.2486,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.3251,
+   "score_at": {
+    "0.5": 0.218,
+    "1.0": 0.3251,
+    "2.0": 0.4309
+   },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.3251,
+   "payload": "dotnet_test_failure",
+   "kind": "test"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12812,
+   "reduced_chars": 3652,
+   "compression": 0.715,
+   "latency_s": 10.022,
+   "latency_score": 0.0907,
+   "retention": 1.0,
+   "answers": "6/6",
+   "score": 0.161,
+   "score_at": {
+    "0.5": 0.0891,
+    "1.0": 0.161,
+    "2.0": 0.2699
+   },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.161,
+   "payload": "code_file_large",
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 11107,
+   "reduced_chars": 6649,
+   "compression": 0.4014,
+   "latency_s": 12.006,
+   "latency_score": 0.0769,
+   "retention": 1.0,
+   "answers": "6/6",
+   "score": 0.1291,
+   "score_at": {
+    "0.5": 0.0727,
+    "1.0": 0.1291,
+    "2.0": 0.2106
+   },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.1291,
+   "payload": "prose_large",
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5721,
+   "reduced_chars": 1240,
+   "compression": 0.7833,
+   "latency_s": 6.164,
+   "latency_score": 0.1396,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.2369,
+   "score_at": {
+    "0.5": 0.1369,
+    "1.0": 0.2369,
+    "2.0": 0.3732
+   },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.2369,
+   "payload": "rtk_proxy_log",
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5363,
+   "reduced_chars": 3376,
+   "compression": 0.3705,
+   "latency_s": 6.771,
+   "latency_score": 0.1287,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.191,
+   "score_at": {
+    "0.5": 0.116,
+    "1.0": 0.191,
+    "2.0": 0.2823
+   },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.191,
+   "payload": "github_pr_list",
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 60672,
+   "reduced_chars": 428,
+   "compression": 0.9929,
+   "latency_s": 2.062,
+   "latency_score": 0.3266,
+   "retention": 0.5,
+   "answers": "3/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "4/6",
+   "score_relaxed": 0.0,
+   "payload": "dotnet_build_failure_verbose",
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5592,
+   "reduced_chars": 1746,
+   "compression": 0.6878,
+   "latency_s": 5.602,
+   "latency_score": 0.1515,
+   "retention": 0.4,
+   "answers": "2/5",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "4/5",
+   "score_relaxed": 0.1986,
+   "payload": "dotnet_test_failures",
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -2134,6 +2420,153 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 20321,
+   "reduced_chars": 5543,
+   "compression": 0.7272,
+   "latency_s": 8.6375,
+   "latency_score": 0.1038,
+   "retention": 0.8333,
+   "answers": "10/12",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.1665,
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12523,
+   "reduced_chars": 7515,
+   "compression": 0.3999,
+   "latency_s": 7.2605,
+   "latency_score": 0.1211,
+   "retention": 0.9286,
+   "answers": "13/14",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1859,
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 8251,
+   "reduced_chars": 2321,
+   "compression": 0.7187,
+   "latency_s": 4.465,
+   "latency_score": 0.183,
+   "retention": 0.8462,
+   "answers": "11/13",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.2917,
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 226,
+   "compression": 0.607,
+   "latency_s": 2.608,
+   "latency_score": 0.2772,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3171,
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6243,
+   "reduced_chars": 3817,
+   "compression": 0.3886,
+   "latency_s": 4.236,
+   "latency_score": 0.191,
+   "retention": 1.0,
+   "answers": "19/19",
+   "score": 0.2561,
+   "score_at": {
+    "0.5": 0.166,
+    "1.0": 0.2561,
+    "2.0": 0.3514
+   },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.2561,
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 61574,
+   "reduced_chars": 835,
+   "compression": 0.9864,
+   "latency_s": 1.9805,
+   "latency_score": 0.3355,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.4006,
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6766,
+   "reduced_chars": 2369,
+   "compression": 0.6499,
+   "latency_s": 4.312,
+   "latency_score": 0.1883,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.2627,
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -3105,6 +3538,153 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 20321,
+   "reduced_chars": 5543,
+   "compression": 0.7272,
+   "latency_s": 8.6375,
+   "latency_score": 0.1038,
+   "retention": 0.8333,
+   "answers": "10/12",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.1665,
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12523,
+   "reduced_chars": 7515,
+   "compression": 0.3999,
+   "latency_s": 7.2605,
+   "latency_score": 0.1211,
+   "retention": 0.9286,
+   "answers": "13/14",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1859,
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 8251,
+   "reduced_chars": 2321,
+   "compression": 0.7187,
+   "latency_s": 4.465,
+   "latency_score": 0.183,
+   "retention": 0.8462,
+   "answers": "11/13",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.2917,
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 226,
+   "compression": 0.607,
+   "latency_s": 2.608,
+   "latency_score": 0.2772,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3171,
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6243,
+   "reduced_chars": 3817,
+   "compression": 0.3886,
+   "latency_s": 4.236,
+   "latency_score": 0.191,
+   "retention": 1.0,
+   "answers": "19/19",
+   "score": 0.2561,
+   "score_at": {
+    "0.5": 0.166,
+    "1.0": 0.2561,
+    "2.0": 0.3514
+   },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.2561,
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 61574,
+   "reduced_chars": 835,
+   "compression": 0.9864,
+   "latency_s": 1.9805,
+   "latency_score": 0.3355,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.4006,
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest_checked",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6766,
+   "reduced_chars": 2369,
+   "compression": 0.6499,
+   "latency_s": 4.312,
+   "latency_score": 0.1883,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.2627,
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -3843,7 +4423,7 @@
  "void": [],
  "judge": {
   "decoys_accepted": 0,
-  "decoys": 222,
+  "decoys": 239,
   "summarizer_accepted": 23,
   "summarizer_lost": 199,
   "void": []
@@ -3860,6 +4440,13 @@
    "date": "2026-10-24",
    "machine": "Apple M4, 24 GB, macOS 27.0.1",
    "commit": "a7fe033",
+   "rtk_proxy": "rtk-proxy 1.0.1",
+   "pi": "1.4.0"
+  },
+  "haiku_digest_checked": {
+   "date": "2026-10-24",
+   "machine": "Apple M4, 24 GB, macOS 27.0.1",
+   "commit": "e4b2b82",
    "rtk_proxy": "rtk-proxy 1.0.1",
    "pi": "1.4.0"
   },

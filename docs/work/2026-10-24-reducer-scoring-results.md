@@ -42,7 +42,7 @@ taken field by field, so a row's length, latency and answers can come from diffe
   model's own `duration_api_ms`). Its reader is still `gpt-6.1-sol`. That run pinned no
   effort and inherited this session's `CLAUDE_EFFORT=medium`, not the pre-registered thinking
   off. The third amendment defines `haiku_digest_checked` (a find-compress-check prompt at
-  `--effort low`), but its run was stopped by the owner after 9 of 39 digests and is not scored.
+  `--effort low`, the session's effort cleared). It ran at `e4b2b82` (F8).
 - **The relaxed view** (fourth amendment, after every result above was seen) is the owner's
   ruling that a small loss is acceptable and a fact in other words is kept. It grades by fact
   (`grading.same_fact`): `4.2s` counts for `4.2 seconds`, `7 failed` for `failed: 7`,
@@ -192,9 +192,24 @@ Graded by fact and judged, Haiku keeps every answer on prose, log and json, and 
 two per kind elsewhere. Under the relaxed view it scores 0.14-0.42 on every kind. It leads log,
 listing and build, and in the counted view json.
 
+### F8a: Asking Haiku to find and re-check the facts first keeps no more of them [MEASURED]
+
+`haiku_digest_checked` gave Haiku the find-compress-check prompt at `--effort low`. All 39
+digests came from Haiku at low effort. It thought for a median 239 tokens (0-2,501). Compared
+with the first Haiku run, word for word it keeps the same answers on every kind except log,
+where it drops one more (11/13). Seven of 13 payloads again keep every answer, and json is again
+the only kind with a nonzero headline score (0.26 vs 0.27). The answers lost in all three runs
+are the same ones: `System.Text.Json`, `4.2 seconds` still written `4.2s`, `(18,83)`,
+`2 Error(s)`, `00:00:00.42`, `failed: 7`, `succeeded: 224`. It removes 2-12 points more on
+code, prose, log, listing and json and the same on build and test, in 2.0-8.6 s per kind
+(first run 1.8-11.1 s). Under the relaxed view it scores 0.17-0.40, slightly higher than the
+first run on code, prose, log and listing and slightly lower on json, build and test. The judge accepted
+11 of its 28 remaining losses and none of its 17 decoys. The prompt's check step does not
+change what Haiku drops or rewords.
+
 ### F9: The judge is strict on numbers; the relaxed view lets the summarizer control score on build and test [MEASURED]
 
-The judge ran over the 383 answers fact grading still called lost, three times each, and every
+Over the first six candidates, the judge ran over the 383 answers fact grading still called lost, three times each, and every
 one of its 294 replies parsed. It accepted none of the 222 decoys, so a changed number is not
 waved through. It accepted 39 real answers: 13 of 26 for Haiku, 23 of 199 for the summarizer,
 2 of 9 for kompress, 1 of 11 for the stand-in, and none of rtk's 126 or the shipped rules' 12.

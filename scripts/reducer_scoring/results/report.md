@@ -1,8 +1,8 @@
 controls clear the run
 
-judge: 0/222 decoys accepted, 23/199 summarizer losses accepted
+judge: 0/239 decoys accepted, 23/199 summarizer losses accepted
 
-{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
+{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest_checked": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "e4b2b82", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
 
 ## Per kind
 
@@ -22,6 +22,13 @@ judge: 0/222 decoys accepted, 23/199 summarizer losses accepted
 | haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 | 0.2711 |
 | haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4185 |
 | haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3286 |
+| haiku_digest_checked | code | 0.0 | 0.7272 | 8.6375 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1665 |
+| haiku_digest_checked | prose | 0.0 | 0.3999 | 7.2605 | 0.9286 | 13/14 | 0.0 | 0.0 | 0.1859 |
+| haiku_digest_checked | log | 0.0 | 0.7187 | 4.4650 | 0.8462 | 11/13 | 0.0 | 0.0 | 0.2917 |
+| haiku_digest_checked | listing | 0.0 | 0.607 | 2.6080 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3171 |
+| haiku_digest_checked | json | 0.2561 | 0.3886 | 4.2360 | 1.0 | 19/19 | 0.166 | 0.3514 | 0.2561 |
+| haiku_digest_checked | build | 0.0 | 0.9864 | 1.9805 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4006 |
+| haiku_digest_checked | test | 0.0 | 0.6499 | 4.3120 | 0.7 | 7/10 | 0.0 | 0.0 | 0.2627 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 | 0.0 |
@@ -76,6 +83,13 @@ judge: 0/222 decoys accepted, 23/199 summarizer losses accepted
 | haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 | 0.2711 |
 | haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4185 |
 | haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3286 |
+| haiku_digest_checked | code | 0.0 | 0.7272 | 8.6375 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1665 |
+| haiku_digest_checked | prose | 0.0 | 0.3999 | 7.2605 | 0.9286 | 13/14 | 0.0 | 0.0 | 0.1859 |
+| haiku_digest_checked | log | 0.0 | 0.7187 | 4.4650 | 0.8462 | 11/13 | 0.0 | 0.0 | 0.2917 |
+| haiku_digest_checked | listing | 0.0 | 0.607 | 2.6080 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3171 |
+| haiku_digest_checked | json | 0.2561 | 0.3886 | 4.2360 | 1.0 | 19/19 | 0.166 | 0.3514 | 0.2561 |
+| haiku_digest_checked | build | 0.0 | 0.9864 | 1.9805 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4006 |
+| haiku_digest_checked | test | 0.0 | 0.6499 | 4.3120 | 0.7 | 7/10 | 0.0 | 0.0 | 0.2627 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 | 0.0 |
@@ -142,6 +156,19 @@ judge: 0/222 decoys accepted, 23/199 summarizer losses accepted
 | haiku_digest | github_pr_list | 0.2157 | 0.3599 | 5.4920 | 1.0 | 5/5 | 0.1355 | 0.3065 | 0.2157 |
 | haiku_digest | dotnet_build_failure_verbose | 0.0 | 0.9928 | 2.0380 | 0.5 | 3/6 | 0.0 | 0.0 | 0.0 |
 | haiku_digest | dotnet_test_failures | 0.0 | 0.6833 | 3.8670 | 0.4 | 2/5 | 0.0 | 0.0 | 0.2527 |
+| haiku_digest_checked | code_file | 0.0 | 0.7482 | 7.2530 | 0.6667 | 4/6 | 0.0 | 0.0 | 0.1738 |
+| haiku_digest_checked | incident_report | 0.0 | 0.3884 | 2.5150 | 0.875 | 7/8 | 0.0 | 0.0 | 0.3284 |
+| haiku_digest_checked | agent_log | 0.0 | 0.5727 | 2.7660 | 0.75 | 6/8 | 0.0 | 0.0 | 0.3628 |
+| haiku_digest_checked | dir_listing | 0.0 | 0.607 | 2.6080 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3171 |
+| haiku_digest_checked | json_payload | 0.425 | 0.4989 | 1.7010 | 1.0 | 14/14 | 0.3122 | 0.5188 | 0.425 |
+| haiku_digest_checked | dotnet_build_failure | 0.4236 | 0.5488 | 1.8990 | 1.0 | 4/4 | 0.3021 | 0.5303 | 0.4236 |
+| haiku_digest_checked | dotnet_test_failure | 0.3251 | 0.4693 | 3.0220 | 1.0 | 5/5 | 0.218 | 0.4309 | 0.3251 |
+| haiku_digest_checked | code_file_large | 0.161 | 0.715 | 10.0220 | 1.0 | 6/6 | 0.0891 | 0.2699 | 0.161 |
+| haiku_digest_checked | prose_large | 0.1291 | 0.4014 | 12.0060 | 1.0 | 6/6 | 0.0727 | 0.2106 | 0.1291 |
+| haiku_digest_checked | rtk_proxy_log | 0.2369 | 0.7833 | 6.1640 | 1.0 | 5/5 | 0.1369 | 0.3732 | 0.2369 |
+| haiku_digest_checked | github_pr_list | 0.191 | 0.3705 | 6.7710 | 1.0 | 5/5 | 0.116 | 0.2823 | 0.191 |
+| haiku_digest_checked | dotnet_build_failure_verbose | 0.0 | 0.9929 | 2.0620 | 0.5 | 3/6 | 0.0 | 0.0 | 0.0 |
+| haiku_digest_checked | dotnet_test_failures | 0.0 | 0.6878 | 5.6020 | 0.4 | 2/5 | 0.0 | 0.0 | 0.1986 |
 | identity | code_file | 0.0 | 0.0 | 0.0000 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
 | identity | incident_report | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 | 0.0 |
 | identity | agent_log | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 | 0.0 |
