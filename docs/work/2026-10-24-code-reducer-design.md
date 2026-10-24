@@ -133,6 +133,8 @@ the whole file. No scope analysis is needed, because the map makes the change re
   entry and saves nothing.
 - Short names are chosen so they never collide with a keyword or with a name already in the file.
 - Names inside strings and comments are not renamed. Comments are usually removed by then anyway.
+- C# conservatively preserves contextual keyword spellings and native integer types, including
+  escaped forms, across declarations and references. This avoids semantic analysis for ambiguous names.
 - The map is rendered once, after the code, as lines of `short_name:original`.
 - Whether a rename pays is a token question, not a character one. The paper measured only 1 to 2%
   for renaming. My call, not the owner's: this option ships off by default until the token test

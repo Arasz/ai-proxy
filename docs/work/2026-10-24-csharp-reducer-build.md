@@ -20,7 +20,7 @@ Three independent planning lanes examined architecture, tests, and retrieval. Th
 2. A pure view builder selects C# only from `.cs`, applies independently controlled comments/imports/renaming, preserves indentation and original number prefixes, and includes the map and supplied hint in the savings comparison. Missing hint returns the original. Unknown paths use conservative lossless handling. No line-joining transform is introduced, so range labels are deferred until one exists.
 3. A developer adapter calls this actual core for offline tests. It is not a retrieval service. Tests use a clearly synthetic hint. Document the boundary and verify that the live handler remains unchanged.
 
-No production tool name or handle is invented here. The initial options are comments on, imports on, renaming off. Options remain local to the core until activation can wire them into `CompressionOptions`. Roslyn provides syntax tokens and trivia without a workspace, compilation or semantic model. Parser SDK dependencies belong in the language adapter, outside the pure core. See [ADR 0004](../adr/0004-language-parsers-behind-the-code-lexer-interface.md).
+No production tool name or handle is invented here. The initial options are comments on, imports on, renaming off. Contextual keyword spellings and native integer types are conservatively excluded from renaming, including escaped spellings, so declaration and reference handling cannot diverge. Options remain local to the core until activation can wire them into `CompressionOptions`. Roslyn provides syntax tokens and trivia without a workspace, compilation or semantic model. Parser SDK dependencies belong in the language adapter, outside the pure core. See [ADR 0004](../adr/0004-language-parsers-behind-the-code-lexer-interface.md).
 
 ## Test design
 
@@ -36,6 +36,10 @@ Expected output is hand-derived. Each behavior starts with a failing test and re
 | Only complete using directives are removed | Drop using statements and declarations |
 | Each option controls its own transformation | Ignore/invert option |
 | Repeated identifiers rename deterministically with no collisions | Global text replace or omit reserved-name check |
+| Contextual keyword spellings, escaped equivalents and native integer types stay consistent across declarations and references | Rename a method call while retaining its declaration |
+| Multiline interpolation format text retains spaces and blank lines | Classify format text as ordinary tokens |
+| Structured XML documentation spans cover the original bytes | Use trivia Span with FullString |
+| Core stays free of parser SDK references | Move Roslyn back into Core |
 | Singletons, keywords, strings and retained comments are not renamed | Rename all text occurrences |
 | Map and supplied hint count toward final size; equal/larger returns exact original | Compare code size alone |
 | Missing/unknown path never enables C# lossy steps | Sniff language from text |
@@ -69,4 +73,19 @@ Build with `dotnet build`, then run `dotnet run --no-build --project scripts/cod
 
 The hint above is synthetic. It promises no runtime retrieval. A small input may return unchanged because the hint costs more than the removed text. Missing context also returns the original safely. A successful command returns status 0; rejected JSON returns status 1 with a diagnostic on stderr and empty stdout.
 
-Adapter validation on 2026-10-24 ran 24 focused contract tests, including actual-core option forwarding, malformed and invalid contracts, and safe missing-context results. The real console was also run twice per mode on both existing C# fixtures to check deterministic output. With the 41-character synthetic hint `[fixture retrieve_original before editing]`, `code_file.txt` went from 7,509 characters to 5,414 with renaming off and 4,642 with it on (46 map entries); `code_file_large.txt` went from 12,812 to 11,288 and 9,153 (90 entries). These complete-view character checks include the hint and map; they are not token scores or model edit evidence.
+Adapter contract tests cover actual-core option forwarding, malformed and invalid contracts, and safe missing-context results. Final combined validation and fixture measurements are recorded below after integration. These are offline support checks, not token scores or model edit evidence.
+
+## Integrated validation
+
+The final source at `a3048d4` passed the Release build and test gates. Independent QA ran 75 reducer/adapter cases with no failures or skips, then restored a clean worktree after six intended mutations. Parser error handling, identifier ValueText grouping, interpolation text protection, duplicate JSON rejection and empty error output all caught their mutations. The directive-only mutation initially survived; an active-directive regression caught it in both lexer and reducer tests after the gap was fixed. QA then repeated the actual CLI cases that had exposed contextual method/property renaming and interpolation-format whitespace loss; both preserved the source facts.
+
+Independent code and architecture reviews found no remaining blockers. The host, live handler, compression pipeline and storage have no changes in this build. Roslyn is referenced only by the new language adapter, composed by the offline CLI and tests.
+
+The Release console ran twice per mode on each C# fixture with the 41-character synthetic hint `[fixture retrieve_original before editing]`. All four results were supported, smaller and deterministic. Sizes below count the entire view including map and hint.
+
+| Fixture | Original characters | Renaming off | Renaming on |
+|---|---:|---:|---:|
+| `code_file.txt` | 7,509 | 5,414 | 4,571 |
+| `code_file_large.txt` | 12,812 | 11,288 | 9,142 |
+
+These are character measurements from offline checks. They establish neither token savings nor agent edit success. Runtime retrieval and all remaining design acceptance checks belong to the activation task.
