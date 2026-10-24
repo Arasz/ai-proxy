@@ -17,6 +17,7 @@ import sqlite3
 import sys
 import zlib
 from collections import Counter
+from contextlib import closing
 from dataclasses import dataclass, field
 
 MESSAGES_PATH = "/v1/messages"
@@ -176,12 +177,11 @@ def summarize(bodies) -> Summary:
 
 def read_bodies(db_path: str):
     """Captured `/v1/messages` bodies, oldest first."""
-    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as connection:
         rows = connection.execute(
-            "select body from capture_request where path = ? order by captured_at", (MESSAGES_PATH,)).fetchall()
-    connection.close()
-    for (raw,) in rows:
-        yield raw
+            "select body from capture_request where path = ? order by captured_at", (MESSAGES_PATH,))
+        for (raw,) in rows:
+            yield raw
 
 
 def render(summary: Summary) -> str:

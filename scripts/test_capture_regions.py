@@ -4,6 +4,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from capture_regions import read_bodies, regions, render, summarize
 
@@ -128,6 +129,31 @@ class SummaryTests(unittest.TestCase):
 
 
 class ReadTests(unittest.TestCase):
+    def test_first_body_is_yielded_before_the_remaining_bodies_are_loaded(self):
+        connection = sqlite3.connect(":memory:")
+        loaded = []
+        def observe(raw):
+            loaded.append(raw)
+            return raw
+        connection.create_function("observe", 1, observe)
+        connection.executescript("""
+            create table captures(captured_at integer, path text, body blob);
+            create index capture_order on captures(captured_at);
+            create view capture_request as
+                select captured_at, path, observe(body) as body from captures;
+        """)
+        connection.executemany("insert into captures values (?, '/v1/messages', ?)",
+                               [(i, str(i).encode()) for i in range(10)])
+        with patch("capture_regions.sqlite3.connect", return_value=connection):
+            bodies = read_bodies("unused.db")
+            try:
+                self.assertEqual(next(bodies), b"0")
+                self.assertLess(len(loaded), 10)
+            finally:
+                bodies.close()
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("select 1")
+
     def test_only_message_requests_are_read(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = os.path.join(tmp, "capture.db")
