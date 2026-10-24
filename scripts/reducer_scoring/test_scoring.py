@@ -10,9 +10,24 @@ from scoring import (
     void_reasons,
 )
 import tokens  # noqa: E402
+from compression_score import compression  # noqa: E402
 
 QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "Which PR?", "a": "PR 8842"}]
 ORIGINAL = "Dana Okonkwo merged PR 8842 after the incident." * 4
+
+
+class QaChargeTests(unittest.TestCase):
+    def runs(self, **extra):
+        return [QaRun("short", 0.1, [["Dana Okonkwo"] * 3, ["PR 8842"] * 3], **extra) for _ in range(3)]
+
+    def test_added_and_fetched_tokens_count_against_the_reduction(self):
+        base = qa_row(ORIGINAL, QUESTIONS, self.runs()).measurement.reduced_tokens
+        charged = qa_row(ORIGINAL, QUESTIONS, self.runs(added_tokens=100, fetched_tokens=tokens.estimate(ORIGINAL)))
+        self.assertEqual(charged.measurement.reduced_tokens, base + 100 + tokens.estimate(ORIGINAL))
+
+    def test_a_fetched_original_is_not_a_saving(self):
+        fetched = qa_row(ORIGINAL, QUESTIONS, self.runs(fetched_tokens=tokens.estimate(ORIGINAL))).measurement
+        self.assertLessEqual(compression(fetched), 0.0)
 
 
 class QaKeptTests(unittest.TestCase):
