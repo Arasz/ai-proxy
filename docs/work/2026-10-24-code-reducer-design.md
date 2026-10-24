@@ -1,7 +1,7 @@
 # Design: an in-process code reducer with per-language lexers
 
 **Date:** 2026-10-24
-**Status:** proposed, waiting for owner approval
+**Status:** approved by owner on 2026-10-24. The [inactive C# core](2026-10-24-csharp-reducer-build.md) builds first; [runtime activation](2026-10-24-csharp-reducer-activation.md) follows CCR retrieval.
 **Goal:** take the code score from the shipped rules' 0.30 toward 0.6 without the agent losing the
 ability to edit what it read.
 
@@ -73,9 +73,10 @@ The owner made these in the 2026-10-24 design conversation.
 5. **Unnumbered output stays unnumbered.** Claude Code's Read numbers its lines, and `cat -n` does;
    those keep original numbers. Plain `cat` output gets no numbers added. `sed -n` and other partial
    reads are out of scope.
-6. **The reducer runs in process, with our own lexers.** No external minifier processes (esbuild,
+6. **The reducer runs in process, with language adapters behind our lexer interface.** No external minifier processes (esbuild,
    python-minifier). Existing minifiers all print one line, which breaks decisions 3 and 4; what we
-   need from them is comment- and string-aware scanning, which a lexer gives.
+   need from them is comment- and string-aware scanning. Roslyn supplies C# syntax; Tree-sitter
+   supplies the later language frontends (owner approved on 2026-10-24).
 7. **One interface for every language**, with options per step.
 8. **An option removes comments**, doc comments and docstrings included. Imports and usings go too
    (the owner accepts losing them).
@@ -119,8 +120,9 @@ The shape below is a sketch for the builder, not a fixed API. It should fit behi
 - **Options** switch each lossy step on or off: `RemoveComments`, `RemoveImports`,
   `RenameIdentifiers`.
 - **Languages, in order** (my call on the order): C#, then TypeScript and JavaScript (one lexer), Python, CSS, HTML.
-  CSharpMinifier's scanner (NuGet, no dependencies, .NET 8 and 10) can serve as the C# lexer or as
-  the reference for ours; the builder decides which.
+  C# uses Roslyn. TS/JS, Python, CSS and HTML use Tree-sitter, through the same interface.
+  Each language still needs its own safe token classification, transformations and acceptance fixtures.
+  See [ADR 0004](../adr/0004-language-parsers-behind-the-code-lexer-interface.md).
 
 ## Renaming and the map
 
@@ -131,6 +133,8 @@ the whole file. No scope analysis is needed, because the map makes the change re
   entry and saves nothing.
 - Short names are chosen so they never collide with a keyword or with a name already in the file.
 - Names inside strings and comments are not renamed. Comments are usually removed by then anyway.
+- C# conservatively preserves contextual keyword spellings and native integer types, including
+  escaped forms, across declarations and references. This avoids semantic analysis for ambiguous names.
 - The map is rendered once, after the code, as lines of `short_name:original`.
 - Whether a rename pays is a token question, not a character one. The paper measured only 1 to 2%
   for renaming. My call, not the owner's: this option ships off by default until the token test
@@ -195,7 +199,7 @@ answer is my call rather than the owner's, it says so.
 - How the file path reaches the reducer: a new field on `ContentPart`, or the decompositor routing
   by path.
 - The exact hint wording, as long as it names the retrieval tool and says to use it before editing.
-- Whether the C# lexer is CSharpMinifier's scanner or our own, written against it as a reference.
+- The language adapter implementation and grammar versions, within the Roslyn/Tree-sitter decision.
 - The short-name alphabet and the order names are assigned in.
 
 ## Acceptance

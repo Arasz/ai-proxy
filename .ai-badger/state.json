@@ -1,7 +1,15 @@
 {
-  "lastUpdated": "2026-10-24",
-  "next": "Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
+  "lastUpdated": "2026-10-24T18:51:17.735029+00:00",
+  "next": "Next: aip-activate-csharp-reducer-with-retrieval (docs/work/2026-10-24-csharp-reducer-activation.md): CCR prerequisite, trusted call paths, exact-file retrieval and storage-failure fallback, then runtime/model/token acceptance. Tree-sitter language PRs follow activation in order TS/JS, Python, CSS, HTML. Existing backlog: Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
   "completedTasks": [
+    {
+      "taskId": "aip-implement-csharp-code-reducer-safely",
+      "date": "2026-10-24",
+      "title": "Stage inactive C# reducer core and offline adapter",
+      "pr": 49,
+      "summary": "Roslyn adapter behind a pure Core lexer port; 75 reducer/adapter cases, executed mutation QA and offline fixture checks pass. Runtime activation remains blocked on exact-file retrieval. Tree-sitter selected for later languages.",
+      "hasNotes": true
+    },
     {
       "taskId": "aip-provider-api-subdomain-host-matching",
       "date": "2026-10-24",
@@ -69,5 +77,6 @@
         "A body larger than 8 MiB is refused rather than forwarded unread."
       ]
     }
-  ]
+  ],
+  "notesRef": ".ai-badger/status-notes.json"
 }

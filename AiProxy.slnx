@@ -1,10 +1,14 @@
 <Solution>
     <Folder Name="/src/">
         <Project Path="src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <Project Path="src/AiProxy.Code/AiProxy.Code.csproj"/>
         <Project Path="src/AiProxy/AiProxy.csproj"/>
         <Project Path="src/AiProxy.Storage/AiProxy.Storage.csproj"/>
     </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/AiProxy.Tests/AiProxy.Tests.csproj"/>
+    </Folder>
+    <Folder Name="/scripts/">
+        <Project Path="scripts/code_reducer_core/CodeReducerCore.csproj"/>
     </Folder>
 </Solution>
