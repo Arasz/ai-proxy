@@ -251,6 +251,48 @@ public class ContentCompressionPipelineTests
             await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.OpenAi), source.Token));
     }
 
+    [Fact]
+    public async Task Each_step_reports_how_long_it_took_and_reduce_is_kept_per_content_type()
+    {
+        var time = new FakeTimeProvider();
+        var store = new RecordingContentStore { OnStore = () => time.Advance(TimeSpan.FromMilliseconds(3)) };
+        var (pipeline, _) = Build(store: store, time: time, logHandler: new SlowHandler(new LogCompressionHandler(), time, TimeSpan.FromMilliseconds(7)));
+        var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
+
+        var result = await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.OpenAi), CancellationToken.None);
+
+        Assert.True(result.Changed);
+        Assert.Equal(["find", "decompose", "reduce.Log", "compose", "rebuild", "store"], result.Stages.Select(stage => stage.Name));
+        var logParts = Assert.Single(store.Records).Parts.Count(part => part.Type == ContentType.Log && part.Path != "below-minimum");
+        Assert.True(logParts > 0, "the body must reach the log reducer, or the timing proves nothing");
+        Assert.Equal(TimeSpan.FromMilliseconds(7 * logParts), result.Stages.Single(stage => stage.Name == "reduce.Log").Elapsed);
+        Assert.Equal(TimeSpan.FromMilliseconds(3), result.Stages.Single(stage => stage.Name == "store").Elapsed);
+        Assert.All(result.Stages.Where(stage => stage.Name is not ("reduce.Log" or "store")), stage => Assert.Equal(TimeSpan.Zero, stage.Elapsed));
+    }
+
+    [Fact]
+    public async Task A_body_without_tool_output_still_reports_the_search()
+    {
+        var (pipeline, _) = Build();
+
+        var result = await pipeline.CompressAsync(new CompressionRequest("""{"model":"m"}"""u8.ToArray(), "application/json", Dialect.OpenAi), CancellationToken.None);
+
+        Assert.False(result.Changed);
+        Assert.Equal(["find"], result.Stages.Select(stage => stage.Name));
+    }
+
+    /// <summary>Runs another handler and moves the clock on, so a stage has a known duration.</summary>
+    private sealed class SlowHandler(ICompressionHandler inner, FakeTimeProvider time, TimeSpan cost) : ICompressionHandler
+    {
+        public bool CanHandle(ContentType type) => inner.CanHandle(type);
+
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
+        {
+            time.Advance(cost);
+            return inner.HandleAsync(part, cancellationToken);
+        }
+    }
+
     private sealed class ThrowingLogHandler(bool cancelled = false) : ICompressionHandler
     {
         public bool CanHandle(ContentType type) => type == ContentType.Log;
@@ -265,8 +307,12 @@ public class ContentCompressionPipelineTests
 
         public Exception? Failure { get; init; }
 
+        public Action? OnStore { get; init; }
+
         public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
         {
+            OnStore?.Invoke();
+
             if (Failure is not null)
             {
                 throw Failure;
