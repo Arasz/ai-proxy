@@ -1,6 +1,6 @@
 controls clear the run
 
-{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
+{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
 
 ## Per kind
 
@@ -13,6 +13,13 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | json | 0.0922 | 0.3189 | 17.5466 | 1.0 | 19/19 | 0.051 | 0.1549 |
 | digest_gpt_stand_in (stand-in) | build | 0.0 | 0.985 | 6.9746 | 0.9 | 9/10 | 0.0 | 0.0 |
 | digest_gpt_stand_in (stand-in) | test | 0.0 | 0.5599 | 13.1300 | 0.8 | 8/10 | 0.0 | 0.0 |
+| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 |
+| haiku_digest | prose | 0.0 | 0.2799 | 8.3410 | 0.9286 | 13/14 | 0.0 | 0.0 |
+| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 |
+| haiku_digest | listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 |
+| haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 |
+| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 |
+| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 |
@@ -60,6 +67,13 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | json | 0.0922 | 0.3189 | 17.5466 | 1.0 | 19/19 | 0.051 | 0.1549 |
 | digest_gpt_stand_in (stand-in) | build | 0.0 | 0.985 | 6.9746 | 0.9 | 9/10 | 0.0 | 0.0 |
 | digest_gpt_stand_in (stand-in) | test | 0.0 | 0.5599 | 13.1300 | 0.8 | 8/10 | 0.0 | 0.0 |
+| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 |
+| haiku_digest | prose | 0.0 | 0.2799 | 8.3410 | 0.9286 | 13/14 | 0.0 | 0.0 |
+| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 |
+| haiku_digest | listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 |
+| haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 |
+| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 |
+| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 |
@@ -113,6 +127,19 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | github_pr_list | 0.0625 | 0.3216 | 27.8702 | 1.0 | 5/5 | 0.0334 | 0.1108 |
 | digest_gpt_stand_in (stand-in) | dotnet_build_failure_verbose | 0.0 | 0.9909 | 7.3170 | 0.8333 | 5/6 | 0.0 | 0.0 |
 | digest_gpt_stand_in (stand-in) | dotnet_test_failures | 0.0 | 0.5969 | 17.6959 | 0.6 | 3/5 | 0.0 | 0.0 |
+| haiku_digest | code_file | 0.0 | 0.6861 | 8.8270 | 0.6667 | 4/6 | 0.0 | 0.0 |
+| haiku_digest | incident_report | 0.0 | 0.2867 | 4.3100 | 0.875 | 7/8 | 0.0 | 0.0 |
+| haiku_digest | agent_log | 0.0 | 0.4617 | 5.3180 | 0.875 | 7/8 | 0.0 | 0.0 |
+| haiku_digest | dir_listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 |
+| haiku_digest | json_payload | 0.391 | 0.4511 | 1.8990 | 1.0 | 14/14 | 0.2851 | 0.4801 |
+| haiku_digest | dotnet_build_failure | 0.4666 | 0.5865 | 1.5810 | 1.0 | 4/4 | 0.3409 | 0.5721 |
+| haiku_digest | dotnet_test_failure | 0.4076 | 0.5392 | 2.0520 | 1.0 | 5/5 | 0.2874 | 0.5154 |
+| haiku_digest | code_file_large | 0.1268 | 0.707 | 13.3530 | 1.0 | 6/6 | 0.0687 | 0.22 |
+| haiku_digest | prose_large | 0.118 | 0.279 | 12.3720 | 1.0 | 6/6 | 0.0682 | 0.1857 |
+| haiku_digest | rtk_proxy_log | 0.3072 | 0.6834 | 4.0470 | 1.0 | 5/5 | 0.1894 | 0.4458 |
+| haiku_digest | github_pr_list | 0.2157 | 0.3599 | 5.4920 | 1.0 | 5/5 | 0.1355 | 0.3065 |
+| haiku_digest | dotnet_build_failure_verbose | 0.0 | 0.9928 | 2.0380 | 0.5 | 3/6 | 0.0 | 0.0 |
+| haiku_digest | dotnet_test_failures | 0.0 | 0.6833 | 3.8670 | 0.4 | 2/5 | 0.0 | 0.0 |
 | identity | code_file | 0.0 | 0.0 | 0.0000 | 1.0 | 6/6 | 0.0 | 0.0 |
 | identity | incident_report | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 |
 | identity | agent_log | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 |

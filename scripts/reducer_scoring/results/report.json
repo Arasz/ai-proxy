@@ -261,6 +261,266 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 7509,
+   "reduced_chars": 2357,
+   "compression": 0.6861,
+   "latency_s": 8.827,
+   "latency_score": 0.1018,
+   "retention": 0.6667,
+   "answers": "4/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "code_file",
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 1416,
+   "reduced_chars": 1010,
+   "compression": 0.2867,
+   "latency_s": 4.31,
+   "latency_score": 0.1883,
+   "retention": 0.875,
+   "answers": "7/8",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "incident_report",
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 2530,
+   "reduced_chars": 1362,
+   "compression": 0.4617,
+   "latency_s": 5.318,
+   "latency_score": 0.1583,
+   "retention": 0.875,
+   "answers": "7/8",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "agent_log",
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 256,
+   "compression": 0.5548,
+   "latency_s": 2.58,
+   "latency_score": 0.2793,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "dir_listing",
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 880,
+   "reduced_chars": 483,
+   "compression": 0.4511,
+   "latency_s": 1.899,
+   "latency_score": 0.3449,
+   "retention": 1.0,
+   "answers": "14/14",
+   "score": 0.391,
+   "score_at": {
+    "0.5": 0.2851,
+    "1.0": 0.391,
+    "2.0": 0.4801
+   },
+   "payload": "json_payload",
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 902,
+   "reduced_chars": 373,
+   "compression": 0.5865,
+   "latency_s": 1.581,
+   "latency_score": 0.3874,
+   "retention": 1.0,
+   "answers": "4/4",
+   "score": 0.4666,
+   "score_at": {
+    "0.5": 0.3409,
+    "1.0": 0.4666,
+    "2.0": 0.5721
+   },
+   "payload": "dotnet_build_failure",
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 1174,
+   "reduced_chars": 541,
+   "compression": 0.5392,
+   "latency_s": 2.052,
+   "latency_score": 0.3277,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.4076,
+   "score_at": {
+    "0.5": 0.2874,
+    "1.0": 0.4076,
+    "2.0": 0.5154
+   },
+   "payload": "dotnet_test_failure",
+   "kind": "test"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12812,
+   "reduced_chars": 3754,
+   "compression": 0.707,
+   "latency_s": 13.353,
+   "latency_score": 0.0697,
+   "retention": 1.0,
+   "answers": "6/6",
+   "score": 0.1268,
+   "score_at": {
+    "0.5": 0.0687,
+    "1.0": 0.1268,
+    "2.0": 0.22
+   },
+   "payload": "code_file_large",
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 11107,
+   "reduced_chars": 8008,
+   "compression": 0.279,
+   "latency_s": 12.372,
+   "latency_score": 0.0748,
+   "retention": 1.0,
+   "answers": "6/6",
+   "score": 0.118,
+   "score_at": {
+    "0.5": 0.0682,
+    "1.0": 0.118,
+    "2.0": 0.1857
+   },
+   "payload": "prose_large",
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5721,
+   "reduced_chars": 1811,
+   "compression": 0.6834,
+   "latency_s": 4.047,
+   "latency_score": 0.1981,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.3072,
+   "score_at": {
+    "0.5": 0.1894,
+    "1.0": 0.3072,
+    "2.0": 0.4458
+   },
+   "payload": "rtk_proxy_log",
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5363,
+   "reduced_chars": 3433,
+   "compression": 0.3599,
+   "latency_s": 5.492,
+   "latency_score": 0.154,
+   "retention": 1.0,
+   "answers": "5/5",
+   "score": 0.2157,
+   "score_at": {
+    "0.5": 0.1355,
+    "1.0": 0.2157,
+    "2.0": 0.3065
+   },
+   "payload": "github_pr_list",
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 60672,
+   "reduced_chars": 438,
+   "compression": 0.9928,
+   "latency_s": 2.038,
+   "latency_score": 0.3292,
+   "retention": 0.5,
+   "answers": "3/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "dotnet_build_failure_verbose",
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 5592,
+   "reduced_chars": 1771,
+   "compression": 0.6833,
+   "latency_s": 3.867,
+   "latency_score": 0.2055,
+   "retention": 0.4,
+   "answers": "2/5",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "payload": "dotnet_test_failures",
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -1553,6 +1813,139 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 20321,
+   "reduced_chars": 6111,
+   "compression": 0.6993,
+   "latency_s": 11.09,
+   "latency_score": 0.0827,
+   "retention": 0.8333,
+   "answers": "10/12",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12523,
+   "reduced_chars": 9018,
+   "compression": 0.2799,
+   "latency_s": 8.341,
+   "latency_score": 0.1071,
+   "retention": 0.9286,
+   "answers": "13/14",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 8251,
+   "reduced_chars": 3173,
+   "compression": 0.6154,
+   "latency_s": 4.6825,
+   "latency_score": 0.176,
+   "retention": 0.9231,
+   "answers": "12/13",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 256,
+   "compression": 0.5548,
+   "latency_s": 2.58,
+   "latency_score": 0.2793,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6243,
+   "reduced_chars": 3916,
+   "compression": 0.3727,
+   "latency_s": 3.6955,
+   "latency_score": 0.213,
+   "retention": 1.0,
+   "answers": "19/19",
+   "score": 0.2711,
+   "score_at": {
+    "0.5": 0.1806,
+    "1.0": 0.2711,
+    "2.0": 0.3616
+   },
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 61574,
+   "reduced_chars": 811,
+   "compression": 0.9868,
+   "latency_s": 1.8095,
+   "latency_score": 0.3559,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6766,
+   "reduced_chars": 2312,
+   "compression": 0.6583,
+   "latency_s": 2.9595,
+   "latency_score": 0.2526,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -2301,6 +2694,139 @@
    "kind": "test"
   },
   {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 20321,
+   "reduced_chars": 6111,
+   "compression": 0.6993,
+   "latency_s": 11.09,
+   "latency_score": 0.0827,
+   "retention": 0.8333,
+   "answers": "10/12",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "code"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 12523,
+   "reduced_chars": 9018,
+   "compression": 0.2799,
+   "latency_s": 8.341,
+   "latency_score": 0.1071,
+   "retention": 0.9286,
+   "answers": "13/14",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "prose"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 8251,
+   "reduced_chars": 3173,
+   "compression": 0.6154,
+   "latency_s": 4.6825,
+   "latency_score": 0.176,
+   "retention": 0.9231,
+   "answers": "12/13",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "log"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 575,
+   "reduced_chars": 256,
+   "compression": 0.5548,
+   "latency_s": 2.58,
+   "latency_score": 0.2793,
+   "retention": 0.8333,
+   "answers": "5/6",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "listing"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6243,
+   "reduced_chars": 3916,
+   "compression": 0.3727,
+   "latency_s": 3.6955,
+   "latency_score": 0.213,
+   "retention": 1.0,
+   "answers": "19/19",
+   "score": 0.2711,
+   "score_at": {
+    "0.5": 0.1806,
+    "1.0": 0.2711,
+    "2.0": 0.3616
+   },
+   "kind": "json"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 61574,
+   "reduced_chars": 811,
+   "compression": 0.9868,
+   "latency_s": 1.8095,
+   "latency_score": 0.3559,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "build"
+  },
+  {
+   "candidate": "haiku_digest",
+   "not_applicable": false,
+   "stand_in": false,
+   "original_chars": 6766,
+   "reduced_chars": 2312,
+   "compression": 0.6583,
+   "latency_s": 2.9595,
+   "latency_score": 0.2526,
+   "retention": 0.7,
+   "answers": "7/10",
+   "score": 0.0,
+   "score_at": {
+    "0.5": 0.0,
+    "1.0": 0.0,
+    "2.0": 0.0
+   },
+   "kind": "test"
+  },
+  {
    "candidate": "identity",
    "not_applicable": false,
    "stand_in": false,
@@ -2972,6 +3498,13 @@
    "date": "2026-10-24",
    "machine": "Apple M4, 24 GB, macOS 27.0.1",
    "commit": "0d7d19b",
+   "rtk_proxy": "rtk-proxy 1.0.1",
+   "pi": "1.4.0"
+  },
+  "haiku_digest": {
+   "date": "2026-10-24",
+   "machine": "Apple M4, 24 GB, macOS 27.0.1",
+   "commit": "a7fe033",
    "rtk_proxy": "rtk-proxy 1.0.1",
    "pi": "1.4.0"
   },

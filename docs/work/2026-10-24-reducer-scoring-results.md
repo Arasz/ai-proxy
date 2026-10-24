@@ -12,7 +12,8 @@ of all six candidates; nothing already scored was re-scored.
 
 **Machine:** Apple M4, 24 GB, macOS 27.0.1. **rtk-proxy** 1.0.1, **pi** 1.4.0. Five candidates
 ran at commit `0d7d19b`. rtk was re-run at `1820d4a` after the code review found its injected
-tool definition was not counted (F6). `results/environment.json` records this per candidate.
+tool definition was not counted (F6). The Haiku digest ran at `a7fe033`, after the second
+amendment. `results/environment.json` records this per candidate.
 Each candidate ran three times on each payload. Each number is a median over the three runs,
 taken field by field, so a row's length, latency and answers can come from different runs.
 
@@ -36,8 +37,9 @@ taken field by field, so a row's length, latency and answers can come from diffe
 - **The reader is not the pre-registered one.** No working Anthropic key was available. The
   reader, digest and summarizer ran on `openai/gpt-6.1-sol` through pi, which is the only model
   the owner's ChatGPT plan accepts. The digest row is therefore a **stand-in**: its retention
-  and compression are real for that model, but its latency is not Haiku's, and it does not
-  settle `digest-verdict`.
+  and compression are real for that model, but its latency is not Haiku's. The second
+  amendment added the real Haiku digest (`claude-haiku-5-5` through `claude -p`, timed by the
+  model's own `duration_api_ms`). Its reader is still `gpt-6.1-sol`.
 
 ## Per kind, at the 1 s budget
 
@@ -45,15 +47,15 @@ A cell is the score, then (compression, latency) when every answer survived, or 
 when one was lost. Where the two views differ, the counted view is in brackets. Scores at
 0.5 s and 2 s are in `results/report.md`. They change no ranking.
 
-| kind | shipped rules | kompress int8 | rtk CCR | digest (stand-in) | identity | summarizer |
-|---|---|---|---|---|---|---|
-| code | **0.30** (18%, 2 ms) | 0.09 (5%, 3.2 s) | 0 (9/12) | 0 (11/12) | 0 (0%) | 0 (2/12) |
-| prose | n/a [0, 0%] | **0.17** (12%, 2.5 s) | 0 (7/14) | 0.07 (31%, 26 s) | 0 (0%) | 0 (2/14) |
-| log | 0 (9/13) | 0.002 (0.1%, 1.4 s) | 0 (8/13) | **0.12** (67%, 14 s) | 0 (0%) | 0 (2/13) |
-| listing | n/a [0, 0%] | n/a [0, 0%] | n/a [0, 0%] | 0 (5/6) | 0 (0%) | 0 (1/6) |
-| json | **0.46** (30%) [0.08, 4%] | 0.09 (5%, 1.6 s) [0.08] | 0 (0/19) | 0.09 (32%, 18 s) | 0 (0%) | 0 (2/19) |
-| build | **0.41** (26%) [0.008, 0.4%] | 0 (5/6) [0 (9/10)] | 0 (2/6) [0 (6/10)] | 0 (9/10) | 0 (0%) | 0 (5/10) |
-| test | **0.40** (25%) [0.34, 21%] | 0 (7/10) | 0 (6/10) | 0 (8/10) | 0 (0%) | 0 (5/10) |
+| kind | shipped rules | kompress int8 | rtk CCR | Haiku digest | digest (stand-in) | identity | summarizer |
+|---|---|---|---|---|---|---|---|
+| code | **0.30** (18%, 2 ms) | 0.09 (5%, 3.2 s) | 0 (9/12) | 0 (10/12) | 0 (11/12) | 0 (0%) | 0 (2/12) |
+| prose | n/a [0, 0%] | **0.17** (12%, 2.5 s) | 0 (7/14) | 0 (13/14) | 0.07 (31%, 26 s) | 0 (0%) | 0 (2/14) |
+| log | 0 (9/13) | 0.002 (0.1%, 1.4 s) | 0 (8/13) | 0 (12/13) | **0.12** (67%, 14 s) | 0 (0%) | 0 (2/13) |
+| listing | n/a [0, 0%] | n/a [0, 0%] | n/a [0, 0%] | 0 (5/6) | 0 (5/6) | 0 (0%) | 0 (1/6) |
+| json | **0.46** (30%) [0.08, 4%] | 0.09 (5%, 1.6 s) [0.08] | 0 (0/19) | 0.27 (37%, 3.7 s) | 0.09 (32%, 18 s) | 0 (0%) | 0 (2/19) |
+| build | **0.41** (26%) [0.008, 0.4%] | 0 (5/6) [0 (9/10)] | 0 (2/6) [0 (6/10)] | 0 (7/10) | 0 (9/10) | 0 (0%) | 0 (5/10) |
+| test | **0.40** (25%) [0.34, 21%] | 0 (7/10) | 0 (6/10) | 0 (7/10) | 0 (8/10) | 0 (0%) | 0 (5/10) |
 
 The shipped rules ran in under 3 ms on every kind.
 
@@ -65,8 +67,8 @@ Identity kept every answer on every kind, so each of the 84 questions can be ans
 own payload by the reader. Identity also scores 0 everywhere, because it removes nothing. The
 summarizer control failed the retention gate on 12 of 13 payloads. The exception is the small
 test failure (`dotnet_test_failure`): its five answers fit in a two-sentence summary. One of 13
-is well under the "more than half" void rule. Neither void rule fired. All 351 reader replies
-parsed as an answer array, so no answer was lost to formatting. Every candidate has exactly
+is well under the "more than half" void rule. Neither void rule fired. All 468 reader replies,
+including the 117 for the Haiku digest, parsed as an answer array, so no answer was lost to formatting. Every candidate has exactly
 three runs of every payload, and the rules runner recorded no reducer failure.
 
 ### F2: The shipped rules lead on code and test output; json and build depend on the view [MEASURED]
@@ -76,7 +78,7 @@ the untouched test payload is counted), removing about 20% in under 3 ms. In the
 pre-registered view they also lead json (0.46) and build output (0.41). Those two leads come
 from leaving out a payload the rules ran on and did not change: the 25-item `github_pr_list`
 JSON and the 60 KB verbose build log. Counting them, json drops to 0.08, behind the digest
-stand-in's 0.09, and build drops to 0.008. Latency barely counts at these speeds, so the
+stand-in's 0.09 and the Haiku digest's 0.27, and build drops to 0.008. Latency barely counts at these speeds, so the
 score is almost all compression.
 
 ### F3: The log reducer loses 4 of 5 answers on rtk-proxy's own log [MEASURED]
@@ -126,10 +128,21 @@ On `gpt-6.1-sol` the digest kept every answer on prose, logs and JSON, removing 
 dropped `System.Text.Json` from the code file, a file name from the listing, and the
 `(18,83)` error position from the verbose build log. Its latency, 4-26 s per kind and up to
 42 s on `prose_large`, holds its best score to 0.12 at 1 s and 0.21 at 2 s. Haiku would be
-faster, so its latency here says nothing about Haiku. Settling `digest-verdict` needs one Haiku
-run through `claude_digest_runner.py`, started by `harness.py run haiku_digest`.
+faster, so its latency here says nothing about Haiku. F8 has the Haiku run.
 
-### F8: What this does not cover [UNVERIFIED]
+### F8: The Haiku digest is fast but drops answers on 6 of 7 kinds [MEASURED]
+
+On `claude-haiku-5-5` the digest took 1.6-13 s per payload (1.8-11 s per kind), 1.7 to 4.7
+times faster than the stand-in per kind. It kept every answer only on json, removing 37% in 3.7 s, for
+a score of 0.27 at 1 s and 0.36 at 2 s. That is the best json score in the counted view. On
+every other kind it lost one to three answers. Answers lost in all three runs:
+`System.Text.Json` (code file), `4.2 seconds` (incident report), and on the large payloads the
+`(18,83)` error position and `2 Error(s)` (verbose build log) and the `failed: 7` and
+`succeeded: 224` totals (test failures). Exact figures and counts are what a digest drops. Seven of 13
+payloads kept every answer, with per-payload scores of 0.12-0.47. On this evidence the digest does
+not pass `digest-verdict` as a general reducer. Json is the one kind where it leads.
+
+### F9: What this does not cover [UNVERIFIED]
 
 - One machine, one reader model, and 13 payloads, with at least two per kind except listings
   (one).
@@ -142,7 +155,8 @@ run through `claude_digest_runner.py`, started by `harness.py run haiku_digest`.
   the proxy variables and sets `NO_PROXY=*`, and pi's config sets no base URL.
 - A pi error that exits 0 and does not start with one of the three known error prefixes would
   be scored as output. Every raw reply and output in this run was checked and is real content.
-- The follow-ups are retrieval-aware scoring for rtk, a Haiku digest run, and a fix for F3.
+- The Haiku digest was graded by the `gpt-6.1-sol` reader, not a Haiku reader.
+- The follow-ups are retrieval-aware scoring for rtk and a fix for F3.
 
 ## Reviews
 
