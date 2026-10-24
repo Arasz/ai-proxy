@@ -1,12 +1,19 @@
+using AiProxy.Core.Content.Code;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace AiProxy.Core.Content.Code;
+namespace AiProxy.Code;
 
 /// <summary>Scans C# syntax tokens and trivia with the Roslyn parser.</summary>
 public sealed class CSharpCodeLexer : ICodeLexer
 {
+    /// <inheritdoc />
+    public bool SupportsPath(string? filePath) =>
+        filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+
+    bool ICodeLexer.IsKeyword(string text) => IsKeyword(text);
+
     /// <summary>Whether a spelling is reserved by C# or used as a contextual keyword.</summary>
     public static bool IsKeyword(string text) =>
         SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None

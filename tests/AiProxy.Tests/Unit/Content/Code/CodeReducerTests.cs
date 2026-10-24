@@ -1,4 +1,5 @@
 using AiProxy.Core.Content.Code;
+using AiProxy.Code;
 
 namespace AiProxy.Tests.Unit.Content.Code;
 
@@ -11,7 +12,7 @@ public sealed class CodeReducerTests
     {
         const string source = "// A deliberately long comment makes the complete compacted view smaller than the original.\n\n    int value = 1; // another long removable comment\n";
 
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(), Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(), Hint);
 
         Assert.True(result.Changed);
         Assert.True(result.Supported);
@@ -27,7 +28,7 @@ public sealed class CodeReducerTests
     public void Missing_hint_or_unknown_path_returns_exact_original(string? hint, string? path)
     {
         const string source = "// long removable comment would otherwise allow reduction of this file\r\n    int value = 1;\r\n";
-        var result = new CodeReducer().Reduce(source, path, null, hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, path, null, hint);
 
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
@@ -37,7 +38,7 @@ public sealed class CodeReducerTests
     public void Multiline_literals_keep_blank_lines_and_trailing_spaces()
     {
         const string source = "// a very long removable comment provides enough savings for the complete hint too\nvar text = \"\"\"\n    first   \n\n    last  \n    \"\"\";\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.Equal("var text = \"\"\"\n    first   \n\n    last  \n    \"\"\";\n" + Hint, result.Text);
@@ -47,7 +48,7 @@ public sealed class CodeReducerTests
     public void Inline_comment_removal_keeps_identifier_separation()
     {
         const string source = "// a very long removable comment provides enough savings for the complete hint too\nint/*removed*/value = 1;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.Contains("int           value", result.Text, StringComparison.Ordinal);
@@ -57,7 +58,7 @@ public sealed class CodeReducerTests
     public void Unsupported_numbered_CRLF_input_is_byte_exact()
     {
         const string source = "  1\t// a long comment that must remain untouched\r\n  2\t#if DEBUG\r\n  3\t    int value = 1;\r\n  4\t#endif\r\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.False(result.Changed);
         Assert.False(result.Supported);
@@ -69,7 +70,7 @@ public sealed class CodeReducerTests
     {
         const string source = "// removed\nint x;\n";
         var hint = new string('h', "// removed\n".Length);
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, hint);
 
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
@@ -78,7 +79,7 @@ public sealed class CodeReducerTests
     public void Every_number_prefix_survives_removable_gaps_and_CRLF()
     {
         const string source = "  60\t// a very long removable comment provides enough savings for the complete hint too\r\n  61\t\r\n  62\t    int value = 1;\r\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.Equal("  62\t    int value = 1;\r\n" + Hint, result.Text);
@@ -87,7 +88,7 @@ public sealed class CodeReducerTests
     public void Only_complete_using_directives_are_removed()
     {
         const string source = "global using System.Text;\nusing static System.Math;\nusing Alias = System.Collections.Generic;\nusing\n    System.Threading;\nusing System;\nclass Keep { void M() { using var resource = Open(); await using var other = Open(); using (var scope = Open()) { Work(); } } }\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.DoesNotContain("System", result.Text, StringComparison.Ordinal);
@@ -101,8 +102,8 @@ public sealed class CodeReducerTests
     {
         const string source = "// a very long removable comment provides enough savings for the complete hint and map too\nint a = 1;\nint VeryLongVariable = 2;\nVeryLongVariable += VeryLongVariable;\nPrint(VeryLongVariable, \"VeryLongVariable\");\n";
         var options = new CodeReductionOptions(RenameIdentifiers: true);
-        var result = new CodeReducer().Reduce(source, "Example.cs", options, Hint);
-        var again = new CodeReducer().Reduce(source, "Example.cs", options, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", options, Hint);
+        var again = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", options, Hint);
 
         Assert.True(result.Changed);
         Assert.Equal("VeryLongVariable", result.RenameMap["b"]);
@@ -120,7 +121,7 @@ public sealed class CodeReducerTests
     public void Numeric_suffixes_are_not_renamed_as_identifiers(string first, string second)
     {
         var source = "// a very long removable comment provides enough savings for the complete hint and map too\nvar first = " + first + ";\nvar second = " + second + ";\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
         Assert.True(result.Changed);
         Assert.Empty(result.RenameMap);
@@ -131,7 +132,7 @@ public sealed class CodeReducerTests
     public void Options_independently_preserve_comments_imports_and_original_names()
     {
         var source = "using System.Text;\n// LongVariable stays readable in this comment\nint LongVariable = 1;\nLongVariable++;\n" + new string('\n', 100);
-        var reducer = new CodeReducer();
+        var reducer = new CodeReducer(new CSharpCodeLexer());
         var keepComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveComments: false), Hint);
         var keepImports = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveImports: false), Hint);
         var keepAll = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, false, false), Hint);
@@ -155,7 +156,7 @@ public sealed class CodeReducerTests
     public void Map_overhead_can_remove_all_apparent_rename_savings()
     {
         const string source = "int Abcd; Abcd++;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(false, false, true), "h");
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(false, false, true), "h");
 
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
@@ -166,7 +167,7 @@ public sealed class CodeReducerTests
     public void A_single_unnumbered_line_prevents_stripping_any_prefix()
     {
         const string source = "  60\t// a very long removable comment provides enough savings for the complete hint too\n\n  62\t    int value = 1;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
@@ -176,7 +177,7 @@ public sealed class CodeReducerTests
     public void Missing_hint_returns_original_even_when_all_lines_are_numbered()
     {
         const string source = "1\t// a very long removable comment provides enough savings for a hint\n2\tint value;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, null);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, null);
 
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
@@ -189,7 +190,7 @@ public sealed class CodeReducerTests
     public void CSharp_newlines_after_comments_do_not_swallow_following_code(string newline)
     {
         var source = "// a long comment that provides more savings than the hint but must not swallow the following code" + newline + "int Important = 42;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Supported);
         Assert.Contains("int Important = 42;", result.Text, StringComparison.Ordinal);
@@ -201,7 +202,7 @@ public sealed class CodeReducerTests
     public void UTF8_string_suffixes_remain_part_of_the_literal(string first, string second)
     {
         var source = "// a very long removable comment provides enough savings for the complete hint and map too\nvar first = " + first + ";\nvar second = " + second + ";\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
         Assert.True(result.Changed);
         Assert.Empty(result.RenameMap);
@@ -214,7 +215,7 @@ public sealed class CodeReducerTests
     {
         var source = string.Concat(Enumerable.Range(0, 45).Select(index =>
             $"int LongIdentifier{index} = 0;\nLongIdentifier{index}++;\n"));
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
         Assert.True(result.Changed);
         Assert.Equal(45, result.RenameMap.Count);
@@ -227,7 +228,7 @@ public sealed class CodeReducerTests
     public void Escaped_identifier_and_plain_occurrences_rename_as_one_name()
     {
         const string source = "// a very long comment leaves room for the rename map and complete hint\nint @café = 1;\n@café += café;\n";
-        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+        var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
         Assert.True(result.Changed);
         Assert.Equal("café", result.RenameMap["a"]);

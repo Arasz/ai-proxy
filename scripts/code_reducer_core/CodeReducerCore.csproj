@@ -6,5 +6,6 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <ProjectReference Include="../../src/AiProxy.Code/AiProxy.Code.csproj"/>
     </ItemGroup>
 </Project>

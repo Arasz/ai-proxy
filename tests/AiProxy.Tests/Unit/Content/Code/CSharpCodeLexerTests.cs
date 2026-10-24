@@ -1,4 +1,5 @@
 using AiProxy.Core.Content.Code;
+using AiProxy.Code;
 
 namespace AiProxy.Tests.Unit.Content.Code;
 

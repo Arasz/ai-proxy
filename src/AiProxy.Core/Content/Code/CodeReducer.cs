@@ -11,16 +11,25 @@ public sealed record CodeReductionResult(string Text, bool Changed, bool Support
 /// <summary>Builds compact C# read views using an explicit path and caller-rendered retrieval hint.</summary>
 public sealed class CodeReducer
 {
+    private readonly ICodeLexer _lexer;
+
+    /// <summary>Creates a C# view builder with a caller-supplied syntax adapter.</summary>
+    public CodeReducer(ICodeLexer lexer)
+    {
+        ArgumentNullException.ThrowIfNull(lexer);
+        _lexer = lexer;
+    }
+
     /// <summary>Returns the original when safety or complete-view savings cannot be established.</summary>
     public CodeReductionResult Reduce(string text, string? filePath, CodeReductionOptions? options, string? retrievalHint)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (string.IsNullOrWhiteSpace(retrievalHint) || filePath is null || !filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(retrievalHint) || !_lexer.SupportsPath(filePath))
         {
             return Original(text, false);
         }
         var (source, prefixes) = Unnumber(text);
-        var lexed = new CSharpCodeLexer().Lex(source);
+        var lexed = _lexer.Lex(source);
         if (!lexed.Supported)
         {
             return Original(text, false);
@@ -62,7 +71,7 @@ public sealed class CodeReducer
             ? new CodeReductionResult(rendered, true, true, new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(map))
             : Original(text, true);
     }
-    private static Dictionary<int, (int Length, string Text)> Rename(
+    private Dictionary<int, (int Length, string Text)> Rename(
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
@@ -81,7 +90,7 @@ public sealed class CodeReducer
             {
                 candidate = ShortName(next++);
             }
-            while (reserved.Contains(candidate) || CSharpCodeLexer.IsKeyword(candidate));
+            while (reserved.Contains(candidate) || _lexer.IsKeyword(candidate));
             if (candidate.Length >= group.Key.Length)
             {
                 continue;

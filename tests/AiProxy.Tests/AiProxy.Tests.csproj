@@ -17,6 +17,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../../src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <ProjectReference Include="../../src/AiProxy.Code/AiProxy.Code.csproj"/>
         <ProjectReference Include="../../scripts/code_reducer_core/CodeReducerCore.csproj"/>
         <ProjectReference Include="../../src/AiProxy/AiProxy.csproj"/>
         <ProjectReference Include="../../src/AiProxy.Storage/AiProxy.Storage.csproj"/>

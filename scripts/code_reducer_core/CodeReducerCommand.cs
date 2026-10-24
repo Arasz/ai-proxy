@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AiProxy.Core.Content.Code;
+using AiProxy.Code;
 
 namespace AiProxy.Tools.CodeReducerCore;
 
@@ -24,7 +25,7 @@ public sealed class CodeReducerCommand
                 root.TryGetProperty("removeComments", out var removeComments) ? removeComments.GetBoolean() : true,
                 root.TryGetProperty("removeImports", out var removeImports) ? removeImports.GetBoolean() : true,
                 root.TryGetProperty("renameIdentifiers", out var renameIdentifiers) && renameIdentifiers.GetBoolean());
-            var result = new CodeReducer().Reduce(text, path, options, hint);
+            var result = new CodeReducer(new CSharpCodeLexer()).Reduce(text, path, options, hint);
             await output.WriteLineAsync(JsonSerializer.Serialize(new { text = result.Text, changed = result.Changed, supported = result.Supported })).ConfigureAwait(false);
             return 0;
         }

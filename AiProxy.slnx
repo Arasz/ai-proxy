@@ -1,6 +1,7 @@
 <Solution>
     <Folder Name="/src/">
         <Project Path="src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <Project Path="src/AiProxy.Code/AiProxy.Code.csproj"/>
         <Project Path="src/AiProxy/AiProxy.csproj"/>
         <Project Path="src/AiProxy.Storage/AiProxy.Storage.csproj"/>
     </Folder>
