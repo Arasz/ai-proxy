@@ -15,9 +15,6 @@ public static class LineShapes
     /// <param name="keepWhole">Whether a line is kept whole, and takes no part in shapes.</param>
     public static IReadOnlyList<string> Collapse(string text, Func<string, bool> keepWhole)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(keepWhole);
-
         var firsts = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var kept = new List<string>();
 
