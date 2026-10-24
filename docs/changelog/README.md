@@ -18,7 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.7.1](0.7.1-upstream-drop-closes-client.md) | An upstream that drops a chunked response between chunks now fails at the client at once, instead of leaving it waiting until its own timeout. | pending |
+| [0.7.1](0.7.1-upstream-drop-closes-client.md) | An upstream that drops a chunked response between chunks now fails at the client at once, instead of leaving it waiting until its own timeout. | #40 |
 | [0.7.0](0.7.0-response-usage-and-timings.md) | With capture on, each captured request also records its response's token usage, sizes and per-stage timings, ours and Titanium's; no response body or header is stored. | #37 |
 | [0.6.0](0.6.0-request-capture.md) | `PROXY_CAPTURE=on` keeps every provider request body, as sent, in a user-only local file; headers and query strings are not stored. | #32 |
 | [0.5.1](0.5.1-failing-reducer-keeps-its-part.md) | A reducer that throws leaves only its own part unreduced and logs a warning; the other parts in the request are still reduced. | #31 |
