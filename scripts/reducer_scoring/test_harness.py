@@ -14,7 +14,8 @@ FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
 TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
 QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
 PREREG = {
-    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "relaxed_retention_floor": 0.7, "runs": 3,
+    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0],
+    "size_normalized_budget": {"budget_per_ktoken_s": 0.056, "budget_per_ktoken_sensitivity_s": [0.0064, 0.015, 0.056]}, "retention_floor": 1.0, "relaxed_retention_floor": 0.7, "runs": 3,
     "gates": {"extractive": {"candidates": ["shipped_rules"]},
               "abstractive": {"candidates": ["haiku_digest", "digest_gpt_stand_in", "summarizer_control", "identity"]}},
     "payloads": {
@@ -72,6 +73,21 @@ class GradingTests(unittest.TestCase):
         row = next(p for p in report(recs)["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")
         self.assertFalse(row["not_applicable"])
         self.assertEqual(row["compression"], 0.0)
+
+    def test_a_kinds_size_score_is_the_equal_weight_mean_of_its_payloads(self):
+        recs = records()
+        recs["shipped_rules"] = runs("a", KEPT, 0.01) + runs("b", KEPT, 3.0) + runs("c", KEPT, 0.25)
+        built = report(recs)
+        scores = [p["size_score"] for p in built["payloads"] if p["candidate"] == "shipped_rules" and p["kind"] == "prose"]
+        self.assertEqual(len(scores), 2)
+        self.assertAlmostEqual(kind(built, "shipped_rules", "prose")["size_score"], sum(scores) / 2, places=4)
+
+    def test_the_size_budget_comes_from_the_preregistration(self):
+        tight = {**PREREG, "size_normalized_budget": {"budget_per_ktoken_s": 0.0001, "budget_per_ktoken_sensitivity_s": [0.0001]}}
+        loose = build_report(PREREG, records(), TEXTS.__getitem__)
+        strict = build_report(tight, records(), TEXTS.__getitem__)
+        pick = lambda b: next(p for p in b["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "c")
+        self.assertLess(pick(strict)["size_score"], pick(loose)["size_score"])
 
     def test_an_untouched_payload_is_reported_as_not_applicable(self):
         untouched = next(p for p in report()["payloads"] if p["candidate"] == "shipped_rules" and p["payload"] == "b")
@@ -271,7 +287,8 @@ class TableTests(unittest.TestCase):
         self.assertIn("(stand-in)", digest)
         cells = [c.strip() for c in rules.strip("|").split("|")]
         row = kind(built, "shipped_rules", "build")
-        self.assertEqual(cells[2:4] + [cells[5]], [str(row["score"]), str(row["compression"]), str(row["retention"])])
+        self.assertEqual([cells[2], cells[4], cells[6], cells[8]],
+                         [str(row["size_score"]), str(row["compression"]), str(row["retention"]), str(row["score"])])
         self.assertTrue(kind(built, "digest_gpt_stand_in", "prose")["stand_in"])
         self.assertFalse(row["stand_in"])
 
