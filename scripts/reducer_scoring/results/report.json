@@ -17,6 +17,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.1091,
    "payload": "code_file",
    "kind": "code"
   },
@@ -37,6 +39,8 @@
     "1.0": 0.1468,
     "2.0": 0.218
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.1468,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -57,6 +61,8 @@
     "1.0": 0.1318,
     "2.0": 0.2192
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.1318,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -77,6 +83,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.2408,
    "payload": "dir_listing",
    "kind": "listing"
   },
@@ -97,6 +105,8 @@
     "1.0": 0.1734,
     "2.0": 0.2525
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1734,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -117,6 +127,8 @@
     "1.0": 0.2141,
     "2.0": 0.332
    },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.2141,
    "payload": "dotnet_build_failure",
    "kind": "build"
   },
@@ -137,6 +149,8 @@
     "1.0": 0.1643,
     "2.0": 0.2535
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.1643,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -157,6 +171,8 @@
     "1.0": 0.0738,
     "2.0": 0.1358
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0738,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -177,6 +193,8 @@
     "1.0": 0.0429,
     "2.0": 0.0788
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0429,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -197,6 +215,8 @@
     "1.0": 0.1079,
     "2.0": 0.1918
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.1079,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -217,6 +237,8 @@
     "1.0": 0.0625,
     "2.0": 0.1108
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0625,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -237,6 +259,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.1787,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -257,6 +281,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0982,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -277,6 +303,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "4/6",
+   "score_relaxed": 0.0,
    "payload": "code_file",
    "kind": "code"
   },
@@ -297,6 +325,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.2273,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -317,6 +347,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/8",
+   "score_relaxed": 0.2063,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -337,6 +369,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3096,
    "payload": "dir_listing",
    "kind": "listing"
   },
@@ -357,6 +391,8 @@
     "1.0": 0.391,
     "2.0": 0.4801
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.391,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -377,6 +413,8 @@
     "1.0": 0.4666,
     "2.0": 0.5721
    },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.4666,
    "payload": "dotnet_build_failure",
    "kind": "build"
   },
@@ -397,6 +435,8 @@
     "1.0": 0.4076,
     "2.0": 0.5154
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.4076,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -417,6 +457,8 @@
     "1.0": 0.1268,
     "2.0": 0.22
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.1268,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -437,6 +479,8 @@
     "1.0": 0.118,
     "2.0": 0.1857
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.118,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -457,6 +501,8 @@
     "1.0": 0.3072,
     "2.0": 0.4458
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.3072,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -477,6 +523,8 @@
     "1.0": 0.2157,
     "2.0": 0.3065
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.2157,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -497,6 +545,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/6",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -517,6 +567,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -537,6 +589,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "payload": "code_file",
    "kind": "code"
   },
@@ -557,6 +611,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.0,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -577,6 +633,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.0,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -597,6 +655,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "payload": "dir_listing",
    "kind": "listing"
   },
@@ -617,6 +677,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.0,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -637,6 +699,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure",
    "kind": "build"
   },
@@ -657,6 +721,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -677,6 +743,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -697,6 +765,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -717,6 +787,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -737,6 +809,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -757,6 +831,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -777,6 +853,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -797,6 +875,8 @@
     "1.0": 0.0994,
     "2.0": 0.1044
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0994,
    "payload": "code_file",
    "kind": "code"
   },
@@ -817,6 +897,8 @@
     "1.0": 0.1752,
     "2.0": 0.177
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.1752,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -837,6 +919,8 @@
     "1.0": 0.0039,
     "2.0": 0.0039
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.0039,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -878,6 +962,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -898,6 +984,8 @@
     "1.0": 0.0798,
     "2.0": 0.0875
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0798,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -918,6 +1006,8 @@
     "1.0": 0.1449,
     "2.0": 0.1758
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.1449,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -938,6 +1028,8 @@
     "1.0": 0.001,
     "2.0": 0.001
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.001,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -958,6 +1050,8 @@
     "1.0": 0.0899,
     "2.0": 0.0933
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0899,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -978,6 +1072,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0062,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -998,6 +1094,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "4/5",
+   "score_relaxed": 0.073,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -1018,6 +1116,8 @@
     "1.0": 0.7015,
     "2.0": 0.7017
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.7015,
    "payload": "code_file",
    "kind": "code"
   },
@@ -1038,6 +1138,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "4/8",
+   "score_relaxed": 0.0,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -1058,6 +1160,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/8",
+   "score_relaxed": 0.0,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -1085,6 +1189,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/14",
+   "score_relaxed": 0.0,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -1112,6 +1218,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -1132,6 +1240,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/6",
+   "score_relaxed": 0.0,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -1152,6 +1262,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/6",
+   "score_relaxed": 0.0,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -1172,6 +1284,8 @@
     "1.0": 0.1255,
     "2.0": 0.1255
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.1255,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -1192,6 +1306,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/5",
+   "score_relaxed": 0.0,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -1212,6 +1328,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/6",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -1232,6 +1350,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -1252,6 +1372,8 @@
     "1.0": 0.2587,
     "2.0": 0.2587
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.2587,
    "payload": "code_file",
    "kind": "code"
   },
@@ -1279,6 +1401,8 @@
     "1.0": 0.4002,
     "2.0": 0.4002
    },
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.4002,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -1306,6 +1430,8 @@
     "1.0": 0.4642,
     "2.0": 0.4642
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.4642,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -1326,6 +1452,8 @@
     "1.0": 0.4147,
     "2.0": 0.4148
    },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.4147,
    "payload": "dotnet_build_failure",
    "kind": "build"
   },
@@ -1353,6 +1481,8 @@
     "1.0": 0.3307,
     "2.0": 0.3307
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.3307,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -1380,6 +1510,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/5",
+   "score_relaxed": 0.0,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -1414,6 +1546,8 @@
     "1.0": 0.4022,
     "2.0": 0.4022
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.4022,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -1434,6 +1568,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/6",
+   "score_relaxed": 0.0,
    "payload": "code_file",
    "kind": "code"
   },
@@ -1454,6 +1590,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/8",
+   "score_relaxed": 0.0,
    "payload": "incident_report",
    "kind": "prose"
   },
@@ -1474,6 +1612,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/8",
+   "score_relaxed": 0.0,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -1494,6 +1634,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/6",
+   "score_relaxed": 0.0,
    "payload": "dir_listing",
    "kind": "listing"
   },
@@ -1514,6 +1656,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/14",
+   "score_relaxed": 0.0,
    "payload": "json_payload",
    "kind": "json"
   },
@@ -1534,6 +1678,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/4",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure",
    "kind": "build"
   },
@@ -1554,6 +1700,8 @@
     "1.0": 0.2761,
     "2.0": 0.417
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.2761,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -1574,6 +1722,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/6",
+   "score_relaxed": 0.0,
    "payload": "code_file_large",
    "kind": "code"
   },
@@ -1594,6 +1744,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/6",
+   "score_relaxed": 0.0,
    "payload": "prose_large",
    "kind": "prose"
   },
@@ -1614,6 +1766,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/5",
+   "score_relaxed": 0.0,
    "payload": "rtk_proxy_log",
    "kind": "log"
   },
@@ -1634,6 +1788,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/5",
+   "score_relaxed": 0.0,
    "payload": "github_pr_list",
    "kind": "json"
   },
@@ -1654,6 +1810,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "3/6",
+   "score_relaxed": 0.0,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -1674,6 +1832,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/5",
+   "score_relaxed": 0.0,
    "payload": "dotnet_test_failures",
    "kind": "test"
   }
@@ -1696,6 +1856,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.0865,
    "kind": "code"
   },
   {
@@ -1715,6 +1877,8 @@
     "1.0": 0.067,
     "2.0": 0.1174
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.067,
    "kind": "prose"
   },
   {
@@ -1734,6 +1898,8 @@
     "1.0": 0.1202,
     "2.0": 0.2091
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.1202,
    "kind": "log"
   },
   {
@@ -1753,6 +1919,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.2408,
    "kind": "listing"
   },
   {
@@ -1772,6 +1940,8 @@
     "1.0": 0.0922,
     "2.0": 0.1549
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0922,
    "kind": "json"
   },
   {
@@ -1791,6 +1961,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.2002,
    "kind": "build"
   },
   {
@@ -1810,6 +1982,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.1257,
    "kind": "test"
   },
   {
@@ -1829,6 +2003,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/12",
+   "score_relaxed": 0.1233,
    "kind": "code"
   },
   {
@@ -1848,6 +2024,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1549,
    "kind": "prose"
   },
   {
@@ -1867,6 +2045,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "12/13",
+   "score_relaxed": 0.2526,
    "kind": "log"
   },
   {
@@ -1886,6 +2066,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3096,
    "kind": "listing"
   },
   {
@@ -1905,6 +2087,8 @@
     "1.0": 0.2711,
     "2.0": 0.3616
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.2711,
    "kind": "json"
   },
   {
@@ -1924,6 +2108,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.3662,
    "kind": "build"
   },
   {
@@ -1943,6 +2129,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.292,
    "kind": "test"
   },
   {
@@ -1962,6 +2150,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.0,
    "kind": "code"
   },
   {
@@ -1981,6 +2171,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -2000,6 +2192,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -2019,6 +2213,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -2038,6 +2234,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -2057,6 +2255,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -2076,6 +2276,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   },
   {
@@ -2095,6 +2297,8 @@
     "1.0": 0.0876,
     "2.0": 0.0941
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.0876,
    "kind": "code"
   },
   {
@@ -2114,6 +2318,8 @@
     "1.0": 0.1711,
     "2.0": 0.1919
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1711,
    "kind": "prose"
   },
   {
@@ -2133,6 +2339,8 @@
     "1.0": 0.0019,
     "2.0": 0.0019
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.0019,
    "kind": "log"
   },
   {
@@ -2158,6 +2366,8 @@
     "1.0": 0.0899,
     "2.0": 0.0933
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.0899,
    "kind": "json"
   },
   {
@@ -2177,6 +2387,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0062,
    "kind": "build"
   },
   {
@@ -2196,6 +2408,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.0596,
    "kind": "test"
   },
   {
@@ -2215,6 +2429,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/12",
+   "score_relaxed": 0.6118,
    "kind": "code"
   },
   {
@@ -2234,6 +2450,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -2253,6 +2471,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -2278,6 +2498,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -2297,6 +2519,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/6",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -2316,6 +2540,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   },
   {
@@ -2335,6 +2561,8 @@
     "1.0": 0.3048,
     "2.0": 0.3048
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.3048,
    "kind": "code"
   },
   {
@@ -2360,6 +2588,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -2385,6 +2615,8 @@
     "1.0": 0.4642,
     "2.0": 0.4642
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.4642,
    "kind": "json"
   },
   {
@@ -2404,6 +2636,8 @@
     "1.0": 0.4147,
     "2.0": 0.4148
    },
+   "answers_relaxed": "4/4",
+   "score_relaxed": 0.4147,
    "kind": "build"
   },
   {
@@ -2423,6 +2657,8 @@
     "1.0": 0.4022,
     "2.0": 0.4022
    },
+   "answers_relaxed": "5/5",
+   "score_relaxed": 0.4022,
    "kind": "test"
   },
   {
@@ -2442,6 +2678,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/12",
+   "score_relaxed": 0.0,
    "kind": "code"
   },
   {
@@ -2461,6 +2699,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -2480,6 +2720,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -2499,6 +2741,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -2518,6 +2762,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -2537,6 +2783,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/10",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -2556,6 +2804,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   }
  ],
@@ -2577,6 +2827,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.0865,
    "kind": "code"
   },
   {
@@ -2596,6 +2848,8 @@
     "1.0": 0.067,
     "2.0": 0.1174
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.067,
    "kind": "prose"
   },
   {
@@ -2615,6 +2869,8 @@
     "1.0": 0.1202,
     "2.0": 0.2091
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.1202,
    "kind": "log"
   },
   {
@@ -2634,6 +2890,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.2408,
    "kind": "listing"
   },
   {
@@ -2653,6 +2911,8 @@
     "1.0": 0.0922,
     "2.0": 0.1549
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0922,
    "kind": "json"
   },
   {
@@ -2672,6 +2932,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.2002,
    "kind": "build"
   },
   {
@@ -2691,6 +2953,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.1257,
    "kind": "test"
   },
   {
@@ -2710,6 +2974,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/12",
+   "score_relaxed": 0.1233,
    "kind": "code"
   },
   {
@@ -2729,6 +2995,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1549,
    "kind": "prose"
   },
   {
@@ -2748,6 +3016,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "12/13",
+   "score_relaxed": 0.2526,
    "kind": "log"
   },
   {
@@ -2767,6 +3037,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.3096,
    "kind": "listing"
   },
   {
@@ -2786,6 +3058,8 @@
     "1.0": 0.2711,
     "2.0": 0.3616
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.2711,
    "kind": "json"
   },
   {
@@ -2805,6 +3079,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.3662,
    "kind": "build"
   },
   {
@@ -2824,6 +3100,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.292,
    "kind": "test"
   },
   {
@@ -2843,6 +3121,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.0,
    "kind": "code"
   },
   {
@@ -2862,6 +3142,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -2881,6 +3163,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -2900,6 +3184,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -2919,6 +3205,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -2938,6 +3226,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -2957,6 +3247,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   },
   {
@@ -2976,6 +3268,8 @@
     "1.0": 0.0876,
     "2.0": 0.0941
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.0876,
    "kind": "code"
   },
   {
@@ -2995,6 +3289,8 @@
     "1.0": 0.1711,
     "2.0": 0.1919
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.1711,
    "kind": "prose"
   },
   {
@@ -3014,6 +3310,8 @@
     "1.0": 0.0019,
     "2.0": 0.0019
    },
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.0019,
    "kind": "log"
   },
   {
@@ -3033,6 +3331,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -3052,6 +3352,8 @@
     "1.0": 0.0807,
     "2.0": 0.0822
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0807,
    "kind": "json"
   },
   {
@@ -3071,6 +3373,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0069,
    "kind": "build"
   },
   {
@@ -3090,6 +3394,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.0596,
    "kind": "test"
   },
   {
@@ -3109,6 +3415,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/12",
+   "score_relaxed": 0.6118,
    "kind": "code"
   },
   {
@@ -3128,6 +3436,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "7/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -3147,6 +3457,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "8/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -3166,6 +3478,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -3185,6 +3499,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "0/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -3204,6 +3520,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/10",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -3223,6 +3541,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   },
   {
@@ -3242,6 +3562,8 @@
     "1.0": 0.3048,
     "2.0": 0.3048
    },
+   "answers_relaxed": "12/12",
+   "score_relaxed": 0.3048,
    "kind": "code"
   },
   {
@@ -3261,6 +3583,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "14/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -3280,6 +3604,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "9/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -3299,6 +3625,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "6/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -3318,6 +3646,8 @@
     "1.0": 0.0817,
     "2.0": 0.0817
    },
+   "answers_relaxed": "19/19",
+   "score_relaxed": 0.0817,
    "kind": "json"
   },
   {
@@ -3337,6 +3667,8 @@
     "1.0": 0.0076,
     "2.0": 0.0076
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.0076,
    "kind": "build"
   },
   {
@@ -3356,6 +3688,8 @@
     "1.0": 0.3445,
     "2.0": 0.3445
    },
+   "answers_relaxed": "10/10",
+   "score_relaxed": 0.3445,
    "kind": "test"
   },
   {
@@ -3375,6 +3709,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/12",
+   "score_relaxed": 0.0,
    "kind": "code"
   },
   {
@@ -3394,6 +3730,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/14",
+   "score_relaxed": 0.0,
    "kind": "prose"
   },
   {
@@ -3413,6 +3751,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/13",
+   "score_relaxed": 0.0,
    "kind": "log"
   },
   {
@@ -3432,6 +3772,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "1/6",
+   "score_relaxed": 0.0,
    "kind": "listing"
   },
   {
@@ -3451,6 +3793,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "2/19",
+   "score_relaxed": 0.0,
    "kind": "json"
   },
   {
@@ -3470,6 +3814,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/10",
+   "score_relaxed": 0.0,
    "kind": "build"
   },
   {
@@ -3489,6 +3835,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
+   "answers_relaxed": "5/10",
+   "score_relaxed": 0.0,
    "kind": "test"
   }
  ],

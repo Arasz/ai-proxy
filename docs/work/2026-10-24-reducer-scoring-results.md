@@ -39,7 +39,21 @@ taken field by field, so a row's length, latency and answers can come from diffe
   the owner's ChatGPT plan accepts. The digest row is therefore a **stand-in**: its retention
   and compression are real for that model, but its latency is not Haiku's. The second
   amendment added the real Haiku digest (`claude-haiku-5-5` through `claude -p`, timed by the
-  model's own `duration_api_ms`). Its reader is still `gpt-6.1-sol`.
+  model's own `duration_api_ms`). Its reader is still `gpt-6.1-sol`. That run pinned no
+  effort and inherited this session's `CLAUDE_EFFORT=medium`, not the pre-registered thinking
+  off. The third amendment defines `haiku_digest_checked` (a find-compress-check prompt at
+  `--effort low`), but its run was stopped by the owner after 9 of 39 digests and is not scored.
+- **The relaxed view** (fourth amendment, after every result above was seen) is the owner's
+  ruling that a small loss is acceptable and a fact in other words is kept. It grades by fact
+  (`grading.same_fact`): `4.2s` counts for `4.2 seconds`, `7 failed` for `failed: 7`,
+  `224 passed` for `succeeded: 224`, `2 errors` for `2 Error(s)`. Across all 3,780 graded
+  answers this keeps every answer the word-for-word check kept and adds 31. A kind then scores
+  0 under 70% retention, and above it the score is multiplied by retention. The recorded
+  replies were re-graded; nothing was re-run.
+- **Per-kind scores are provisional.** The owner has since ruled that scores are normalised to
+  payload size and a kind is the mean of its payloads (plan
+  `aip-reducer-fixes-from-scoring-results`, step `size-normalized-score`). Until that re-run,
+  the per-kind tables pool characters as described above.
 
 ## Per kind, at the 1 s budget
 
@@ -58,6 +72,21 @@ when one was lost. Where the two views differ, the counted view is in brackets. 
 | test | **0.40** (25%) [0.34, 21%] | 0 (7/10) | 0 (6/10) | 0 (7/10) | 0 (8/10) | 0 (0%) | 0 (5/10) |
 
 The shipped rules ran in under 3 ms on every kind.
+
+## Per kind, relaxed view
+
+Graded by fact, floor 0.7, score multiplied by retention, 1 s budget. A cell is the score, then
+(answers kept) when one was lost. The counted view is in brackets where it differs.
+
+| kind | shipped rules | kompress int8 | rtk CCR | Haiku digest | digest (stand-in) | identity | summarizer |
+|---|---|---|---|---|---|---|---|
+| code | **0.30** | 0.09 | **0.61** (9/12) | 0.12 (10/12) | 0.09 (11/12) | 0 | 0 (2/12) |
+| prose | n/a [0] | **0.17** | 0 (7/14) | 0.15 | 0.07 | 0 | 0 (2/14) |
+| log | 0 (9/13) | 0.002 | 0 (8/13) | **0.25** (12/13) | 0.12 | 0 | 0 (2/13) |
+| listing | n/a [0] | n/a [0] | n/a [0] | **0.31** (5/6) | 0.24 (5/6) | 0 | 0 (1/6) |
+| json | **0.46** [0.08] | 0.09 [0.08] | 0 (0/19) | 0.27 **[0.27]** | 0.09 | 0 | 0 (2/19) |
+| build | **0.41** [0.008] | 0.006 [0.007] | 0 (2/6) [0 (6/10)] | 0.37 (7/10) **[0.37]** | 0.20 (9/10) | 0 | 0 (5/10) |
+| test | **0.40** [0.34] | 0.06 (7/10) | 0 (6/10) | 0.29 (8/10) | 0.13 | 0 | 0 (5/10) |
 
 ## Findings
 
@@ -130,19 +159,43 @@ dropped `System.Text.Json` from the code file, a file name from the listing, and
 42 s on `prose_large`, holds its best score to 0.12 at 1 s and 0.21 at 2 s. Haiku would be
 faster, so its latency here says nothing about Haiku. F8 has the Haiku run.
 
-### F8: The Haiku digest is fast but drops answers on 6 of 7 kinds [MEASURED]
+### F8: The Haiku digest is fast; word for word it loses answers on 6 of 7 kinds, mostly by rewording [MEASURED]
 
 On `claude-haiku-5-5` the digest took 1.6-13 s per payload (1.8-11 s per kind), 1.7 to 4.7
 times faster than the stand-in per kind. It kept every answer only on json, removing 37% in 3.7 s, for
 a score of 0.27 at 1 s and 0.36 at 2 s. That is the best json score in the counted view. On
-every other kind it lost one to three answers. Answers lost in all three runs:
-`System.Text.Json` (code file), `4.2 seconds` (incident report), and on the large payloads the
-`(18,83)` error position and `2 Error(s)` (verbose build log) and the `failed: 7` and
-`succeeded: 224` totals (test failures). Exact figures and counts are what a digest drops. Seven of 13
-payloads kept every answer, with per-payload scores of 0.12-0.47. On this evidence the digest does
-not pass `digest-verdict` as a general reducer. Json is the one kind where it leads.
+every other kind the word-for-word check lost one to three answers. Seven of 13 payloads kept
+every answer, with per-payload scores of 0.12-0.47.
 
-### F9: What this does not cover [UNVERIFIED]
+The reader's misses fall into three groups:
+
+- **Reworded, fact kept.** The digest wrote `p99 4.2s` and `7 failed, 224 passed`; the reader
+  copied those, and `4.2 seconds`, `failed: 7` and `succeeded: 224` were marked lost. The prompt
+  asked for facts "exactly as written", so Haiku did not follow it here.
+- **Dropped.** `System.Text.Json` (the first using directive), `00:00:00.42` (elapsed build
+  time) and `512ms` (one test's duration) are not in the digest. These are low-value facts.
+- **Kept, but the reader could not use it.** The digest kept `ProviderHostCatalog.cs(18,83)`,
+  but flattened the build log so the reader answered `(33,16)`, the other file's position,
+  for "the error in the second file". For `2 Error(s)` the digest wrote `2 errors` and the
+  reader replied `UNKNOWN`.
+
+Graded by fact, Haiku keeps every answer on prose (14/14) and json, and test rises from 7/10
+to 8/10. Under the
+relaxed view it scores 0.12-0.37 on every kind and leads log, listing and, in the counted view,
+json and build.
+
+### F9: The relaxed view lets lossy candidates score, but changes no lossless result [MEASURED]
+
+Every candidate that kept every answer scores the same in both views. What changes is who gets
+a score despite a loss. rtk's preview keeps 9 of 12 answers on code (all 6 on `code_file`, 3 of 6 on
+`code_file_large`) and removes 54-78%, so it scores 0.61 there, the highest code score in
+either view. The digests score on every kind.
+The shipped rules lose 4 of 13 log answers (69%, F3), just under the 0.7 floor, so log stays 0.
+Fact grading changed four kind rows (five in the counted view): the digests' reworded counts
+and durations on prose and test, and one kompress build answer. It turned no kept answer into
+a lost one.
+
+### F10: What this does not cover [UNVERIFIED]
 
 - One machine, one reader model, and 13 payloads, with at least two per kind except listings
   (one).
@@ -155,7 +208,12 @@ not pass `digest-verdict` as a general reducer. Json is the one kind where it le
   the proxy variables and sets `NO_PROXY=*`, and pi's config sets no base URL.
 - A pi error that exits 0 and does not start with one of the three known error prefixes would
   be scored as output. Every raw reply and output in this run was checked and is real content.
-- The Haiku digest was graded by the `gpt-6.1-sol` reader, not a Haiku reader.
+- The Haiku digest was graded by the `gpt-6.1-sol` reader, not a Haiku reader, and ran at an
+  inherited effort, not a pinned one.
+- Fact grading covers the spellings seen in this run (units, label-first counts, passed and
+  succeeded, Error(s), positions). A reader asked whether a fact is present would also recover
+  `2 errors` answered `UNKNOWN`; that was not run.
+- The 0.7 floor and the retention multiplier were chosen after the results were seen.
 - The follow-ups are retrieval-aware scoring for rtk and a fix for F3.
 
 ## Reviews

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from compression_score import compression, latency_score, retention, score  # noqa: E402
 from preregistration import HERE, load, payload_text  # noqa: E402
+from grading import same_fact  # noqa: E402
 from scoring import QaRun, ReducerRun, Row, extractive_row, kind_row, qa_row, void_reasons  # noqa: E402
 
 STAND_IN = {"digest_gpt_stand_in"}
@@ -33,13 +34,16 @@ def _digests(out: Path, candidate: str) -> Path:
     return out / f"{candidate}.digests.ndjson"
 
 
-def _fields(candidate: str, row: Row, prereg: dict) -> dict:
+def _fields(candidate: str, row: Row, prereg: dict, relaxed_row: Row | None = None) -> dict:
+    """A row's report fields; the relaxed score comes from relaxed_row, the same row graded by fact."""
     budgets = sorted({prereg["budget_s"], *prereg["budget_sensitivity_s"]})
     fields = {"candidate": candidate, "not_applicable": row.not_applicable, "stand_in": candidate in STAND_IN}
     m = row.measurement
     if m is None:
         return fields
     floor = prereg["retention_floor"]
+    r = (relaxed_row or row).measurement
+    relaxed = score(r, prereg["budget_s"], prereg["relaxed_retention_floor"]) * retention(r)
     return fields | {
         "original_chars": m.original_chars, "reduced_chars": m.reduced_chars,
         "compression": round(compression(m), 4), "latency_s": round(m.latency_s, 6),
@@ -47,6 +51,7 @@ def _fields(candidate: str, row: Row, prereg: dict) -> dict:
         "retention": round(retention(m), 4), "answers": f"{m.answers_kept}/{m.answers_total}",
         "score": round(score(m, prereg["budget_s"], floor), 4),
         "score_at": {str(b): round(score(m, b, floor), 4) for b in budgets},
+        "answers_relaxed": f"{r.answers_kept}/{r.answers_total}", "score_relaxed": round(relaxed, 4),
     }
 
 
@@ -55,7 +60,7 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
     extractive = set(prereg["gates"]["extractive"]["candidates"])
     payload_rows, kind_rows, counted_rows, by_candidate = [], [], [], {}
     for candidate, lines in records.items():
-        rows, counted = {}, {}
+        rows, counted, by_fact, counted_by_fact = {}, {}, {}, {}
         for name, payload in prereg["payloads"].items():
             mine = sorted((r for r in lines if r["payload"] == name), key=lambda r: r["run"])
             if not mine:
@@ -63,18 +68,24 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
             original = text_of(name)
             if candidate in extractive:
                 reducer_runs = [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0)) for r in mine]
-                rows[name] = extractive_row(original, payload["questions"], reducer_runs)
-                counted[name] = extractive_row(original, payload["questions"], reducer_runs, count_untouched=True)
+                for view, match in ((rows, None), (by_fact, same_fact)):
+                    view[name] = extractive_row(original, payload["questions"], reducer_runs, **_by(match))
+                for view, match in ((counted, None), (counted_by_fact, same_fact)):
+                    view[name] = extractive_row(original, payload["questions"], reducer_runs, count_untouched=True,
+                                                **_by(match))
             else:
-                rows[name] = counted[name] = qa_row(original, payload["questions"],
-                                                    [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine])
-            payload_rows.append(_fields(candidate, rows[name], prereg) | {"payload": name, "kind": payload["kind"]})
+                qa_runs = [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine]
+                rows[name] = counted[name] = qa_row(original, payload["questions"], qa_runs)
+                by_fact[name] = counted_by_fact[name] = qa_row(original, payload["questions"], qa_runs, same_fact)
+            payload_rows.append(_fields(candidate, rows[name], prereg, by_fact[name])
+                                | {"payload": name, "kind": payload["kind"]})
         by_candidate[candidate] = rows
         kinds = dict.fromkeys(prereg["payloads"][n]["kind"] for n in rows)
         for kind in kinds:
-            for view, target in ((rows, kind_rows), (counted, counted_rows)):
-                pooled = kind_row([row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind])
-                target.append(_fields(candidate, pooled, prereg) | {"kind": kind})
+            def pool(view):
+                return kind_row([row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind])
+            for view, fact_view, target in ((rows, by_fact, kind_rows), (counted, counted_by_fact, counted_rows)):
+                target.append(_fields(candidate, pool(view), prereg, pool(fact_view)) | {"kind": kind})
     void = _incomplete(prereg, records)
     for control in ("identity", "summarizer_control"):
         if control not in by_candidate:
@@ -82,6 +93,10 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
     if not void:
         void = void_reasons(by_candidate["identity"], by_candidate["summarizer_control"])
     return {"payloads": payload_rows, "kinds": kind_rows, "kinds_counted": counted_rows, "void": void}
+
+
+def _by(match) -> dict:
+    return {} if match is None else {"match": match}
 
 
 def _incomplete(prereg: dict, records: dict[str, list[dict]]) -> list[str]:
@@ -157,17 +172,18 @@ def _environment() -> dict:
 
 
 def _table(rows: list[dict], label: str) -> str:
-    head = f"| candidate | {label} | score | compression | latency s | retention | answers | score @0.5 s | score @2 s |\n"
-    head += "|---|---|---|---|---|---|---|---|---|\n"
+    head = f"| candidate | {label} | score | compression | latency s | retention | answers | score @0.5 s | score @2 s | relaxed |\n"
+    head += "|---|---|---|---|---|---|---|---|---|---|\n"
     lines = []
     for r in rows:
         name = r["candidate"] + (" (stand-in)" if r["stand_in"] else "")
         where = r.get("payload", r["kind"])
         if r["not_applicable"]:
-            lines.append(f"| {name} | {where} | n/a | | | | | | |")
+            lines.append(f"| {name} | {where} | n/a | | | | | | | |")
             continue
         lines.append(f"| {name} | {where} | {r['score']} | {r['compression']} | {r['latency_s']:.4f} | "
-                     f"{r['retention']} | {r['answers']} | {r['score_at']['0.5']} | {r['score_at']['2.0']} |")
+                     f"{r['retention']} | {r['answers']} | {r['score_at']['0.5']} | {r['score_at']['2.0']} | "
+                     f"{r['score_relaxed']} |")
     return head + "\n".join(lines) + "\n"
 
 

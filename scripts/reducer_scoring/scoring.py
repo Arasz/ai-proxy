@@ -38,13 +38,13 @@ class Row:
     not_applicable: bool = False
 
 
-def qa_kept(replies: list[list[str]], questions: list[dict]) -> int:
+def qa_kept(replies: list[list[str]], questions: list[dict], match=answered) -> int:
     """Questions still answered: a question is lost only when at least two of its replies miss."""
     if len(replies) != len(questions):
         raise ValueError(f"{len(replies)} reply sets for {len(questions)} questions")
     kept = 0
     for question, answers in zip(questions, replies):
-        misses = sum(not answered(reply, question["a"]) for reply in answers)
+        misses = sum(not match(reply, question["a"]) for reply in answers)
         if misses < MISSES_THAT_LOSE:
             kept += 1
     return kept
@@ -60,21 +60,22 @@ def _median_row(original: str, total: int, lengths: list[int], latencies: list[f
     ))
 
 
-def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun], count_untouched: bool = False) -> Row:
+def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun], count_untouched: bool = False,
+                   match=answered) -> Row:
     """Verbatim retention: an answer is kept when it still appears in the candidate's output.
 
     Untouched output is n/a, as pre-registered, unless count_untouched measures it as nothing removed.
     """
     if not count_untouched and all(run.output == original for run in runs):
         return Row(None, not_applicable=True)
-    kept = [sum(answered(run.output, q["a"]) for q in questions) for run in runs]
+    kept = [sum(match(run.output, q["a"]) for q in questions) for run in runs]
     lengths = [len(r.output) + r.added_chars for r in runs]
     return _median_row(original, len(questions), lengths, [r.latency_s for r in runs], kept)
 
 
-def qa_row(original: str, questions: list[dict], runs: list[QaRun]) -> Row:
+def qa_row(original: str, questions: list[dict], runs: list[QaRun], match=answered) -> Row:
     """QA retention: an answer is kept when the reader, given the candidate's output, still finds it."""
-    kept = [qa_kept(run.replies, questions) for run in runs]
+    kept = [qa_kept(run.replies, questions, match) for run in runs]
     return _median_row(original, len(questions), [len(r.output) for r in runs], [r.latency_s for r in runs], kept)
 
 

@@ -5,13 +5,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from harness import _table, build_report, run
+from harness import _fields, _table, build_report, run
+from compression_score import Measurement  # noqa: E402  (harness puts scripts/ on the path)
+from scoring import Row
 
 FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
 TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
 QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
 PREREG = {
-    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "runs": 3,
+    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "relaxed_retention_floor": 0.7, "runs": 3,
     "gates": {"extractive": {"candidates": ["shipped_rules"]},
               "abstractive": {"candidates": ["haiku_digest", "digest_gpt_stand_in", "summarizer_control", "identity"]}},
     "payloads": {
@@ -107,6 +109,45 @@ class CountedViewTests(unittest.TestCase):
         counted = next(r for r in report(recs)["kinds_counted"]
                        if r["candidate"] == "shipped_rules" and r["kind"] == "build")
         self.assertEqual((counted["not_applicable"], counted["score"]), (False, 0.0))
+
+
+class RelaxedViewTests(unittest.TestCase):
+    def fields(self, kept, total=10):
+        return _fields("haiku_digest", Row(Measurement(1000, 600, 1.0, kept, total), False), PREREG)
+
+    def test_a_small_loss_scores_its_harmonic_mean_scaled_by_retention(self):
+        c, lat = 0.4, 0.5
+        row = self.fields(8)
+        self.assertEqual(row["score"], 0.0)
+        self.assertEqual(row["score_relaxed"], round(2 * c * lat / (c + lat) * 0.8, 4))
+
+    def test_a_loss_at_the_relaxed_floor_still_scores(self):
+        self.assertGreater(self.fields(7)["score_relaxed"], 0.0)
+
+    def test_a_loss_under_the_relaxed_floor_scores_zero(self):
+        self.assertEqual(self.fields(6)["score_relaxed"], 0.0)
+
+    def test_without_loss_the_relaxed_score_is_the_headline_score(self):
+        row = self.fields(10)
+        self.assertEqual(row["score_relaxed"], row["score"])
+
+    def test_the_relaxed_view_grades_the_fact_not_the_wording(self):
+        questions = [{"q": "p99?", "a": "4.2 seconds"}, {"q": "failed?", "a": "failed: 7"},
+                     {"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
+        prereg = PREREG | {"payloads": {"a": {"kind": "prose", "questions": questions}}}
+        replies = [["4.2s"] * 3, ["7 failed"] * 3, ["Dana Okonkwo"] * 3, ["PR 8842"] * 3]
+        recs = {"digest_gpt_stand_in": runs("a", "short", 0.0, replies)}
+        row = next(r for r in build_report(prereg, recs, TEXTS.__getitem__)["kinds"])
+        self.assertEqual((row["answers"], row["answers_relaxed"]), ("2/4", "4/4"))
+        self.assertEqual(row["score"], 0.0)
+        self.assertGreater(row["score_relaxed"], 0.0)
+
+    def test_the_table_shows_the_relaxed_score_last(self):
+        built = report()
+        rules = next(line for line in _table(built["kinds"], "kind").splitlines()
+                     if line.startswith("| shipped_rules | build"))
+        self.assertEqual(rules.strip("|").split("|")[-1].strip(),
+                         str(kind(built, "shipped_rules", "build")["score_relaxed"]))
 
 
 class VoidTests(unittest.TestCase):
