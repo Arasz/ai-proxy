@@ -6,10 +6,10 @@ every other destination through. There are no upstream or pass-through rules to 
 
 | Provider | API host |
 |---|---|
-| OpenAI | `api.openai.com` |
+| OpenAI | `api.openai.com`, plus the regional `us.`, `eu.`, `gb.`, `ca.`, `au.`, `jp.`, `kr.`, `sg.`, `in.` and `ae.api.openai.com` |
 | Anthropic | `api.anthropic.com` |
 | Google Gemini | `generativelanguage.googleapis.com` |
-| OpenRouter | `openrouter.ai` |
+| OpenRouter | `openrouter.ai`, `eu.openrouter.ai` |
 
 HTTPS requests to those hosts are decrypted so ai-proxy can inspect and optionally compress
 request bodies. The first run creates and asks the operating system to trust a per-user root
