@@ -144,6 +144,11 @@ public static class ResponseUsageReader
             return usage;
         }
 
+        if (type.ValueKind != JsonValueKind.String)
+        {
+            throw new JsonException("An event type must be a string.");
+        }
+
         if (type.ValueEquals("message_start")
             && root.TryGetProperty("message", out var message)
             && message.ValueKind == JsonValueKind.Object

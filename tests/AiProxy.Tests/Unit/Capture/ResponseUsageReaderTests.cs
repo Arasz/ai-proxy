@@ -65,6 +65,24 @@ public class ResponseUsageReaderTests
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
     }
 
+    [Theory]
+    [InlineData("123")]
+    [InlineData("null")]
+    [InlineData("true")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    public void A_non_string_event_type_is_malformed_and_keeps_preceding_usage(string type)
+    {
+        var invalidEvent = $"data: {{\"type\":{type}}}\n\n";
+        var alone = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(invalidEvent), EventStream, null);
+        var afterUsage = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream + invalidEvent), EventStream, null);
+
+        Assert.Null(alone.Usage);
+        Assert.Equal("malformed", alone.Error);
+        Assert.Equal(new ResponseUsage(100, 57, 200, 301), afterUsage.Usage);
+        Assert.Equal("truncated", afterUsage.Error);
+    }
+
     [Fact]
     public void A_delta_null_does_not_erase_a_count_the_start_gave()
     {
