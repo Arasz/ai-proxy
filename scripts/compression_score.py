@@ -45,3 +45,8 @@ def score(m: Measurement, budget_s: float, retention_floor: float = 1.0) -> floa
     if c == 0.0:
         return 0.0
     return 2 * c * lat / (c + lat)
+
+
+def size_score(m: Measurement, budget_per_ktoken_s: float, retention_floor: float = 1.0) -> float:
+    """The score with a latency budget that scales with the payload: budget_per_ktoken_s per 1,000 original tokens."""
+    return score(m, budget_per_ktoken_s * m.original_tokens / 1000, retention_floor)
