@@ -34,7 +34,10 @@ public sealed class JsonCompressionHandler : ICompressionHandler
                 document.RootElement.WriteTo(writer);
             }
 
-            return ValueTask.FromResult(new HandledContent(Encoding.UTF8.GetString(buffer.ToArray()), CompactPath));
+            var compact = Encoding.UTF8.GetString(buffer.ToArray());
+
+            // The writer still escapes characters outside the basic plane, so a compact document can come out longer.
+            return ValueTask.FromResult(new HandledContent(compact.Length <= part.Text.Length ? compact : part.Text, CompactPath));
         }
         catch (JsonException)
         {

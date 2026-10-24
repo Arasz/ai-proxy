@@ -17,7 +17,8 @@ pipeline saw no part get shorter and kept the original. In a region with several
 JSON part would be composed in whenever another part shrank. **Fixed** in this change: the handler
 writes with `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`
 (`src/AiProxy.Core/Content/Handlers/JsonCompressionHandler.cs`), since the text goes to a model,
-not into HTML. A compact document still cannot shrink without losing values, so `github_pr_list`
+not into HTML. That encoder still escapes characters outside the basic plane (an emoji becomes two
+`\u` escapes), so the handler also returns the input when its compact form would be longer. A compact document still cannot shrink without losing values, so `github_pr_list`
 stays untouched, now for the right reason.
 
 **Evidence:** test `Compact_json_is_written_back_as_it_was_not_escaped_longer` in
