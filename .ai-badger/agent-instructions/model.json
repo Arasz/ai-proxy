@@ -6,13 +6,51 @@
   "instructionSets": {},
   "sharedPolicy": {
     "authoritativeDocs": [],
-    "nonNegotiableInvariants": [],
+    "nonNegotiableInvariants": [
+      {
+        "id": "no-redundant-null-checks",
+        "summary": "With nullable analysis on, never null-check a value whose type is non-nullable.",
+        "patterns": [
+          "no-redundant-null-checks"
+        ],
+        "mustAppearIn": [
+          "CLAUDE.md",
+          "AGENTS.md",
+          ".github/copilot-instructions.md"
+        ]
+      },
+      {
+        "id": "primary-constructors",
+        "summary": "Declare C# constructor parameters as a primary constructor.",
+        "patterns": [
+          "primary-constructors"
+        ],
+        "mustAppearIn": [
+          "CLAUDE.md",
+          "AGENTS.md",
+          ".github/copilot-instructions.md"
+        ]
+      }
+    ],
     "reviewCategories": []
   },
   "agents": {},
   "validation": {
     "requiredHeadings": {},
-    "requiredPatterns": {},
+    "requiredPatterns": {
+      "CLAUDE.md": [
+        "no-redundant-null-checks",
+        "primary-constructors"
+      ],
+      "AGENTS.md": [
+        "no-redundant-null-checks",
+        "primary-constructors"
+      ],
+      ".github/copilot-instructions.md": [
+        "no-redundant-null-checks",
+        "primary-constructors"
+      ]
+    },
     "forbiddenPatterns": {}
   }
 }
