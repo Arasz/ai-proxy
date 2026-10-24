@@ -128,7 +128,9 @@ class SummaryTests(unittest.TestCase):
                 {"type": "text", "text": "valid first block"},
                 {"type": "text", "text": 123}]}]):
             with self.subTest(messages=messages):
-                invalid = body(model="invalid", system="abcd", messages=messages)
+                invalid = body(model="invalid", system=[{
+                    "type": "text", "text": "abcd", "cache_control": {"type": "ephemeral"}}],
+                    messages=messages)
                 valid = body(model="valid", system="abcd")
                 s = summarize([invalid, valid])
                 self.assertEqual((s.requests, s.unreadable), (1, 1))
