@@ -9,6 +9,6 @@
         <Project Path="tests/AiProxy.Tests/AiProxy.Tests.csproj"/>
     </Folder>
     <Folder Name="/scripts/">
-        <Project Path="scripts/code_reducer_core/CodeReducerCore.csproj"/>
+        <Project Path="scripts/CodeReducerCore/CodeReducerCore.csproj"/>
     </Folder>
 </Solution>
