@@ -1,6 +1,7 @@
 using System.Net;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
+using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Hosting;
@@ -25,6 +26,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private bool _systemProxySet;
     private SystemProxyMarker? _marker;
     private ISystemProxyGuardSession? _guard;
+    private readonly Func<HttpWebClient, bool> _upstreamClosed;
     private volatile bool _upstreamStateUnreadable;
 
     /// <summary>Creates the proxy service without changing system settings until started.</summary>
@@ -44,7 +46,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         IProviderHosts providerHosts,
         ISystemProxyGuardLauncher guardLauncher,
         ILoggerFactory loggerFactory,
-        TimeSpan markerWait)
+        TimeSpan markerWait,
+        Func<HttpWebClient, bool>? upstreamClosed = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(guardLauncher);
@@ -60,6 +63,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _providerHosts = providerHosts;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
+        _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
         Address = new Uri($"http://{options.ListenAddress}:{options.Port}");
     }
 
@@ -307,7 +311,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         bool closed;
         try
         {
-            closed = UpstreamConnection.IsClosed(e.HttpClient);
+            closed = _upstreamClosed(e.HttpClient);
         }
         catch (MissingMemberException exception)
         {
