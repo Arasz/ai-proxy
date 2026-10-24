@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from rtk_runner import ccr_latencies, request_body, tool_result_text
+from rtk_runner import added_chars, ccr_latencies, request_body, tool_result_text
 
 
 class ToolResultTextTests(unittest.TestCase):
@@ -14,6 +14,16 @@ class ToolResultTextTests(unittest.TestCase):
         body["messages"][1]["content"][0]["content"] = [
             {"type": "text", "text": "head"}, {"type": "text", "text": "[rtk_retrieve abc]"}]
         self.assertEqual(tool_result_text(body), "head[rtk_retrieve abc]")
+
+
+class AddedCharsTests(unittest.TestCase):
+    def test_an_injected_tool_definition_counts_toward_what_the_model_sees(self):
+        body = json.loads(request_body("x"))
+        body["tools"] = [{"name": "rtk_retrieve", "description": "get it back"}]
+        self.assertEqual(added_chars(body), len(json.dumps(body["tools"])))
+
+    def test_a_body_without_tools_adds_nothing(self):
+        self.assertEqual(added_chars(json.loads(request_body("x"))), 0)
 
 
 class CcrLatencyTests(unittest.TestCase):

@@ -58,7 +58,7 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
             original = text_of(name)
             if candidate in extractive:
                 rows[name] = extractive_row(original, payload["questions"],
-                                            [ReducerRun(r["output"], r["latency_s"]) for r in mine])
+                                            [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0)) for r in mine])
             else:
                 rows[name] = qa_row(original, payload["questions"],
                                     [QaRun(r["output"], r["latency_s"], r["replies"]) for r in mine])
@@ -105,7 +105,10 @@ def _command(candidate: str, runs: int, names: list[str]) -> tuple[list[str], di
 
 def run(candidates: list[str], out: Path, runs: int) -> None:
     out.mkdir(parents=True, exist_ok=True)
-    (out / "environment.json").write_text(json.dumps(_environment(), indent=1) + "\n", encoding="utf-8")
+    recorded = out / "environment.json"
+    environments = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else {}
+    environments |= dict.fromkeys(candidates, _environment())
+    recorded.write_text(json.dumps(environments, indent=1) + "\n", encoding="utf-8")
     names = list(load()["payloads"])
     if "shipped_rules" in candidates:
         subprocess.run(["dotnet", "build", str(HERE / "rules_runner"), "-c", "Release", "-v", "q"], check=True)
@@ -153,8 +156,8 @@ def _table(rows: list[dict], label: str) -> str:
 def report(out: Path) -> None:
     records = {p.stem: [json.loads(line) for line in p.open(encoding="utf-8")] for p in sorted(out.glob("*.jsonl"))}
     recorded = out / "environment.json"
-    environment = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else _environment()
-    built = build_report(load(), records) | {"environment": environment}
+    environments = json.loads(recorded.read_text(encoding="utf-8")) if recorded.exists() else {}
+    built = build_report(load(), records) | {"environment": {c: environments.get(c, "not recorded") for c in records}}
     (out / "report.json").write_text(json.dumps(built, indent=1) + "\n", encoding="utf-8")
     verdict = "VOID: " + "; ".join(built["void"]) if built["void"] else "controls clear the run"
     md = f"{verdict}\n\n{json.dumps(built['environment'])}\n\n## Per kind\n\n{_table(built['kinds'], 'kind')}" \

@@ -41,6 +41,11 @@ def tool_result_text(body: dict) -> str:
     return "".join(block.get("text", "") for block in content)
 
 
+def added_chars(body: dict) -> int:
+    """Characters rtk added outside the tool result: the tool definitions it injects into the request."""
+    return len(json.dumps(body["tools"])) if body.get("tools") else 0
+
+
 def ccr_latencies(ccr_trips: list[float], plain_trips: list[float]) -> list[float]:
     """Each CCR round trip less the median plain round trip, floored at zero."""
     baseline = statistics.median(plain_trips)
@@ -70,9 +75,11 @@ class Upstream(ThreadingHTTPServer):
         threading.Thread(target=self.serve_forever, daemon=True).start()
 
 
-def _wait_for(port: int, seconds: float = 20.0) -> None:
+def _wait_for(port: int, proc: subprocess.Popen, seconds: float = 20.0) -> None:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"rtk-proxy exited with {proc.returncode} before listening on {port}")
         with socket.socket() as s:
             if s.connect_ex(("127.0.0.1", port)) == 0:
                 return
@@ -90,7 +97,7 @@ def _start_rtk(home: str, port: int, upstream: int, ccr: bool, pipeline: str = P
          "--anthropic-upstream", f"http://127.0.0.1:{upstream}", "--ccr", "true" if ccr else "false",
          "--db", os.path.join(home, "rtk-proxy.db"), "--icm-db", os.path.join(home, "rtk-proxy-memory.db")],
         env=env, cwd=home, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    _wait_for(port)
+    _wait_for(port, proc)
     return proc
 
 
@@ -121,13 +128,17 @@ def main() -> None:
                 body = request_body(payload_text(name))
                 _round_trip(CCR_PORT, body)
                 _round_trip(PLAIN_PORT, body)
-                ccr_trips, outputs, plain_trips = [], [], []
+                ccr_trips, sent, plain_trips = [], [], []
                 for _ in range(runs):
+                    ccr_upstream.last = None
                     ccr_trips.append(_round_trip(CCR_PORT, body))
-                    outputs.append(tool_result_text(ccr_upstream.last))
+                    if ccr_upstream.last is None:
+                        raise RuntimeError(f"rtk-proxy answered {name} without forwarding it upstream")
+                    sent.append(ccr_upstream.last)
                     plain_trips.append(_round_trip(PLAIN_PORT, body))
-                for run, (output, latency) in enumerate(zip(outputs, ccr_latencies(ccr_trips, plain_trips))):
-                    print(json.dumps({"payload": name, "run": run, "output": output, "latency_s": latency}), flush=True)
+                for run, (upstream_body, latency) in enumerate(zip(sent, ccr_latencies(ccr_trips, plain_trips))):
+                    print(json.dumps({"payload": name, "run": run, "output": tool_result_text(upstream_body),
+                                      "added_chars": added_chars(upstream_body), "latency_s": latency}), flush=True)
         finally:
             for proc in procs:
                 proc.terminate()

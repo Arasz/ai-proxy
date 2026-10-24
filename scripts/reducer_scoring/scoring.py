@@ -14,10 +14,11 @@ MISSES_THAT_LOSE = 2
 
 @dataclass(frozen=True)
 class ReducerRun:
-    """One run of an extractive candidate: the text it produced and how long that took."""
+    """One run of an extractive candidate: the text it produced, how long that took, and what it added outside it."""
 
     output: str
     latency_s: float
+    added_chars: int = 0
 
 
 @dataclass(frozen=True)
@@ -49,10 +50,10 @@ def qa_kept(replies: list[list[str]], questions: list[dict]) -> int:
     return kept
 
 
-def _median_row(original: str, total: int, outputs: list[str], latencies: list[float], kept: list[int]) -> Row:
+def _median_row(original: str, total: int, lengths: list[int], latencies: list[float], kept: list[int]) -> Row:
     return Row(Measurement(
         original_chars=len(original),
-        reduced_chars=statistics.median_low(len(o) for o in outputs),
+        reduced_chars=statistics.median_low(lengths),
         latency_s=statistics.median(latencies),
         answers_kept=statistics.median_low(kept),
         answers_total=total,
@@ -64,13 +65,14 @@ def extractive_row(original: str, questions: list[dict], runs: list[ReducerRun])
     if all(run.output == original for run in runs):
         return Row(None, not_applicable=True)
     kept = [sum(answered(run.output, q["a"]) for q in questions) for run in runs]
-    return _median_row(original, len(questions), [r.output for r in runs], [r.latency_s for r in runs], kept)
+    lengths = [len(r.output) + r.added_chars for r in runs]
+    return _median_row(original, len(questions), lengths, [r.latency_s for r in runs], kept)
 
 
 def qa_row(original: str, questions: list[dict], runs: list[QaRun]) -> Row:
     """QA retention: an answer is kept when the reader, given the candidate's output, still finds it."""
     kept = [qa_kept(run.replies, questions) for run in runs]
-    return _median_row(original, len(questions), [r.output for r in runs], [r.latency_s for r in runs], kept)
+    return _median_row(original, len(questions), [len(r.output) for r in runs], [r.latency_s for r in runs], kept)
 
 
 def kind_row(rows: list[Row]) -> Row:

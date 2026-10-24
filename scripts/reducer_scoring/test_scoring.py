@@ -43,6 +43,11 @@ class ExtractiveRowTests(unittest.TestCase):
                 ReducerRun("Dana Okonkwo PR 8842", 0.1)]
         self.assertFalse(extractive_row(ORIGINAL, QUESTIONS, runs).not_applicable)
 
+    def test_characters_added_outside_the_output_count_as_reduced_length(self):
+        runs = [ReducerRun("Dana Okonkwo PR 8842", 0.1, added_chars=400)] * 3
+        reduced = extractive_row(ORIGINAL, QUESTIONS, runs).measurement.reduced_chars
+        self.assertEqual(reduced, len("Dana Okonkwo PR 8842") + 400)
+
     def test_latency_and_length_are_medians_over_runs(self):
         runs = [ReducerRun("Dana Okonkwo PR 8842", 0.9),
                 ReducerRun("Dana Okonkwo PR 8842 xx", 0.1),
