@@ -79,6 +79,33 @@ public class ResponseBufferTests
     }
 
     [Fact]
+    public void A_tail_that_starts_inside_a_line_drops_that_part_even_when_it_reads_like_an_event()
+    {
+        // Answer text that looks like an event line, with the tail's first byte placed on one of those copies:
+        // kept, the partial line would read as a broken event and lose the stream its final usage.
+        var lead = Stream(events: 30_000).Split("event: message_delta", StringSplitOptions.None)[0];
+        var filler = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"" +
+                     string.Concat(Enumerable.Repeat("data: {\\\"type\\\":\\\"x\\\"} ", 40)) + "\"}}\n\n";
+        const string end = "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":57,\"cache_read_input_tokens\":301}}\n\n";
+        var fillers = (ResponseBuffer.TailBytes / filler.Length) + 2;
+        var text = lead + string.Concat(Enumerable.Repeat(filler, fillers)) + end;
+        var cut = Encoding.UTF8.GetByteCount(text) - ResponseBuffer.TailBytes;
+        var onCopy = text.IndexOf("data: {\\\"type", cut, StringComparison.Ordinal);
+        // Padding after that copy moves the cut forward onto it.
+        text = text.Insert(text.LastIndexOf("\"}}", StringComparison.Ordinal), new string(' ', onCopy - cut));
+        var stream = Encoding.UTF8.GetBytes(text);
+        const string copy = "data: {\\\"type";
+        Assert.Equal(copy, Encoding.UTF8.GetString(stream, stream.Length - ResponseBuffer.TailBytes, copy.Length));
+        var buffer = ResponseBuffer.For(EventStream, null);
+
+        Append(buffer, stream, 4096);
+
+        var reading = ResponseUsageReader.Read(buffer.Body, EventStream, null);
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
+    }
+
+    [Fact]
     public void A_released_buffer_holds_nothing()
     {
         var buffer = ResponseBuffer.For("application/json", null);
