@@ -123,6 +123,21 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual((s.requests, s.unreadable), (1, 1))
         self.assertEqual(s.kinds["system"].sent_chars, 2)
 
+    def test_invalid_message_structures_are_unreadable_without_partial_totals(self):
+        for messages in ([None], [{"role": "user", "content": [
+                {"type": "text", "text": "valid first block"},
+                {"type": "text", "text": 123}]}]):
+            with self.subTest(messages=messages):
+                invalid = body(model="invalid", system="abcd", messages=messages)
+                valid = body(model="valid", system="abcd")
+                s = summarize([invalid, valid])
+                self.assertEqual((s.requests, s.unreadable), (1, 1))
+                self.assertEqual(s.models, {"valid": 1})
+                self.assertEqual(s.modes, {"stateless": 1})
+                self.assertEqual(s.cache_breakpoints, 0)
+                self.assertEqual(s.as_dict()["kinds"], {
+                    "system": {"count": 1, "sent_chars": 4, "new_chars": 4}})
+
     def test_an_unreadable_body_is_counted_not_raised(self):
         s = summarize([b"\x00not json", body(system="ab")])
         self.assertEqual((s.requests, s.unreadable), (1, 1))

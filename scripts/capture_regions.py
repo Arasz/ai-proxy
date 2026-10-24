@@ -161,11 +161,19 @@ def summarize(bodies) -> Summary:
         if request is None:
             summary.unreadable += 1
             continue
+        try:
+            breakpoints = _breakpoints(request)
+            found = regions(request)
+            model = str(request.get("model", "?"))
+            mode = _mode(request)
+        except (AttributeError, TypeError, ValueError):
+            summary.unreadable += 1
+            continue
         summary.requests += 1
-        summary.cache_breakpoints += _breakpoints(request)
-        summary.models[str(request.get("model", "?"))] += 1
-        summary.modes[_mode(request)] += 1
-        for r in regions(request):
+        summary.cache_breakpoints += breakpoints
+        summary.models[model] += 1
+        summary.modes[mode] += 1
+        for r in found:
             totals = summary.kinds.setdefault(r.kind, KindTotals())
             totals.count += 1
             totals.sent_chars += r.chars
