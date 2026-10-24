@@ -5,7 +5,7 @@ using AiProxy.Core.Content.Code;
 namespace CodeReducerCore;
 
 /// <summary>Runs the offline JSON adapter for a caller-supplied code-read view.</summary>
-public sealed class CodeReducerCommand
+public static class CodeReducerCommand
 {
     /// <summary>Reads one request and writes a reduced view, or a diagnostic with a nonzero result.</summary>
     public static async Task<int> RunAsync(TextReader input, TextWriter output, TextWriter error)

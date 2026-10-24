@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using AiProxy.Core.Content.Code;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,14 +9,14 @@ namespace AiProxy.Code;
 /// <summary>Scans C# syntax tokens and trivia with the Roslyn parser.</summary>
 public sealed class CSharpCodeLexer : ICodeLexer
 {
-    private static readonly HashSet<SyntaxKind> StringLiteralKinds =
+    private static readonly FrozenSet<SyntaxKind> StringLiteralKinds =
     [
         SyntaxKind.StringLiteralExpression,
         SyntaxKind.Utf8StringLiteralExpression,
         SyntaxKind.CharacterLiteralExpression,
     ];
 
-    private static readonly HashSet<SyntaxKind> InterpolatedStringTokenKinds =
+    private static readonly FrozenSet<SyntaxKind> InterpolatedStringTokenKinds =
     [
         SyntaxKind.InterpolatedStringStartToken,
         SyntaxKind.InterpolatedStringEndToken,
