@@ -1,0 +1,21 @@
+2026-03-11T09:14:02Z INFO  worker=api-3 conn=8812 msg="request received" path=/v1/orders/99182
+2026-03-11T09:14:02Z INFO  worker=api-3 conn=8812 msg="db query" sql="SELECT * FROM orders WHERE id=99182" dur_ms=41
+2026-03-11T09:14:02Z INFO  worker=api-3 conn=8812 msg="cache lookup" key="order:99182" hit=false
+2026-03-11T09:14:02Z INFO  worker=api-3 conn=8812 msg="db query" sql="SELECT * FROM customers WHERE id=4471" dur_ms=12
+2026-03-11T09:14:03Z WARN  worker=api-3 conn=8812 msg="pool stats" active=48 idle=2 size=50 waiters=311
+2026-03-11T09:14:03Z ERROR worker=api-3 conn=8812 msg="pool exhausted" file="/srv/app/db/pool.py" line=214 err="timeout waiting for connection after 5000ms" trace_id=8f2c1ab4
+2026-03-11T09:14:03Z INFO  worker=api-3 conn=8812 msg="retry scheduled" attempt=1 backoff_ms=250
+2026-03-11T09:14:04Z ERROR worker=api-3 conn=8812 msg="pool exhausted" file="/srv/app/db/pool.py" line=214 err="timeout waiting for connection after 5000ms" trace_id=8f2c1ab4
+2026-03-11T09:14:04Z INFO  worker=api-3 conn=8812 msg="retry scheduled" attempt=2 backoff_ms=500
+2026-03-11T09:14:05Z FATAL worker=api-3 conn=8812 msg="giving up" err="connection pool exhausted, 311 waiters pending" trace_id=8f2c1ab4
+2026-03-11T09:14:05Z INFO  worker=api-3 conn=8812 msg="request failed" status=503 dur_ms=3110
+2026-03-11T09:14:05Z INFO  worker=api-4 conn=8813 msg="request received" path=/v1/orders/99183
+2026-03-11T09:14:05Z INFO  worker=api-4 conn=8813 msg="db query" sql="SELECT * FROM orders WHERE id=99183" dur_ms=38
+2026-03-11T09:14:06Z WARN  worker=api-4 conn=8813 msg="pool stats" active=50 idle=0 size=50 waiters=402
+2026-03-11T09:14:06Z ERROR worker=api-4 conn=8813 msg="pool exhausted" file="/srv/app/db/pool.py" line=214 err="timeout waiting for connection after 5000ms" trace_id=9a3d2cc5
+2026-03-11T09:14:07Z FATAL worker=api-4 conn=8813 msg="giving up" err="connection pool exhausted, 402 waiters pending" trace_id=9a3d2cc5
+2026-03-11T09:14:07Z INFO  worker=api-4 conn=8813 msg="request failed" status=503 dur_ms=2044
+2026-03-11T09:14:07Z INFO  worker=api-5 conn=8814 msg="request received" path=/v1/orders/99184
+2026-03-11T09:14:08Z ERROR worker=api-5 conn=8814 msg="pool exhausted" file="/srv/app/db/pool.py" line=214 err="timeout waiting for connection after 5000ms" trace_id=7c9e1f02
+2026-03-11T09:14:09Z FATAL worker=api-5 conn=8814 msg="giving up" err="connection pool exhausted, 388 waiters pending" trace_id=7c9e1f02
+2026-03-11T09:14:09Z INFO  worker=api-5 conn=8814 msg="request failed" status=503 dur_ms=2902

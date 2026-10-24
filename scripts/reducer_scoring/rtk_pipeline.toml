@@ -1,0 +1,13 @@
+schema_version = 1
+
+# The proxy half of the operator's ~/.config/rtk/pipeline.toml (sha256 653bad8b...f5 on
+# 2026-10-23): the hook rules, the terse directive and the Haiku upstream never run on the
+# proxy path, so they are left out and no key command is ever invoked.
+[pipeline]
+name    = "reducer-scoring"
+extends = ["rtk:proxy"]
+
+[[proxy.request.tool_result]]
+name = "ccr"
+when = { tokens_gt = 1000 }
+use  = ["ccr"]

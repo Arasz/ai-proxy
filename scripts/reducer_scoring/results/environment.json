@@ -1,0 +1,44 @@
+{
+ "identity": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "0d7d19b",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ },
+ "kompress_int8": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "0d7d19b",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ },
+ "rtk_ccr": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "1820d4a",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ },
+ "shipped_rules": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "0d7d19b",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ },
+ "summarizer_control": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "0d7d19b",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ },
+ "digest_gpt_stand_in": {
+  "date": "2026-10-24",
+  "machine": "Apple M4, 24 GB, macOS 27.0.1",
+  "commit": "0d7d19b",
+  "rtk_proxy": "rtk-proxy 1.0.1",
+  "pi": "1.4.0"
+ }
+}

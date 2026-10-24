@@ -30,6 +30,10 @@ class ScoreTests(unittest.TestCase):
         # compression 0.5, latency 1/(1+1) = 0.5 -> harmonic mean 0.5
         self.assertAlmostEqual(score(measured(), budget_s=1.0), 0.5)
 
+    def test_unequal_compression_and_latency_give_the_exact_harmonic_mean(self):
+        # compression 0.8, latency 1/(1+1) = 0.5 -> 2*0.8*0.5/1.3; geometric would be 0.632, min 0.5
+        self.assertAlmostEqual(score(measured(reduced=200), budget_s=1.0), 0.8 / 1.3)
+
     def test_imbalance_scores_below_balance(self):
         lopsided = score(measured(reduced=10, latency_s=9.0), budget_s=1.0)   # C 0.99, L 0.1
         balanced = score(measured(reduced=500, latency_s=1.0), budget_s=1.0)  # C 0.5,  L 0.5

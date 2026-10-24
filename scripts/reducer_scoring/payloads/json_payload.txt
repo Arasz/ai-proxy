@@ -1,0 +1,50 @@
+{
+  "order_id": 99182,
+  "customer_id": 4471,
+  "status": "failed",
+  "http_status": 503,
+  "failure": {
+    "reason": "connection pool exhausted",
+    "waiters": 311,
+    "file": "/srv/app/db/pool.py",
+    "line": 214,
+    "timeout_ms": 5000
+  },
+  "trace_id": "8f2c1ab4",
+  "worker": "api-3",
+  "conn": 8812,
+  "attempts": [
+    {
+      "n": 1,
+      "backoff_ms": 250,
+      "at": "2026-03-11T09:14:03Z"
+    },
+    {
+      "n": 2,
+      "backoff_ms": 500,
+      "at": "2026-03-11T09:14:04Z"
+    }
+  ],
+  "items": [
+    {
+      "sku": "A-1188",
+      "qty": 2,
+      "price_eur": 49.9
+    },
+    {
+      "sku": "B-0042",
+      "qty": 1,
+      "price_eur": 12.5
+    }
+  ],
+  "shipping": {
+    "carrier": "dhl",
+    "tracking": "JD00022910099182",
+    "eta": "2026-03-13"
+  },
+  "payment": {
+    "captured": false,
+    "auth_code": "AUTH-77120",
+    "gateway": "stripe-eu-1"
+  }
+}

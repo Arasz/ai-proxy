@@ -1,0 +1,10 @@
+total 128
+drwxr-xr-x@  9 dev  staff   288 Oct 21 23:56 .
+drwxr-xr-x@  5 dev  staff   160 Oct 22 00:00 ..
+-rw-r--r--@  1 dev  staff  1937 Oct 21 23:49 AiProxy.csproj
+-rw-r--r--@  1 dev  staff  2861 Oct 21 23:52 Detection/ProviderDetector.cs
+-rw-r--r--@  1 dev  staff  1420 Oct 21 23:55 Detection/Dialect.cs
+-rw-r--r--@  1 dev  staff  1904 Oct 21 23:57 Forwarding/UpstreamForwarder.cs
+-rw-r--r--@  1 dev  staff  2210 Oct 21 23:58 Forwarding/CredentialRule.cs
+-rw-r--r--@  1 dev  staff   412 Oct 22 00:00 Program.cs
+-rw-r--r--@  1 dev  staff  1044 Oct 21 23:59 appsettings.json

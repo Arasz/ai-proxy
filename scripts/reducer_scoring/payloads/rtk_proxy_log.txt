@@ -1,0 +1,32 @@
+2026-10-23T18:25:09.919669Z  INFO rtk_proxy::engine_rules: proxy.request rules pipeline=haiku-compaction ccr=true align=true retire=false normalize=true methods=false
+2026-10-23T18:25:09.922290Z  INFO rtk_proxy: usage store open db="/home/dev/probe/db-a/rtk-proxy.db"
+2026-10-23T18:25:09.928641Z  INFO rtk_proxy: icm memory store open icm_db="/home/dev/probe/db-a/mem.db"
+2026-10-23T18:25:09.928674Z  INFO rtk_proxy: pipeline stages=["ingest_filter", "cache_align", "normalize", "pixel_compress", "ccr"] ccr=true
+2026-10-23T18:25:09.928817Z  INFO rtk_proxy: rtk-proxy listening bind="127.0.0.1:18080"
+2026-10-23T18:25:25.508537Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=cdb66ea21c0dcdcf tokens_compressed=819 tokens_in_context=283 blocks_compressed=1
+2026-10-23T18:25:25.516248Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=b567c6ffeebebc54 tokens_compressed=1207 tokens_in_context=994 blocks_compressed=1
+2026-10-23T18:25:25.521939Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=246079e517b330bd tokens_compressed=1419 tokens_in_context=1031 blocks_compressed=1
+2026-10-23T18:25:25.527232Z  INFO rtk_proxy::pipeline::normalize: normalize: category-A normalisation applied blocks=1 chars_removed=1 tokens_saved=1 tokens_before=1634
+2026-10-23T18:25:25.527637Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=94dbdd0da1822158 tokens_compressed=1633 tokens_in_context=1032 blocks_compressed=1
+2026-10-23T18:25:25.533058Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=6a6744e7db519e8a tokens_compressed=1812 tokens_in_context=1004 blocks_compressed=1
+2026-10-23T18:25:25.538438Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=ca5f99dfd7d8f52a tokens_compressed=2020 tokens_in_context=1035 blocks_compressed=1
+2026-10-23T18:25:25.543887Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=01fd33aa498da764 tokens_compressed=2396 tokens_in_context=1028 blocks_compressed=1
+2026-10-23T18:25:25.549694Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=3341df9fa0a4e0cb tokens_compressed=3247 tokens_in_context=1023 blocks_compressed=1
+2026-10-23T18:25:25.555186Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=ebd546fefb26d542 tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2
+2026-10-23T18:25:32.525182Z  INFO rtk_proxy::pipeline::normalize: normalize: category-A normalisation applied blocks=1 chars_removed=1 tokens_saved=1 tokens_before=374
+2026-10-23T18:25:32.525322Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=54b2c23c5c811fc5 tokens_compressed=373 tokens_in_context=278 blocks_compressed=1
+2026-10-23T18:25:32.530107Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=a7384a5fe7d20d64 tokens_compressed=452 tokens_in_context=283 blocks_compressed=1
+2026-10-23T18:25:32.534814Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=cd55230831bd6da1 tokens_compressed=536 tokens_in_context=281 blocks_compressed=1
+2026-10-23T18:25:32.540260Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=f26b5dea45d2e9d0 tokens_compressed=633 tokens_in_context=297 blocks_compressed=1
+2026-10-23T18:25:32.546043Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=48cd36fd8a7f10cf tokens_compressed=708 tokens_in_context=287 blocks_compressed=1
+2026-10-23T18:25:47.118469Z  INFO rtk_proxy::pipeline::normalize: normalize: category-A normalisation applied blocks=1 chars_removed=1 tokens_saved=1 tokens_before=298
+2026-10-23T18:25:47.123837Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=56966974459d8504 tokens_compressed=318 tokens_in_context=293 blocks_compressed=1
+2026-10-23T18:25:47.129030Z  INFO rtk_proxy::pipeline::normalize: normalize: category-A normalisation applied blocks=1 chars_removed=1 tokens_saved=1 tokens_before=315
+2026-10-23T18:25:47.129159Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=9ec60bc766c740a8 tokens_compressed=314 tokens_in_context=285 blocks_compressed=1
+2026-10-23T18:25:47.134162Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=7cabef60af7dd883 tokens_compressed=324 tokens_in_context=283 blocks_compressed=1
+2026-10-23T18:25:47.139345Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=874c262e8ae9f799 tokens_compressed=334 tokens_in_context=289 blocks_compressed=1
+2026-10-23T18:25:47.144303Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=d3d5ebb01d514885 tokens_compressed=344 tokens_in_context=288 blocks_compressed=1
+2026-10-23T18:25:47.149131Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=18859ffa39fe55a2 tokens_compressed=358 tokens_in_context=301 blocks_compressed=1
+2026-10-23T18:25:47.154102Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=3dca9417d603ecc1 tokens_compressed=358 tokens_in_context=283 blocks_compressed=1
+2026-10-23T18:25:47.159212Z  INFO rtk_proxy::pipeline::ccr: ccr: compressed request, cached original content session=48674bd888244d64 tokens_compressed=367 tokens_in_context=289 blocks_compressed=1
+2026-10-23T18:28:08.647166Z  INFO rtk_proxy: shutdown requested via SIGTERM

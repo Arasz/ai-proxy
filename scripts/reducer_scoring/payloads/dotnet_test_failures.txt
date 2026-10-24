@@ -1,0 +1,63 @@
+Running tests from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_line_that_carries_the_failure_survives_even_at_info_level (3ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "\n[retained identifiers] failed ERROR 2026 03 12 10"···
+  Not found: "status=503"
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_line_that_carries_the_failure_survives_even_at_info_level() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:29
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_last_two_lines_are_anchors_and_survive (1ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "\n[retained identifiers] 2026 03 12 10 00 INFO 1 01"···
+  Not found: "the last line"
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_last_two_lines_are_anchors_and_survive() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:84
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.A_line_at_error_level_survives_even_when_its_message_carries_no_signal (0ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "\n[retained identifiers] ERROR 2026 03 12 10 00 INF"···
+  Not found: "boom"
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.A_line_at_error_level_survives_even_when_its_message_carries_no_signal() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:66
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.Every_line_the_reduction_keeps_is_a_line_of_the_input (3ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Item not found in collection
+  Collection: ["2026-03-12 10:00:00 INFO worker=api-1 request star"···, "2026-03-12 10:00:01 INFO worker=api-1 request fail"···, "2026-03-12 10:00:02 INFO worker=api-1 nothing to s"···, "2026-03-12 10:00:03 INFO worker=api-1 nothing to s"···, "2026-03-12 10:00:04 ERROR worker=api-2 boom", ···]
+  Not found:  ""
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.Every_line_the_reduction_keeps_is_a_line_of_the_input() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:115
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.A_repeated_line_is_dropped_after_the_first (1ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Equal() Failure: Values differ
+  Expected: 1
+  Actual:   0
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.A_repeated_line_is_dropped_after_the_first() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:96
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_first_two_lines_are_anchors_and_survive (0ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "\n[retained identifiers] failed ERROR 2026 03 12 10"···
+  Not found: "request started"
+    at AiProxy.Tests.Unit.Content.Handlers.LogCompressionHandlerTests.The_first_two_lines_are_anchors_and_survive() in /home/dev/ai-proxy/tests/AiProxy.Tests/Unit/Content/Handlers/LogCompressionHandlerTests.cs:45
+    --- End of stack trace from previous location ---
+failed AiProxy.Tests.Integration.ProviderCompressionTests.The_provider_upstream_receives_the_tool_output_reduced (512ms)
+  from /home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64)
+  Assert.Contains() Failure: Sub-string not found
+  String:    "{"model":"claude-haiku-4-5","max_tokens":5,"messag"···
+  Not found: "status=503"
+    at AiProxy.Tests.Integration.ProviderCompressionTests.The_provider_upstream_receives_the_tool_output_reduced() in /home/dev/ai-proxy/tests/AiProxy.Tests/Integration/ProviderCompressionTests.cs:47
+    at AiProxy.Tests.Integration.ProviderCompressionTests.The_provider_upstream_receives_the_tool_output_reduced() in /home/dev/ai-proxy/tests/AiProxy.Tests/Integration/ProviderCompressionTests.cs:48
+    at AiProxy.Tests.Integration.ProviderCompressionTests.The_provider_upstream_receives_the_tool_output_reduced() in /home/dev/ai-proxy/tests/AiProxy.Tests/Integration/ProviderCompressionTests.cs:48
+    --- End of stack trace from previous location ---
+/home/dev/ai-proxy/tests/AiProxy.Tests/bin/Debug/net10.0/AiProxy.Tests.dll (net10.0|arm64) failed with 7 error(s) (6s 350ms)
+Exit code: 2
+  Error output: ai-proxy guard could not clear the system proxy: networksetup failed
+
+Test run summary: Failed!
+  total: 231
+  failed: 7
+  succeeded: 224
+  skipped: 0
+  duration: 6s 783ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)
