@@ -336,11 +336,12 @@ meant "the agent must call `rtk_retrieve`", not "the content is gone" (F6).
 low through `pi`. pi's Anthropic route is out of credit and other pi providers were not used, so both
 new arms use `claude -p` with `claude-opus-5-5`, `--effort low`, isolated as `claude_digest_runner.command()`
 (no tools, `--setting-sources ""`, `--strict-mcp-config`, `--no-session-persistence`, `--system-prompt`,
-JSON output; proxy variables and `NODE_EXTRA_CA_CERTS` removed). Every reader call checked that
-`modelUsage` named only `claude-opus-5-5`. Both arms read the same saved `rtk_ccr` outputs
+JSON output; proxy variables and `NODE_EXTRA_CA_CERTS` removed). Each reader call checked, when
+`modelUsage` was present, that it named only `claude-opus-5-5`. Both arms read the same saved `rtk_ccr` outputs
 (13 payloads, 3 runs, 3 replies per run, same questions). rtk was not re-run. The answers are therefore
 not comparable with the pi-read rows of other candidates in this document; they are comparable with each
-other. No quota or rate-limit error occurred (limit was two).
+other. No quota or rate-limit error occurred, per the run log (limit was two); the saved files do not
+record it [UNVERIFIED from files].
 
 - `rtk_ccr_reader`: today's `READER_SYSTEM`, no retrieval. Graded by the reader's replies (QA), not verbatim.
 - `rtk_ccr_retrieval`: the reader may reply exactly `RETRIEVE <id>` for an id in an `rtk_retrieve` marker in
@@ -349,7 +350,9 @@ other. No quota or rate-limit error occurred (limit was two).
   occurred). Marker ids were checked to be one stable id per payload and unique across payloads; the
   runner cannot read rtk's store, so id-to-content is not independently confirmed beyond that.
 - A run counts as retrieved, for the compression charge, when any of its three reader calls retrieved;
-  the full original is then charged to `reduced_tokens`. Latency is rtk's saved `latency_s` plus the
+  the full original is then charged to `reduced_tokens` once per run, even when only 1 or 2 of its 3
+replies retrieved (for example `dotnet_test_failure`, 7 of 9), so the retrieval arm's token cost is
+slightly overstated against an agent that asks once. Latency is rtk's saved `latency_s` plus the
   median wall time of the first (retrieval-asking) call of the retrieving calls: the extra round trip.
   Reader wall time per call is in `reader_wall_s` of each record (median 4.0 s without retrieval;
   3.3 s first call and 3.5 s second call with it).
@@ -371,10 +374,8 @@ over the kind's payloads. Retrieval column is `rtk_ccr_retrieval` only.
 | build | 6/10 | 10/10 | 0.95 | 0.00 | 0.0029 | 1.64 | 8/18 (44%) |
 | test | 5/10 | 10/10 | 0.46 | 0.00 | 0.0006 | 3.82 | 15/18 (83%) |
 
-The `listing` kind is n/a in the pre-registered view (rtk left `dir_listing` untouched); in the
-counted view both arms keep 6/6 and charge the tool definition (compression 0). The `build` and
-`listing` rows above use the pre-registered view; the counted view (`kinds_counted`) differs only
-there (build no retrieval 6/10, compression 0.95; retrieval arm 10/10). Every score at the 1 s budget
+The `listing` kind is n/a for the extractive `rtk_ccr` only (rtk left `dir_listing` untouched); both
+QA arms count it as 6/6 with compression 0, and for them `kinds` and `kinds_counted` are identical. Every score at the 1 s budget
 is 0.0 except `rtk_ccr_retrieval` code (0.10), because compression is 0 or tiny whenever the original
 is fetched. The retrieval arm keeps every answer on every kind.
 
