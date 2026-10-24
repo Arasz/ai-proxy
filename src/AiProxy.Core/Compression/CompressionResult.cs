@@ -1,4 +1,4 @@
-using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 
 namespace AiProxy.Core.Compression;
 

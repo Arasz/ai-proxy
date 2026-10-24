@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using Dapper;
 
 namespace AiProxy.Storage;

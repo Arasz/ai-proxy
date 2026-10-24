@@ -1,4 +1,5 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
 using Microsoft.Extensions.Logging;
@@ -133,7 +134,7 @@ public sealed partial class ProviderRequestInspector
                     exchange.ResponseBytes,
                     reading.Usage,
                     reading.Error,
-                    exchange.Stages.ToList()),
+                    exchange.Stages.ToArray()),
                 CancellationToken.None);
         }
         catch (Exception exception)

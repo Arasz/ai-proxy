@@ -1,4 +1,4 @@
-namespace AiProxy.Core.Capture;
+namespace AiProxy.Core.Timing;
 
 /// <summary>How long one named step of handling a request took.</summary>
 public sealed record StageTiming(string Name, TimeSpan Elapsed);
@@ -37,5 +37,5 @@ public sealed class StageTimings
     }
 
     /// <summary>The stages so far, in the order they first ran.</summary>
-    public IReadOnlyList<StageTiming> ToList() => _stages.ToArray();
+    public StageTiming[] ToArray() => _stages.ToArray();
 }

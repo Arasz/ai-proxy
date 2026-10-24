@@ -1,4 +1,5 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using Titanium.Web.Proxy.StreamExtended.Network;
 
 namespace AiProxy.Hosting;

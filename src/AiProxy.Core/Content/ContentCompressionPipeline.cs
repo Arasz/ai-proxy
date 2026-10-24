@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 
 namespace AiProxy.Core.Content;
@@ -69,7 +69,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         stages.Add("find", _time.GetElapsedTime(started));
         if (regions.Count == 0)
         {
-            return new CompressionResult(request.Body, false) { Stages = stages.ToList() };
+            return new CompressionResult(request.Body, false) { Stages = stages.ToArray() };
         }
 
         var requestId = Guid.CreateVersion7().ToString();
@@ -92,7 +92,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         if (replacements.Count == 0)
         {
-            return new CompressionResult(request.Body, false) { PartFailures = failures, Stages = stages.ToList() };
+            return new CompressionResult(request.Body, false) { PartFailures = failures, Stages = stages.ToArray() };
         }
 
         started = _time.GetTimestamp();
@@ -126,7 +126,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
-        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToList() };
+        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToArray() };
     }
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>

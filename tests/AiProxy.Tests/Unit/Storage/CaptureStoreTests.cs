@@ -1,4 +1,5 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Timing;
 using AiProxy.Core.Providers;
 using AiProxy.Storage;
 using Dapper;

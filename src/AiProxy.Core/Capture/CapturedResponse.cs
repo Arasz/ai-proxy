@@ -1,3 +1,5 @@
+using AiProxy.Core.Timing;
+
 namespace AiProxy.Core.Capture;
 
 /// <summary>The numbers of one captured exchange's response: sizes, token usage and stage timings, never content.</summary>
