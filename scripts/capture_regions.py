@@ -15,6 +15,7 @@ import json
 import os
 import sqlite3
 import sys
+import zlib
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -117,7 +118,8 @@ def regions(request: dict) -> list[Region]:
         for block in content or []:
             if isinstance(block, dict):
                 kind, chars = _block_chars(block)
-                found.append(_region(f"{role}.{kind}", chars, block))
+                payload = block.get("content", "") if kind == "tool_result" else block
+                found.append(_region(f"{role}.{kind}", chars, payload))
     return found
 
 
@@ -146,7 +148,7 @@ def _parse(raw: bytes):
             raw = gzip.decompress(raw)
         request = json.loads(raw)
         return request if isinstance(request, dict) else None
-    except (OSError, ValueError):
+    except (OSError, ValueError, EOFError, zlib.error):
         return None
 
 

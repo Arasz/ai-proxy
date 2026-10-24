@@ -78,6 +78,19 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual((s.kinds["user.text"].sent_chars, s.kinds["user.text"].new_chars), (6, 4))
         self.assertEqual(s.kinds["assistant.text"].new_chars, 2)
 
+    def test_identical_tool_results_from_different_invocations_are_new_only_once(self):
+        for content in ("hello world", [{"type": "text", "text": "hello world"}]):
+            with self.subTest(content=content):
+                requests = [body(messages=[{"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": invocation, "content": content,
+                     "is_error": is_error}]}])
+                    for invocation, is_error in (("t1", False), ("t2", True))]
+                requests.append(body(messages=[{"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": "t3", "content": "different"}]}]))
+                s = summarize(requests)
+                totals = s.kinds["user.tool_result"]
+                self.assertEqual((totals.count, totals.sent_chars, totals.new_chars), (3, 31, 20))
+
     def test_cache_breakpoints_are_counted(self):
         s = summarize([body(system=[{"type": "text", "text": "x", "cache_control": {"type": "ephemeral"}}],
                             messages=[{"role": "user", "content": [
@@ -96,6 +109,18 @@ class SummaryTests(unittest.TestCase):
     def test_a_gzip_body_is_read(self):
         s = summarize([gzip.compress(body(system="abcd"))])
         self.assertEqual((s.requests, s.unreadable), (1, 0))
+
+    def test_truncated_gzip_is_unreadable_and_reporting_continues(self):
+        truncated = gzip.compress(body(system="abcd"))[:-1]
+        s = summarize([truncated, body(system="ab")])
+        self.assertEqual((s.requests, s.unreadable), (1, 1))
+        self.assertEqual(s.kinds["system"].sent_chars, 2)
+
+    def test_corrupt_deflate_is_unreadable_and_reporting_continues(self):
+        corrupt = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x07"
+        s = summarize([corrupt, body(system="ab")])
+        self.assertEqual((s.requests, s.unreadable), (1, 1))
+        self.assertEqual(s.kinds["system"].sent_chars, 2)
 
     def test_an_unreadable_body_is_counted_not_raised(self):
         s = summarize([b"\x00not json", body(system="ab")])
