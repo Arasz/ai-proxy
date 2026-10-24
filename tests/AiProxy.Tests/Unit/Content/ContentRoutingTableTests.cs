@@ -101,20 +101,33 @@ public sealed class ContentRoutingTableTests
                 .Where(line => line.Length > 0 && !line.StartsWith("[retained identifiers]", StringComparison.Ordinal))
                 .ToArray();
 
-            foreach (var line in kept)
-            {
-                Assert.Contains(line, input, StringComparer.Ordinal);
-            }
-
-            // The kept lines are the input's lines in the input's order: a reduction
-            // drops lines, it does not shuffle them.
+            // Each kept line is an input line, or some of its words in their order, and the
+            // kept lines follow the input's order: a reduction drops, it does not shuffle.
             var position = 0;
             foreach (var line in kept)
             {
-                var found = Array.FindIndex(input, position, candidate => string.Equals(candidate, line, StringComparison.Ordinal));
+                var found = Array.FindIndex(input, position, candidate => WordsOf(line, candidate));
                 Assert.True(found >= 0, $"the line '{line}' is not in the input after the line before it");
                 position = found + 1;
             }
         }
+    }
+
+    private static bool WordsOf(string kept, string line)
+    {
+        var words = line.Split(' ');
+        var position = 0;
+        foreach (var word in kept.Split(' '))
+        {
+            position = Array.IndexOf(words, word, position);
+            if (position < 0)
+            {
+                return false;
+            }
+
+            position++;
+        }
+
+        return true;
     }
 }

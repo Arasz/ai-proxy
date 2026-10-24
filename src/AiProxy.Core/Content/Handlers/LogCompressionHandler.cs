@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace AiProxy.Core.Content.Handlers;
 
-/// <summary>Keeps the lines of a log that carry a signal, and drops the rest.</summary>
+/// <summary>Keeps the lines of a log that carry a signal whole, and shortens repeats of a line's shape to what changed.</summary>
 public sealed class LogCompressionHandler : ICompressionHandler
 {
     /// <summary>The path this handler reports.</summary>
@@ -24,7 +24,7 @@ public sealed class LogCompressionHandler : ICompressionHandler
     {
         ArgumentNullException.ThrowIfNull(part);
 
-        var kept = LogRules.Keep(part.Text, CarriesSignal);
+        var kept = LineShapes.Collapse(part.Text, CarriesSignal);
         var reduced = Reduction.DeduplicateLines(string.Join("\n", kept));
         var overlaid = MustKeepOverlay.Apply(reduced, part.Text);
 

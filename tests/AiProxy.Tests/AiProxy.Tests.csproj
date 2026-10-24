@@ -32,4 +32,10 @@
         <Using Include="Xunit"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- The scored payloads and their pre-registered answers, shared with the scoring harness. -->
+        <None Include="../../scripts/reducer_scoring/payloads/*.txt" Link="ReducerScoring/payloads/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"/>
+        <None Include="../../scripts/reducer_scoring/preregistration.json" Link="ReducerScoring/preregistration.json" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
 </Project>

@@ -21,6 +21,9 @@ public sealed class LogCompressionHandlerTests
 
     private static ContentPart Part(string text) => new("request", 1, ContentType.Log, text);
 
+    private static string[] Lines(string reduced) =>
+        reduced.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal)).ToArray();
+
     [Fact]
     public async Task The_line_that_carries_the_failure_survives_even_at_info_level()
     {
@@ -30,11 +33,81 @@ public sealed class LogCompressionHandlerTests
     }
 
     [Fact]
-    public async Task A_line_without_a_signal_and_outside_the_anchors_is_dropped()
+    public async Task A_line_that_repeats_an_earlier_shape_keeps_only_what_changed()
     {
         var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
 
-        Assert.DoesNotContain("nothing to see", result.Text, StringComparison.Ordinal);
+        Assert.Equal(1, Lines(result.Text).Count(line => line.Contains("nothing to see", StringComparison.Ordinal)));
+        Assert.Contains("10:00:03", Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task The_first_line_of_a_shape_is_kept_whole()
+    {
+        var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
+
+        Assert.Contains("2026-03-12 10:00:02 INFO worker=api-1 nothing to see", Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task The_values_that_changed_stay_together_with_their_keys()
+    {
+        // The scored question asks for one field of the row picked by another field, so the
+        // two values must survive on the same line, each next to its key.
+        var text = string.Join("\n",
+        [
+            "2026-10-23T18:25:25.508537Z  INFO ccr: compressed session=cdb66ea2 tokens_compressed=819 tokens_in_context=283 blocks_compressed=1",
+            "2026-10-23T18:25:25.521939Z  INFO ccr: compressed session=246079e5 tokens_compressed=1419 tokens_in_context=1031 blocks_compressed=1",
+            "2026-10-23T18:25:25.555186Z  INFO ccr: compressed session=ebd546fe tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("2026-10-23T18:25:25.521939Z session=246079e5 tokens_compressed=1419 tokens_in_context=1031", Lines(result.Text));
+        Assert.Contains("2026-10-23T18:25:25.555186Z session=ebd546fe tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2", Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task A_line_with_another_shape_is_kept_whole()
+    {
+        var text = string.Join("\n",
+        [
+            "2026-10-23T18:25:09Z INFO rtk_proxy: pipeline stages=[\"normalize\", \"ccr\"]",
+            "2026-10-23T18:25:09Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18080\"",
+            "2026-10-23T18:25:10Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18081\" again",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Equal(text.Split('\n'), Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task A_line_with_other_keys_is_not_shortened_against_an_unrelated_line()
+    {
+        var text = string.Join("\n",
+        [
+            "10:00:00 INFO worker=api-1 status=200",
+            "10:00:01 INFO worker=api-1 retries=200",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Equal(text.Split('\n'), Lines(result.Text));
+    }
+
+    [Fact]
+    public async Task A_value_without_a_key_is_compared_too()
+    {
+        var text = string.Join("\n",
+        [
+            "10:00:00 worker api-1 took 41 ms",
+            "10:00:01 worker api-1 took 12 ms",
+        ]);
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains("10:00:01 12", Lines(result.Text));
     }
 
     [Fact]
@@ -105,14 +178,13 @@ public sealed class LogCompressionHandlerTests
     }
 
     [Fact]
-    public async Task Every_line_the_reduction_keeps_is_a_line_of_the_input()
+    public async Task Every_line_the_reduction_keeps_is_words_of_one_input_line_in_order()
     {
         var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
 
-        var kept = result.Text.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal));
-        foreach (var line in kept)
+        foreach (var line in Lines(result.Text))
         {
-            Assert.Contains(line, Log.Split('\n'), StringComparer.Ordinal);
+            Assert.Contains(Log.Split('\n'), input => OrderedSubsequence.Holds(line, input) && line.Split(' ').All(input.Split(' ').Contains));
         }
     }
 
