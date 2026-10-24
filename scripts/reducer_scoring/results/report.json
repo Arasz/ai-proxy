@@ -303,8 +303,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "4/6",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.1477,
    "payload": "code_file",
    "kind": "code"
   },
@@ -347,8 +347,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "7/8",
-   "score_relaxed": 0.2063,
+   "answers_relaxed": "8/8",
+   "score_relaxed": 0.2357,
    "payload": "agent_log",
    "kind": "log"
   },
@@ -545,7 +545,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "3/6",
+   "answers_relaxed": "4/6",
    "score_relaxed": 0.0,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
@@ -567,8 +567,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "3/5",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "4/5",
+   "score_relaxed": 0.2527,
    "payload": "dotnet_test_failures",
    "kind": "test"
   },
@@ -962,8 +962,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "3/5",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "4/5",
+   "score_relaxed": 0.0306,
    "payload": "dotnet_test_failure",
    "kind": "test"
   },
@@ -1568,7 +1568,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "1/6",
+   "answers_relaxed": "2/6",
    "score_relaxed": 0.0,
    "payload": "code_file",
    "kind": "code"
@@ -1612,7 +1612,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "0/8",
+   "answers_relaxed": "1/8",
    "score_relaxed": 0.0,
    "payload": "agent_log",
    "kind": "log"
@@ -1656,7 +1656,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/14",
+   "answers_relaxed": "3/14",
    "score_relaxed": 0.0,
    "payload": "json_payload",
    "kind": "json"
@@ -1810,8 +1810,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "3/6",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "5/6",
+   "score_relaxed": 0.2439,
    "payload": "dotnet_build_failure_verbose",
    "kind": "build"
   },
@@ -1832,7 +1832,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "0/5",
+   "answers_relaxed": "2/5",
    "score_relaxed": 0.0,
    "payload": "dotnet_test_failures",
    "kind": "test"
@@ -2003,8 +2003,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "10/12",
-   "score_relaxed": 0.1233,
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.1356,
    "kind": "code"
   },
   {
@@ -2045,8 +2045,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "12/13",
-   "score_relaxed": 0.2526,
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.2737,
    "kind": "log"
   },
   {
@@ -2108,8 +2108,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "7/10",
-   "score_relaxed": 0.3662,
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.4185,
    "kind": "build"
   },
   {
@@ -2129,8 +2129,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "8/10",
-   "score_relaxed": 0.292,
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.3286,
    "kind": "test"
   },
   {
@@ -2408,8 +2408,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "7/10",
-   "score_relaxed": 0.0596,
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.0681,
    "kind": "test"
   },
   {
@@ -2678,7 +2678,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/12",
+   "answers_relaxed": "3/12",
    "score_relaxed": 0.0,
    "kind": "code"
   },
@@ -2720,7 +2720,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/13",
+   "answers_relaxed": "3/13",
    "score_relaxed": 0.0,
    "kind": "log"
   },
@@ -2762,7 +2762,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/19",
+   "answers_relaxed": "3/19",
    "score_relaxed": 0.0,
    "kind": "json"
   },
@@ -2783,8 +2783,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "5/10",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.2104,
    "kind": "build"
   },
   {
@@ -2804,8 +2804,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "5/10",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.2056,
    "kind": "test"
   }
  ],
@@ -2974,8 +2974,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "10/12",
-   "score_relaxed": 0.1233,
+   "answers_relaxed": "11/12",
+   "score_relaxed": 0.1356,
    "kind": "code"
   },
   {
@@ -3016,8 +3016,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "12/13",
-   "score_relaxed": 0.2526,
+   "answers_relaxed": "13/13",
+   "score_relaxed": 0.2737,
    "kind": "log"
   },
   {
@@ -3079,8 +3079,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "7/10",
-   "score_relaxed": 0.3662,
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.4185,
    "kind": "build"
   },
   {
@@ -3100,8 +3100,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "8/10",
-   "score_relaxed": 0.292,
+   "answers_relaxed": "9/10",
+   "score_relaxed": 0.3286,
    "kind": "test"
   },
   {
@@ -3394,8 +3394,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "7/10",
-   "score_relaxed": 0.0596,
+   "answers_relaxed": "8/10",
+   "score_relaxed": 0.0681,
    "kind": "test"
   },
   {
@@ -3709,7 +3709,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/12",
+   "answers_relaxed": "3/12",
    "score_relaxed": 0.0,
    "kind": "code"
   },
@@ -3751,7 +3751,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/13",
+   "answers_relaxed": "3/13",
    "score_relaxed": 0.0,
    "kind": "log"
   },
@@ -3793,7 +3793,7 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "2/19",
+   "answers_relaxed": "3/19",
    "score_relaxed": 0.0,
    "kind": "json"
   },
@@ -3814,8 +3814,8 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "5/10",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.2104,
    "kind": "build"
   },
   {
@@ -3835,12 +3835,19 @@
     "1.0": 0.0,
     "2.0": 0.0
    },
-   "answers_relaxed": "5/10",
-   "score_relaxed": 0.0,
+   "answers_relaxed": "7/10",
+   "score_relaxed": 0.2056,
    "kind": "test"
   }
  ],
  "void": [],
+ "judge": {
+  "decoys_accepted": 0,
+  "decoys": 222,
+  "summarizer_accepted": 23,
+  "summarizer_lost": 199,
+  "void": []
+ },
  "environment": {
   "digest_gpt_stand_in": {
    "date": "2026-10-24",

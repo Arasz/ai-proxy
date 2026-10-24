@@ -1,5 +1,7 @@
 controls clear the run
 
+judge: 0/222 decoys accepted, 23/199 summarizer losses accepted
+
 {"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
 
 ## Per kind
@@ -13,13 +15,13 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | json | 0.0922 | 0.3189 | 17.5466 | 1.0 | 19/19 | 0.051 | 0.1549 | 0.0922 |
 | digest_gpt_stand_in (stand-in) | build | 0.0 | 0.985 | 6.9746 | 0.9 | 9/10 | 0.0 | 0.0 | 0.2002 |
 | digest_gpt_stand_in (stand-in) | test | 0.0 | 0.5599 | 13.1300 | 0.8 | 8/10 | 0.0 | 0.0 | 0.1257 |
-| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1233 |
+| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1356 |
 | haiku_digest | prose | 0.0 | 0.2799 | 8.3410 | 0.9286 | 13/14 | 0.0 | 0.0 | 0.1549 |
-| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 | 0.2526 |
+| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 | 0.2737 |
 | haiku_digest | listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3096 |
 | haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 | 0.2711 |
-| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3662 |
-| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.292 |
+| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4185 |
+| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3286 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 | 0.0 |
@@ -33,7 +35,7 @@ controls clear the run
 | kompress_int8 | listing | n/a | | | | | | | |
 | kompress_int8 | json | 0.0899 | 0.0509 | 1.6045 | 1.0 | 5/5 | 0.0838 | 0.0933 | 0.0899 |
 | kompress_int8 | build | 0.0 | 0.004 | 69.2786 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.0062 |
-| kompress_int8 | test | 0.0 | 0.0466 | 1.0031 | 0.7 | 7/10 | 0.0 | 0.0 | 0.0596 |
+| kompress_int8 | test | 0.0 | 0.0466 | 1.0031 | 0.7 | 7/10 | 0.0 | 0.0 | 0.0681 |
 | rtk_ccr | code | 0.0 | 0.6898 | 0.0021 | 0.75 | 9/12 | 0.0 | 0.0 | 0.6118 |
 | rtk_ccr | prose | 0.0 | 0.7362 | 0.0006 | 0.5 | 7/14 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr | log | 0.0 | 0.2166 | 0.0009 | 0.6154 | 8/13 | 0.0 | 0.0 | 0.0 |
@@ -53,8 +55,8 @@ controls clear the run
 | summarizer_control | log | 0.0 | 0.9404 | 4.5205 | 0.1538 | 2/13 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | listing | 0.0 | 0.6939 | 4.2574 | 0.1667 | 1/6 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | json | 0.0 | 0.9157 | 5.3232 | 0.1053 | 2/19 | 0.0 | 0.0 | 0.0 |
-| summarizer_control | build | 0.0 | 0.9924 | 4.6448 | 0.5 | 5/10 | 0.0 | 0.0 | 0.0 |
-| summarizer_control | test | 0.0 | 0.9088 | 4.7100 | 0.5 | 5/10 | 0.0 | 0.0 | 0.0 |
+| summarizer_control | build | 0.0 | 0.9924 | 4.6448 | 0.5 | 5/10 | 0.0 | 0.0 | 0.2104 |
+| summarizer_control | test | 0.0 | 0.9088 | 4.7100 | 0.5 | 5/10 | 0.0 | 0.0 | 0.2056 |
 
 ## Per kind, untouched payloads counted as nothing removed
 
@@ -67,13 +69,13 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | json | 0.0922 | 0.3189 | 17.5466 | 1.0 | 19/19 | 0.051 | 0.1549 | 0.0922 |
 | digest_gpt_stand_in (stand-in) | build | 0.0 | 0.985 | 6.9746 | 0.9 | 9/10 | 0.0 | 0.0 | 0.2002 |
 | digest_gpt_stand_in (stand-in) | test | 0.0 | 0.5599 | 13.1300 | 0.8 | 8/10 | 0.0 | 0.0 | 0.1257 |
-| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1233 |
+| haiku_digest | code | 0.0 | 0.6993 | 11.0900 | 0.8333 | 10/12 | 0.0 | 0.0 | 0.1356 |
 | haiku_digest | prose | 0.0 | 0.2799 | 8.3410 | 0.9286 | 13/14 | 0.0 | 0.0 | 0.1549 |
-| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 | 0.2526 |
+| haiku_digest | log | 0.0 | 0.6154 | 4.6825 | 0.9231 | 12/13 | 0.0 | 0.0 | 0.2737 |
 | haiku_digest | listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3096 |
 | haiku_digest | json | 0.2711 | 0.3727 | 3.6955 | 1.0 | 19/19 | 0.1806 | 0.3616 | 0.2711 |
-| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3662 |
-| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.292 |
+| haiku_digest | build | 0.0 | 0.9868 | 1.8095 | 0.7 | 7/10 | 0.0 | 0.0 | 0.4185 |
+| haiku_digest | test | 0.0 | 0.6583 | 2.9595 | 0.7 | 7/10 | 0.0 | 0.0 | 0.3286 |
 | identity | code | 0.0 | 0.0 | 0.0000 | 1.0 | 12/12 | 0.0 | 0.0 | 0.0 |
 | identity | prose | 0.0 | 0.0 | 0.0000 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
 | identity | log | 0.0 | 0.0 | 0.0000 | 1.0 | 13/13 | 0.0 | 0.0 | 0.0 |
@@ -87,7 +89,7 @@ controls clear the run
 | kompress_int8 | listing | 0.0 | 0.0 | 0.1472 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
 | kompress_int8 | json | 0.0807 | 0.0437 | 0.9191 | 1.0 | 19/19 | 0.0778 | 0.0822 | 0.0807 |
 | kompress_int8 | build | 0.0 | 0.0039 | 34.7411 | 0.9 | 9/10 | 0.0 | 0.0 | 0.0069 |
-| kompress_int8 | test | 0.0 | 0.0466 | 1.0031 | 0.7 | 7/10 | 0.0 | 0.0 | 0.0596 |
+| kompress_int8 | test | 0.0 | 0.0466 | 1.0031 | 0.7 | 7/10 | 0.0 | 0.0 | 0.0681 |
 | rtk_ccr | code | 0.0 | 0.6898 | 0.0021 | 0.75 | 9/12 | 0.0 | 0.0 | 0.6118 |
 | rtk_ccr | prose | 0.0 | 0.7362 | 0.0006 | 0.5 | 7/14 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr | log | 0.0 | 0.2166 | 0.0009 | 0.6154 | 8/13 | 0.0 | 0.0 | 0.0 |
@@ -107,8 +109,8 @@ controls clear the run
 | summarizer_control | log | 0.0 | 0.9404 | 4.5205 | 0.1538 | 2/13 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | listing | 0.0 | 0.6939 | 4.2574 | 0.1667 | 1/6 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | json | 0.0 | 0.9157 | 5.3232 | 0.1053 | 2/19 | 0.0 | 0.0 | 0.0 |
-| summarizer_control | build | 0.0 | 0.9924 | 4.6448 | 0.5 | 5/10 | 0.0 | 0.0 | 0.0 |
-| summarizer_control | test | 0.0 | 0.9088 | 4.7100 | 0.5 | 5/10 | 0.0 | 0.0 | 0.0 |
+| summarizer_control | build | 0.0 | 0.9924 | 4.6448 | 0.5 | 5/10 | 0.0 | 0.0 | 0.2104 |
+| summarizer_control | test | 0.0 | 0.9088 | 4.7100 | 0.5 | 5/10 | 0.0 | 0.0 | 0.2056 |
 
 ## Per payload
 
@@ -127,9 +129,9 @@ controls clear the run
 | digest_gpt_stand_in (stand-in) | github_pr_list | 0.0625 | 0.3216 | 27.8702 | 1.0 | 5/5 | 0.0334 | 0.1108 | 0.0625 |
 | digest_gpt_stand_in (stand-in) | dotnet_build_failure_verbose | 0.0 | 0.9909 | 7.3170 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.1787 |
 | digest_gpt_stand_in (stand-in) | dotnet_test_failures | 0.0 | 0.5969 | 17.6959 | 0.6 | 3/5 | 0.0 | 0.0 | 0.0982 |
-| haiku_digest | code_file | 0.0 | 0.6861 | 8.8270 | 0.6667 | 4/6 | 0.0 | 0.0 | 0.0 |
+| haiku_digest | code_file | 0.0 | 0.6861 | 8.8270 | 0.6667 | 4/6 | 0.0 | 0.0 | 0.1477 |
 | haiku_digest | incident_report | 0.0 | 0.2867 | 4.3100 | 0.875 | 7/8 | 0.0 | 0.0 | 0.2273 |
-| haiku_digest | agent_log | 0.0 | 0.4617 | 5.3180 | 0.875 | 7/8 | 0.0 | 0.0 | 0.2063 |
+| haiku_digest | agent_log | 0.0 | 0.4617 | 5.3180 | 0.875 | 7/8 | 0.0 | 0.0 | 0.2357 |
 | haiku_digest | dir_listing | 0.0 | 0.5548 | 2.5800 | 0.8333 | 5/6 | 0.0 | 0.0 | 0.3096 |
 | haiku_digest | json_payload | 0.391 | 0.4511 | 1.8990 | 1.0 | 14/14 | 0.2851 | 0.4801 | 0.391 |
 | haiku_digest | dotnet_build_failure | 0.4666 | 0.5865 | 1.5810 | 1.0 | 4/4 | 0.3409 | 0.5721 | 0.4666 |
@@ -139,7 +141,7 @@ controls clear the run
 | haiku_digest | rtk_proxy_log | 0.3072 | 0.6834 | 4.0470 | 1.0 | 5/5 | 0.1894 | 0.4458 | 0.3072 |
 | haiku_digest | github_pr_list | 0.2157 | 0.3599 | 5.4920 | 1.0 | 5/5 | 0.1355 | 0.3065 | 0.2157 |
 | haiku_digest | dotnet_build_failure_verbose | 0.0 | 0.9928 | 2.0380 | 0.5 | 3/6 | 0.0 | 0.0 | 0.0 |
-| haiku_digest | dotnet_test_failures | 0.0 | 0.6833 | 3.8670 | 0.4 | 2/5 | 0.0 | 0.0 | 0.0 |
+| haiku_digest | dotnet_test_failures | 0.0 | 0.6833 | 3.8670 | 0.4 | 2/5 | 0.0 | 0.0 | 0.2527 |
 | identity | code_file | 0.0 | 0.0 | 0.0000 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
 | identity | incident_report | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 | 0.0 |
 | identity | agent_log | 0.0 | 0.0 | 0.0000 | 1.0 | 8/8 | 0.0 | 0.0 | 0.0 |
@@ -159,7 +161,7 @@ controls clear the run
 | kompress_int8 | dir_listing | n/a | | | | | | | |
 | kompress_int8 | json_payload | n/a | | | | | | | |
 | kompress_int8 | dotnet_build_failure | n/a | | | | | | | |
-| kompress_int8 | dotnet_test_failure | 0.0 | 0.0196 | 0.2518 | 0.6 | 3/5 | 0.0 | 0.0 | 0.0 |
+| kompress_int8 | dotnet_test_failure | 0.0 | 0.0196 | 0.2518 | 0.6 | 3/5 | 0.0 | 0.0 | 0.0306 |
 | kompress_int8 | code_file_large | 0.0798 | 0.0509 | 4.4196 | 1.0 | 6/6 | 0.0678 | 0.0875 | 0.0798 |
 | kompress_int8 | prose_large | 0.1449 | 0.1258 | 4.8505 | 1.0 | 6/6 | 0.1072 | 0.1758 | 0.1449 |
 | kompress_int8 | rtk_proxy_log | 0.001 | 0.0005 | 2.0745 | 1.0 | 5/5 | 0.001 | 0.001 | 0.001 |
@@ -203,5 +205,5 @@ controls clear the run
 | summarizer_control | prose_large | 0.0 | 0.961 | 5.8729 | 0.0 | 0/6 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | rtk_proxy_log | 0.0 | 0.9544 | 4.6040 | 0.4 | 2/5 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | github_pr_list | 0.0 | 0.9357 | 6.4137 | 0.0 | 0/5 | 0.0 | 0.0 | 0.0 |
-| summarizer_control | dotnet_build_failure_verbose | 0.0 | 0.9956 | 4.8279 | 0.5 | 3/6 | 0.0 | 0.0 | 0.0 |
+| summarizer_control | dotnet_build_failure_verbose | 0.0 | 0.9956 | 4.8279 | 0.5 | 3/6 | 0.0 | 0.0 | 0.2439 |
 | summarizer_control | dotnet_test_failures | 0.0 | 0.944 | 4.5262 | 0.0 | 0/5 | 0.0 | 0.0 | 0.0 |

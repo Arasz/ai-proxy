@@ -50,6 +50,10 @@ taken field by field, so a row's length, latency and answers can come from diffe
   answers this keeps every answer the word-for-word check kept and adds 31. A kind then scores
   0 under 70% retention, and above it the score is multiplied by retention. The recorded
   replies were re-graded; nothing was re-run.
+- **The judge** (fifth amendment, registered before it ran) handles what the spelling rules
+  cannot. For every answer still lost, the reader sees the candidate's output, the question and
+  the expected answer, and says yes or no three times; two yes keep the answer, in the relaxed
+  view only. Each numeric answer is also asked with one number changed, as a decoy.
 - **Per-kind scores are provisional.** The owner has since ruled that scores are normalised to
   payload size and a kind is the mean of its payloads (plan
   `aip-reducer-fixes-from-scoring-results`, step `size-normalized-score`). Until that re-run,
@@ -75,18 +79,19 @@ The shipped rules ran in under 3 ms on every kind.
 
 ## Per kind, relaxed view
 
-Graded by fact, floor 0.7, score multiplied by retention, 1 s budget. A cell is the score, then
-(answers kept) when one was lost. The counted view is in brackets where it differs.
+Graded by fact, then by the judge; floor 0.7; score multiplied by retention; 1 s budget. A cell
+is the score, then (answers kept) when one was lost. The counted view is in brackets where it
+differs.
 
 | kind | shipped rules | kompress int8 | rtk CCR | Haiku digest | digest (stand-in) | identity | summarizer |
 |---|---|---|---|---|---|---|---|
-| code | **0.30** | 0.09 | **0.61** (9/12) | 0.12 (10/12) | 0.09 (11/12) | 0 | 0 (2/12) |
+| code | **0.30** | 0.09 | **0.61** (9/12) | 0.14 (11/12) | 0.09 (11/12) | 0 | 0 (3/12) |
 | prose | n/a [0] | **0.17** | 0 (7/14) | 0.15 | 0.07 | 0 | 0 (2/14) |
-| log | 0 (9/13) | 0.002 | 0 (8/13) | **0.25** (12/13) | 0.12 | 0 | 0 (2/13) |
+| log | 0 (9/13) | 0.002 | 0 (8/13) | **0.27** | 0.12 | 0 | 0 (3/13) |
 | listing | n/a [0] | n/a [0] | n/a [0] | **0.31** (5/6) | 0.24 (5/6) | 0 | 0 (1/6) |
-| json | **0.46** [0.08] | 0.09 [0.08] | 0 (0/19) | 0.27 **[0.27]** | 0.09 | 0 | 0 (2/19) |
-| build | **0.41** [0.008] | 0.006 [0.007] | 0 (2/6) [0 (6/10)] | 0.37 (7/10) **[0.37]** | 0.20 (9/10) | 0 | 0 (5/10) |
-| test | **0.40** [0.34] | 0.06 (7/10) | 0 (6/10) | 0.29 (8/10) | 0.13 | 0 | 0 (5/10) |
+| json | **0.46** [0.08] | 0.09 [0.08] | 0 (0/19) | 0.27 **[0.27]** | 0.09 | 0 | 0 (3/19) |
+| build | 0.41 [0.008] | 0.006 [0.007] | 0 (2/6) [0 (6/10)] | **0.42** (8/10) | 0.20 (9/10) | 0 | 0.21 (7/10) |
+| test | **0.40** [0.34] | 0.07 (8/10) | 0 (6/10) | 0.33 (9/10) | 0.13 | 0 | 0.21 (7/10) |
 
 ## Findings
 
@@ -183,21 +188,30 @@ The reader's misses fall into three groups:
   for "the error in the second file". For `2 Error(s)` the digest wrote `2 errors` and the
   reader replied `UNKNOWN`.
 
-Graded by fact, Haiku keeps every answer on prose (14/14) and json, and test rises from 7/10
-to 8/10. Under the
-relaxed view it scores 0.12-0.37 on every kind and leads log, listing and, in the counted view,
-json and build.
+Graded by fact and judged, Haiku keeps every answer on prose, log and json, and loses at most
+two per kind elsewhere. Under the relaxed view it scores 0.14-0.42 on every kind. It leads log,
+listing and build, and in the counted view json.
 
-### F9: The relaxed view lets lossy candidates score, but changes no lossless result [MEASURED]
+### F9: The judge is strict on numbers; the relaxed view lets the summarizer control score on build and test [MEASURED]
 
-Every candidate that kept every answer scores the same in both views. What changes is who gets
-a score despite a loss. rtk's preview keeps 9 of 12 answers on code (all 6 on `code_file`, 3 of 6 on
-`code_file_large`) and removes 54-78%, so it scores 0.61 there, the highest code score in
-either view. The digests score on every kind.
-The shipped rules lose 4 of 13 log answers (69%, F3), just under the 0.7 floor, so log stays 0.
-Fact grading changed four kind rows (five in the counted view): the digests' reworded counts
-and durations on prose and test, and one kompress build answer. It turned no kept answer into
-a lost one.
+The judge ran over the 383 answers fact grading still called lost, three times each, and every
+one of its 294 replies parsed. It accepted none of the 222 decoys, so a changed number is not
+waved through. It accepted 39 real answers: 13 of 26 for Haiku, 23 of 199 for the summarizer,
+2 of 9 for kompress, 1 of 11 for the stand-in, and none of rtk's 126 or the shipped rules' 12.
+Most are the fact in other words: `2 errors`, `7 failed, 224 passed`, `HTTP 503`,
+`pool.py:214`, `finished in 0.42 seconds`, `line 33, column 16`. A few are lenient. `unknown` was
+accepted for `Dialect.Unknown`. The summarizer got `failed: 7` once by adding up "six … and
+one", and got `5000` ms with no 5000 in the text. Kompress's `second last line` was accepted
+for the substring `the second to last line`, which is wrong.
+
+The relaxed view changes no lossless result. It lets lossy candidates score. rtk's preview
+keeps 9 of 12 code answers (all 6 on `code_file`, 3 of 6 on `code_file_large`) and removes
+54-78%, so it scores 0.61 on code, the highest code score in any view. The shipped rules keep
+9 of 13 log answers (69%, F3), just under the floor, so log stays 0. And the summarizer
+control, built to fail, scores 0.21 on build and test at 7 of 10. Per payload it passes only 2
+of 13 (`dotnet_test_failure` and `dotnet_build_failure_verbose`), so the "more than half" void
+rule does not fire. Pooling two payloads into one kind is what lifts it over the floor. On
+build and test, a relaxed score is not evidence that a candidate beats a two-sentence summary.
 
 ### F10: What this does not cover [UNVERIFIED]
 
@@ -215,8 +229,8 @@ a lost one.
 - The Haiku digest was graded by the `gpt-6.1-sol` reader, not a Haiku reader, and ran at an
   inherited effort, not a pinned one.
 - Fact grading covers the spellings seen in this run (units, label-first counts, passed and
-  succeeded, Error(s), positions). A reader asked whether a fact is present would also recover
-  `2 errors` answered `UNKNOWN`; that was not run.
+  succeeded, Error(s), positions). The judge covers the rest but is a model: its errors are
+  listed in F9 and were not corrected by hand.
 - The 0.7 floor and the retention multiplier were chosen after the results were seen.
 - The follow-ups are retrieval-aware scoring for rtk and a fix for F3.
 
