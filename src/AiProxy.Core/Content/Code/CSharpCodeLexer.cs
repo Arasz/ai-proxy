@@ -41,7 +41,8 @@ public sealed class CSharpCodeLexer : ICodeLexer
                 continue;
             }
 
-            spans.Add(new CodeToken(kind.Value, trivia.ToFullString(), trivia.SpanStart, LineAt(text, trivia.SpanStart)));
+            var triviaSpan = kind == CodeTokenKind.Comment && trivia.HasStructure ? trivia.FullSpan : trivia.Span;
+            spans.Add(new CodeToken(kind.Value, trivia.ToFullString(), triviaSpan.Start, 1));
         }
 
         foreach (var token in root.DescendantTokens(descendIntoTrivia: false))
@@ -53,7 +54,7 @@ public sealed class CSharpCodeLexer : ICodeLexer
 
             var kind = TokenKind(token);
             var valueText = kind == CodeTokenKind.Identifier ? token.ValueText : null;
-            spans.Add(new CodeToken(kind, token.Text, token.SpanStart, LineAt(text, token.SpanStart), valueText));
+            spans.Add(new CodeToken(kind, token.Text, token.SpanStart, 1, valueText));
         }
 
         spans.Sort(static (left, right) => left.Offset.CompareTo(right.Offset));
@@ -91,10 +92,20 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var kind = token.Kind();
         if (kind == SyntaxKind.IdentifierToken)
         {
-            return SyntaxFacts.GetContextualKeywordKind(token.ValueText) == SyntaxKind.None
-                || token.Text.StartsWith('@')
+            var contextualKind = SyntaxFacts.GetContextualKeywordKind(token.ValueText);
+            if (contextualKind == SyntaxKind.None || token.Text.StartsWith('@'))
+            {
+                return CodeTokenKind.Identifier;
+            }
+
+            if (IsContextualKeywordUse(token, contextualKind))
+            {
+                return CodeTokenKind.Keyword;
+            }
+
+            return token.Parent is IdentifierNameSyntax or VariableDeclaratorSyntax or ParameterSyntax
                 ? CodeTokenKind.Identifier
-                : CodeTokenKind.Keyword;
+                : CodeTokenKind.Other;
         }
 
         return SyntaxFacts.IsKeywordKind(kind) || SyntaxFacts.IsContextualKeyword(kind)
@@ -102,10 +113,23 @@ public sealed class CSharpCodeLexer : ICodeLexer
             : CodeTokenKind.Other;
     }
 
+    private static bool IsContextualKeywordUse(SyntaxToken token, SyntaxKind contextualKind) => contextualKind switch
+    {
+        SyntaxKind.VarKeyword => token.Parent is IdentifierNameSyntax { Parent: VariableDeclarationSyntax or ForEachStatementSyntax or DeclarationExpressionSyntax },
+        SyntaxKind.RecordKeyword => token.Parent is RecordDeclarationSyntax,
+        SyntaxKind.AwaitKeyword => token.Parent is AwaitExpressionSyntax,
+        SyntaxKind.YieldKeyword => token.Parent is YieldStatementSyntax,
+        SyntaxKind.WithKeyword => token.Parent is WithExpressionSyntax,
+        SyntaxKind.InitKeyword => token.Parent is AccessorDeclarationSyntax accessor && accessor.IsKind(SyntaxKind.InitAccessorDeclaration),
+        _ => false,
+    };
+
     private static IReadOnlyList<CodeToken>? CompleteCoverage(string text, IReadOnlyList<CodeToken> spans)
     {
         var tokens = new List<CodeToken>(spans.Count);
         var position = 0;
+        var scanPosition = 0;
+        var line = 1;
         foreach (var span in spans)
         {
             if (span.Offset < position)
@@ -116,36 +140,36 @@ public sealed class CSharpCodeLexer : ICodeLexer
             if (span.Offset > position)
             {
                 var gap = text[position..span.Offset];
-                tokens.Add(new CodeToken(CodeTokenKind.Other, gap, position, LineAt(text, position)));
+                tokens.Add(new CodeToken(CodeTokenKind.Other, gap, position, line));
+                line = AdvanceLines(text, ref scanPosition, span.Offset, line);
             }
 
-            tokens.Add(span);
+            tokens.Add(span with { Line = line });
             position = span.Offset + span.Text.Length;
+            line = AdvanceLines(text, ref scanPosition, position, line);
         }
 
         if (position < text.Length)
         {
             var gap = text[position..];
-            tokens.Add(new CodeToken(CodeTokenKind.Other, gap, position, LineAt(text, position)));
+            tokens.Add(new CodeToken(CodeTokenKind.Other, gap, position, line));
         }
 
         return tokens;
     }
 
-    private static int LineAt(string text, int end)
+    private static int AdvanceLines(string text, ref int scanPosition, int end, int line)
     {
-        var line = 1;
-        for (var index = 0; index < end; index++)
+        while (scanPosition < end)
         {
-            if (text[index] is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029')
+            var current = text[scanPosition];
+            if (current is '\r' or '\u0085' or '\u2028' or '\u2029'
+                || current == '\n' && (scanPosition == 0 || text[scanPosition - 1] != '\r'))
             {
-                if (text[index] == '\r' && index + 1 < end && text[index + 1] == '\n')
-                {
-                    index++;
-                }
-
                 line++;
             }
+
+            scanPosition++;
         }
 
         return line;

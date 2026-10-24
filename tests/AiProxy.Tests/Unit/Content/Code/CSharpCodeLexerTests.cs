@@ -81,4 +81,54 @@ public sealed class CSharpCodeLexerTests
         Assert.True(CSharpCodeLexer.IsKeyword("nint"));
         Assert.False(CSharpCodeLexer.IsKeyword("café"));
     }
+
+    [Fact]
+    public void Mixed_CSharp_newlines_keep_exact_offsets_and_original_line_numbers()
+    {
+        const string source = "int first;\r\nint second;\u0085int third;\u2028int fourth;\u2029int fifth;";
+
+        var result = new CSharpCodeLexer().Lex(source);
+
+        Assert.True(result.Supported);
+        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
+        var identifiers = result.Tokens.Where(static token => token.Kind == CodeTokenKind.Identifier).ToDictionary(static token => token.Text);
+        Assert.Equal(1, identifiers["first"].Line);
+        Assert.Equal(2, identifiers["second"].Line);
+        Assert.Equal(3, identifiers["third"].Line);
+        Assert.Equal(4, identifiers["fourth"].Line);
+        Assert.Equal(5, identifiers["fifth"].Line);
+        foreach (var token in identifiers.Values)
+        {
+            Assert.Equal(token.Text, source.Substring(token.Offset, token.Text.Length));
+        }
+    }
+
+    [Fact]
+    public void Contextual_words_that_parse_as_identifiers_keep_identifier_value_text()
+    {
+        const string source = "class C { void M() { int @record=1; @record++; System.Console.WriteLine(record); } }";
+
+        var result = new CSharpCodeLexer().Lex(source);
+
+        Assert.True(result.Supported);
+        Assert.Equal(3, result.Tokens.Count(token => token.Kind == CodeTokenKind.Identifier && token.ValueText == "record"));
+        Assert.True(CSharpCodeLexer.IsKeyword("record"));
+    }
+
+    [Fact]
+    public void Documentation_comment_trivia_preserves_source_span_and_indentation()
+    {
+        const string source = "  /// <summary>Long documentation.</summary>\r\n  class C { }";
+
+        var result = new CSharpCodeLexer().Lex(source);
+
+        Assert.True(result.Supported);
+        Assert.Equal(source, string.Concat(result.Tokens.Select(token => token.Text)));
+        var comment = Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Comment);
+        Assert.Equal(source.IndexOf("///", StringComparison.Ordinal), comment.Offset);
+        Assert.Equal(1, comment.Line);
+        var declaration = Assert.Single(result.Tokens, token => token.Kind == CodeTokenKind.Keyword && token.Text == "class");
+        Assert.Equal(2, declaration.Line);
+        Assert.Equal("class", source.Substring(declaration.Offset, declaration.Text.Length));
+    }
 }
