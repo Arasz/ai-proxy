@@ -50,3 +50,11 @@ Expected output is hand-derived. Each behavior starts with a failing test and re
 The future activation task must complete CCR design and implementation, correlate trusted whole-file tool calls by call ID, assign unambiguous file references, and guarantee the exact original is readable before emitting a compacted view. Storage failure must preserve the original request for retrieval-dependent code. Only then replace the registered blank-line handler and expose global options.
 
 The four design checks remain the release gate: lexer tests; 36 hint-on edit runs across Haiku/Sonnet and renaming off/on through real proxy retrieval; token comparison on both C# payloads including map/hint; and token-based, map-aware QA scoring charging each retrieval as the full file. This inactive build can prove only the lexer/core and offline adapter checks. It claims no model score or edit success. TS/JS, Python, CSS and HTML remain later language PRs in that order.
+
+## Offline adapter contract
+
+The developer console reads one JSON object from stdin and writes one JSON object to stdout. Required `text` is a string; optional `filePath` and `retrievalHint` are strings or null. Optional booleans `removeComments`, `removeImports` and `renameIdentifiers` default to true, true and false. Unknown or duplicate properties, wrong types and malformed input fail with a nonzero exit code, a diagnostic on stderr and no output view.
+
+Successful output carries `text`, `changed` and `supported`. The map is already rendered inside `text`; the adapter adds no hint or retrieval service of its own. `changed=false` means the exact original was returned. `supported` reports the lexer result, not runtime retrieval readiness. Missing hints or unknown paths produce the safe original result.
+
+Contract tests run in the existing xUnit project under `CodeAdapter`; the console project is part of the solution so CI builds it. Actual console smoke runs exercise both existing C# scoring payloads with renaming off/on and a synthetic hint. These are offline support checks, not the deferred model acceptance.
