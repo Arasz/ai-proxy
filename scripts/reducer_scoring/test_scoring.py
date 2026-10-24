@@ -43,6 +43,10 @@ class ExtractiveRowTests(unittest.TestCase):
         row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01, under_minimum=True)] * 3)
         self.assertTrue(row.not_applicable)
 
+    def test_one_run_over_the_minimum_keeps_the_payload_measured(self):
+        runs = [ReducerRun(ORIGINAL, 0.01, under_minimum=True)] * 2 + [ReducerRun(ORIGINAL, 0.01)]
+        self.assertFalse(extractive_row(ORIGINAL, QUESTIONS, runs).not_applicable)
+
     def test_an_unchanged_payload_over_the_minimum_is_measured_as_nothing_removed(self):
         row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun(ORIGINAL, 0.01)] * 3)
         self.assertFalse(row.not_applicable)

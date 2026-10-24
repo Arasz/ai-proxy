@@ -10,11 +10,18 @@ import tokens  # noqa: E402
 
 
 class ToolResultTextTests(unittest.TestCase):
-    def test_a_payload_at_or_under_the_ccr_threshold_is_under_minimum(self):
-        threshold = rtk_runner.ccr_threshold(rtk_runner.PIPELINE)
-        self.assertEqual(threshold, 1000)
-        self.assertTrue(rtk_runner.under_minimum("x " * 10, threshold))
-        self.assertFalse(rtk_runner.under_minimum("word " * 2000, threshold))
+    def test_the_threshold_is_the_ccr_rules_tokens_gt_in_the_pipeline_file(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as file:
+            file.write('[[proxy.request.tool_result]]\nname = "other"\nwhen = { tokens_gt = 5 }\nuse = ["x"]\n'
+                       '[[proxy.request.tool_result]]\nname = "ccr"\nwhen = { tokens_gt = 777 }\nuse = ["ccr"]\n')
+        self.assertEqual(rtk_runner.ccr_threshold(file.name), 777)
+        self.assertEqual(rtk_runner.ccr_threshold(rtk_runner.PIPELINE), 1000)
+
+    def test_a_payload_at_the_threshold_is_under_minimum_and_one_token_more_is_not(self):
+        text = "word " * 400
+        at = tokens.estimate(text)
+        self.assertTrue(rtk_runner.under_minimum(text, at))
+        self.assertFalse(rtk_runner.under_minimum(text, at - 1))
 
     def test_string_content_comes_back_as_sent(self):
         body = json.loads(request_body("plain output"))
