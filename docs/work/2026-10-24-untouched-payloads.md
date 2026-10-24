@@ -12,7 +12,7 @@ shorter, and then the region is left as it was (`ContentCompressionPipeline.cs:2
 ### F1 — `github_pr_list`: the JSON reducer made the document longer, a bug [MEASURED]
 
 The payload is already compact JSON on one line. `json.compact` rewrote it 5,362 to 5,372 characters:
-`Utf8JsonWriter`'s default encoder escapes `'` as `'`, and the payload has two apostrophes. The
+`Utf8JsonWriter`'s default encoder escapes `'` as `\u0027` (six characters for one), and the payload has two apostrophes. The
 pipeline saw no part get shorter and kept the original. In a region with several parts, an inflated
 JSON part would be composed in whenever another part shrank. **Fixed** in this change: the handler
 writes with `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`
@@ -22,13 +22,13 @@ stays untouched, now for the right reason.
 
 **Evidence:** test `Compact_json_is_written_back_as_it_was_not_escaped_longer` in
 `tests/AiProxy.Tests/Unit/Content/Handlers/JsonCompressionHandlerTests.cs`, red before the fix
-(`fix: don't drop it`), green after.
+(`fix: don\u0027t drop it`), green after.
 
 ### F2 — `dotnet_build_failure_verbose`: there is no build kind, so 60 KB goes to the prose reducer [MEASURED]
 
 The decompositor reads the whole MSBuild log as one Prose part (`ContentDecompositor.cs:233`; no
 rule recognises MSBuild output). `prose.dedupe` (`ProseCompressionHandler.cs:17`) drops repeated
-lines only, and the log has 65 lines, all distinct after trimming. Two lines, the compiler command
+lines only, and the log has 64 lines, distinct after trimming except blank lines, which dedupe keeps. Two lines, the compiler command
 line and its response file, hold 55,759 of the 60,671 characters; nothing in the shipped rules
 shortens a line. Not fixed here: it needs a build-output kind or a route to the log/shell
 reducers, which is a design change for the owner. The shorter `dotnet_build_failure` is also read as
@@ -43,16 +43,17 @@ reducer is lossless on purpose; this is correct under the shipped rules.
 ### F4 — `prose_large`: split into 35 fragments, most below their minimum [MEASURED]
 
 The decompositor splits the 11,107-character document into 35 alternating Markdown and Prose parts.
-Minimums apply per part (`ContentCompressionPipeline.cs:199`), so 22 parts (Prose under 512,
-Markdown under 200) are skipped, though the document is 20 times the minimum. The other 13 reach the
-lossless Markdown and Prose reducers and have nothing to remove. Both causes are by design today;
+Minimums apply per part (`ContentCompressionPipeline.cs:199`), so 26 of the 35 parts (16 Prose under
+512, 10 Markdown under 200) are skipped, though the document is about 22 times the Prose minimum. The
+other 9 (8 Markdown, 1 Prose) reach the lossless Markdown and Prose reducers and have nothing to remove. Both causes are by design today;
 whether a minimum should apply to the region rather than to each fragment is an owner question.
 
-### F5 — `dir_listing`: read as Prose, and left alone either way [MEASURED]
+### F5 — `dir_listing`: read as Prose, not as a listing [MEASURED]
 
 `ls -l` lines do not match the path-line rule (`ContentDecompositor.cs:223`), so the listing is read
-as Prose. The listing minimum is `int.MaxValue` (`CompressionOptions.cs`), which would leave it
-alone anyway. Correct in effect.
+as Prose. As a 574-character Prose part it is over the 512 minimum and reaches `prose.dedupe`, which
+removes nothing (574 to 574). The `int.MaxValue` listing minimum never applies, because the part is
+not typed as a listing. Unchanged in effect, but not for the intended reason.
 
 ## What the counted view shows
 
