@@ -97,7 +97,12 @@ def _start_rtk(home: str, port: int, upstream: int, ccr: bool, pipeline: str = P
          "--anthropic-upstream", f"http://127.0.0.1:{upstream}", "--ccr", "true" if ccr else "false",
          "--db", os.path.join(home, "rtk-proxy.db"), "--icm-db", os.path.join(home, "rtk-proxy-memory.db")],
         env=env, cwd=home, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    _wait_for(port, proc)
+    try:
+        _wait_for(port, proc)
+    except BaseException:
+        proc.terminate()
+        proc.wait(timeout=10)
+        raise
     return proc
 
 
@@ -121,9 +126,10 @@ def main() -> None:
         homes = [os.path.join(root, n) for n in ("ccr", "plain")]
         for home in homes:
             os.makedirs(home)
-        procs = [_start_rtk(homes[0], CCR_PORT, CCR_UPSTREAM, True),
-                 _start_rtk(homes[1], PLAIN_PORT, PLAIN_UPSTREAM, False)]
+        procs = []
         try:
+            procs.append(_start_rtk(homes[0], CCR_PORT, CCR_UPSTREAM, True))
+            procs.append(_start_rtk(homes[1], PLAIN_PORT, PLAIN_UPSTREAM, False))
             for name in names:
                 body = request_body(payload_text(name))
                 _round_trip(CCR_PORT, body)
