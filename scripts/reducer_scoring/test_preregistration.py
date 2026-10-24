@@ -48,7 +48,7 @@ class PreregistrationTests(unittest.TestCase):
         sensitivity = budget["budget_per_ktoken_sensitivity_s"]
         self.assertEqual(len(sensitivity), 3)
         self.assertEqual(sensitivity, sorted(sensitivity))
-        self.assertEqual(budget["budget_per_ktoken_s"], sensitivity[1])
+        self.assertEqual(budget["budget_per_ktoken_s"], sensitivity[2])
         self.assertEqual(budget["token_method"], "scripts/tokens_calibration.json")
 
     def test_no_budget_is_stated_per_thousand_characters(self):

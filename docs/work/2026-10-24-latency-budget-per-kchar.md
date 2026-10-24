@@ -123,14 +123,15 @@ Sizes are estimated tokens, not provider counts.
 (original_tokens / 1000)`, `token_method` in the same file), regenerated from the saved runs in
 the commit that scored sizes in tokens.
 
-### F8 — At 0.015 s per 1,000 tokens the rule reducers score about 0.96 on latency and every model reducer under 0.02 [INFERRED]
+### F8 — At the registered 0.056 s per 1,000 tokens the rule reducers score about 0.99 on latency and every model reducer under 0.06 [INFERRED]
 
 Latency score is `budget / (budget + seconds per 1,000 tokens)`. At the p10, p50 and p90 budgets:
 shipped rules 0.91, 0.96, 0.99; rtk CCR 0.92, 0.97, 0.99; kompress int8 0.007, 0.017, 0.059; Haiku
-digest 0.002, 0.004, 0.016. Computed from F7 and F6. The registered budget is 0.015 with
-{0.0064, 0.015, 0.056} as the sensitivity set, in `size_normalized_budget` of
-`scripts/reducer_scoring/preregistration.json`. The earlier owner acceptance covered 0.04 per
-1,000 characters; the restated value awaits the owner's confirmation.
+digest 0.002, 0.004, 0.016. Computed from F7 and F6. The registered budget is the p90, 0.056,
+with {0.0064, 0.015, 0.056} as the sensitivity set, in `size_normalized_budget` of
+`scripts/reducer_scoring/preregistration.json`. The owner chose the p90 over the median on
+2026-10-24, before any run used it. The p90 is lenient to slow reducers, and model reducers
+still score near zero.
 
 ## Still open
 
