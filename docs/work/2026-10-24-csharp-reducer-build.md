@@ -16,11 +16,11 @@ Three independent planning lanes examined architecture, tests, and retrieval. Th
 
 ## This build
 
-1. A common lexer contract and conservative C# scanner represent comments, strings, identifiers, keywords, whitespace and line endings. Unsupported or unterminated constructs cause a whole-file bailout.
+1. A common lexer contract and a conservative Roslyn syntax adapter represent comments, strings, identifiers, keywords, whitespace and line endings. Unsupported or unterminated constructs cause a whole-file bailout.
 2. A pure view builder selects C# only from `.cs`, applies independently controlled comments/imports/renaming, preserves indentation and original number prefixes, and includes the map and supplied hint in the savings comparison. Missing hint returns the original. Unknown paths use conservative lossless handling. No line-joining transform is introduced, so range labels are deferred until one exists.
 3. A developer adapter calls this actual core for offline tests. It is not a retrieval service. Tests use a clearly synthetic hint. Document the boundary and verify that the live handler remains unchanged.
 
-No production tool name or handle is invented here. The initial options are comments on, imports on, renaming off. Options remain local to the core until activation can wire them into `CompressionOptions`. No new package or external minifier is needed.
+No production tool name or handle is invented here. The initial options are comments on, imports on, renaming off. Options remain local to the core until activation can wire them into `CompressionOptions`. Roslyn provides syntax tokens and trivia without a workspace, compilation or semantic model. Parser SDK dependencies belong in the language adapter, outside the pure core. See [ADR 0004](../adr/0004-language-parsers-behind-the-code-lexer-interface.md).
 
 ## Test design
 
@@ -42,14 +42,14 @@ Expected output is hand-derived. Each behavior starts with a failing test and re
 | Missing or empty hint returns exact original | Bypass public-entry hint guard |
 | Equal-size output or map overhead removes saving | Compare code-only size or use less-than-or-equal |
 | Global/static/alias/multiline usings are distinct from using declarations/statements | Drop using-prefixed lines |
-| Unsupported preprocessor or escaped identifier on numbered CRLF input bails out exactly | Rename escaped identifiers or normalize before bailout |
+| Unsupported preprocessor syntax on numbered CRLF input bails out exactly | Process directives or normalize before bailout |
 | Adapter reaches actual reducer with both rename settings | Substitute spike regex or discard options |
 
 ## Activation and release remain deferred
 
 The future activation task must complete CCR design and implementation, correlate trusted whole-file tool calls by call ID, assign unambiguous file references, and guarantee the exact original is readable before emitting a compacted view. Storage failure must preserve the original request for retrieval-dependent code. Only then replace the registered blank-line handler and expose global options.
 
-The four design checks remain the release gate: lexer tests; 36 hint-on edit runs across Haiku/Sonnet and renaming off/on through real proxy retrieval; token comparison on both C# payloads including map/hint; and token-based, map-aware QA scoring charging each retrieval as the full file. This inactive build can prove only the lexer/core and offline adapter checks. It claims no model score or edit success. TS/JS, Python, CSS and HTML remain later language PRs in that order.
+The four design checks remain the release gate: lexer tests; 36 hint-on edit runs across Haiku/Sonnet and renaming off/on through real proxy retrieval; token comparison on both C# payloads including map/hint; and token-based, map-aware QA scoring charging each retrieval as the full file. This inactive build can prove only the lexer/core and offline adapter checks. It claims no model score or edit success. TS/JS, Python, CSS and HTML remain later language PRs in that order, using Tree-sitter as approved by the owner on 2026-10-24. Native loading, grammar versions and each language's safe transformations must pass their own acceptance checks.
 
 ## Offline adapter contract
 
