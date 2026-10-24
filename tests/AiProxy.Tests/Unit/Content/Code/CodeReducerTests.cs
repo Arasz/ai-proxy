@@ -86,12 +86,12 @@ public sealed class CodeReducerTests
     [Fact]
     public void Only_complete_using_directives_are_removed()
     {
-        const string source = "global using System.Text;\nusing static System.Math;\nusing Alias = System.Collections.Generic;\nusing\n    System.Threading;\nusing System; class Keep {}\nusing var resource = Open();\nawait using var other = Open();\nusing (var scope = Open()) { Work(); }\n";
+        const string source = "global using System.Text;\nusing static System.Math;\nusing Alias = System.Collections.Generic;\nusing\n    System.Threading;\nusing System;\nclass Keep { void M() { using var resource = Open(); await using var other = Open(); using (var scope = Open()) { Work(); } } }\n";
         var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.DoesNotContain("System", result.Text, StringComparison.Ordinal);
-        Assert.Contains(" class Keep {}", result.Text, StringComparison.Ordinal);
+        Assert.Contains("class Keep {", result.Text, StringComparison.Ordinal);
         Assert.Contains("using var resource = Open();", result.Text, StringComparison.Ordinal);
         Assert.Contains("await using var other = Open();", result.Text, StringComparison.Ordinal);
         Assert.Contains("using (var scope = Open()) { Work(); }", result.Text, StringComparison.Ordinal);
@@ -168,8 +168,8 @@ public sealed class CodeReducerTests
         const string source = "  60\t// a very long removable comment provides enough savings for the complete hint too\n\n  62\t    int value = 1;\n";
         var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
 
-        Assert.True(result.Changed);
-        Assert.StartsWith("  60\n  62\t", result.Text, StringComparison.Ordinal);
+        Assert.False(result.Changed);
+        Assert.Equal(source, result.Text);
     }
 
     [Fact]
@@ -186,14 +186,13 @@ public sealed class CodeReducerTests
     [InlineData("\u0085")]
     [InlineData("\u2028")]
     [InlineData("\u2029")]
-    public void Unmodelled_CSharp_newlines_return_the_exact_file(string newline)
+    public void CSharp_newlines_after_comments_do_not_swallow_following_code(string newline)
     {
         var source = "// a long comment that provides more savings than the hint but must not swallow the following code" + newline + "int Important = 42;\n";
         var result = new CodeReducer().Reduce(source, "Example.cs", null, Hint);
 
-        Assert.False(result.Changed);
-        Assert.False(result.Supported);
-        Assert.Equal(source, result.Text);
+        Assert.True(result.Supported);
+        Assert.Contains("int Important = 42;", result.Text, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -208,5 +207,30 @@ public sealed class CodeReducerTests
         Assert.Empty(result.RenameMap);
         Assert.Contains(first, result.Text, StringComparison.Ordinal);
         Assert.Contains(second, result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generated_short_names_skip_CSharp_keywords()
+    {
+        var source = string.Concat(Enumerable.Range(0, 45).Select(index =>
+            $"int LongIdentifier{index} = 0;\nLongIdentifier{index}++;\n"));
+        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal(45, result.RenameMap.Count);
+        Assert.DoesNotContain("as", result.RenameMap.Keys);
+        Assert.Equal("LongIdentifier44", result.RenameMap["at"]);
+        Assert.Contains("int at = 0;\nat++;", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Escaped_identifier_and_plain_occurrences_rename_as_one_name()
+    {
+        const string source = "// a very long comment leaves room for the rename map and complete hint\nint @café = 1;\n@café += café;\n";
+        var result = new CodeReducer().Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal("café", result.RenameMap["a"]);
+        Assert.Contains("int a = 1;\na += a;", result.Text, StringComparison.Ordinal);
     }
 }

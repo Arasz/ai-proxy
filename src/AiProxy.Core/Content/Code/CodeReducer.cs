@@ -66,11 +66,11 @@ public sealed class CodeReducer
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
-        var reserved = identifiers.Select(token => token.Text).ToHashSet(StringComparer.Ordinal);
+        var reserved = identifiers.Select(static token => token.ValueText ?? token.Text).ToHashSet(StringComparer.Ordinal);
         var used = identifiers.Where(token => view.AsSpan(token.Offset, token.Text.Length).SequenceEqual(token.Text));
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         var next = 0;
-        foreach (var group in used.GroupBy(token => token.Text, StringComparer.Ordinal))
+        foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
             if (group.Count() < 2)
             {
@@ -90,8 +90,8 @@ public sealed class CodeReducer
             names.Add(group.Key, candidate);
             map.Add(candidate, group.Key);
         }
-        return used.Where(token => names.ContainsKey(token.Text))
-            .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.Text]));
+        return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
+            .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.ValueText ?? token.Text]));
     }
 
     private static string ShortName(int value)
