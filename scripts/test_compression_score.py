@@ -4,7 +4,7 @@ from compression_score import Measurement, latency_score, score
 
 
 def measured(reduced=500, latency_s=1.0, kept=4, total=4):
-    return Measurement(original_chars=1000, reduced_chars=reduced, latency_s=latency_s,
+    return Measurement(original_tokens=1000, reduced_tokens=reduced, latency_s=latency_s,
                        answers_kept=kept, answers_total=total)
 
 

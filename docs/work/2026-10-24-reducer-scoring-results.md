@@ -291,3 +291,35 @@ the report were these:
 - score formula;
 - kind pooling;
 - median selection.
+
+## Amendment 2026-10-24: sizes in tokens
+
+The harness now reports sizes in estimated tokens, not characters: `original_tokens`,
+`reduced_tokens` and the tokens a candidate adds outside its output (rtk's injected tool
+definition), and compression is computed from those. Saved rtk records that hold `added_chars` are
+converted with the same estimate. No candidate was re-run; `results/report.json` was regenerated
+from the saved runs with `python3 scripts/reducer_scoring/harness.py report`. Latency, the budget
+and the latency score are unchanged. The character figures above stay as the historical record.
+
+**Method label** (`token_method` in `results/report.json`): estimated: 2.8916 chars/token from
+116 stateless claude requests (claude-sonnet-5 76, claude-haiku-5-5 29, claude-opus-5-5 6,
+claude-sonnet-5-5 3, claude-haiku-4-5-20251001 2; 2026-10-24), holdout median error 2.2%. The
+calibration is in [2026-10-24-claude-token-calibration.md](2026-10-24-claude-token-calibration.md);
+applying it to opus-5-5 is unverified there. Tokens here are an estimate, not a provider count.
+
+Original and reduced tokens per kind, original to reduced, from `results/report.json`. The
+pre-registered view leaves untouched payloads out, so "n/a" marks a kind with no changed payload;
+the counted view measures them as nothing removed.
+
+| candidate, view | code | prose | log | listing | json | build | test |
+|---|---|---|---|---|---|---|---|
+| shipped rules, pre-registered | 7028 to 5764 | n/a | 2853 to 866 | n/a | 304 to 212 | 312 to 230 | 1934 to 1447 |
+| shipped rules, counted | 7028 to 5764 | 4331 to 4331 | 2853 to 866 | 199 to 199 | 2159 to 2067 | 21294 to 21212 | 2340 to 1853 |
+| kompress int8, pre-registered | 7028 to 6651 | 4331 to 3800 | 2853 to 2850 | n/a | 1855 to 1760 | 20982 to 20899 | 2340 to 2231 |
+| rtk CCR, pre-registered | 7028 to 2179 | 4331 to 1142 | 2853 to 2235 | n/a | 2159 to 526 | 20982 to 666 | 2340 to 1267 |
+| rtk CCR, counted | 7028 to 2179 | 4331 to 1142 | 2853 to 2235 | 199 to 346 | 2159 to 526 | 21294 to 1125 | 2340 to 1267 |
+
+Because every size is one ratio away from its character figure, compression ratios per payload are
+within 0.003 of the character figures (largest difference over all rows); the tool definition rtk adds has a token
+estimate that rounds on its own. The token figures matter for the next step: the latency budget is
+per 1,000 tokens, not per 1,000 characters.

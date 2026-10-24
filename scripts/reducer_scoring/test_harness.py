@@ -8,6 +8,7 @@ from unittest.mock import patch
 from harness import _fields, _table, build_report, run
 from compression_score import Measurement  # noqa: E402  (harness puts scripts/ on the path)
 from scoring import Row
+import tokens  # noqa: E402
 
 FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
 TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
@@ -73,15 +74,34 @@ class GradingTests(unittest.TestCase):
         self.assertEqual((identity["retention"], identity["score"]), (1.0, 0.0))
 
 
+class TokenSizeTests(unittest.TestCase):
+    def test_rows_carry_token_sizes_and_no_character_sizes(self):
+        built = report()
+        for row in built["payloads"] + built["kinds"] + built["kinds_counted"]:
+            if not row["not_applicable"]:
+                with self.subTest(candidate=row["candidate"]):
+                    self.assertIn("original_tokens", row)
+                    self.assertIn("reduced_tokens", row)
+                    self.assertFalse([k for k in row if k.endswith("_chars")])
+
+    def test_the_report_names_how_tokens_were_estimated(self):
+        self.assertEqual(report()["token_method"], tokens.METHOD)
+
+    def test_saved_added_chars_are_converted_to_tokens(self):
+        recs = {"shipped_rules": [r | {"added_chars": 300} for r in runs("c", KEPT)]}
+        counted = next(r for r in report(recs)["payloads"] if r["payload"] == "c")
+        self.assertEqual(counted["reduced_tokens"], tokens.estimate(KEPT) + tokens.from_chars(300))
+
+
 class KindAndScoreTests(unittest.TestCase):
     def test_each_kind_pools_only_its_own_payloads(self):
         built = report()
-        self.assertEqual(kind(built, "identity", "prose")["original_chars"], len(TEXTS["a"]) + len(TEXTS["b"]))
-        self.assertEqual(kind(built, "identity", "build")["original_chars"], len(TEXTS["c"]))
+        self.assertEqual(kind(built, "identity", "prose")["original_tokens"], tokens.estimate(TEXTS["a"]) + tokens.estimate(TEXTS["b"]))
+        self.assertEqual(kind(built, "identity", "build")["original_tokens"], tokens.estimate(TEXTS["c"]))
 
     def test_the_headline_score_is_at_the_pre_registered_budget(self):
         build = kind(report(), "shipped_rules", "build")
-        c = 1 - len(KEPT) / len(TEXTS["c"])
+        c = 1 - tokens.estimate(KEPT) / tokens.estimate(TEXTS["c"])
         lat = 1.0 / (1.0 + 0.25)
         self.assertAlmostEqual(build["score"], round(2 * c * lat / (c + lat), 4))
         self.assertEqual(build["score"], build["score_at"]["1.0"])
@@ -96,11 +116,11 @@ class CountedViewTests(unittest.TestCase):
     def test_an_untouched_payload_counts_as_nothing_removed_in_the_counted_view(self):
         counted = next(r for r in report()["kinds_counted"] if r["candidate"] == "shipped_rules" and r["kind"] == "prose")
         self.assertFalse(counted["not_applicable"])
-        self.assertEqual(counted["original_chars"], len(TEXTS["a"]) + len(TEXTS["b"]))
-        self.assertEqual(counted["reduced_chars"], len(KEPT) + len(TEXTS["b"]))
+        self.assertEqual(counted["original_tokens"], tokens.estimate(TEXTS["a"]) + tokens.estimate(TEXTS["b"]))
+        self.assertEqual(counted["reduced_tokens"], tokens.estimate(KEPT) + tokens.estimate(TEXTS["b"]))
 
     def test_the_pre_registered_view_still_leaves_it_out(self):
-        self.assertEqual(kind(report(), "shipped_rules", "prose")["original_chars"], len(TEXTS["a"]))
+        self.assertEqual(kind(report(), "shipped_rules", "prose")["original_tokens"], tokens.estimate(TEXTS["a"]))
 
     def test_a_kind_with_only_untouched_payloads_scores_zero_in_the_counted_view(self):
         recs = records()

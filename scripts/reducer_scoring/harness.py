@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from compression_score import compression, latency_score, retention, score  # noqa: E402
 from preregistration import HERE, load, payload_text  # noqa: E402
+import tokens  # noqa: E402
 from grading import same_fact  # noqa: E402
 from judge_runner import accepted, lost  # noqa: E402
 from scoring import QaRun, ReducerRun, Row, extractive_row, kind_row, qa_row, void_reasons  # noqa: E402
@@ -47,7 +48,7 @@ def _fields(candidate: str, row: Row, prereg: dict, relaxed_row: Row | None = No
     r = (relaxed_row or row).measurement
     relaxed = score(r, prereg["budget_s"], prereg["relaxed_retention_floor"]) * retention(r)
     return fields | {
-        "original_chars": m.original_chars, "reduced_chars": m.reduced_chars,
+        "original_tokens": m.original_tokens, "reduced_tokens": m.reduced_tokens,
         "compression": round(compression(m), 4), "latency_s": round(m.latency_s, 6),
         "latency_score": round(latency_score(m.latency_s, prereg["budget_s"]), 4),
         "retention": round(retention(m), 4), "answers": f"{m.answers_kept}/{m.answers_total}",
@@ -93,7 +94,7 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
             original = text_of(name)
             if candidate in extractive:
                 def reducer_runs(judging):
-                    return [ReducerRun(r["output"], r["latency_s"], r.get("added_chars", 0),
+                    return [ReducerRun(r["output"], r["latency_s"], _added_tokens(r),
                                        judged.get((candidate, name, r["run"]), frozenset()) if judging else frozenset())
                             for r in mine]
                 for view, match in ((rows, None), (by_fact, same_fact)):
@@ -123,7 +124,12 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
     if not void:
         void = void_reasons(by_candidate["identity"], by_candidate["summarizer_control"])
     return {"payloads": payload_rows, "kinds": kind_rows, "kinds_counted": counted_rows, "void": void,
-            "judge": judge_check}
+            "judge": judge_check, "token_method": tokens.METHOD}
+
+
+def _added_tokens(record: dict) -> int:
+    """Tokens a run added outside its output; older records hold characters, converted by the same estimate."""
+    return record.get("added_tokens", tokens.from_chars(record.get("added_chars", 0)))
 
 
 def _by(match) -> dict:

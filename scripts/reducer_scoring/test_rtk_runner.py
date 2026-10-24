@@ -5,7 +5,8 @@ from unittest.mock import Mock, patch
 
 import rtk_runner
 
-from rtk_runner import added_chars, ccr_latencies, order_for, request_body, tool_result_text
+from rtk_runner import added_tokens, ccr_latencies, order_for, request_body, tool_result_text
+import tokens  # noqa: E402
 
 
 class ToolResultTextTests(unittest.TestCase):
@@ -20,14 +21,14 @@ class ToolResultTextTests(unittest.TestCase):
         self.assertEqual(tool_result_text(body), "head[rtk_retrieve abc]")
 
 
-class AddedCharsTests(unittest.TestCase):
+class AddedTokensTests(unittest.TestCase):
     def test_an_injected_tool_definition_counts_toward_what_the_model_sees(self):
         body = json.loads(request_body("x"))
         body["tools"] = [{"name": "rtk_retrieve", "description": "get it back"}]
-        self.assertEqual(added_chars(body), len(json.dumps(body["tools"])))
+        self.assertEqual(added_tokens(body), tokens.estimate(json.dumps(body["tools"])))
 
     def test_a_body_without_tools_adds_nothing(self):
-        self.assertEqual(added_chars(json.loads(request_body("x"))), 0)
+        self.assertEqual(added_tokens(json.loads(request_body("x"))), 0)
 
 
 class CcrLatencyTests(unittest.TestCase):

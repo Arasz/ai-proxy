@@ -10,8 +10,8 @@ from dataclasses import dataclass
 class Measurement:
     """What one candidate did to one payload, medians over three runs."""
 
-    original_chars: int
-    reduced_chars: int
+    original_tokens: int
+    reduced_tokens: int
     latency_s: float
     answers_kept: int
     answers_total: int
@@ -19,9 +19,9 @@ class Measurement:
 
 def compression(m: Measurement) -> float:
     """Share of the payload removed: 0.0 keeps everything, 1.0 removes everything."""
-    if m.original_chars == 0:
+    if m.original_tokens == 0:
         return 0.0
-    return max(0.0, 1.0 - m.reduced_chars / m.original_chars)
+    return max(0.0, 1.0 - m.reduced_tokens / m.original_tokens)
 
 
 def retention(m: Measurement) -> float:
