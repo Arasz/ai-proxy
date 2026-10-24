@@ -4,7 +4,7 @@ judge: 0/239 decoys accepted, 23/199 summarizer losses accepted
 
 sizes: estimated: 2.8916 chars/token from 116 stateless claude requests (claude-sonnet-5 76, claude-haiku-5-5 29, claude-opus-5-5 6, claude-sonnet-5-5 3, claude-haiku-4-5-20251001 2; 2026-10-24 to 2026-10-24), holdout median error 2.2%
 
-{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest_checked": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "e4b2b82", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr_reader": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "7162df1", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0", "claude": "2.1.310", "reader": "claude-opus-5-5:low via claude -p"}, "rtk_ccr_retrieval": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "7162df1", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0", "claude": "2.1.310", "reader": "claude-opus-5-5:low via claude -p"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
+{"digest_gpt_stand_in": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "a7fe033", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "haiku_digest_checked": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "e4b2b82", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "identity": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "kompress_int8": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "1820d4a", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "rtk_ccr_reader": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "7162df1", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0", "claude": "2.1.310", "reader": "claude-opus-5-5:low via claude -p"}, "rtk_ccr_retrieval": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "7162df1", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0", "claude": "2.1.310", "reader": "claude-opus-5-5:low via claude -p"}, "shipped_rules": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "24b20ac", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}, "summarizer_control": {"date": "2026-10-24", "machine": "Apple M4, 24 GB, macOS 27.0.1", "commit": "0d7d19b", "rtk_proxy": "rtk-proxy 1.0.1", "pi": "1.4.0"}}
 
 ## Per kind
 
@@ -66,13 +66,13 @@ sizes: estimated: 2.8916 chars/token from 116 stateless claude requests (claude-
 | rtk_ccr_retrieval | json | 0.0 | 0.0 | 2.9005 | 1.0 | 19/19 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | build | 0.0 | 0.0 | 1.6429 | 1.0 | 10/10 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | test | 0.0 | 0.0 | 3.8211 | 1.0 | 10/10 | 0.0 | 0.0 | 0.0 |
-| shipped_rules | code | 0.3048 | 0.1799 | 0.0022 | 1.0 | 12/12 | 0.3047 | 0.3048 | 0.3048 |
+| shipped_rules | code | 0.3047 | 0.1799 | 0.0041 | 1.0 | 12/12 | 0.3045 | 0.3048 | 0.3047 |
 | shipped_rules | prose | n/a | | | | | | | |
-| shipped_rules | log | 0.0 | 0.6965 | 0.0006 | 0.6923 | 9/13 | 0.0 | 0.0 | 0.0 |
+| shipped_rules | log | 0.3944 | 0.2457 | 0.0017 | 1.0 | 13/13 | 0.3942 | 0.3944 | 0.3944 |
 | shipped_rules | listing | n/a | | | | | | | |
 | shipped_rules | json | 0.4646 | 0.3026 | 0.0002 | 1.0 | 14/14 | 0.4646 | 0.4646 | 0.4646 |
-| shipped_rules | build | 0.4162 | 0.2628 | 0.0003 | 1.0 | 4/4 | 0.4162 | 0.4162 | 0.4162 |
-| shipped_rules | test | 0.4022 | 0.2518 | 0.0009 | 1.0 | 5/5 | 0.4022 | 0.4023 | 0.4022 |
+| shipped_rules | build | 0.4162 | 0.2628 | 0.0004 | 1.0 | 4/4 | 0.4162 | 0.4162 | 0.4162 |
+| shipped_rules | test | 0.4022 | 0.2518 | 0.0016 | 1.0 | 5/5 | 0.402 | 0.4022 | 0.4022 |
 | summarizer_control | code | 0.0 | 0.968 | 5.0226 | 0.1667 | 2/12 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | prose | 0.0 | 0.9404 | 5.5997 | 0.1429 | 2/14 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | log | 0.0 | 0.9404 | 4.5205 | 0.1538 | 2/13 | 0.0 | 0.0 | 0.0 |
@@ -141,13 +141,13 @@ sizes: estimated: 2.8916 chars/token from 116 stateless claude requests (claude-
 | rtk_ccr_retrieval | json | 0.0 | 0.0 | 2.9005 | 1.0 | 19/19 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | build | 0.0 | 0.0 | 1.6429 | 1.0 | 10/10 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | test | 0.0 | 0.0 | 3.8211 | 1.0 | 10/10 | 0.0 | 0.0 | 0.0 |
-| shipped_rules | code | 0.3048 | 0.1799 | 0.0022 | 1.0 | 12/12 | 0.3047 | 0.3048 | 0.3048 |
-| shipped_rules | prose | 0.0 | 0.0 | 0.0002 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
-| shipped_rules | log | 0.0 | 0.6965 | 0.0006 | 0.6923 | 9/13 | 0.0 | 0.0 | 0.0 |
-| shipped_rules | listing | 0.0 | 0.0 | 0.0001 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
+| shipped_rules | code | 0.3047 | 0.1799 | 0.0041 | 1.0 | 12/12 | 0.3045 | 0.3048 | 0.3047 |
+| shipped_rules | prose | 0.0 | 0.0 | 0.0003 | 1.0 | 14/14 | 0.0 | 0.0 | 0.0 |
+| shipped_rules | log | 0.3944 | 0.2457 | 0.0017 | 1.0 | 13/13 | 0.3942 | 0.3944 | 0.3944 |
+| shipped_rules | listing | 0.0 | 0.0 | 0.0002 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
 | shipped_rules | json | 0.0817 | 0.0426 | 0.0002 | 1.0 | 19/19 | 0.0817 | 0.0817 | 0.0817 |
-| shipped_rules | build | 0.0077 | 0.0039 | 0.0029 | 1.0 | 10/10 | 0.0077 | 0.0077 | 0.0077 |
-| shipped_rules | test | 0.3445 | 0.2081 | 0.0006 | 1.0 | 10/10 | 0.3445 | 0.3445 | 0.3445 |
+| shipped_rules | build | 0.0077 | 0.0039 | 0.0076 | 1.0 | 10/10 | 0.0077 | 0.0077 | 0.0077 |
+| shipped_rules | test | 0.3445 | 0.2081 | 0.0010 | 1.0 | 10/10 | 0.3444 | 0.3445 | 0.3445 |
 | summarizer_control | code | 0.0 | 0.968 | 5.0226 | 0.1667 | 2/12 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | prose | 0.0 | 0.9404 | 5.5997 | 0.1429 | 2/14 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | log | 0.0 | 0.9404 | 4.5205 | 0.1538 | 2/13 | 0.0 | 0.0 | 0.0 |
@@ -264,19 +264,19 @@ sizes: estimated: 2.8916 chars/token from 116 stateless claude requests (claude-
 | rtk_ccr_retrieval | github_pr_list | 0.0 | 0.0 | 2.8893 | 1.0 | 5/5 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | dotnet_build_failure_verbose | 0.0 | 0.0 | 3.2857 | 1.0 | 6/6 | 0.0 | 0.0 | 0.0 |
 | rtk_ccr_retrieval | dotnet_test_failures | 0.0 | 0.0 | 3.8178 | 1.0 | 5/5 | 0.0 | 0.0 | 0.0 |
-| shipped_rules | code_file | 0.2587 | 0.1486 | 0.0020 | 1.0 | 6/6 | 0.2587 | 0.2588 | 0.2587 |
+| shipped_rules | code_file | 0.2587 | 0.1486 | 0.0036 | 1.0 | 6/6 | 0.2586 | 0.2587 | 0.2587 |
 | shipped_rules | incident_report | n/a | | | | | | | |
-| shipped_rules | agent_log | 0.4003 | 0.2503 | 0.0006 | 1.0 | 8/8 | 0.4003 | 0.4003 | 0.4003 |
+| shipped_rules | agent_log | 0.062 | 0.032 | 0.0011 | 1.0 | 8/8 | 0.062 | 0.062 | 0.062 |
 | shipped_rules | dir_listing | n/a | | | | | | | |
 | shipped_rules | json_payload | 0.4646 | 0.3026 | 0.0002 | 1.0 | 14/14 | 0.4646 | 0.4646 | 0.4646 |
-| shipped_rules | dotnet_build_failure | 0.4162 | 0.2628 | 0.0003 | 1.0 | 4/4 | 0.4162 | 0.4162 | 0.4162 |
+| shipped_rules | dotnet_build_failure | 0.4162 | 0.2628 | 0.0004 | 1.0 | 4/4 | 0.4162 | 0.4162 | 0.4162 |
 | shipped_rules | dotnet_test_failure | n/a | | | | | | | |
-| shipped_rules | code_file_large | 0.3306 | 0.1981 | 0.0024 | 1.0 | 6/6 | 0.3305 | 0.3307 | 0.3306 |
+| shipped_rules | code_file_large | 0.3305 | 0.1981 | 0.0046 | 1.0 | 6/6 | 0.3303 | 0.3306 | 0.3305 |
 | shipped_rules | prose_large | n/a | | | | | | | |
-| shipped_rules | rtk_proxy_log | 0.0 | 0.8938 | 0.0007 | 0.2 | 1/5 | 0.0 | 0.0 | 0.0 |
+| shipped_rules | rtk_proxy_log | 0.5074 | 0.3402 | 0.0023 | 1.0 | 5/5 | 0.5072 | 0.5076 | 0.5074 |
 | shipped_rules | github_pr_list | n/a | | | | | | | |
 | shipped_rules | dotnet_build_failure_verbose | n/a | | | | | | | |
-| shipped_rules | dotnet_test_failures | 0.4022 | 0.2518 | 0.0009 | 1.0 | 5/5 | 0.4022 | 0.4023 | 0.4022 |
+| shipped_rules | dotnet_test_failures | 0.4022 | 0.2518 | 0.0016 | 1.0 | 5/5 | 0.402 | 0.4022 | 0.4022 |
 | summarizer_control | code_file | 0.0 | 0.9623 | 5.4108 | 0.1667 | 1/6 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | incident_report | 0.0 | 0.7796 | 5.3266 | 0.25 | 2/8 | 0.0 | 0.0 | 0.0 |
 | summarizer_control | agent_log | 0.0 | 0.9086 | 4.4370 | 0.0 | 0/8 | 0.0 | 0.0 | 0.0 |

@@ -21,7 +21,7 @@ public sealed class CodeAdapterTests
     [Fact]
     public async Task Defaults_invoke_the_actual_reducer_and_publish_only_the_contract_fields()
     {
-        var source = "// " + new string('x', 100) + "\nclass Example { }\n\n";
+        var source = $"// {new string('x', 100)}\nclass Example {{ }}\n\n";
         var request = JsonSerializer.Serialize(new { text = source, filePath = "Example.cs", retrievalHint = "[fixture retrieve before editing]" });
         using var input = new StringReader(request);
         using var output = new StringWriter();
@@ -72,7 +72,7 @@ public sealed class CodeAdapterTests
     [InlineData(true, true, false)]
     public async Task Explicit_options_reach_the_actual_core(bool removeComments, bool removeImports, bool renameIdentifiers)
     {
-        var source = "// retained comment\nusing Example;\nint originalLongName = 1;\noriginalLongName += originalLongName;\noriginalLongName++;\n" + new string('\n', 100);
+        var source = $"// retained comment\nusing Example;\nint originalLongName = 1;\noriginalLongName += originalLongName;\noriginalLongName++;\n{new string('\n', 100)}";
         var request = JsonSerializer.Serialize(new { text = source, filePath = "Example.cs", retrievalHint = "[fixture hint]", removeComments, removeImports, renameIdentifiers });
         using var input = new StringReader(request);
         using var output = new StringWriter();
@@ -99,7 +99,7 @@ public sealed class CodeAdapterTests
     [InlineData("Example.cs", "")]
     public async Task Missing_context_returns_the_exact_original(string? filePath, string? retrievalHint)
     {
-        var source = "// " + new string('x', 100) + "\r\nclass Example { }\r\n\r\n";
+        var source = $"// {new string('x', 100)}\r\nclass Example {{ }}\r\n\r\n";
         var request = JsonSerializer.Serialize(new { text = source, filePath, retrievalHint });
         using var input = new StringReader(request);
         using var output = new StringWriter();

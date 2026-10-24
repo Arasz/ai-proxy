@@ -45,7 +45,8 @@ public sealed class ProviderCompressionTests : IDisposable
         var received = Assert.Single(upstream.Requests);
         Assert.True(received.Body.Length < body.Length, $"the body was {received.Body.Length} bytes, the original was {body.Length}");
         Assert.Contains("status=503", received.Body, StringComparison.Ordinal);
-        Assert.DoesNotContain("nothing to see here", received.Body, StringComparison.Ordinal);
+        Assert.Single(received.Body.Split("nothing to see here").Skip(1));
+        Assert.Contains("10:00:04", received.Body, StringComparison.Ordinal);
     }
 
     [Fact]

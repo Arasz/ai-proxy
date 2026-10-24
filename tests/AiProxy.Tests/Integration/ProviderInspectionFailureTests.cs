@@ -29,8 +29,7 @@ public sealed class ProviderInspectionFailureTests
         Assert.Equal(Body, received.Body);
         Assert.Contains(loggers.Entries, entry =>
             entry.Category == typeof(ProviderRequestInspector).FullName &&
-            entry.Level == LogLevel.Warning &&
-            entry.Exception is InvalidOperationException);
+            entry is { Level: LogLevel.Warning, Exception: InvalidOperationException });
     }
 
     [Fact]
