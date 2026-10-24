@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from compression_score import compression, latency_score, retention, score  # noqa: E402
+from compression_score import compression, latency_score, retention, score, size_score  # noqa: E402
 from preregistration import HERE, load, payload_text  # noqa: E402
 import tokens  # noqa: E402
 from grading import same_fact  # noqa: E402
@@ -55,7 +55,20 @@ def _fields(candidate: str, row: Row, prereg: dict, relaxed_row: Row | None = No
         "score": round(score(m, prereg["budget_s"], floor), 4),
         "score_at": {str(b): round(score(m, b, floor), 4) for b in budgets},
         "answers_relaxed": f"{r.answers_kept}/{r.answers_total}", "score_relaxed": round(relaxed, 4),
+        **_size_fields([m], prereg),
     }
+
+
+def _size_fields(measured: list, prereg: dict) -> dict:
+    """The size-normalized score: each payload judged on its own budget, a kind as the equal-weight mean."""
+    sized = prereg["size_normalized_budget"]
+    budgets = sorted({sized["budget_per_ktoken_s"], *sized["budget_per_ktoken_sensitivity_s"]})
+    floor = prereg["retention_floor"]
+
+    def mean(budget):
+        return round(sum(size_score(m, budget, floor) for m in measured) / len(measured), 4)
+
+    return {"size_score": mean(sized["budget_per_ktoken_s"]), "size_score_at": {str(b): mean(b) for b in budgets}}
 
 
 JUDGE_DECOY_LIMIT = 0.1
@@ -114,10 +127,15 @@ def build_report(prereg: dict, records: dict[str, list[dict]], text_of=payload_t
         by_candidate[candidate] = rows
         kinds = dict.fromkeys(prereg["payloads"][n]["kind"] for n in rows)
         for kind in kinds:
-            def pool(view):
-                return kind_row([row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind])
+            def members(view):
+                return [row for n, row in view.items() if prereg["payloads"][n]["kind"] == kind]
+
             for view, fact_view, target in ((rows, by_fact, kind_rows), (counted, counted_by_fact, counted_rows)):
-                target.append(_fields(candidate, pool(view), prereg, pool(fact_view)) | {"kind": kind})
+                fields = _fields(candidate, kind_row(members(view)), prereg, kind_row(members(fact_view)))
+                measured = [row.measurement for row in members(view) if not row.not_applicable]
+                if measured:
+                    fields |= _size_fields(measured, prereg)
+                target.append(fields | {"kind": kind})
     void = _incomplete(prereg, records)
     for control in ("identity", "summarizer_control"):
         if control not in by_candidate:
@@ -210,18 +228,19 @@ def _environment() -> dict:
 
 
 def _table(rows: list[dict], label: str) -> str:
-    head = f"| candidate | {label} | score | compression | latency s | retention | answers | score @0.5 s | score @2 s | relaxed |\n"
-    head += "|---|---|---|---|---|---|---|---|---|---|\n"
+    head = (f"| candidate | {label} | size score | size score @0.015 | compression | latency s | retention | answers | "
+            f"summed score | summed @0.5 s | summed @2 s | relaxed |\n")
+    head += "|---|---|---|---|---|---|---|---|---|---|---|---|\n"
     lines = []
     for r in rows:
         name = r["candidate"] + (" (stand-in)" if r["stand_in"] else "")
         where = r.get("payload", r["kind"])
         if r["not_applicable"]:
-            lines.append(f"| {name} | {where} | n/a | | | | | | | |")
+            lines.append(f"| {name} | {where} | n/a | | | | | | | | | |")
             continue
-        lines.append(f"| {name} | {where} | {r['score']} | {r['compression']} | {r['latency_s']:.4f} | "
-                     f"{r['retention']} | {r['answers']} | {r['score_at']['0.5']} | {r['score_at']['2.0']} | "
-                     f"{r['score_relaxed']} |")
+        lines.append(f"| {name} | {where} | {r['size_score']} | {r['size_score_at'].get('0.015', '')} | "
+                     f"{r['compression']} | {r['latency_s']:.4f} | {r['retention']} | {r['answers']} | {r['score']} | "
+                     f"{r['score_at']['0.5']} | {r['score_at']['2.0']} | {r['score_relaxed']} |")
     return head + "\n".join(lines) + "\n"
 
 

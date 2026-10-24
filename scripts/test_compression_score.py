@@ -1,6 +1,6 @@
 import unittest
 
-from compression_score import Measurement, latency_score, score
+from compression_score import Measurement, latency_score, score, size_score
 
 
 def measured(reduced=500, latency_s=1.0, kept=4, total=4):
@@ -45,3 +45,14 @@ class ScoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SizeScoreTests(unittest.TestCase):
+    def test_same_latency_per_thousand_tokens_scores_the_same_at_any_size(self):
+        small = Measurement(original_tokens=1000, reduced_tokens=500, latency_s=0.02, answers_kept=1, answers_total=1)
+        large = Measurement(original_tokens=10000, reduced_tokens=5000, latency_s=0.2, answers_kept=1, answers_total=1)
+        self.assertAlmostEqual(size_score(small, 0.056), size_score(large, 0.056))
+
+    def test_the_budget_is_per_thousand_tokens(self):
+        m = Measurement(original_tokens=2000, reduced_tokens=1000, latency_s=0.112, answers_kept=1, answers_total=1)
+        self.assertAlmostEqual(size_score(m, 0.056), score(m, budget_s=0.112))
