@@ -2,6 +2,7 @@
  "registered": "2026-10-23",
  "budget_s": 1.0,
  "retention_floor": 1.0,
+ "relaxed_retention_floor": 0.7,
  "runs": 3,
  "models": {
   "qa_reader": "claude-opus-5-5",
@@ -460,6 +461,7 @@
   "abstractive": {
    "candidates": [
     "haiku_digest",
+    "haiku_digest_checked",
     "digest_gpt_stand_in",
     "summarizer_control",
     "identity"
@@ -523,6 +525,48 @@
    "timing": {
     "haiku_digest": "duration_api_ms from the claude -p result: the model's time without CLI startup; the process wall time is kept as wall_s"
    }
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": false,
+   "after": "the haiku_digest run had been seen; nothing already scored is re-scored",
+   "reason": "haiku_digest ran with no pinned effort and inherited the session's CLAUDE_EFFORT=medium, against the pre-registered thinking-off digest; the owner asked for a re-run at low effort with a prompt that finds the facts first and checks them last",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "candidates": {
+    "haiku_digest_checked": "claude-haiku-5-5 at --effort low with CHECKED_SYSTEM (claude_digest_runner.py), CLAUDE_EFFORT cleared from the child environment, graded by the same QA reader",
+    "haiku_digest": "kept as recorded: DIGEST_SYSTEM, no --effort flag, CLAUDE_EFFORT=medium inherited"
+   },
+   "invocation": "claude -p --model claude-haiku-5-5 --tools '' --setting-sources '' --strict-mcp-config --no-session-persistence --output-format json --effort low, payload on stdin, proxy variables and CLAUDE_EFFORT cleared",
+   "thinking": "low is the lowest effort claude -p accepts; thinking cannot be switched off from the CLI"
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": false,
+   "after": "every candidate's floor-1.0 scores had been seen, including haiku_digest",
+   "reason": "the owner ruled that a small loss is acceptable and that a fact in another wording is kept: most haiku_digest losses were reworded facts, and the few dropped facts were low-value",
+   "relaxed_view": "a second score, score_relaxed, with its own answer count answers_relaxed. Answers are graded by fact (grading.same_fact): both sides are rewritten to one spelling first, so a unit written short (4.2s for 4.2 seconds), a count written number first (7 failed for failed: 7), passed for succeeded, errors for Error(s) and a position with spaces still count. Then the same harmonic mean at the 1 s budget, zero when fact-graded retention is under 0.7, otherwise multiplied by that retention so a lossless candidate stays ahead of a lossy one at equal compression and latency. The verbatim floor-1.0 score stays the headline. Recorded replies are re-graded; nothing is re-run."
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": true,
+   "after": "amendment 4's fact-graded relaxed view had been seen; the judge had not run",
+   "reason": "the owner chose a reader judge for facts the spelling rules cannot recover, such as '2 errors' answered UNKNOWN",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "judge": "judge_runner.py: for every answer fact grading still calls lost, the QA reader gets the candidate's output and numbered items (question plus proposed answer) and replies yes or no, three times; two yes accept the answer. Accepted answers count in the relaxed view only, never in the headline.",
+   "decoys": "every judged answer with a number is also asked with its last number raised by one, shuffled in by a seed fixed per candidate run. If the judge accepts more than 10% of decoys, the judge is not used and the relaxed view is graded by fact only.",
+   "control": "summarizer_control losses are judged too; the share it accepts is reported as the judge's leniency"
   }
  ]
 }

@@ -5,13 +5,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from harness import _table, build_report, run
+from harness import _fields, _table, build_report, run
+from compression_score import Measurement  # noqa: E402  (harness puts scripts/ on the path)
+from scoring import Row
 
 FACTS = "Dana Okonkwo merged PR 8842 after the incident. "
 TEXTS = {"a": FACTS * 10, "b": FACTS * 20, "c": "build: " + FACTS * 8}
 QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
 PREREG = {
-    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "runs": 3,
+    "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "relaxed_retention_floor": 0.7, "runs": 3,
     "gates": {"extractive": {"candidates": ["shipped_rules"]},
               "abstractive": {"candidates": ["haiku_digest", "digest_gpt_stand_in", "summarizer_control", "identity"]}},
     "payloads": {
@@ -109,6 +111,64 @@ class CountedViewTests(unittest.TestCase):
         self.assertEqual((counted["not_applicable"], counted["score"]), (False, 0.0))
 
 
+class RelaxedViewTests(unittest.TestCase):
+    def fields(self, kept, total=10):
+        return _fields("haiku_digest", Row(Measurement(1000, 600, 1.0, kept, total), False), PREREG)
+
+    def test_a_small_loss_scores_its_harmonic_mean_scaled_by_retention(self):
+        c, lat = 0.4, 0.5
+        row = self.fields(8)
+        self.assertEqual(row["score"], 0.0)
+        self.assertEqual(row["score_relaxed"], round(2 * c * lat / (c + lat) * 0.8, 4))
+
+    def test_a_loss_at_the_relaxed_floor_still_scores(self):
+        self.assertGreater(self.fields(7)["score_relaxed"], 0.0)
+
+    def test_a_loss_under_the_relaxed_floor_scores_zero(self):
+        self.assertEqual(self.fields(6)["score_relaxed"], 0.0)
+
+    def test_without_loss_the_relaxed_score_is_the_headline_score(self):
+        row = self.fields(10)
+        self.assertEqual(row["score_relaxed"], row["score"])
+
+    def test_the_relaxed_view_grades_the_fact_not_the_wording(self):
+        questions = [{"q": "p99?", "a": "4.2 seconds"}, {"q": "failed?", "a": "failed: 7"},
+                     {"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
+        prereg = PREREG | {"payloads": {"a": {"kind": "prose", "questions": questions}}}
+        replies = [["4.2s"] * 3, ["7 failed"] * 3, ["Dana Okonkwo"] * 3, ["PR 8842"] * 3]
+        recs = {"digest_gpt_stand_in": runs("a", "short", 0.0, replies)}
+        row = next(r for r in build_report(prereg, recs, TEXTS.__getitem__)["kinds"])
+        self.assertEqual((row["answers"], row["answers_relaxed"]), ("2/4", "4/4"))
+        self.assertEqual(row["score"], 0.0)
+        self.assertGreater(row["score_relaxed"], 0.0)
+
+    def judged_report(self, decoys_accepted):
+        recs = records()
+        recs["haiku_digest"] = [r for p in TEXTS for r in runs(p, "short", 0.0, [["Dana Okonkwo"] * 3, ["?"] * 3])]
+        judged = {("haiku_digest", p, r): frozenset({"PR 8842"}) for p in TEXTS for r in range(3)}
+        return build_report(PREREG, recs, TEXTS.__getitem__, (judged, (decoys_accepted, 20)))
+
+    def test_a_judged_answer_counts_in_the_relaxed_view_only(self):
+        row = kind(self.judged_report(0), "haiku_digest", "prose")
+        self.assertEqual((row["answers"], row["answers_relaxed"]), ("2/4", "4/4"))
+
+    def test_a_judge_that_accepts_more_than_a_tenth_of_its_decoys_is_not_used(self):
+        built = self.judged_report(3)
+        self.assertEqual(kind(built, "haiku_digest", "prose")["answers_relaxed"], "2/4")
+        self.assertIn("decoy", " ".join(built["judge"]["void"]))
+
+    def test_a_judge_at_a_tenth_of_its_decoys_is_used(self):
+        built = self.judged_report(2)
+        self.assertEqual((built["judge"]["void"], kind(built, "haiku_digest", "prose")["answers_relaxed"]), ([], "4/4"))
+
+    def test_the_table_shows_the_relaxed_score_last(self):
+        built = report()
+        rules = next(line for line in _table(built["kinds"], "kind").splitlines()
+                     if line.startswith("| shipped_rules | build"))
+        self.assertEqual(rules.strip("|").split("|")[-1].strip(),
+                         str(kind(built, "shipped_rules", "build")["score_relaxed"]))
+
+
 class VoidTests(unittest.TestCase):
     def test_a_clean_run_stands(self):
         self.assertEqual(report()["void"], [])
@@ -170,6 +230,27 @@ class RunTests(unittest.TestCase):
 
             self.assertEqual((out / "haiku_digest.jsonl").read_text(encoding="utf-8"), fresh)
             self.assertEqual((out / "haiku_digest.digests.ndjson").read_text(encoding="utf-8"), fresh)
+
+    def test_each_haiku_candidate_names_itself_to_the_digest_runner_and_keeps_its_own_digests(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            out = Path("results")
+            seen = []
+
+            def runner(command, **kwargs):
+                if Path(command[1]).name == "claude_digest_runner.py":
+                    seen.append(command[2])
+                    kwargs["stdout"].write('{"output": "d", "latency_s": 1}\n')
+                else:
+                    self.assertEqual(Path(command[command.index("--outputs") + 1]).name,
+                                     "haiku_digest_checked.digests.ndjson")
+                return subprocess.CompletedProcess(command, 0)
+
+            with patch("harness._environment", return_value={}), patch("harness.load", return_value=PREREG), \
+                    patch("harness.subprocess.run", side_effect=runner):
+                run(["haiku_digest_checked"], out, 3)
+
+            self.assertEqual(seen, ["haiku_digest_checked"])
+            self.assertTrue((out / "haiku_digest_checked.digests.ndjson").exists())
 
 
 if __name__ == "__main__":

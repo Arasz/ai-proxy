@@ -23,6 +23,10 @@ class QaKeptTests(unittest.TestCase):
         replies = [["Dana Okonkwo", "UNKNOWN", "Bob"], ["PR 8842"] * 3]
         self.assertEqual(qa_kept(replies, QUESTIONS), 1)
 
+    def test_a_given_match_decides_what_counts(self):
+        replies = [["Dana"] * 3, ["PR 8842"] * 3]
+        self.assertEqual(qa_kept(replies, QUESTIONS, lambda reply, expected: expected.startswith(reply)), 2)
+
     def test_replies_must_cover_every_question(self):
         with self.assertRaises(ValueError):
             qa_kept([["Dana Okonkwo"] * 3], QUESTIONS)
@@ -73,6 +77,28 @@ class ExtractiveRowTests(unittest.TestCase):
                 ReducerRun("Dana Okonkwo PR 8842", 0.1),
                 ReducerRun("Dana Okonkwo", 0.1)]
         self.assertEqual(extractive_row(ORIGINAL, QUESTIONS, runs).measurement.answers_kept, 2)
+
+
+class MatchTests(unittest.TestCase):
+    def test_extractive_rows_use_the_given_match(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana; PR", 0.0)] * 3,
+                             match=lambda text, expected: expected.split()[0] in text)
+        self.assertEqual(row.measurement.answers_kept, 2)
+
+    def test_qa_rows_use_the_given_match(self):
+        row = qa_row(ORIGINAL, QUESTIONS, [QaRun("d", 1.0, [["Dana"] * 3, ["PR"] * 3])] * 3,
+                     match=lambda reply, expected: expected.startswith(reply))
+        self.assertEqual(row.measurement.answers_kept, 2)
+
+
+class JudgedTests(unittest.TestCase):
+    def test_a_judged_answer_is_kept_by_an_extractive_run(self):
+        row = extractive_row(ORIGINAL, QUESTIONS, [ReducerRun("Dana Okonkwo", 0.0, judged=frozenset({"PR 8842"}))] * 3)
+        self.assertEqual(row.measurement.answers_kept, 2)
+
+    def test_a_judged_answer_is_kept_by_a_reader_run(self):
+        run = QaRun("d", 1.0, [["Dana Okonkwo"] * 3, ["UNKNOWN"] * 3], judged=frozenset({"PR 8842"}))
+        self.assertEqual(qa_row(ORIGINAL, QUESTIONS, [run] * 3).measurement.answers_kept, 2)
 
 
 class QaRowTests(unittest.TestCase):
