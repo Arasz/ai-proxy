@@ -362,20 +362,198 @@ public class RequestCaptureTests : IDisposable
     }
 
     [Fact]
+    public async Task An_after_response_handler_added_once_the_proxy_runs_sees_the_response_row_already_written()
+    {
+        // The absence test below relies on this ordering: Titanium awaits AfterResponse handlers one after another.
+        var store = new RecordingCaptureStore { ResponseDelay = TimeSpan.FromMilliseconds(300) };
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await StartProxyAsync(capture: true, store: store);
+        var seen = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        proxy.Services.GetRequiredService<TitaniumProxyService>().Server.AfterResponse += (_, _) =>
+        {
+            seen.TrySetResult(store.Responses.Count);
+            return Task.CompletedTask;
+        };
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
+
+        Assert.Equal(1, await seen.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task A_request_whose_capture_failed_gets_no_response_row()
     {
         var store = new ThrowingCaptureStore();
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(capture: true, store: store);
+        var finished = 0;
+        proxy.Services.GetRequiredService<TitaniumProxyService>().Server.AfterResponse += (_, _) =>
+        {
+            Interlocked.Increment(ref finished);
+            return Task.CompletedTask;
+        };
 
         using var response = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
         await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         using var second = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
         await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        // The response row would be written just after the client has the response; give it the time to.
-        await Task.Delay(300, TestContext.Current.CancellationToken);
+        // This handler runs after the proxy's own, so once it has seen both exchanges the proxy is done with them.
+        await WaitForAsync(() => Volatile.Read(ref finished) >= 2 ? "done" : null);
 
         Assert.Equal(0, store.Responses);
+    }
+
+    [Fact]
+    public async Task An_error_status_still_gets_a_row_with_the_status_and_no_usage()
+    {
+        const string error = """{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}""";
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = static (_, context) =>
+        {
+            context.Response.StatusCode = 529;
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync(error);
+        };
+        await using var proxy = await StartProxyAsync(capture: true);
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
+
+        Assert.Equal(529, (int)response.StatusCode);
+        var row = Assert.Single(await ReadResponsesAsync(proxy));
+        Assert.Equal(529, row.Status);
+        Assert.Equal("no-usage", row.UsageError);
+        Assert.Equal((null, null, null, null), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
+        Assert.Equal(Encoding.UTF8.GetByteCount(error), row.ResponseBytes);
+    }
+
+    [Fact]
+    public async Task A_plain_event_stream_far_over_the_cap_still_gives_its_whole_usage()
+    {
+        var events = new StringBuilder(StreamStart);
+        while (events.Length < (5 * 1024 * 1024))
+        {
+            events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
+        }
+
+        var stream = Encoding.UTF8.GetBytes(events.Append(StreamEnd).ToString());
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = async (_, context) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            for (var offset = 0; offset < stream.Length; offset += 100_003)
+            {
+                await context.Response.Body.WriteAsync(stream.AsMemory(offset, Math.Min(100_003, stream.Length - offset)));
+                await context.Response.Body.FlushAsync();
+            }
+        };
+        await using var proxy = await StartProxyAsync(capture: true);
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m","stream":true}"""u8.ToArray());
+
+        Assert.Equal(stream, await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+        var row = Assert.Single(await ReadResponsesAsync(proxy));
+        Assert.Null(row.UsageError);
+        Assert.Equal((100L, 57L, 200L, 301L), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
+        Assert.Equal(stream.Length, row.ResponseBytes);
+    }
+
+    [Fact]
+    public async Task The_inspector_stages_hold_the_time_their_step_took()
+    {
+        var time = new FakeTimeProvider();
+        var store = new RecordingCaptureStore { OnRequest = () => time.Advance(TimeSpan.FromMilliseconds(5)) };
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = static (_, context) =>
+        {
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync(UsageMessage);
+        };
+        await using var proxy = await StartProxyAsync(capture: true, store: store, time: time);
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
+
+        var stages = (await WaitForAsync(() => store.Responses.FirstOrDefault())).Stages.ToDictionary(stage => stage.Name, stage => stage.Elapsed);
+        Assert.Equal(TimeSpan.Zero, stages["body-read"]);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), stages["capture-write"]);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), stages["inspector"]);
+        Assert.Equal(TimeSpan.Zero, stages["usage-read"]);
+    }
+
+    [Fact]
+    public async Task Titanium_times_the_wait_for_the_first_byte_apart_from_the_whole_exchange()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = static async (_, context) =>
+        {
+            await Task.Delay(300);
+            context.Response.ContentType = "text/event-stream";
+            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(StreamStart));
+            await context.Response.Body.FlushAsync();
+            await Task.Delay(300);
+            await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(StreamEnd));
+        };
+        await using var proxy = await StartProxyAsync(capture: true);
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m","stream":true}"""u8.ToArray());
+
+        var stages = Stages(Assert.Single(await ReadResponsesAsync(proxy)));
+        var (firstByte, total) = (stages["titanium.ttfb"], stages["titanium.total"]);
+        Assert.InRange(firstByte, 250_000, 10_000_000);
+        Assert.True(total - firstByte >= 250_000, $"ttfb {firstByte} us and total {total} us: the second write's wait is not in the total");
+        Assert.True(stages["inspector"] < firstByte, $"inspector {stages["inspector"]} us is not below ttfb {firstByte} us");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Only_capture_attaches_a_reader_to_the_response_stream(bool capture)
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await StartProxyAsync(capture: capture, compression: true);
+        var field = typeof(Titanium.Web.Proxy.EventArguments.SessionEventArgsBase).GetField("DataReceived", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var attached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        proxy.Services.GetRequiredService<TitaniumProxyService>().Server.BeforeResponse += (_, e) =>
+        {
+            attached.TrySetResult(field.GetValue(e) is not null);
+            return Task.CompletedTask;
+        };
+
+        using var response = await SendAsync(proxy, upstream, ToolResultBody());
+
+        Assert.Equal(capture, await attached.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task An_upstream_that_drops_the_stream_midway_leaves_a_row_with_what_passed()
+    {
+        var head = Encoding.UTF8.GetBytes(StreamStart + "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_to");
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = async (_, context) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            await context.Response.Body.WriteAsync(head);
+            await context.Response.Body.FlushAsync();
+            await Task.Delay(100);
+            context.Abort();
+        };
+        await using var proxy = await StartProxyAsync(capture: true);
+
+        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+        try
+        {
+            using var response = await client.PostAsync(new Uri(upstream.BaseAddress, "/v1/messages"), Json("""{"model":"m","stream":true}"""u8.ToArray()), TestContext.Current.CancellationToken);
+            await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            // Titanium leaves the client waiting until its own timeout, with capture off as well; the row is what is tested here.
+        }
+
+        var row = Assert.Single(await ReadResponsesAsync(proxy));
+        Assert.Equal(head.Length, row.ResponseBytes);
+        Assert.Equal((100L, 1L, 200L, 300L), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
+        Assert.Equal("truncated", row.UsageError);
     }
 
     private const string UsageMessage = """
@@ -443,7 +621,8 @@ public class RequestCaptureTests : IDisposable
     private static async Task<T> WaitForAsync<T>(Func<Task<T?>> probe)
         where T : class
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
         while (true)
         {
             T? value = null;
@@ -451,7 +630,7 @@ public class RequestCaptureTests : IDisposable
             {
                 value = await probe();
             }
-            catch (SqliteException) when (DateTime.UtcNow < deadline)
+            catch (SqliteException) when (!deadline.IsCancellationRequested)
             {
             }
 
@@ -460,8 +639,38 @@ public class RequestCaptureTests : IDisposable
                 return value;
             }
 
-            Assert.True(DateTime.UtcNow < deadline, "timed out waiting for the capture");
-            await Task.Delay(20, TestContext.Current.CancellationToken);
+            Assert.False(deadline.IsCancellationRequested, "timed out waiting for the capture");
+            try
+            {
+                await Task.Delay(20, deadline.Token);
+            }
+            catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+            }
+        }
+    }
+
+    /// <summary>Keeps what the proxy hands it in memory; can move a fake clock or stall, to time a step.</summary>
+    private sealed class RecordingCaptureStore : IRequestCaptureStore
+    {
+        private readonly ConcurrentQueue<CapturedResponse> _responses = new();
+
+        public Action? OnRequest { get; init; }
+
+        public TimeSpan ResponseDelay { get; init; }
+
+        public IReadOnlyCollection<CapturedResponse> Responses => _responses.ToArray();
+
+        public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken)
+        {
+            OnRequest?.Invoke();
+            return ValueTask.CompletedTask;
+        }
+
+        public async ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
+        {
+            await Task.Delay(ResponseDelay, cancellationToken);
+            _responses.Enqueue(response);
         }
     }
 

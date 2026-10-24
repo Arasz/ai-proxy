@@ -51,23 +51,46 @@ macOS the file is `0600` and its directory `0700`. Nothing removes old rows; del
 measurement is over. A failed write is logged as a warning and the request goes out regardless.
 
 Each captured request also gets one row of `capture_response`, under the same `request_id`, once
-its response has passed through. The row holds numbers only: the completion time, the status
-code, the request body size as sent and as forwarded, the response body size on the wire, the
-four token counts the provider reported (`input_tokens`, `output_tokens`,
-`cache_creation_input_tokens`, `cache_read_input_tokens`), and `stages`, a JSON object of how many
-microseconds each step took. The stages are the proxy's own (`body-read`, `capture-write`,
-`compression` and its `compression.*` steps, `set-body`, `inspector` for the whole request
-handling, `usage-read`) and Titanium's (`titanium.client-request-read`, `titanium.connection-wait`,
-`titanium.request-send`, `titanium.ttfb`, `titanium.response-delivery`, `titanium.total`).
+its response has passed through, whatever its status code. The row holds numbers only: the
+completion time, the status code, the request body size as sent and as forwarded, the response
+body size on the wire, the four token counts the provider reported (`input_tokens`,
+`output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`), and `stages`, a JSON
+object of how many microseconds each step took. The stages are the proxy's own (`body-read`,
+`capture-write`, `compression` and its `compression.*` steps, `set-body`, `usage-read`, and
+`inspector`, the whole request handling, which includes the steps before it) and Titanium's
+(`titanium.client-request-read`, `titanium.connection-wait`, `titanium.request-send`,
+`titanium.ttfb`, `titanium.response-delivery`, `titanium.total`).
+
+Usage is read for Anthropic only: from a JSON message's `usage`, or from an event stream's
+`message_start` and final `message_delta`. OpenAI's `prompt_tokens` and `completion_tokens` are not
+mapped, because OpenAI counts cached tokens inside its prompt count and Anthropic does not, so an
+OpenAI response gets `no-usage`.
 
 The response body is not stored, and neither are response headers. The proxy copies the body as
-it streams past to the client, never holding it back, reads the usage from it once the response
-is complete, then drops the copy. The usage is read from a JSON message or an Anthropic event
-stream, gzip, deflate or br encoded. When it cannot be read, the token counts are empty and
-`usage_error` says why: `over-cap` for a body over 4 MiB, `encoding:<name>` for an encoding the
-proxy does not decode, `decode-failed`, `malformed` or `no-usage`. A failed response write is
-logged as a warning and the response is relayed regardless. A `capture.db` from an earlier version
-keeps its rows and gains the new table on the next capture.
+it streams past to the client, never holding it back, reads the usage once the response is
+complete, then lets the copy go. A plain event stream keeps only its first and last 64 KiB, where
+the usage is, so a stream of any length is read; any other body, and an event stream that is
+gzip, deflate or br encoded, is kept whole up to 4 MiB and decoded up to 16 MiB. When the counts
+cannot be read they are empty and `usage_error` says why:
+
+| `usage_error` | Meaning |
+|---|---|
+| `over-cap` | The body was over 4 MiB as sent, or over 16 MiB decoded. |
+| `encoding:<name>` | The body used a content encoding the proxy does not decode. |
+| `decode-failed` | The body did not decode, or a gzip, zlib-deflate or br body was cut short. A raw-deflate body carries no trailer, so one cut short is read as far as it goes and usually comes out `malformed`. |
+| `malformed` | The body was not JSON, or a stream broke before any usage was read. |
+| `no-usage` | The body was readable and carried no Anthropic usage, such as an error response. |
+| `truncated` | A stream ended inside an event. The counts read before it are kept, so the output count may be the early one from `message_start`. |
+
+An upstream that drops a stream midway still gets a row, with the bytes that passed and
+`truncated` or the usage read so far. The client is left waiting until its own timeout in that
+case, with capture off as well; that is Titanium's handling of the dropped connection.
+
+The row is written once the client has the whole response, in Titanium's `AfterResponse` step.
+On a keep-alive connection that step can delay the next request on the same connection by one
+SQLite insert. A failed response write is logged as a warning and the response is relayed
+regardless. A `capture.db` from an earlier version keeps its rows and gains the new table on the
+next capture.
 
 ## Local health endpoint
 
