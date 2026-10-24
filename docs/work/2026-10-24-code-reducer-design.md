@@ -1,7 +1,7 @@
 # Design: an in-process code reducer with per-language lexers
 
 **Date:** 2026-10-24
-**Status:** proposed, waiting for owner approval
+**Status:** approved by owner on 2026-10-24. The [inactive C# core](2026-10-24-csharp-reducer-build.md) builds first; [runtime activation](2026-10-24-csharp-reducer-activation.md) follows CCR retrieval.
 **Goal:** take the code score from the shipped rules' 0.30 toward 0.6 without the agent losing the
 ability to edit what it read.
 

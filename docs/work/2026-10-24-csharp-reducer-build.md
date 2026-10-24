@@ -39,6 +39,10 @@ Expected output is hand-derived. Each behavior starts with a failing test and re
 | Singletons, keywords, strings and retained comments are not renamed | Rename all text occurrences |
 | Map and supplied hint count toward final size; equal/larger returns exact original | Compare code size alone |
 | Missing/unknown path never enables C# lossy steps | Sniff language from text |
+| Missing or empty hint returns exact original | Bypass public-entry hint guard |
+| Equal-size output or map overhead removes saving | Compare code-only size or use less-than-or-equal |
+| Global/static/alias/multiline usings are distinct from using declarations/statements | Drop using-prefixed lines |
+| Unsupported preprocessor or escaped identifier on numbered CRLF input bails out exactly | Rename escaped identifiers or normalize before bailout |
 | Adapter reaches actual reducer with both rename settings | Substitute spike regex or discard options |
 
 ## Activation and release remain deferred
