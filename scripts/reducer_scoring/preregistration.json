@@ -445,6 +445,7 @@
   "abstractive": {
    "candidates": [
     "haiku_digest",
+    "digest_gpt_stand_in",
     "summarizer_control",
     "identity"
    ],
@@ -486,6 +487,27 @@
    "reader_calls": "each reader call answers all of a payload's questions as a JSON array, in order; a reply that is not an array of the right length answers every question with nothing (a miss), and the raw reply is kept",
    "thinking": "reader at low effort; digest and summarizer with thinking off",
    "identity_runs": "identity's output is the payload itself, so its 3 runs differ only in the reader's replies"
+  },
+  {
+   "date": "2026-10-24",
+   "before_any_run": false,
+   "after": "the first full run of all six candidates had been seen; nothing already scored is re-scored",
+   "reason": "the owner made Haiku reachable through the Claude Code CLI, so the digest can run on its pre-registered model",
+   "models": {
+    "qa_reader": "openai/gpt-6.1-sol",
+    "qa_effort": "low",
+    "digest": "claude-haiku-5-5",
+    "digest_stand_in": "openai/gpt-6.1-sol",
+    "summarizer": "openai/gpt-6.1-sol"
+   },
+   "candidates": {
+    "haiku_digest": "the digest prompt on claude-haiku-5-5, one isolated `claude -p` call per payload and run, graded by the same QA reader",
+    "digest_gpt_stand_in": "the earlier stand-in rows, renamed from haiku_digest, unchanged"
+   },
+   "invocation": "claude -p --model claude-haiku-5-5 --tools '' --setting-sources '' --strict-mcp-config --no-session-persistence --output-format json, payload on stdin, proxy variables cleared",
+   "timing": {
+    "haiku_digest": "duration_api_ms from the claude -p result: the model's time without CLI startup; the process wall time is kept as wall_s"
+   }
   }
  ]
 }

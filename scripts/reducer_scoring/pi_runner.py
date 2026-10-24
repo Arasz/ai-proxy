@@ -18,14 +18,15 @@ READER_REPLIES = 3
 PARALLEL = 4
 FAILED_CALL = re.compile(r"^(OpenAI API error|Connection error|Error:)", re.IGNORECASE)
 
+DIGEST_SYSTEM = (
+    "You compress tool output for a coding agent that will act on it. Rewrite the output as short as "
+    "possible while keeping every fact the agent may need: names, identifiers, paths, numbers, versions, "
+    "error codes and messages, exactly as written. Reply with the compressed output only.")
 SYSTEMS = {
-    "haiku_digest": (
-        "You compress tool output for a coding agent that will act on it. Rewrite the output as short as "
-        "possible while keeping every fact the agent may need: names, identifiers, paths, numbers, versions, "
-        "error codes and messages, exactly as written. Reply with the compressed output only."),
+    "digest_gpt_stand_in": DIGEST_SYSTEM,
     "summarizer_control": "Summarize the text in at most two short sentences. Reply with the summary only.",
 }
-MODEL_ROLE = {"haiku_digest": "digest", "summarizer_control": "summarizer"}
+MODEL_ROLE = {"digest_gpt_stand_in": "digest_stand_in", "summarizer_control": "summarizer"}
 READER_SYSTEM = (
     "Answer questions using only the text you are given. Reply with a JSON array of strings, one answer "
     "per question, in order. Copy each answer exactly as it appears in the text. When the text does not "
@@ -67,20 +68,32 @@ def pi_call(model: str, system: str, prompt: str) -> tuple[str, float]:
     return reply, elapsed
 
 
+def supplied(path: str) -> dict[tuple[str, int], tuple[str, float]]:
+    """Outputs another runner produced, keyed by (payload, run), with that runner's latency."""
+    with open(path, encoding="utf-8") as lines:
+        records = [json.loads(line) for line in lines]
+    return {(r["payload"], r["run"]): (r["output"], r["latency_s"]) for r in records}
+
+
 def main() -> None:
     from preregistration import load, payload_text
 
     candidate, runs, names = sys.argv[1], int(sys.argv[2]), sys.argv[3:]
+    given = None
+    if names[:1] == ["--outputs"]:
+        given, names = supplied(names[1]), names[2:]
     prereg = load()
     models = prereg["amendments"][-1]["models"]
     reader = f"{models['qa_reader']}:{models['qa_effort']}"
-    reducer = None if candidate == "identity" else f"{models[MODEL_ROLE[candidate]]}:off"
+    reducer = None if candidate == "identity" or given else f"{models[MODEL_ROLE[candidate]]}:off"
 
     def one_run(job: tuple[str, int]) -> dict:
         name, run = job
         text = payload_text(name)
         questions = prereg["payloads"][name]["questions"]
-        if reducer is None:
+        if given is not None:
+            output, latency = given[(name, run)]
+        elif reducer is None:
             output, latency = text, 0.0
         else:
             output, latency = pi_call(reducer, SYSTEMS[candidate], text)

@@ -8,7 +8,7 @@ QUESTIONS = [{"q": "Who?", "a": "Dana Okonkwo"}, {"q": "PR?", "a": "PR 8842"}]
 PREREG = {
     "budget_s": 1.0, "budget_sensitivity_s": [0.5, 2.0], "retention_floor": 1.0, "runs": 3,
     "gates": {"extractive": {"candidates": ["shipped_rules"]},
-              "abstractive": {"candidates": ["haiku_digest", "summarizer_control", "identity"]}},
+              "abstractive": {"candidates": ["haiku_digest", "digest_gpt_stand_in", "summarizer_control", "identity"]}},
     "payloads": {
         "a": {"kind": "prose", "questions": QUESTIONS},
         "b": {"kind": "prose", "questions": QUESTIONS},
@@ -35,7 +35,7 @@ def records():
         # The summary still contains both answers word for word, but the reader misses them.
         "summarizer_control": [r for p in TEXTS for r in runs(p, KEPT, 2.0, NONE)],
         # The digest paraphrases both answers away, but the reader still finds them.
-        "haiku_digest": [r for p in TEXTS for r in runs(p, "Okonkwo (Dana), pull request 8842", 3.0, ALL)],
+        "digest_gpt_stand_in": [r for p in TEXTS for r in runs(p, "Okonkwo (Dana), pull request 8842", 3.0, ALL)],
     }
 
 
@@ -52,7 +52,7 @@ class GradingTests(unittest.TestCase):
         self.assertEqual(kind(report(), "shipped_rules", "prose")["retention"], 1.0)
 
     def test_the_digest_is_judged_by_the_reader_not_by_its_text(self):
-        self.assertEqual(kind(report(), "haiku_digest", "prose")["retention"], 1.0)
+        self.assertEqual(kind(report(), "digest_gpt_stand_in", "prose")["retention"], 1.0)
 
     def test_the_summarizer_is_judged_by_the_reader_not_by_its_text(self):
         self.assertEqual(kind(report(), "summarizer_control", "prose")["retention"], 0.0)
@@ -133,13 +133,13 @@ class TableTests(unittest.TestCase):
     def test_the_digest_row_is_labelled_a_stand_in_and_columns_are_in_order(self):
         built = report()
         table = _table(built["kinds"], "kind")
-        digest = next(line for line in table.splitlines() if line.startswith("| haiku_digest"))
+        digest = next(line for line in table.splitlines() if line.startswith("| digest_gpt_stand_in"))
         rules = next(line for line in table.splitlines() if line.startswith("| shipped_rules | build"))
         self.assertIn("(stand-in)", digest)
         cells = [c.strip() for c in rules.strip("|").split("|")]
         row = kind(built, "shipped_rules", "build")
         self.assertEqual(cells[2:4] + [cells[5]], [str(row["score"]), str(row["compression"]), str(row["retention"])])
-        self.assertTrue(kind(built, "haiku_digest", "prose")["stand_in"])
+        self.assertTrue(kind(built, "digest_gpt_stand_in", "prose")["stand_in"])
         self.assertFalse(row["stand_in"])
 
 

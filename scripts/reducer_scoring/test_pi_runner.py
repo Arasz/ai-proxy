@@ -1,6 +1,6 @@
 import unittest
 
-from pi_runner import parse_answers, qa_prompt
+from pi_runner import parse_answers, qa_prompt, supplied
 
 QUESTIONS = [{"q": "Who was on call?", "a": "Dana Okonkwo"}, {"q": "Which PR?", "a": "PR 8842"}]
 
@@ -12,6 +12,20 @@ class QaPromptTests(unittest.TestCase):
         self.assertIn("Which PR?", prompt)
         self.assertNotIn("Dana Okonkwo", prompt)
         self.assertNotIn("PR 8842", prompt)
+
+
+class SuppliedOutputsTests(unittest.TestCase):
+    def test_supplied_digests_are_keyed_by_payload_and_run(self):
+        import json
+        import os
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            for run in range(2):
+                f.write(json.dumps({"payload": "a", "run": run, "output": f"digest {run}", "latency_s": 1.5 + run}) + "\n")
+        try:
+            self.assertEqual(supplied(f.name), {("a", 0): ("digest 0", 1.5), ("a", 1): ("digest 1", 2.5)})
+        finally:
+            os.unlink(f.name)
 
 
 class ParseAnswersTests(unittest.TestCase):
