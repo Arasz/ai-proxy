@@ -142,28 +142,31 @@ public class ContentStoreTests : IDisposable
     [Fact]
     public async Task A_reader_is_never_locked_out_by_a_writer()
     {
-        // A reader does not take the write lock, so a request reading the store is never
-        // refused because the worker is writing. The writers are in the same test because
-        // they are what a reader has to be indifferent to.
-        var work = new List<Task>();
-        var readers = new List<Task>();
+        var record = Record();
+        await _store.PersistAsync(record, TestContext.Current.CancellationToken);
 
-        for (var index = 0; index < 10; index++)
+        await using var writer = ContentSchema.Open(_databasePath);
+        ContentSchema.Execute(writer, "BEGIN IMMEDIATE;");
+        try
         {
-            var requestId = $"request-{index}";
+            await writer.ExecuteAsync(
+                "UPDATE content_request SET original = @Original WHERE request_id = @RequestId;",
+                new { Original = "uncommitted change", record.RequestId });
 
-            work.Add(Task.Run(async () => await _store.PersistAsync(
-                Record() with { RequestId = requestId },
-                TestContext.Current.CancellationToken),
-                TestContext.Current.CancellationToken));
+            var whileWriting = await _store.GetAsync(record.RequestId, TestContext.Current.CancellationToken);
 
-            readers.Add(Task.Run(async () => await _store.GetAsync(requestId, TestContext.Current.CancellationToken),
-                TestContext.Current.CancellationToken));
+            Assert.NotNull(whileWriting);
+            Assert.Equal(record.Original, whileWriting.Original);
+            Assert.Equal("the compressed part", Assert.Single(whileWriting.Parts).Text);
+        }
+        finally
+        {
+            ContentSchema.Execute(writer, "ROLLBACK;");
         }
 
-        await Task.WhenAll(readers);
-
-        Assert.All(readers, reader => Assert.True(reader.IsCompletedSuccessfully));
+        var afterWriting = await _store.GetAsync(record.RequestId, TestContext.Current.CancellationToken);
+        Assert.NotNull(afterWriting);
+        Assert.Equal(record.Original, afterWriting.Original);
     }
 
     [Fact]
