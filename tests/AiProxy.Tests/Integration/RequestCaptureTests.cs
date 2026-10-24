@@ -403,6 +403,32 @@ public class RequestCaptureTests : IDisposable
         Assert.Equal(0, store.Responses);
     }
 
+    [Theory]
+    [InlineData(Dialect.OpenAi)]
+    [InlineData(Dialect.Gemini)]
+    public async Task Non_Anthropic_response_usage_is_not_recorded_as_Anthropic_tokens(Dialect dialect)
+    {
+        const string responseBody = """{"usage":{"input_tokens":100,"output_tokens":20,"input_tokens_details":{"cached_tokens":80}}}""";
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = static (_, context) =>
+        {
+            context.Response.ContentType = "application/json";
+            return context.Response.WriteAsync(responseBody);
+        };
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string> { ["PROXY_CAPTURE"] = "on" },
+            providerHosts: new LoopbackProviderHosts(dialect));
+
+        using var response = await SendAsync(proxy, upstream, """{"model":"m"}"""u8.ToArray());
+
+        Assert.Equal(responseBody, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(dialect.ToString(), Assert.Single(await ReadCapturesAsync(proxy)).Provider);
+        var row = Assert.Single(await ReadResponsesAsync(proxy));
+        Assert.Equal("no-usage", row.UsageError);
+        Assert.Equal((null, null, null, null), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
+        Assert.Equal(Encoding.UTF8.GetByteCount(responseBody), row.ResponseBytes);
+    }
+
     [Fact]
     public async Task An_error_status_still_gets_a_row_with_the_status_and_no_usage()
     {

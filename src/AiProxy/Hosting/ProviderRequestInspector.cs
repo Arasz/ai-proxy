@@ -64,7 +64,7 @@ public sealed partial class ProviderRequestInspector
         }
 
         var started = _time.GetTimestamp();
-        var exchange = new CapturedExchange();
+        var exchange = new CapturedExchange { Dialect = dialect };
         var captureId = Guid.NewGuid().ToString("N");
 
         var stage = _time.GetTimestamp();
@@ -130,9 +130,11 @@ public sealed partial class ProviderRequestInspector
         {
             var response = e.HttpClient.Response;
             var stage = _time.GetTimestamp();
-            var reading = kept.OverCap
-                ? new UsageReading(null, ResponseUsageReader.OverCap)
-                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+            var reading = exchange.Dialect != Dialect.Anthropic
+                ? new UsageReading(null, ResponseUsageReader.NoUsage)
+                : kept.OverCap
+                    ? new UsageReading(null, ResponseUsageReader.OverCap)
+                    : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
             exchange.Stages.Add("usage-read", _time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 

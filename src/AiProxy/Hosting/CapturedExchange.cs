@@ -1,4 +1,5 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Titanium.Web.Proxy.StreamExtended.Network;
 
@@ -7,6 +8,9 @@ namespace AiProxy.Hosting;
 /// <summary>What the inspector keeps about one exchange between BeforeRequest and AfterResponse.</summary>
 internal sealed class CapturedExchange
 {
+    /// <summary>The provider dialect identified from the request host.</summary>
+    public required Dialect Dialect { get; init; }
+
     /// <summary>The handle of the original content when compression stored the request.</summary>
     public string? ContentId { get; set; }
 
