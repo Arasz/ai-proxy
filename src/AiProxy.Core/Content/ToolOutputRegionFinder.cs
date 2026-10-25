@@ -21,22 +21,22 @@ public sealed class ToolOutputRegionFinder
             return [];
         }
 
-        var (indexes, documentCount) = FindToolOutputIndexes(body.Span);
-        if (indexes.Count == 0)
+        var found = FindToolOutputIndexes(body.Span);
+        if (found.Indexes.Count == 0)
         {
             return [];
         }
 
-        var (regions, tokenCount) = FindRegions(body.Span, indexes);
+        var (regions, tokenCount) = FindRegions(body.Span, found.Indexes);
 
         // The two passes count the string values of the body in the same order, with the
         // same parser, so the counts agree unless one of them stopped early. A reader
         // that saw MORE strings than the document has would mean the two disagree about
         // the order, and a region found by position would then be the wrong region.
-        return tokenCount > documentCount ? [] : regions;
+        return tokenCount > found.Count ? [] : regions;
     }
 
-    private static (Dictionary<int, FileRead?> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
+    private static ToolOutputIndexes FindToolOutputIndexes(ReadOnlySpan<byte> body)
     {
         var indexes = new Dictionary<int, FileRead?>();
 
@@ -47,81 +47,77 @@ public sealed class ToolOutputRegionFinder
         }
         catch (JsonException)
         {
-            return (indexes, 0);
+            return new ToolOutputIndexes(indexes, 0);
         }
 
         using (document)
         {
-            var counter = 0;
             var files = ToolCallFiles.Collect(document.RootElement);
-            Walk(document.RootElement, ref counter, indexes, files);
-            return (indexes, counter);
+            var count = Walk(document.RootElement, 0, indexes, files);
+            return new ToolOutputIndexes(indexes, count);
         }
     }
 
-    private static void Walk(JsonElement element, ref int counter, Dictionary<int, FileRead?> indexes, ToolCallFiles files)
+    /// <summary>Walks the element and returns the counter after its last string.</summary>
+    private static int Walk(JsonElement element, int counter, Dictionary<int, FileRead?> indexes, ToolCallFiles files)
     {
         switch (element.ValueKind)
         {
             case JsonValueKind.String:
-                counter++;
-                break;
+                return counter + 1;
 
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
                 {
-                    if (IsToolOutputProperty(element, property))
-                    {
-                        WalkToolOutput(property.Value, ref counter, indexes, files, files.ReadFor(element));
-                        continue;
-                    }
-
-                    Walk(property.Value, ref counter, indexes, files);
+                    counter = IsToolOutputProperty(element, property)
+                        ? WalkToolOutput(property.Value, counter, indexes, files, files.ReadFor(element))
+                        : Walk(property.Value, counter, indexes, files);
                 }
 
-                break;
+                return counter;
 
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
                 {
-                    Walk(item, ref counter, indexes, files);
+                    counter = Walk(item, counter, indexes, files);
                 }
 
-                break;
+                return counter;
 
             default:
-                break;
+                return counter;
         }
     }
 
-    private static void WalkToolOutput(
+    private static int WalkToolOutput(
         JsonElement value,
-        ref int counter,
+        int counter,
         Dictionary<int, FileRead?> indexes,
         ToolCallFiles files,
         FileRead? path)
     {
         // A path names one whole file, so an output that spans more than one string keeps none.
-        var first = counter;
         var before = indexes.Count;
-        WalkToolOutputStrings(value, ref counter, indexes, files, path);
+        var next = WalkToolOutputStrings(value, counter, indexes, files, path);
         if (path is null || indexes.Count - before <= 1)
         {
-            return;
+            return next;
         }
 
-        for (var index = first; index < counter; index++)
+        for (var index = counter; index < next; index++)
         {
             if (indexes.ContainsKey(index))
             {
                 indexes[index] = null;
             }
         }
+
+        return next;
     }
 
-    private static void WalkToolOutputStrings(
+    private static int WalkToolOutputStrings(
         JsonElement value,
-        ref int counter,
+        int counter,
         Dictionary<int, FileRead?> indexes,
         ToolCallFiles files,
         FileRead? path)
@@ -130,15 +126,14 @@ public sealed class ToolOutputRegionFinder
         {
             case JsonValueKind.String:
                 indexes[counter] = path;
-                counter++;
-                break;
+                return counter + 1;
 
             case JsonValueKind.Array:
                 foreach (var item in value.EnumerateArray())
                 {
                     if (item.ValueKind != JsonValueKind.Object)
                     {
-                        Walk(item, ref counter, indexes, files);
+                        counter = Walk(item, counter, indexes, files);
                         continue;
                     }
 
@@ -151,11 +146,11 @@ public sealed class ToolOutputRegionFinder
                             continue;
                         }
 
-                        Walk(property.Value, ref counter, indexes, files);
+                        counter = Walk(property.Value, counter, indexes, files);
                     }
                 }
 
-                break;
+                return counter;
 
             case JsonValueKind.Object:
                 foreach (var property in value.EnumerateObject())
@@ -168,38 +163,28 @@ public sealed class ToolOutputRegionFinder
                         continue;
                     }
 
-                    if (property.Value.ValueKind == JsonValueKind.Object)
-                    {
-                        WalkToolOutputStrings(property.Value, ref counter, indexes, files, path);
-                        continue;
-                    }
-
-                    Walk(property.Value, ref counter, indexes, files);
+                    counter = property.Value.ValueKind == JsonValueKind.Object
+                        ? WalkToolOutputStrings(property.Value, counter, indexes, files, path)
+                        : Walk(property.Value, counter, indexes, files);
                 }
 
-                break;
+                return counter;
 
             default:
-                break;
+                return counter;
         }
     }
 
     private static bool IsToolOutputProperty(JsonElement parent, JsonProperty property)
     {
         var type = GetString(parent, "type");
-        var role = GetString(parent, "role");
 
-        if ((type == "tool_result" || role == "tool") && property.NameEquals("content"))
+        return type switch
         {
-            return property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array;
-        }
-
-        if (type == "function_call_output" && property.NameEquals("output"))
-        {
-            return property.Value.ValueKind == JsonValueKind.String;
-        }
-
-        return property.NameEquals("functionResponse") && property.Value.ValueKind == JsonValueKind.Object;
+            "tool_result" or "tool" when property.NameEquals("content") => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array,
+            "function_call_output" when property.NameEquals("output") => property.Value.ValueKind == JsonValueKind.String,
+            _ => property.NameEquals("functionResponse") && property.Value.ValueKind == JsonValueKind.Object
+        };
     }
 
     private static string? GetString(JsonElement element, string name) =>
@@ -242,18 +227,17 @@ public sealed class ToolOutputRegionFinder
         {
             var current = body[index];
 
-            if (current == (byte)'\\')
+            switch (current)
             {
-                index += 2;
-                continue;
+                case (byte)'\\':
+                    index += 2;
+                    continue;
+                case (byte)'"':
+                    return index + 1;
+                default:
+                    index++;
+                    break;
             }
-
-            if (current == (byte)'"')
-            {
-                return index + 1;
-            }
-
-            index++;
         }
 
         return body.Length;
