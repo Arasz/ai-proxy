@@ -256,6 +256,74 @@ public sealed class ToolOutputFilePathTests
     }
 
     [Fact]
+    public void A_result_marked_as_an_error_carries_no_path()
+    {
+        var body = AnthropicBody(
+            AnthropicCall("call-a", """{"file_path":"src/A.cs"}"""),
+            """{"type":"tool_result","tool_use_id":"call-a","is_error":true,"content":"File does not exist."}""");
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_gemini_function_response_carries_no_path_because_it_has_no_call_id()
+    {
+        var body = """
+            {"contents":[
+              {"role":"model","parts":[{"functionCall":{"name":"read_file","args":{"path":"src/A.cs"}}}]},
+              {"role":"user","parts":[{"functionResponse":{"name":"read_file","response":{"output":"content"}}}]}]}
+            """;
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_lone_surrogate_in_another_call_leaves_the_other_paths_resolved()
+    {
+        var body = """
+            {"messages":[
+              {"role":"assistant","tool_calls":[
+                {"id":"call-x","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"x\ud800y\"}"}},
+                {"id":"call-\ud800","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/B.cs\"}"}},
+                {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}}]},
+              {"role":"tool","tool_call_id":"call-a","content":"content of a"}]}
+            """;
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Theory]
+    [InlineData("Read")]
+    [InlineData("read")]
+    [InlineData("read_file")]
+    [InlineData("read_text_file")]
+    [InlineData("readFile")]
+    [InlineData("ReadFile")]
+    [InlineData("mcp__filesystem__read_file")]
+    public void A_tool_named_as_a_read_carries_its_path(string name)
+    {
+        var body = AnthropicBody(
+            $$$"""{"type":"tool_use","id":"call-a","name":"{{{name}}}","input":{"path":"src/A.cs"}}""",
+            AnthropicResult("call-a", "content"));
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Theory]
+    [InlineData("thread")]
+    [InlineData("spreadsheet")]
+    [InlineData("reader_mode")]
+    [InlineData("unread")]
+    public void A_tool_whose_name_only_contains_read_carries_no_path(string name)
+    {
+        var body = AnthropicBody(
+            $$$"""{"type":"tool_use","id":"call-a","name":"{{{name}}}","input":{"path":"src/A.cs"}}""",
+            AnthropicResult("call-a", "content"));
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
     public void A_call_that_is_not_a_read_carries_no_path()
     {
         var body = AnthropicBody(

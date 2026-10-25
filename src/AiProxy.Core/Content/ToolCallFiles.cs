@@ -9,7 +9,7 @@ namespace AiProxy.Core.Content;
 /// </remarks>
 internal sealed class ToolCallFiles
 {
-    private static readonly string[] PathKeys = ["file_path", "path", "filePath"];
+    private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal) { "file_path", "path", "filePath" };
 
     private readonly Dictionary<string, FileRead?> _calls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);
@@ -28,7 +28,8 @@ internal sealed class ToolCallFiles
     public FileRead? ReadFor(JsonElement result)
     {
         var id = ResultId(result);
-        if (id is null || _results.GetValueOrDefault(id) != 1)
+        if (id is null || _results.GetValueOrDefault(id) != 1 ||
+            (result.TryGetProperty("is_error", out var error) && error.ValueKind == JsonValueKind.True))
         {
             return null;
         }
@@ -130,7 +131,7 @@ internal sealed class ToolCallFiles
 
     private static FileRead? PathOf(string? name, string? arguments)
     {
-        if (arguments is null)
+        if (!IsReadName(name) || arguments is null)
         {
             return null;
         }
@@ -148,8 +149,7 @@ internal sealed class ToolCallFiles
 
     private static FileRead? PathOf(string? name, JsonElement input)
     {
-        if (name is null || !name.Contains("read", StringComparison.OrdinalIgnoreCase) ||
-            input.ValueKind != JsonValueKind.Object)
+        if (!IsReadName(name) || input.ValueKind != JsonValueKind.Object)
         {
             return null;
         }
@@ -159,10 +159,10 @@ internal sealed class ToolCallFiles
         var allowLarge = false;
         foreach (var property in input.EnumerateObject())
         {
-            if (PathKeys.Contains(property.Name, StringComparer.Ordinal) && property.Value.ValueKind == JsonValueKind.String)
+            if (PathKeys.Contains(property.Name) && property.Value.ValueKind == JsonValueKind.String)
             {
                 paths++;
-                path = property.Value.GetString();
+                path = ReadString(property.Value);
             }
             else if (property.NameEquals("allow_large") && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
@@ -177,8 +177,52 @@ internal sealed class ToolCallFiles
         return paths == 1 && !string.IsNullOrWhiteSpace(path) ? new FileRead(path, allowLarge) : null;
     }
 
+    /// <summary>Whether one segment of the name is "read": Read, read_file, readFile, but not thread.</summary>
+    private static bool IsReadName(string? name)
+    {
+        if (name is null)
+        {
+            return false;
+        }
+
+        var start = 0;
+        for (var index = 1; index <= name.Length; index++)
+        {
+            var ends = index == name.Length ||
+                       !char.IsLetterOrDigit(name[index]) ||
+                       (char.IsUpper(name[index]) && char.IsLower(name[index - 1]));
+            if (!ends)
+            {
+                continue;
+            }
+
+            if (name.AsSpan(start, index - start).Equals("read", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            start = index < name.Length && !char.IsLetterOrDigit(name[index]) ? index + 1 : index;
+        }
+
+        return false;
+    }
+
     private static string? GetString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
+            ? ReadString(value)
             : null;
+
+    // A string that does not transcode, such as a lone surrogate, is a value this class cannot
+    // trust, so it reads as absent and the call it belongs to keeps no path.
+    private static string? ReadString(JsonElement value)
+    {
+        try
+        {
+            return value.GetString();
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
 }
