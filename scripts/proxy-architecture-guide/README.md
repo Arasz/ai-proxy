@@ -1,8 +1,8 @@
 # Proxy architecture guide
 
 Interactive research snapshot for 2026-10-25. Runtime source is pinned to
-`c2cce0cf754ef84e6318305fedd8c087881ff65c`. Eleven exported plans include
-one new local draft and one locally updated export; those two carry embedded
+`c2cce0cf754ef84e6318305fedd8c087881ff65c`. Twelve exported plans include
+local drafts and locally updated exports; those carry embedded
 source text and SHA-256 rather than a link claiming they existed at that commit.
 
 Open [the standalone guide](../../docs/work/2026-10-25-proxy-architecture-guide.html).
