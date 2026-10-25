@@ -11,6 +11,7 @@ Active records:
 | File | What it is |
 |---|---|
 | [2026-10-25-ccr-core.md](2026-10-25-ccr-core.md) | Inactive CCR preview and retrieval core, provisional settings, parent graph and review evidence. |
+| [2026-10-25-ccr-runtime-plan.md](2026-10-25-ccr-runtime-plan.md) | CCR runtime implementation plan: evidence, scope, shape, steps and gates for the in-request retrieval loop. |
 | [2026-10-25-ccr-design-feedback.md](2026-10-25-ccr-design-feedback.md) | Owner responses to the CCR design gate, including settings that must be reconciled before activation. |
 | [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
 | [2026-10-24-untouched-payloads.md](2026-10-24-untouched-payloads.md) | Research record: why five over-minimum payloads came out unchanged. The JSON reducer made compact JSON longer by escaping `'` (fixed); MSBuild logs have no kind and go to the prose reducer; Markdown and prose reducers are lossless by design; per-fragment minimums skip most of a long document. Five findings, all measured. |
