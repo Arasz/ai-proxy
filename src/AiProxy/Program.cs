@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using AiProxy;
+using AiProxy.Cli;
 using AiProxy.Hosting;
+using AiProxy.Mcp;
 using Titanium.Web.Proxy.Network;
 
 if (GuardCommand.IsRequested(args))
@@ -13,6 +15,16 @@ if (GuardCommand.IsRequested(args))
     CertificateManager.SuppressInteractiveRootStoreMutations = true;
     using var input = new StreamReader(Console.OpenStandardInput());
     return new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, TimeSpan.FromSeconds(5)).Run(input);
+}
+
+if (args is [CliProcess.Command, ..])
+{
+    return await new CliProcess().RunAsync(args);
+}
+
+if (args is [McpServerProcess.Command, .. var options])
+{
+    return await new McpServerProcess().RunAsync(options);
 }
 
 var builder = WebApplication.CreateBuilder(args);

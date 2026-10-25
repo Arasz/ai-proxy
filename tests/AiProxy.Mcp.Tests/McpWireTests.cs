@@ -144,7 +144,8 @@ internal sealed class McpProcess : IAsyncDisposable
     public McpProcess(string endpoint)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "mcp", "AiProxy.Mcp.dll"));
+        start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
+        start.ArgumentList.Add("mcp");
         start.ArgumentList.Add("--endpoint");
         start.ArgumentList.Add(endpoint);
         _process = Process.Start(start)!;

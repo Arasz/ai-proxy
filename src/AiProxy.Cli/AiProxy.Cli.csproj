@@ -1,14 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <OutputType>Exe</OutputType>
-    <PackAsTool>true</PackAsTool>
-    <PackageId>ai-proxy-cli</PackageId>
-    <ToolCommandName>ai-proxy-cli</ToolCommandName>
-    <Description>Spectre terminal views of ai-proxy statistics.</Description>
-    <Authors>Rafał Araszkiewicz</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/Arasz/ai-proxy</RepositoryUrl>
+    <TargetFramework>net10.0</TargetFramework><IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../AiProxy.Client/AiProxy.Client.csproj" />
