@@ -10,6 +10,8 @@ Active records:
 
 | File | What it is |
 |---|---|
+| [2026-10-25-forward-proxy-test-port.md](2026-10-25-forward-proxy-test-port.md) | Deterministic reproduction and fix for the forward-proxy fixture's listener port race. |
+| [2026-10-25-ccr-design-feedback.md](2026-10-25-ccr-design-feedback.md) | Owner responses to the CCR design gate, including settings that must be reconciled before activation. |
 | [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md) | Historical reverse-proxy plan, superseded by ADR 0003's machine-wide forward-proxy design. |
 | [2026-10-24-untouched-payloads.md](2026-10-24-untouched-payloads.md) | Research record: why five over-minimum payloads came out unchanged. The JSON reducer made compact JSON longer by escaping `'` (fixed); MSBuild logs have no kind and go to the prose reducer; Markdown and prose reducers are lossless by design; per-fragment minimums skip most of a long document. Five findings, all measured. |
 | [2026-10-24-provider-cache-strategies.md](2026-10-24-provider-cache-strategies.md) | Research record: how Anthropic, OpenAI (with regional hosts), Gemini and OpenRouter key, price and invalidate their prompt caches, and the per-provider rule for what the compressor may rewrite, where, when, and who owns the cache markers. Reads cost 0.05x to 0.1x of input and writes 1.25x to 2.5x where charged; one conflict with the thread-billing record (the changing billing header). Includes the universal fallback and the refusal tests. Fourteen findings — 9 read, 4 inferred, 1 unverified. |

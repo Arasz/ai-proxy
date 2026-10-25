@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,6 +8,35 @@ namespace AiProxy.Tests.Integration;
 
 public sealed class ForwardProxyTests
 {
+    [Fact]
+    public async Task A_listener_started_before_proxy_binding_cannot_claim_the_proxy_port()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        TcpListener? competingListener = null;
+        try
+        {
+            await using var proxy = await TestProxy.StartAsync(port =>
+            {
+                competingListener = new TcpListener(IPAddress.Loopback, port);
+                competingListener.Start();
+            });
+            using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.Address), UseProxy = true };
+            using var client = new HttpClient(handler);
+
+            using var response = await client.GetAsync(new Uri(upstream.BaseAddress, "/competing-startup"), TestContext.Current.CancellationToken);
+
+            Assert.InRange(proxy.Address.Port, 1, 65535);
+            Assert.NotEqual(((IPEndPoint)competingListener!.LocalEndpoint).Port, proxy.Address.Port);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("upstream ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.Equal("/competing-startup", Assert.Single(upstream.Requests).Path);
+        }
+        finally
+        {
+            competingListener?.Stop();
+        }
+    }
+
     [Fact]
     public async Task An_unknown_http_destination_passes_through_with_its_request_and_response()
     {
@@ -34,40 +64,49 @@ public sealed class ForwardProxyTests
         Assert.False(received.Headers.ContainsKey("via"));
     }
 
-    private sealed class TestProxy : IAsyncDisposable
+    private sealed class TestProxy(TitaniumProxyService service, TemporaryDirectory directory) : IAsyncDisposable
     {
-        private readonly TitaniumProxyService _service;
-        private readonly TemporaryDirectory _directory;
+        public Uri Address => new($"http://127.0.0.1:{service.EndPoints.Single().Port}");
 
-        private TestProxy(TitaniumProxyService service, TemporaryDirectory directory)
+        public static async Task<TestProxy> StartAsync(Action<int>? beforeBind = null)
         {
-            _service = service;
-            _directory = directory;
-        }
-
-        public Uri Address => _service.Address;
-
-        public static async Task<TestProxy> StartAsync()
-        {
-            var portListener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-            portListener.Start();
-            var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
-            portListener.Stop();
+            beforeBind?.Invoke(0);
             var directory = new TemporaryDirectory();
             var service = new TitaniumProxyService(
-                new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
+                new ProxyRuntimeOptions(IPAddress.Loopback, 0, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
                 new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
                 new CanonicalProviderHosts(),
                 NullLoggerFactory.Instance);
-            await service.StartAsync(TestContext.Current.CancellationToken);
-            return new TestProxy(service, directory);
+            try
+            {
+                await service.StartAsync(TestContext.Current.CancellationToken);
+                return new TestProxy(service, directory);
+            }
+            catch
+            {
+                try
+                {
+                    await service.DisposeAsync();
+                }
+                finally
+                {
+                    directory.Dispose();
+                }
+
+                throw;
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
-            await _service.StopAsync(CancellationToken.None);
-            await _service.DisposeAsync();
-            _directory.Dispose();
+            try
+            {
+                await service.DisposeAsync();
+            }
+            finally
+            {
+                directory.Dispose();
+            }
         }
     }
 }
