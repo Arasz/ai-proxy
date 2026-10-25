@@ -23,6 +23,6 @@ public sealed class CompressionExecutor : ICompressionExecutor
         var handled = await route.Handler.HandleAsync(part, cancellationToken).ConfigureAwait(false);
         var ratio = part.Text.Length == 0 ? 1.0 : (double)handled.Text.Length / part.Text.Length;
 
-        return new CompressedPart(part.ChunkId, part.Type, handled.Text, part.Text, handled.Path, ratio);
+        return new CompressedPart(part.ChunkId, part.Type, handled.Text, part.Text, handled.Path, ratio, handled.RetrievalId);
     }
 }

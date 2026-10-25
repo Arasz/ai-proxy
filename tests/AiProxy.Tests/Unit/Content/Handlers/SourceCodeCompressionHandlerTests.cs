@@ -20,6 +20,7 @@ public sealed class SourceCodeCompressionHandlerTests
         var result = await Handler.HandleAsync(Part(Source, "/repo/src/Example.cs"), CancellationToken.None);
 
         Assert.Equal(SourceCodeCompressionHandler.CodeViewPath, result.Path);
+        Assert.Equal(CcrView.IdOf(Source), result.RetrievalId);
         Assert.EndsWith(CcrView.Hint(CcrView.IdOf(Source)), result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("A long comment", result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("using System", result.Text, StringComparison.Ordinal);

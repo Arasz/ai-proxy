@@ -10,7 +10,7 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
     /// <summary>The path this handler reports when it drops blank lines.</summary>
     public const string HandlerPath = "sourcecode.blank-lines";
 
-    /// <summary>The path this handler reports when it sends a code view; the pipeline keeps the original of every part on it.</summary>
+    /// <summary>The path this handler reports when it sends a code view.</summary>
     public const string CodeViewPath = "sourcecode.code-view";
 
     private readonly ICodeLexer[] _lexers = lexers.ToArray();
@@ -31,8 +31,9 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
             return null;
         }
 
-        var view = new CodeReducer(lexer).Reduce(part.Text, part.FilePath, new CodeReductionOptions(), CcrView.Hint(CcrView.IdOf(part.Text)));
-        return view.Changed ? new HandledContent(view.Text, CodeViewPath) : null;
+        var id = CcrView.IdOf(part.Text);
+        var view = new CodeReducer(lexer).Reduce(part.Text, part.FilePath, new CodeReductionOptions(), CcrView.Hint(id));
+        return view.Changed ? new HandledContent(view.Text, CodeViewPath, id) : null;
     }
 
     private static string WithoutBlankLines(string text)

@@ -30,25 +30,24 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
             return preview;
         }
 
-        await KeepAsync(original, mode, cancellationToken).ConfigureAwait(false);
+        await KeepAsync(preview.Id, original, mode, cancellationToken).ConfigureAwait(false);
         return preview;
     }
 
-    /// <summary>Returns the id the original is retrieved by, keeping it in the store first when the mode is a thread; throws when it could not be kept.</summary>
+    /// <summary>Keeps the original under its id in the store when the mode is a thread; throws when it could not be kept.</summary>
+    /// <param name="id">The id the sent text names.</param>
     /// <param name="original">The text as the client sent it.</param>
     /// <param name="mode">The request's CCR mode; stateless originals travel with the request instead.</param>
     /// <param name="cancellationToken">The request's token.</param>
-    public async ValueTask<string> KeepAsync(string original, CcrMode mode, CancellationToken cancellationToken)
+    public async ValueTask KeepAsync(string id, string original, CcrMode mode, CancellationToken cancellationToken)
     {
-        var id = CcrView.IdOf(original);
         if (mode != CcrMode.Thread)
         {
-            return id;
+            return;
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(KeepTimeout);
         await store.KeepAsync(new KeptOriginal(id, original, CcrText.LinesOf(original).Length), timeout.Token).ConfigureAwait(false);
-        return id;
     }
 }

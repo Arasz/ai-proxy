@@ -11,5 +11,5 @@ public static class CcrView
 
     /// <summary>The hint line for a view whose original is kept under <paramref name="id"/>.</summary>
     public static string Hint(string id) =>
-        CcrText.Invariant($"{Marker}{id}: comments and imports removed. Call proxy_retrieve with this id for the exact file.]");
+        CcrText.Invariant($"{Marker}{id}: comments and imports removed. Call proxy_retrieve with this id for the exact text.]");
 }

@@ -3,7 +3,6 @@ using System.Text.Json;
 using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content.Ccr;
-using AiProxy.Core.Content.Handlers;
 
 namespace AiProxy.Core.Content;
 
@@ -35,7 +34,7 @@ public sealed class ContentCompressionPipeline(
     /// <summary>The chunk id a failed CCR keep is reported under, since it belongs to a region rather than a part.</summary>
     public const int RegionChunkId = -1;
 
-    /// <summary>The path a failure is reported under when a code view's original could not be kept, so the region went out unchanged.</summary>
+    /// <summary>The path a failure is reported under when a part's original could not be kept for retrieval, so its region went out unchanged.</summary>
     public const string OriginalNotKeptPath = "ccr.original-not-kept";
 
     /// <inheritdoc />
@@ -201,7 +200,7 @@ public sealed class ContentCompressionPipeline(
         }
     }
 
-    /// <summary>Keeps the original of every code view under the id its hint names; false when one could not be kept.</summary>
+    /// <summary>Keeps the original of every part that names a retrieval id, under that id; false when one could not be kept.</summary>
     private async ValueTask<bool> KeepViewsAsync(
         IReadOnlyList<CompressedPart> reduced,
         CcrMode mode,
@@ -209,11 +208,17 @@ public sealed class ContentCompressionPipeline(
         List<PartFailure> failures,
         CancellationToken cancellationToken)
     {
-        foreach (var part in reduced.Where(static part => part.Path == SourceCodeCompressionHandler.CodeViewPath))
+        foreach (var part in reduced)
         {
+            if (part.RetrievalId is not { } id)
+            {
+                continue;
+            }
+
             try
             {
-                originals[await previewer.KeepAsync(part.OriginalText, mode, cancellationToken).ConfigureAwait(false)] = part.OriginalText;
+                await previewer.KeepAsync(id, part.OriginalText, mode, cancellationToken).ConfigureAwait(false);
+                originals[id] = part.OriginalText;
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
