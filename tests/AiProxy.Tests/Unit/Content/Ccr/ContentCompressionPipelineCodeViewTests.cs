@@ -38,7 +38,7 @@ public sealed class ContentCompressionPipelineCodeViewTests
     private static ContentCompressionPipeline Build(MemoryOriginalStore store) => new(
         new ToolOutputRegionFinder(),
         new ContentDecompositor(),
-        new CompressionExecutor(new ContentRouter([new SourceCodeCompressionHandler([new CSharpCodeLexer()])], new PassThroughCompressionHandler())),
+        new CompressionExecutor(new ContentRouter([new SourceCodeCompressionHandler([new CSharpCodeLexer(), new JavaScriptCodeLexer()])], new PassThroughCompressionHandler())),
         new ContentCompositor(),
         new NullContentStore(),
         CompressionOptions.WithMinimum(1),
@@ -125,6 +125,18 @@ public sealed class ContentCompressionPipelineCodeViewTests
         var (id, original) = Assert.Single(result.Originals);
         Assert.Equal(CcrView.IdOf(large), id);
         Assert.Equal(large, original);
+    }
+
+    [Fact]
+    public async Task A_jsx_file_read_by_a_tool_call_goes_out_as_its_view()
+    {
+        const string jsx =
+            "import React from \"react\";\nimport { useState } from \"react\";\n\n// A comment long enough that the view, hint included, is smaller than the file.\nexport function Counter() {\n    const [count, setCount] = useState(0); // the state the model reads\n    return <button onClick={() => setCount(count + 1)}>{count}</button>;\n}\n";
+
+        var result = await CompressAsync(new MemoryOriginalStore(), CcrMode.Stateless, new ReadFile("src/Counter.jsx", jsx));
+
+        Assert.EndsWith(CcrView.Hint(CcrView.IdOf(jsx)), ToolResults(result)[0], StringComparison.Ordinal);
+        Assert.Equal(jsx, result.Originals[CcrView.IdOf(jsx)]);
     }
 
     [Fact]

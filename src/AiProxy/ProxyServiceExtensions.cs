@@ -116,6 +116,8 @@ public static partial class ProxyServiceExtensions
             {
                 services.AddSingleton<ICodeLexer, CSharpCodeLexer>();
                 services.AddSingleton<ICodeLexer>(static _ => new PythonCodeLexer());
+                services.AddSingleton<ICodeLexer>(static _ => new JavaScriptCodeLexer());
+                services.AddSingleton<ICodeLexer>(static _ => new TypeScriptCodeLexer());
             }
 
             services.AddSingleton<ICompressionHandler, SourceCodeCompressionHandler>();
