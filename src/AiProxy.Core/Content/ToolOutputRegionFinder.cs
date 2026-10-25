@@ -126,29 +126,12 @@ public sealed class ToolOutputRegionFinder
         switch (value.ValueKind)
         {
             case JsonValueKind.String:
-                indexes[counter] = path;
-                return counter + 1;
+                return Record(counter, indexes, path);
 
             case JsonValueKind.Array:
                 foreach (var item in value.EnumerateArray())
                 {
-                    if (item.ValueKind != JsonValueKind.Object)
-                    {
-                        counter = Walk(item, counter, indexes, files);
-                        continue;
-                    }
-
-                    foreach (var property in item.EnumerateObject())
-                    {
-                        if (property.NameEquals(ToolCallJson.Text) &&property.Value.ValueKind == JsonValueKind.String)
-                        {
-                            indexes[counter] = path;
-                            counter++;
-                            continue;
-                        }
-
-                        counter = Walk(property.Value, counter, indexes, files);
-                    }
+                    counter = WalkContentBlock(item, counter, indexes, files, path);
                 }
 
                 return counter;
@@ -156,17 +139,7 @@ public sealed class ToolOutputRegionFinder
             case JsonValueKind.Object:
                 foreach (var property in value.EnumerateObject())
                 {
-                    if ((property.NameEquals(ToolCallJson.Output) || property.NameEquals(ToolCallJson.Result)) &&
-                        property.Value.ValueKind == JsonValueKind.String)
-                    {
-                        indexes[counter] = path;
-                        counter++;
-                        continue;
-                    }
-
-                    counter = property.Value.ValueKind == JsonValueKind.Object
-                        ? WalkToolOutputStrings(property.Value, counter, indexes, files, path)
-                        : Walk(property.Value, counter, indexes, files);
+                    counter = WalkResultProperty(property, counter, indexes, files, path);
                 }
 
                 return counter;
@@ -175,6 +148,56 @@ public sealed class ToolOutputRegionFinder
                 return counter;
         }
     }
+
+    /// <summary>A block of an output array keeps its <c>text</c> string as output; everything else is walked as ordinary body.</summary>
+    private static int WalkContentBlock(
+        JsonElement block,
+        int counter,
+        Dictionary<int, FileRead?> indexes,
+        ToolCallFiles files,
+        FileRead? path)
+    {
+        if (block.ValueKind != JsonValueKind.Object)
+        {
+            return Walk(block, counter, indexes, files);
+        }
+
+        foreach (var property in block.EnumerateObject())
+        {
+            counter = IsString(property, ToolCallJson.Text)
+                ? Record(counter, indexes, path)
+                : Walk(property.Value, counter, indexes, files);
+        }
+
+        return counter;
+    }
+
+    /// <summary>A property of an output object keeps its <c>output</c> or <c>result</c> string as output, and looks inside nested objects.</summary>
+    private static int WalkResultProperty(
+        JsonProperty property,
+        int counter,
+        Dictionary<int, FileRead?> indexes,
+        ToolCallFiles files,
+        FileRead? path)
+    {
+        if (IsString(property, ToolCallJson.Output) || IsString(property, ToolCallJson.Result))
+        {
+            return Record(counter, indexes, path);
+        }
+
+        return property.Value.ValueKind == JsonValueKind.Object
+            ? WalkToolOutputStrings(property.Value, counter, indexes, files, path)
+            : Walk(property.Value, counter, indexes, files);
+    }
+
+    private static int Record(int counter, Dictionary<int, FileRead?> indexes, FileRead? path)
+    {
+        indexes[counter] = path;
+        return counter + 1;
+    }
+
+    private static bool IsString(JsonProperty property, string name) =>
+        property.NameEquals(name) && property.Value.ValueKind == JsonValueKind.String;
 
     private static bool IsToolOutputProperty(JsonElement parent, JsonProperty property)
     {
