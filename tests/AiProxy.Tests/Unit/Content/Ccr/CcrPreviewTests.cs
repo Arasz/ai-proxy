@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
@@ -215,6 +216,18 @@ public sealed partial class CcrPreviewTests
         Assert.StartsWith(body[0], original, StringComparison.Ordinal);
         Assert.Matches(@"^\[line 1 cut at character \d+ of " + original.Length + @"\]$", body[1]);
         Assert.Equal(1, preview.ShownLines);
+    }
+
+    [Fact]
+    public void A_single_line_cut_preserves_a_unicode_character_crossing_the_boundary()
+    {
+        var boundary = Body(Build(new string('q', 20_000)).Text).First().Length;
+        var original = new string('q', boundary - 1) + "😀" + new string('q', 20_000 - boundary - 1);
+
+        var preview = Build(original);
+
+        Assert.Equal(new string('q', boundary - 1), Body(preview.Text).First());
+        Assert.True(new UTF8Encoding(false, true).GetByteCount(preview.Text) > 0);
     }
 
     private static string Shape(string shape) => shape switch

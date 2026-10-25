@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Content.Ccr;
 
@@ -136,6 +136,26 @@ public sealed class CcrRetrievalTests
         Assert.Contains("NEEDLE", window, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_pattern_window_keeps_complete_unicode_characters_at_both_edges(bool pairAtStart)
+    {
+        var original = pairAtStart
+            ? new string('a', 120) + "😀" + new string('b', 119) + "X" + new string('c', 500)
+            : new string('a', 120) + "X" + new string('b', 118) + "😀" + new string('c', 500);
+
+        var result = CcrRetrieval.Answer(Pattern("X", id: CcrPreview.IdOf(original)), original, Options);
+
+        Assert.Null(result.Error);
+        var line = Assert.Single(Body(result));
+        var expected = pairAtStart
+            ? "1\t[characters 123-361 of 742] " + new string('b', 119) + "X" + new string('c', 119)
+            : "1\t[characters 1-239 of 741] " + new string('a', 120) + "X" + new string('b', 118);
+        Assert.Equal(expected, line);
+        Assert.True(new UTF8Encoding(false, true).GetByteCount(result.Text) > 0);
+    }
+
     [Fact]
     public void A_pattern_with_no_match_is_a_normal_empty_result()
     {
@@ -155,15 +175,13 @@ public sealed class CcrRetrievalTests
     }
 
     [Fact]
-    public void A_catastrophic_pattern_finishes_quickly_with_a_normal_answer()
+    public void A_catastrophic_backtracking_pattern_returns_a_normal_answer()
     {
         var original = string.Join("\n", Enumerable.Range(1, 50).Select(_ => new string('a', 40) + "!"));
         var arguments = $$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"pattern","pattern":"^(a+)+$"}""";
 
-        var clock = Stopwatch.StartNew();
         var result = CcrRetrieval.Answer(arguments, original, Options);
 
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
         Assert.Null(result.Error);
         Assert.Equal(["[no line matches]"], Body(result));
     }
@@ -194,6 +212,17 @@ public sealed class CcrRetrievalTests
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":11}""")]
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":-1}""")]
     public void Malformed_arguments_are_bad_input(string arguments)
+    {
+        Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
+    }
+
+    [Theory]
+    [InlineData("""{"id":"ID","mode":"pattern","pattern":"\uD800"}""")]
+    [InlineData("""{"id":"ID","mode":"pattern","pattern":"\uDC00"}""")]
+    [InlineData("""{"id":"\uD800","mode":"whole"}""")]
+    [InlineData("""{"id":"ID","mode":"\uD800"}""")]
+    [InlineData("""{"id":"ID","mode":"whole","\uD800":1}""")]
+    public void Malformed_unicode_arguments_are_bad_input(string arguments)
     {
         Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
     }

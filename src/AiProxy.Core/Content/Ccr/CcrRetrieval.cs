@@ -176,7 +176,18 @@ public sealed record CcrRetrieval(string Text, string? Error)
         }
 
         var start = match is null ? 0 : Math.Clamp(match.Index + (match.Length / 2) - (window / 2), 0, line.Length - window);
-        return Invariant($"{index + 1}\t[characters {start + 1}-{start + window} of {line.Length}] {line.Substring(start, window)}");
+        var end = start + window;
+        if (start > 0 && char.IsLowSurrogate(line[start]) && char.IsHighSurrogate(line[start - 1]))
+        {
+            start++;
+        }
+
+        if (end < line.Length && char.IsHighSurrogate(line[end - 1]) && char.IsLowSurrogate(line[end]))
+        {
+            end--;
+        }
+
+        return Invariant($"{index + 1}\t[characters {start + 1}-{end} of {line.Length}] {line[start..end]}");
     }
 
     private static (Request? Request, string Reason) Parse(string arguments, CcrOptions options)
@@ -201,9 +212,23 @@ public sealed record CcrRetrieval(string Text, string? Error)
 
             foreach (var property in root.EnumerateObject())
             {
-                if (!Properties.Contains(property.Name, StringComparer.Ordinal))
+                string name;
+                try
                 {
-                    return (null, $"Unknown property '{property.Name}'.");
+                    name = property.Name;
+                    if (property.Value.ValueKind == JsonValueKind.String)
+                    {
+                        _ = property.Value.GetString();
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    return (null, "The arguments contain malformed Unicode.");
+                }
+
+                if (!Properties.Contains(name, StringComparer.Ordinal))
+                {
+                    return (null, $"Unknown property '{name}'.");
                 }
             }
 
