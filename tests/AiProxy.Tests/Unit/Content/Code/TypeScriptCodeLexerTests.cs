@@ -171,4 +171,50 @@ public sealed class TypeScriptCodeLexerTests
     [InlineData(null, false)]
     public void Supports_typescript_paths(string? path, bool expected) =>
         Assert.Equal(expected, new TypeScriptCodeLexer().SupportsPath(path));
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Line_numbers_advance_by_every_line_break_inside_a_multi_line_token(string eol)
+    {
+        var source = "/* one\ntwo\nthree */\nafter;\nconst s = `a\nb\nc`;\nlast;\n".Replace("\n", eol, StringComparison.Ordinal);
+
+        var result = new TypeScriptCodeLexer().Lex(source, "a.ts");
+
+        LexedSource.AssertCovers(source, result);
+        Assert.Equal(4, LexedSource.Single(result, CodeTokenKind.Identifier, "after").Line);
+        Assert.Equal(8, LexedSource.Single(result, CodeTokenKind.Identifier, "last").Line);
+    }
+
+    [Fact]
+    public void Renaming_never_picks_the_spelling_of_a_jsx_tag_or_attribute()
+    {
+        var names = LexedSource.ManyNames(60).ToArray();
+        var source = Padding
+            + "const e = <a b=\"1\">text</a>;\n"
+            + string.Concat(names.Select(static name => $"let {name} = {name};\n"));
+
+        var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.True(result.RenameMap.Count >= 50);
+        Assert.DoesNotContain(result.RenameMap.Keys, static name => name is "a" or "b");
+        Assert.Contains("<a b=\"1\">text</a>", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Renaming_never_touches_jsx_namespace_names_used_repeatedly()
+    {
+        const string jsx = "<div namespace_prefix:attribute_label=\"1\"><i namespace_prefix:attribute_label=\"2\" /></div>";
+        const string source = Padding
+            + "const repeated_value = 1, other_value = repeated_value + repeated_value;\n"
+            + $"export const e = {jsx};\n";
+
+        var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Contains("repeated_value", result.RenameMap.Values);
+        Assert.DoesNotContain(result.RenameMap.Values, static name => name is "namespace_prefix" or "attribute_label");
+        Assert.Contains(jsx, result.Text, StringComparison.Ordinal);
+    }
 }

@@ -187,4 +187,44 @@ public sealed class PythonCodeLexerTests
     [InlineData(null, false)]
     public void Supports_python_paths(string? path, bool expected) =>
         Assert.Equal(expected, new PythonCodeLexer().SupportsPath(path));
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void Line_numbers_advance_by_every_line_break_inside_a_multi_line_token(string eol)
+    {
+        var source = "doc = \"\"\"first\nsecond\nthird\"\"\"\nafter = 1\n".Replace("\n", eol, StringComparison.Ordinal);
+
+        var result = new PythonCodeLexer().Lex(source);
+
+        LexedSource.AssertCovers(source, result);
+        Assert.Equal(4, LexedSource.Single(result, CodeTokenKind.Identifier, "after").Line);
+    }
+
+    [Fact]
+    public void Reducer_keeps_an_import_that_shares_its_line_with_code()
+    {
+        const string source = Padding + "x = 1; import os\ny = os\n";
+
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal($"x = 1; import os\ny = os\n{Hint}", result.Text);
+    }
+
+    [Fact]
+    public void Renaming_treats_spellings_that_normalize_alike_as_one_name()
+    {
+        var names = LexedSource.ManyNames(40).ToArray();
+        var source = Padding
+            + "ﬁle = 1\nfile = ﬁle + file\n"
+            + string.Concat(names.Select(static name => $"{name} = {name}\n"));
+
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        var shortName = Assert.Single(result.RenameMap, static pair => pair.Value == "file").Key;
+        Assert.DoesNotContain("ﬁ", result.Text, StringComparison.Ordinal);
+        Assert.Contains($"{shortName} = 1\n{shortName} = {shortName} + {shortName}\n", result.Text, StringComparison.Ordinal);
+    }
 }
