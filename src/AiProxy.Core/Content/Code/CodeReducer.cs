@@ -8,28 +8,21 @@ public sealed record CodeReductionOptions(bool RemoveComments = true, bool Remov
 /// <summary>A read view, its change/support flags, and the short-name to original-name map.</summary>
 public sealed record CodeReductionResult(string Text, bool Changed, bool Supported, IReadOnlyDictionary<string, string> RenameMap);
 
-/// <summary>Builds compact C# read views using an explicit path and caller-rendered retrieval hint.</summary>
-public sealed class CodeReducer
+/// <summary>Builds compact source read views using an explicit path and caller-rendered retrieval hint.</summary>
+public sealed class CodeReducer(ICodeLexer lexer)
 {
-    private readonly ICodeLexer _lexer;
+    private static readonly char[] Quotes = ['"', '\'', '`'];
 
-    /// <summary>Creates a C# view builder with a caller-supplied syntax adapter.</summary>
-    public CodeReducer(ICodeLexer lexer)
-    {
-        ArgumentNullException.ThrowIfNull(lexer);
-        _lexer = lexer;
-    }
 
     /// <summary>Returns the original when safety or complete-view savings cannot be established.</summary>
     public CodeReductionResult Reduce(string text, string? filePath, CodeReductionOptions? options, string? retrievalHint)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        if (string.IsNullOrWhiteSpace(retrievalHint) || !_lexer.SupportsPath(filePath))
+        if (string.IsNullOrWhiteSpace(retrievalHint) || !lexer.SupportsPath(filePath))
         {
             return Original(text, false);
         }
         var (source, prefixes) = Unnumber(text);
-        var lexed = _lexer.Lex(source);
+        var lexed = lexer.Lex(source, filePath);
         if (!lexed.Supported)
         {
             return Original(text, false);
@@ -48,7 +41,15 @@ public sealed class CodeReducer
                 Blank(view, token.Offset, token.Text.Length);
             }
         }
-        if (options.RemoveImports)
+        if (options.RemoveImports && lexed.Imports is { } imports)
+        {
+            foreach (var span in imports)
+            {
+                Blank(view, span.Offset, span.Length);
+                Array.Fill(literals, false, span.Offset, span.Length);
+            }
+        }
+        else if (options.RemoveImports)
         {
             RemoveImports(view, lexed.Tokens);
         }
@@ -75,13 +76,18 @@ public sealed class CodeReducer
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
+        var fixedNames = tokens.Where(static token => token.Kind is CodeTokenKind.Other or CodeTokenKind.Keyword)
+            .Select(static token => token.Text)
+            .ToHashSet(StringComparer.Ordinal);
         var reserved = identifiers.Select(static token => token.ValueText ?? token.Text).ToHashSet(StringComparer.Ordinal);
+        reserved.UnionWith(fixedNames);
+        reserved.UnionWith(tokens.Where(static token => token.Kind == CodeTokenKind.String).Select(static token => StringValue(token.Text)));
         var used = identifiers.Where(token => view.AsSpan(token.Offset, token.Text.Length).SequenceEqual(token.Text));
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2 || _lexer.IsKeyword(group.Key))
+            if (group.Count() < 2 || lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
             {
                 continue;
             }
@@ -90,7 +96,7 @@ public sealed class CodeReducer
             {
                 candidate = ShortName(next++);
             }
-            while (reserved.Contains(candidate) || _lexer.IsKeyword(candidate));
+            while (reserved.Contains(candidate) || lexer.IsKeyword(candidate));
             if (candidate.Length >= group.Key.Length)
             {
                 continue;
@@ -101,6 +107,12 @@ public sealed class CodeReducer
         }
         return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
             .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.ValueText ?? token.Text]));
+    }
+
+    private static string StringValue(string literal)
+    {
+        var start = literal.AsSpan().IndexOfAny(Quotes);
+        return start < 0 ? literal : literal.AsSpan(start).Trim(Quotes).ToString();
     }
 
     private static string ShortName(int value)

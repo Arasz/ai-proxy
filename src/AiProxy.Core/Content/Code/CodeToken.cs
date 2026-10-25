@@ -15,5 +15,9 @@ public enum CodeTokenKind
 /// <summary>A source token with its zero-based offset and one-based original line.</summary>
 public sealed record CodeToken(CodeTokenKind Kind, string Text, int Offset, int Line, string? ValueText = null);
 
+/// <summary>A stretch of source text by zero-based offset and length.</summary>
+public readonly record struct CodeSpan(int Offset, int Length);
+
 /// <summary>Tokens for a supported file, or an unsupported result without partial tokens.</summary>
-public sealed record CodeLexResult(bool Supported, IReadOnlyList<CodeToken> Tokens);
+/// <param name="Imports">Import statements the reducer may remove; null applies its C# using-directive rule.</param>
+public sealed record CodeLexResult(bool Supported, IReadOnlyList<CodeToken> Tokens, IReadOnlyList<CodeSpan>? Imports = null);
