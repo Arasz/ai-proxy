@@ -18,7 +18,7 @@ Each row is one test. "Mutation" is the defect put in front of the test to watch
 | P7 | Core | A region made of many small parts that together exceed the minimum is previewed | Per-fragment minimum skips a large region (untouched-payloads finding) | Apply `MinimumFor` per part |
 | P8 | Core | Every preview line except markers and the overlay block appears verbatim in the original, in the same order | Preview rewrites content, so a fact in it is wrong | Trim trailing whitespace on kept lines |
 | P9 | Core | A build log whose only error line sits in the middle keeps that line in the preview with its original line number | Fixed head and tail drops the signal line (rtk's build and test losses) | Disable signal-line selection |
-| P10 | Core | Preview size is at most 1,000 estimated tokens including markers and overlay | Budget ignores marker or overlay cost | Exclude the overlay from the budget sum |
+| P10 | Core | Preview size is at most 1,500 estimated tokens including markers and overlay | Budget ignores marker or overlay cost | Exclude the overlay from the budget sum |
 | P11 | Core | Each elided run is named by its exact original line range, and the named ranges plus shown lines cover 1..N with no gap or overlap | Wrong line numbers send the model to the wrong slice | Number shown lines from 0 |
 | P12 | Core | A single line longer than the budget is cut at a character offset and the cut is named | One-line JSON produces an over-budget preview or an empty one | Skip lines longer than the budget |
 | P13 | Core | A region that already contains `[proxy preview` is returned unchanged and not previewed | Double preview or expansion of an echoed preview | Remove the marker check |
@@ -36,7 +36,7 @@ Each row is one test. "Mutation" is the defect put in front of the test to watch
 | R6 | Core | An invalid regex returns `bad_pattern`; a catastrophic pattern finishes within the 250 ms timeout | ReDoS on the request path | Drop `NonBacktracking` and the timeout |
 | R7 | Core | Zero matches is a normal result, not `is_error` | Model treats a negative answer as a failure and retries | Return `bad_pattern` on no match |
 | R8 | Core | after its header line, `whole` returns the original byte for byte, with CRLF and a trailing newline kept and no line-number prefixes | Edits fail on altered whitespace (activation record) | Normalize line endings |
-| R9 | Core | A `lines` result over 4,000 estimated tokens is cut and names the next start line | Large slice silently truncated | Cut without the continuation line |
+| R9 | Core | A `lines` result over 3,000 estimated tokens is cut and names the next start line | Large slice silently truncated | Cut without the continuation line |
 | R10 | Core | Missing `id`, unknown `mode`, extra property, or a malformed id returns `bad_input` | Proxy throws and the client request fails | Let the parser throw |
 | R11 | Core | An id with no original returns `not_kept` with the "re-run the tool" text | Proxy throws or answers from another original | Fall back to the most recent original |
 

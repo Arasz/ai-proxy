@@ -25,7 +25,7 @@ The first release covers Anthropic Messages on `api.anthropic.com`, thread and s
 
 ### Preview format
 
-The preview is a subset of the original's lines, kept verbatim, in original order, within a budget of 1,000 estimated tokens. Selection is structure-aware rather than a fixed head and tail. Lines that match the failure, exit-code and state-transition patterns of `MustKeepOverlay` are kept first, up to 40% of the budget. The rest goes to the head and the tail, two parts head to one part tail. Each elided run becomes one line naming the original line range. A trailing `MustKeepOverlay` block lists identifiers from the hidden lines, capped at 5% as today, so the model knows what to search for. A single line longer than the budget is cut at a character offset and the cut is named. The split ratios are assumptions the gate tunes.
+The preview is a subset of the original's lines, kept verbatim, in original order, within a budget of 1,500 estimated tokens. Selection is structure-aware rather than a fixed head and tail. Lines that match the failure, exit-code and state-transition patterns of `MustKeepOverlay` are kept first, up to 40% of the budget. The rest goes to the head and the tail, two parts head to one part tail. Each elided run becomes one line naming the original line range. A trailing `MustKeepOverlay` block lists identifiers from the hidden lines, capped at 5% as today, so the model knows what to search for. A single line longer than the budget is cut at a character offset and the cut is named. The split ratios are assumptions the gate tunes.
 
 The marker is fixed text with no timestamp, counter, request id or store state:
 
@@ -64,7 +64,7 @@ One tool, appended to the request's tools:
 }
 ```
 
-`lines` returns original lines `start` to `end`, each prefixed with its line number and a tab. `pattern` returns every matching line with `context` lines around it, at most 50 matches. For a line over 240 characters it returns a 240-character window around the match. The pattern runs with `RegexOptions.NonBacktracking` and a 250 ms timeout. `whole` returns the header line, a line feed, then the original text exactly, with no line-number prefixes, so an edit can use it; the host passes the result into the `tool_result` unchanged. A `lines` or `pattern` result is capped at 4,000 estimated tokens and says where it stopped. The first line of every result names the id, the mode and the original's total line count.
+`lines` returns original lines `start` to `end`, each prefixed with its line number and a tab. `pattern` returns every matching line with `context` lines around it, at most 50 matches. For a line over 240 characters it returns a 240-character window around the match. The pattern runs with `RegexOptions.NonBacktracking` and a 250 ms timeout. `whole` returns the header line, a line feed, then the original text exactly, with no line-number prefixes, so an edit can use it; the host passes the result into the `tool_result` unchanged. A `lines` or `pattern` result is capped at 3,000 estimated tokens and says where it stopped. The first line of every result names the id, the mode and the original's total line count.
 
 Errors are tool results with `is_error: true` and one code: `not_kept` (unknown id, evicted, or never stored; the model is told to re-run the tool that produced it), `bad_range` (with the total line count), `bad_pattern`, `bad_input` (schema violation) or `limit_reached`. Zero matches is a normal result, not an error.
 
