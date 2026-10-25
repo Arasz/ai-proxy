@@ -98,6 +98,52 @@ public sealed class TypeScriptCodeLexerTests
         Assert.Contains("Partial<Record<string, number>>", result.Text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Reducer_keeps_directive_comments_verbatim_on_their_original_lines()
+    {
+        const string source = "1\t/// <reference types=\"node\" />\n"
+            + "2\t// a long removable comment so the compact view plus its hint is smaller than the source\n"
+            + "3\t// @ts-ignore\n"
+            + "4\tlet a: number = f();\n"
+            + "5\t// @ts-expect-error\n"
+            + "6\tlet b: string = 1; // gone\n";
+
+        var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.ts", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal(
+            "1\t/// <reference types=\"node\" />\n3\t// @ts-ignore\n4\tlet a: number = f();\n5\t// @ts-expect-error\n6\tlet b: string = 1;\n" + Hint,
+            result.Text);
+    }
+
+    [Theory]
+    [InlineData("/// <reference path=\"a.d.ts\" />", CodeTokenKind.Other)]
+    [InlineData("/// <amd-module name=\"m\" />", CodeTokenKind.Other)]
+    [InlineData("// @ts-ignore", CodeTokenKind.Other)]
+    [InlineData("// @ts-expect-error: why", CodeTokenKind.Other)]
+    [InlineData("// @ts-nocheck", CodeTokenKind.Other)]
+    [InlineData("// @ts-check", CodeTokenKind.Other)]
+    [InlineData("/* eslint-disable no-console */", CodeTokenKind.Other)]
+    [InlineData("// eslint-disable-next-line no-undef", CodeTokenKind.Other)]
+    [InlineData("/* eslint-enable */", CodeTokenKind.Other)]
+    [InlineData("/*! MIT license */", CodeTokenKind.Other)]
+    [InlineData("//# sourceMappingURL=a.js.map", CodeTokenKind.Other)]
+    [InlineData("/** @jsx h */", CodeTokenKind.Other)]
+    [InlineData("/* @jsxImportSource preact */", CodeTokenKind.Other)]
+    [InlineData("/// plain triple slash", CodeTokenKind.Comment)]
+    [InlineData("// ts-ignore without the at sign", CodeTokenKind.Comment)]
+    [InlineData("/* a license, but not a bang comment */", CodeTokenKind.Comment)]
+    public void Comments_a_tool_reads_are_kept_as_code(string comment, CodeTokenKind expected)
+    {
+        var source = comment + "\nlet x = 1;\n";
+
+        var result = new TypeScriptCodeLexer().Lex(source, "a.ts");
+
+        LexedSource.AssertCovers(source, result);
+        Assert.Equal(expected, result.Tokens[0].Kind);
+        Assert.Equal(comment, result.Tokens[0].Text);
+    }
+
     [Theory]
     [InlineData("a.ts", true)]
     [InlineData("a.TSX", true)]

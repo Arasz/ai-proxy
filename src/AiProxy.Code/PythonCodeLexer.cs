@@ -1,12 +1,13 @@
 using System.Collections.Frozen;
 using System.Text;
+using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
 using TreeSitter;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans Python with the Tree-sitter grammar; docstrings are strings and f-string fields are code.</summary>
-public sealed class PythonCodeLexer : ICodeLexer
+public sealed partial class PythonCodeLexer : ICodeLexer
 {
     private static readonly Language Language = new("Python");
 
@@ -17,7 +18,10 @@ public sealed class PythonCodeLexer : ICodeLexer
         static node => node.Type == "interpolation" && node.Children.Any(static child => !child.IsNamed && child.Type == "="),
         static node => node.Type is "import_statement" or "import_from_statement",
         false,
-        static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC));
+        static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),
+        static (comment, line) => line == 1 && comment.StartsWith("#!", StringComparison.Ordinal)
+            || line <= 2 && EncodingCookie().IsMatch(comment)
+            || ToolDirective().IsMatch(comment));
 
     private static readonly FrozenSet<string> Keywords =
     [
@@ -55,4 +59,12 @@ public sealed class PythonCodeLexer : ICodeLexer
 
     /// <inheritdoc />
     public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, Language, Grammar, IsKeyword);
+
+    /// <summary>A type-checker, linter, coverage or formatter directive anywhere in a comment.</summary>
+    [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|fmt:\s*(?:off|on)\b)")]
+    private static partial Regex ToolDirective();
+
+    /// <summary>The PEP 263 source-encoding declaration.</summary>
+    [GeneratedRegex("coding[:=]")]
+    private static partial Regex EncodingCookie();
 }

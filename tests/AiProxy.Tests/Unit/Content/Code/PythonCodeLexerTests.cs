@@ -124,6 +124,50 @@ public sealed class PythonCodeLexerTests
         Assert.Contains("print(self, match, case, type, len)", result.Text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Reducer_keeps_directive_comments_verbatim_on_their_original_lines()
+    {
+        const string source = "1\t#!/usr/bin/env python\n"
+            + "2\t# -*- coding: utf-8 -*-\n"
+            + "3\t# a long removable comment so the compact view plus its hint is smaller than the source\n"
+            + "4\timport os\n"
+            + "5\tx = os.path  # type: ignore\n"
+            + "6\ty = 1  # gone\n";
+
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", null, Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal(
+            "1\t#!/usr/bin/env python\n2\t# -*- coding: utf-8 -*-\n5\tx = os.path  # type: ignore\n6\ty = 1\n" + Hint,
+            result.Text);
+    }
+
+    [Theory]
+    [InlineData("x = 1  # type: int", 1, CodeTokenKind.Other)]
+    [InlineData("x = 1  # noqa", 1, CodeTokenKind.Other)]
+    [InlineData("x = 1  # long line # noqa: E501", 1, CodeTokenKind.Other)]
+    [InlineData("x = 1  # pragma: no cover", 1, CodeTokenKind.Other)]
+    [InlineData("x = 1  # pylint: disable=invalid-name", 1, CodeTokenKind.Other)]
+    [InlineData("# mypy: ignore-errors", 1, CodeTokenKind.Other)]
+    [InlineData("# fmt: off", 1, CodeTokenKind.Other)]
+    [InlineData("# fmt: on", 1, CodeTokenKind.Other)]
+    [InlineData("#!/usr/bin/env python3", 1, CodeTokenKind.Other)]
+    [InlineData("# vim: set fileencoding=utf-8 :", 2, CodeTokenKind.Other)]
+    [InlineData("# -*- coding: latin-1 -*-", 3, CodeTokenKind.Comment)]
+    [InlineData("#! not a shebang off line one", 2, CodeTokenKind.Comment)]
+    [InlineData("x = 1  # the type of x", 1, CodeTokenKind.Comment)]
+    public void Comments_a_tool_reads_are_kept_as_code(string line, int lineNumber, CodeTokenKind expected)
+    {
+        var source = string.Concat(Enumerable.Repeat("y = 0\n", lineNumber - 1)) + line + "\n";
+
+        var result = new PythonCodeLexer().Lex(source);
+
+        LexedSource.AssertCovers(source, result);
+        var comment = Assert.Single(result.Tokens, static token => token.Text.StartsWith('#'));
+        Assert.Equal(expected, comment.Kind);
+        Assert.Equal(lineNumber, comment.Line);
+    }
+
     [Theory]
     [InlineData("example.py", true)]
     [InlineData("EXAMPLE.PY", true)]

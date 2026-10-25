@@ -1,11 +1,12 @@
 using System.Collections.Frozen;
+using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
 using TreeSitter;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans JavaScript and JSX with the Tree-sitter grammar; template text is string, <c>${}</c> is code.</summary>
-public sealed class JavaScriptCodeLexer : ICodeLexer
+public sealed partial class JavaScriptCodeLexer : ICodeLexer
 {
     private static readonly Language Language = new("JavaScript");
 
@@ -59,6 +60,11 @@ public sealed class JavaScriptCodeLexer : ICodeLexer
             node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
             static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
             true,
-            static _ => null);
+            static _ => null,
+            static (comment, _) => ToolDirective().IsMatch(comment));
     }
+
+    /// <summary>Triple-slash directives, TypeScript and ESLint pragmas, license, source-map and JSX pragma comments.</summary>
+    [GeneratedRegex(@"^///\s*<(?:reference|amd-)|@ts-(?:ignore|expect-error|nocheck|check)\b|\beslint-(?:disable|enable)|^/\*!|^//[#@]\s*sourceMappingURL=|@jsx")]
+    private static partial Regex ToolDirective();
 }

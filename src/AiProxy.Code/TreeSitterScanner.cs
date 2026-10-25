@@ -9,6 +9,7 @@ namespace AiProxy.Code;
 /// <param name="IsUnsupported">A construct the reducer must not transform, beyond error and missing nodes.</param>
 /// <param name="IsImport">A top-level statement that may be removed when it stands alone on its lines.</param>
 /// <param name="ImportNeedsTerminator">Whether the code before a removed import must end with a semicolon.</param>
+/// <param name="IsDirective">A comment, by text and one-based line, that a tool reads and the view must keep.</param>
 internal sealed record TreeSitterGrammar(
     FrozenDictionary<string, string?> Strings,
     FrozenSet<string> Comments,
@@ -16,7 +17,8 @@ internal sealed record TreeSitterGrammar(
     Func<Node, bool> IsUnsupported,
     Func<Node, bool> IsImport,
     bool ImportNeedsTerminator,
-    Func<string, string?> ValueText);
+    Func<string, string?> ValueText,
+    Func<string, int, bool> IsDirective);
 
 /// <summary>Scans a file with a Tree-sitter grammar into tokens covering every character exactly once.</summary>
 internal static class TreeSitterScanner
@@ -35,7 +37,7 @@ internal static class TreeSitterScanner
         {
             return Unsupported();
         }
-        var tokens = Cover(text, spans);
+        var tokens = Cover(text, spans, grammar);
         return tokens is null
             ? Unsupported()
             : new CodeLexResult(true, tokens, Imports(text, tree.RootNode, tokens, grammar));
@@ -118,7 +120,7 @@ internal static class TreeSitterScanner
         return new CodeToken(keyword ? CodeTokenKind.Keyword : CodeTokenKind.Other, spelling, node.StartIndex, 0);
     }
 
-    private static List<CodeToken>? Cover(string text, List<CodeToken> spans)
+    private static List<CodeToken>? Cover(string text, List<CodeToken> spans, TreeSitterGrammar grammar)
     {
         var tokens = new List<CodeToken>(spans.Count * 2);
         var position = 0;
@@ -136,7 +138,9 @@ internal static class TreeSitterScanner
         var line = 1;
         for (var index = 0; index < tokens.Count; index++)
         {
-            tokens[index] = tokens[index] with { Line = line };
+            var token = tokens[index];
+            var kind = token.Kind == CodeTokenKind.Comment && grammar.IsDirective(token.Text, line) ? CodeTokenKind.Other : token.Kind;
+            tokens[index] = token with { Kind = kind, Line = line };
             line += LineBreaks(text, tokens[index].Offset, tokens[index].Text.Length);
         }
         return tokens;
