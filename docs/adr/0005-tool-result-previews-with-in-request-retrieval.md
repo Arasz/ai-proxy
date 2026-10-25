@@ -96,7 +96,7 @@ For a stateless client every tool result is re-previewed on every send, identica
 
 The other providers, for when their loops exist. OpenAI appends to `tools` and adds no `prompt_cache_breakpoint`, paying a one-time 1.25x write on GPT-5.6 and later and none before it. Gemini appends a function declaration at the end of `tools` (assumption: the API accepts it next to the client's tools), with no write fee, and requests that use `cachedContent` get no previews, because their tools are immutable in the cache object. OpenRouter follows the upstream named by the model prefix; tools are not in its sticky-routing hash, so injection does not move routing. Router and unknown models get the fallback, which means no CCR.
 
-Expected compression under the fallback (owner question F13; owner approved the fallback as stated on 2026-10-25). The fallback (cache strategies F13) forbids touching `tools`, so `proxy_retrieve` cannot be injected: a fallback provider gets no previews. It still gets every pure per-region reducer, because a tool result rewritten as a function of its own bytes is exactly what F13 rule 2 allows. Tool-result compression on a fallback provider is therefore the shipped-rules column of the scoring record, the same as on a known provider without CCR. Per kind, at the 1 s budget, with every answer kept:
+Expected compression under the fallback (owner question F13; owner approved the fallback as stated on 2026-10-25, with an opt-in switch, see Configuration below). The fallback (cache strategies F13) forbids touching `tools`, so `proxy_retrieve` cannot be injected: a fallback provider gets no previews. It still gets every pure per-region reducer, because a tool result rewritten as a function of its own bytes is exactly what F13 rule 2 allows. Tool-result compression on a fallback provider is therefore the shipped-rules column of the scoring record, the same as on a known provider without CCR. Per kind, at the 1 s budget, with every answer kept:
 
 | kind | fallback (shipped rules, no CCR) | known provider with CCR (rtk CCR, retrieval allowed) |
 |---|---|---|
@@ -110,6 +110,17 @@ Expected compression under the fallback (owner question F13; owner approved the 
 Sources: reducer scoring results, "Per kind, at the 1 s budget", "rtk CCR with retrieval allowed" and "log reducer keeps every value". The CCR column is rtk's preview, scored once a reader may retrieve: it keeps every answer, but retrieval re-sends the original, so its net compression falls to 0% to 6%. The fallback loses only what our own CCR adds over that, which the activation gate below has yet to measure. For thread clients the fallback also compresses only on first send (F13 rule 3), the same as on known providers.
 
 Enabling or disabling CCR changes `tools` and is a cache event for every conversation in flight, like a preview version change.
+
+### Configuration
+
+CCR settings bind from `Proxy:Ccr`, beside `Proxy:Compression`, through the same configuration binder (environment form `PROXY__CCR__ENABLED`):
+
+| Setting | Default | Effect |
+|---|---|---|
+| `Proxy:Ccr:Enabled` | `false` | Turns CCR on for recognised providers. A kind still previews only when the activation gate enabled it. |
+| `Proxy:Ccr:UnknownProviders` | `false` | Also previews for providers the fallback covers (owner ruling on F13, 2026-10-25). Off by default: an unrecognised provider gets only the per-region reducers. When on, the proxy appends `proxy_retrieve` to those requests too, and accepts the cache risk the fallback avoids. |
+
+`UnknownProviders` has no effect while `Enabled` is false.
 
 ### Storage and eviction
 
