@@ -11,4 +11,7 @@ public interface ICodeLexer
 
     /// <summary>Scans a complete file; unsupported syntax returns no partial tokens.</summary>
     CodeLexResult Lex(string text);
+
+    /// <summary>Scans a complete file whose grammar may depend on its path, such as TSX.</summary>
+    CodeLexResult Lex(string text, string? filePath) => Lex(text);
 }

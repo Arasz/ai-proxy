@@ -8,7 +8,7 @@ public sealed record CodeReductionOptions(bool RemoveComments = true, bool Remov
 /// <summary>A read view, its change/support flags, and the short-name to original-name map.</summary>
 public sealed record CodeReductionResult(string Text, bool Changed, bool Supported, IReadOnlyDictionary<string, string> RenameMap);
 
-/// <summary>Builds compact C# read views using an explicit path and caller-rendered retrieval hint.</summary>
+/// <summary>Builds compact source read views using an explicit path and caller-rendered retrieval hint.</summary>
 public sealed class CodeReducer
 {
     private readonly ICodeLexer _lexer;
@@ -29,7 +29,7 @@ public sealed class CodeReducer
             return Original(text, false);
         }
         var (source, prefixes) = Unnumber(text);
-        var lexed = _lexer.Lex(source);
+        var lexed = _lexer.Lex(source, filePath);
         if (!lexed.Supported)
         {
             return Original(text, false);
@@ -48,7 +48,15 @@ public sealed class CodeReducer
                 Blank(view, token.Offset, token.Text.Length);
             }
         }
-        if (options.RemoveImports)
+        if (options.RemoveImports && lexed.Imports is { } imports)
+        {
+            foreach (var span in imports)
+            {
+                Blank(view, span.Offset, span.Length);
+                Array.Fill(literals, false, span.Offset, span.Length);
+            }
+        }
+        else if (options.RemoveImports)
         {
             RemoveImports(view, lexed.Tokens);
         }
