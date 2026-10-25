@@ -1,0 +1,275 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - link "ai-proxy ATLAS" [ref=e5] [cursor=pointer]:
+      - /url: "#main"
+      - text: ai-proxy
+      - generic [ref=e12]: ATLAS
+    - generic [ref=e13]: SYSTEM FIELD GUIDE
+    - navigation "Guide sections" [ref=e14]:
+      - button "Architecture" [ref=e15] [cursor=pointer]
+      - button "Plans 10" [ref=e22] [cursor=pointer]:
+        - generic [ref=e27]: Plans
+        - generic [ref=e28]: "10"
+      - button "Terms & evidence" [ref=e29] [cursor=pointer]
+    - generic [ref=e33]:
+      - text: SOURCE SNAPSHOT
+      - paragraph [ref=e35]:
+        - text: 25 October 2026
+        - link "c2cce0c" [ref=e36] [cursor=pointer]:
+          - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/
+      - button "Dark view" [ref=e40] [cursor=pointer]
+  - main [ref=e43]:
+    - generic [ref=e44]:
+      - generic [ref=e45]: Engineering / Proxy architecture
+      - generic [ref=e46]: Self-contained · offline ready
+    - generic [ref=e48]:
+      - generic [ref=e49]: LOCAL TRAFFIC. VISIBLE DECISIONS.
+      - heading "One proxy. Three ways through." [level=1] [ref=e50]: One proxy.Three ways through.
+      - paragraph [ref=e51]: A source-backed map of where requests go, what changes, and what is still a proposal. Explore a provider to follow its path.
+      - generic [ref=e52]:
+        - generic [ref=e53]: Source read
+        - generic [ref=e54]:
+          - text: Runtime at
+          - link "c2cce0c" [ref=e55] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/
+          - text: · Plan snapshot 2026-10-25 · Vendor pages checked 2026-10-25
+        - button "Inspect sources" [ref=e56] [cursor=pointer]
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - text: 01 / TRANSPORT
+          - strong [ref=e62]: Forward proxy
+          - paragraph [ref=e63]: Original host + caller credential
+        - generic [ref=e64]:
+          - text: 02 / COMPRESSION
+          - strong [ref=e65]: Opt-in, tool outputs
+          - paragraph [ref=e66]: Whole-request rewriting is planned
+        - generic [ref=e67]:
+          - text: 03 / RECOVERY
+          - strong [ref=e68]: HTTP content endpoint
+          - paragraph [ref=e69]: Model retrieval loop is planned
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - heading "Follow the request" [level=2] [ref=e72]
+          - generic [ref=e73]: HOST FIRST · DIALECT SECOND
+        - tablist "provider" [ref=e74]:
+          - tab "Anthropic" [selected] [ref=e75] [cursor=pointer]
+          - tab "OpenAI" [ref=e76] [cursor=pointer]
+          - tab "Default" [ref=e77] [cursor=pointer]
+        - tabpanel "Anthropic" [ref=e78]:
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: Messages dialect
+              - heading "Anthropic" [level=3] [ref=e82]
+            - generic [ref=e83]: Current path
+          - code [ref=e84]: api.anthropic.com
+          - paragraph [ref=e85]: Selective HTTPS inspection and tool-result reduction. First CCR release is proposed here.
+          - list "Anthropic request path" [ref=e86]:
+            - listitem [ref=e87]:
+              - text: "01"
+              - strong [ref=e88]: Agent + credential
+            - listitem [ref=e91]:
+              - text: "02"
+              - strong [ref=e92]: Exact Anthropic host
+            - listitem [ref=e95]:
+              - text: "03"
+              - strong [ref=e96]: TLS inspect
+            - listitem [ref=e99]:
+              - text: "04"
+              - strong [ref=e100]: tool_result text
+            - listitem [ref=e103]:
+              - text: "05"
+              - strong [ref=e104]: Optional reduction
+            - listitem [ref=e107]:
+              - text: "06"
+              - strong [ref=e108]: Anthropic + stream
+          - generic [ref=e109]:
+            - article [ref=e110]:
+              - generic [ref=e111]: WIRED TODAY
+              - list [ref=e113]:
+                - listitem [ref=e114]: Exact host match selects the Anthropic dialect. The caller’s credential is forwarded to the addressed host.
+                - listitem [ref=e115]: With capture or compression enabled, bodies with declared length up to 8 MiB can be inspected. Anthropic tool_result text is eligible for reduction.
+                - listitem [ref=e116]: Capture stores the original request; Anthropic JSON/SSE responses can supply usage and cache counters.
+                - listitem [ref=e117]: "The existing recovery path is GET /content/{requestId}, returning the entire original request. No model tool is injected today."
+            - article [ref=e118]:
+              - generic [ref=e119]: PROPOSED / NOT WIRED
+              - list [ref=e121]:
+                - listitem [ref=e122]: Owner feedback approves Anthropic Messages first, for both thread and stateless clients.
+                - listitem [ref=e123]: Proposed proxy_retrieve is appended on tools-bearing requests; the proxy would answer it in hidden upstream turns.
+                - listitem [ref=e124]: Thread ledgers, stable previews and tool ID aliases must preserve later continuations. Streaming tool-use blocks would be held while text/thinking continue.
+                - listitem [ref=e125]: The feedback permits 3 retrieval rounds plus a limit round, at most 5 upstream calls. This is a proposed bound, not current runtime behavior.
+          - generic [ref=e131]:
+            - strong [ref=e132]: Cache implications
+            - paragraph [ref=e133]: Preserve the cumulative tools → system → messages prefix. Keep tool schemas, thinking blocks and cache_control unchanged. 5-minute default and optional 1-hour TTL apply; model minima vary. Stable output is necessary but does not prove a billed cache hit.
+            - link "Primary provider documentation" [ref=e134] [cursor=pointer]:
+              - /url: https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+          - generic [ref=e138]:
+            - link "Host catalog" [ref=e139] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Core/Providers/ProviderHostCatalog.cs#L7
+            - link "Body / capture gates" [ref=e143] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy/Hosting/ProviderRequestInspector.cs#L49
+            - link "Owner feedback" [ref=e147] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/docs/work/2026-10-25-ccr-design-feedback.md#L7
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - heading "Data & decision flows" [level=2] [ref=e153]
+          - generic [ref=e154]: ARCHIFY · 9 / 9 CHECKS EACH
+        - tablist "diagram" [ref=e155]:
+          - tab "Data flow" [selected] [ref=e156] [cursor=pointer]
+          - tab "Reduction logic" [ref=e157] [cursor=pointer]
+        - tabpanel [ref=e158]:
+          - paragraph [ref=e159]: Simplified known-provider path. Capture is an optional observation branch; it does not gate the response. Unknown HTTPS takes the tunnel path in the Default tab.
+          - iframe [ref=e160]:
+            - generic [ref=f1e1]:
+              - toolbar "Diagram actions" [ref=f1e2]:
+                - button "Toggle color theme" [pressed] [ref=f1e3] [cursor=pointer]:
+                  - generic [ref=f1e5]: Light
+                - 'button "Visual style: Classic. Choose visual style" [ref=f1e7] [cursor=pointer]':
+                  - generic [ref=f1e9]: Classic
+                - button "Enter presentation stage" [ref=f1e11] [cursor=pointer]:
+                  - generic [ref=f1e13]: Present
+                - button "Export diagram" [ref=f1e15] [cursor=pointer]: Export
+              - generic [ref=f1e17]:
+                - heading "Provider request data path" [level=1] [ref=f1e21]
+                - generic [ref=f1e22]:
+                  - img "Provider request data path A data-flow diagram generated by Archify." [ref=f1e23]:
+                    - generic [ref=f1e26]: 01 / Client
+                    - generic [ref=f1e28]: 02 / Inspect
+                    - generic [ref=f1e30]: 03 / Reduce
+                    - generic [ref=f1e32]: 04 / Forward
+                    - generic [ref=f1e34]: 05 / Observe
+                    - group "Direct relationship explorer":
+                      - 'button "Inspect relationship 1 of 4: Agent client to Host inspection, HTTP / TLS. Press Enter for details."'
+                      - 'button "Inspect relationship 2 of 4: Host inspection to Compression, Request body. Press Enter for details."'
+                      - 'button "Inspect relationship 3 of 4: Compression to Provider API, Forwarded bytes. Press Enter for details."'
+                      - 'button "Inspect relationship 4 of 4: Provider API to Local capture, Usage + timing. Press Enter for details."'
+                    - button "Focus Agent client, 01 / Client" [ref=f1e35] [cursor=pointer]:
+                      - generic [ref=f1e38]: Agent client
+                    - button "Focus Host inspection, 02 / Inspect" [ref=f1e39] [cursor=pointer]:
+                      - generic [ref=f1e42]: Host inspection
+                    - button "Focus Compression, 03 / Reduce" [ref=f1e43] [cursor=pointer]:
+                      - generic [ref=f1e46]: Compression
+                    - button "Focus Provider API, 04 / Forward" [ref=f1e47] [cursor=pointer]:
+                      - generic [ref=f1e50]: Provider API
+                    - button "Focus Local capture, 05 / Observe" [ref=f1e51] [cursor=pointer]:
+                      - generic [ref=f1e54]: Local capture
+                    - generic [ref=f1e55]: HTTP / TLS
+                    - generic [ref=f1e58]: Request body
+                    - generic [ref=f1e61]: Forwarded bytes
+                    - generic [ref=f1e64]: Usage + timing
+                    - group "Semantic legend" [ref=f1e67]:
+                      - generic [ref=f1e68]: Legend
+                      - button "Inspect data store, 1 node" [ref=f1e69] [cursor=pointer]:
+                        - generic [ref=f1e72]: data store
+                        - generic [aria-hidden]:
+                          - generic: "1"
+                      - generic [ref=f1e73]: data flow
+                  - status [ref=f1e75]
+                  - toolbar "Diagram view controls" [ref=f1e76]:
+                    - button "Trace a directed route" [ref=f1e77] [cursor=pointer]: PATH
+                    - button "Open semantic radar" [ref=f1e78] [cursor=pointer]: MAP
+                    - button "Open semantic lens" [ref=f1e79] [cursor=pointer]: LENS
+                    - button "Find a node" [ref=f1e80] [cursor=pointer]
+                    - button "Open diagram guide" [ref=f1e82] [cursor=pointer]
+                    - button "Zoom out" [disabled] [ref=f1e84]
+                    - button "Zoom in again to reveal tags and annotations. Reset diagram view" [ref=f1e86] [cursor=pointer]:
+                      - generic [ref=f1e87]: 100%
+                    - button "Zoom in" [ref=f1e88] [cursor=pointer]
+                - generic [ref=f1e90]:
+                  - generic [ref=f1e91]:
+                    - heading "Current behavior" [level=3] [ref=f1e94]
+                    - list [ref=f1e95]:
+                      - listitem [ref=f1e96]: • Compression is off by default. Credentials stay caller-owned.
+                      - listitem [ref=f1e97]: • Only known provider HTTPS destinations are inspected.
+                  - generic [ref=f1e98]:
+                    - heading "Separate paths" [level=3] [ref=f1e101]
+                    - list [ref=f1e102]:
+                      - listitem [ref=f1e103]: • Unknown HTTPS stays in an opaque CONNECT tunnel.
+                      - listitem [ref=f1e104]: • Capture is optional; response bodies are relayed to the client.
+              - status
+          - group [ref=e161]:
+            - generic "Read flow as text" [ref=e162] [cursor=pointer]
+        - generic [ref=e165]:
+          - link "Inspector" [ref=e166] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy/Hosting/ProviderRequestInspector.cs#L49
+          - link "Pipeline" [ref=e170] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Core/Content/ContentCompressionPipeline.cs#L68
+          - link "Storage" [ref=e174] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Storage/SqliteContentStore.cs#L30
+      - generic [ref=e178]:
+        - generic [ref=e179]:
+          - heading "What sits behind the arrows" [level=2] [ref=e180]
+          - generic [ref=e181]: FOUR PROJECTS · CLEAR BOUNDARIES
+        - generic [ref=e182]:
+          - article [ref=e183]:
+            - text: HTTP + process host
+            - heading "AiProxy" [level=3] [ref=e184]
+            - paragraph [ref=e185]: Titanium transport, selective TLS, system-proxy lifecycle, capture and composition.
+            - link "Source" [ref=e187] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy/ProxyApplication.cs#L19
+          - article [ref=e191]:
+            - text: Rules + transformations
+            - heading "AiProxy.Core" [level=3] [ref=e192]
+            - paragraph [ref=e193]: Host catalog, region selection, decomposition, reduction and composition. No HTTP adapter in this layer.
+            - link "Source" [ref=e195] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Core/Content/ContentCompressionPipeline.cs#L1
+          - article [ref=e199]:
+            - text: SQLite adapters
+            - heading "AiProxy.Storage" [level=3] [ref=e200]
+            - paragraph [ref=e201]: Queued compression records and request/response captures. HTTP recovery returns the whole original request.
+            - link "Source" [ref=e203] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Storage/SqliteContentStore.cs#L30
+          - article [ref=e207]:
+            - text: Parser adapters
+            - heading "AiProxy.Code" [level=3] [ref=e208]
+            - paragraph [ref=e209]: Language lexers for the staged code reducer. The live source handler still only removes blank lines outside literals.
+            - link "Source" [ref=e211] [cursor=pointer]:
+              - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy/ProxyApplication.cs#L117
+      - generic [ref=e215]:
+        - generic [ref=e216]: Implementation limit
+        - heading "Queued recovery is not a durability guarantee." [level=3] [ref=e217]
+        - paragraph [ref=e218]: A storage exception can still leave changed content forwarded today. The planned activation gate demands immediately readable originals and original-body fallback on storage failure.
+        - generic [ref=e219]:
+          - link "Current exception path" [ref=e220] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/src/AiProxy.Core/Content/ContentCompressionPipeline.cs#L114
+          - link "Activation gates" [ref=e224] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/docs/work/2026-10-24-csharp-reducer-activation.md#L15
+      - generic [ref=e228]:
+        - generic [ref=e229]:
+          - heading "The next architecture is still gated" [level=2] [ref=e230]
+          - button "Explore all plans" [ref=e231] [cursor=pointer]
+        - generic [ref=e234]:
+          - generic [ref=e235]:
+            - generic [ref=e236]: "1"
+            - text: Reconcile CCR contract
+          - generic [ref=e237]:
+            - generic [ref=e238]: "2"
+            - text: Review core + prove tests
+          - generic [ref=e239]:
+            - generic [ref=e240]: "3"
+            - text: Wire hidden retrieval
+          - generic [ref=e241]:
+            - generic [ref=e242]: "4"
+            - text: Preserve cache + originals
+          - generic [ref=e243]:
+            - generic [ref=e244]: "5"
+            - text: Activate C# reducer
+          - generic [ref=e245]:
+            - generic [ref=e246]: "6"
+            - text: Real-proxy edit acceptance
+        - generic [ref=e247]:
+          - generic [ref=e248]:
+            - generic [ref=e249]: Owner feedback
+            - heading "Thresholds need reconciliation." [level=3] [ref=e250]
+            - paragraph [ref=e251]: Trigger feedback changes 3,000 to 1,500 tokens. The range/pattern cap heading says 4,000, with an owner note of 3,000. The shipping gate and mixed client-tool-call handling have notes without verdicts.
+          - generic [ref=e252]:
+            - generic [ref=e253]: Absent proposal
+            - heading "ADR 0005 is referenced, not present." [level=3] [ref=e254]
+            - paragraph [ref=e255]: The feedback references an ADR file absent from this source snapshot. Its approved portions are recorded intent; a finished design and live end-to-end retrieval are not established.
+        - generic [ref=e256]:
+          - link "CCR feedback" [ref=e257] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/docs/work/2026-10-25-ccr-design-feedback.md#L17
+          - link "Activation dependencies" [ref=e261] [cursor=pointer]:
+            - /url: https://github.com/Arasz/ai-proxy/blob/c2cce0cf754ef84e6318305fedd8c087881ff65c/docs/work/2026-10-24-csharp-reducer-activation.md#L15
+      - generic [ref=e265]:
+        - generic [ref=e266]: ai-proxy / architecture atlas
+        - generic [ref=e267]: Source snapshot, not a live monitor · 2026-10-25

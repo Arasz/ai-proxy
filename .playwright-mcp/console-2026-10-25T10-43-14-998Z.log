@@ -1,0 +1,3 @@
+[     225ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:18746/favicon.ico:0
+[   40777ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap:0
+[   41060ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwgknk-4.woff2:0

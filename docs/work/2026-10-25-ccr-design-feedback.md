@@ -1,6 +1,6 @@
 # Refinement feedback — CCR design: ADR 0005 decisions
 
-<!-- refinement-form: refinement:2026-10-25-ccr-design:v1 · saved 2026-10-25T10:24:02.242Z · answered 14/16 -->
+<!-- refinement-form: refinement:2026-10-25-ccr-design:v1 · saved 2026-10-25T10:35:10.654Z · answered 14/16 -->
 
 Source document: `docs/adr/0005-tool-result-previews-with-in-request-retrieval.md, docs/work/2026-10-24-provider-cache-strategies.md (F13)`
 
