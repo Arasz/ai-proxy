@@ -121,7 +121,7 @@ public sealed class RequestCaptureTests : IDisposable
         using var response = await SendAsync(proxy, upstream, body);
 
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
-        Assert.Null(proxy.Services.GetService<IRequestCaptureStore>());
+        Assert.IsType<NoRequestCapture>(proxy.Services.GetRequiredService<IRequestCaptureStore>());
         Assert.False(proxy.Services.GetRequiredService<TitaniumProxyService>().Server.EnableRequestTimingCapture, "capture off must leave Titanium's timing off");
         Assert.Empty(Directory.GetFiles(proxy.DataDirectory, $"{SqliteCaptureStore.FileName}*"));
     }

@@ -1,4 +1,6 @@
+using AiProxy.Ccr;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
@@ -7,52 +9,35 @@ using Titanium.Web.Proxy.EventArguments;
 namespace AiProxy.Hosting;
 
 /// <summary>Inspects, captures and compresses requests sent to provider API hosts.</summary>
-public sealed partial class ProviderRequestInspector
+/// <param name="compression">Compresses provider bodies; the pass-through pipeline leaves them alone.</param>
+/// <param name="providerHosts">Says which hosts are provider APIs.</param>
+/// <param name="capture">Where every provider request body is kept as sent; <see cref="NoRequestCapture"/> keeps nothing.</param>
+/// <param name="ccr">Plans and relays recoverable compression; <see cref="CcrOff"/> forwards every request.</param>
+/// <param name="logger">Where failures are logged.</param>
+/// <param name="time">Stamps each capture and times its stages.</param>
+public sealed partial class ProviderRequestInspector(
+    ICompressionPipeline compression,
+    IProviderHosts providerHosts,
+    IRequestCaptureStore capture,
+    ICcrRuntime ccr,
+    ILogger<ProviderRequestInspector> logger,
+    TimeProvider time)
 {
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
-    private readonly ICompressionPipeline _compression;
-    private readonly IProviderHosts _providerHosts;
-    private readonly bool _compressionEnabled;
-    private readonly ILogger<ProviderRequestInspector> _logger;
-    private readonly IRequestCaptureStore? _capture;
-    private readonly TimeProvider _time;
-
-    /// <summary>Creates an inspector; with compression disabled and no capture store every request passes through untouched.</summary>
-    /// <param name="capture">Where every provider request body is kept as sent; null leaves capture off.</param>
-    /// <param name="time">The clock that stamps each capture and times its stages; null uses the system clock.</param>
-    public ProviderRequestInspector(
-        ICompressionPipeline compression,
-        IProviderHosts providerHosts,
-        bool compressionEnabled,
-        ILogger<ProviderRequestInspector> logger,
-        IRequestCaptureStore? capture = null,
-        TimeProvider? time = null)
-    {
-        ArgumentNullException.ThrowIfNull(compression);
-        ArgumentNullException.ThrowIfNull(providerHosts);
-        ArgumentNullException.ThrowIfNull(logger);
-        _compression = compression;
-        _providerHosts = providerHosts;
-        _compressionEnabled = compressionEnabled;
-        _logger = logger;
-        _capture = capture;
-        _time = time ?? TimeProvider.System;
-    }
-
     /// <summary>Whether capture is on, so the proxy has to time exchanges and hand over each finished response.</summary>
-    internal bool CapturesResponses => _capture is not null;
+    internal bool CapturesResponses => capture.Keeps;
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
-        if (!_compressionEnabled && _capture is null)
+        if (!compression.Compresses && !capture.Keeps)
         {
             return;
         }
 
         var request = e.HttpClient.Request;
-        if (_providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
+        if (providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
         {
             return;
         }
@@ -62,41 +47,66 @@ public sealed partial class ProviderRequestInspector
             return;
         }
 
-        var started = _time.GetTimestamp();
+        var started = time.GetTimestamp();
         var exchange = new CapturedExchange { Dialect = dialect };
         var captureId = Guid.NewGuid().ToString("N");
 
-        var stage = _time.GetTimestamp();
+        var stage = time.GetTimestamp();
         var body = await e.GetRequestBody(CancellationToken.None);
-        exchange.Stages.Add("body-read", _time.GetElapsedTime(stage));
+        exchange.Stages.Add("body-read", time.GetElapsedTime(stage));
         exchange.RequestBytes = body.Length;
         exchange.ForwardedBytes = body.Length;
 
-        if (_capture is not null)
+        if (capture.Keeps)
         {
-            stage = _time.GetTimestamp();
-            if (await CaptureAsync(_capture, captureId, dialect, request.RequestUri, body))
+            stage = time.GetTimestamp();
+            if (await CaptureAsync(captureId, dialect, request.RequestUri, body))
             {
                 exchange.CaptureId = captureId;
                 e.DataReceived += exchange.OnDataReceived;
                 e.UserData = exchange;
             }
 
-            exchange.Stages.Add("capture-write", _time.GetElapsedTime(stage));
+            exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
         }
 
-        if (_compressionEnabled)
+        if (compression.Compresses)
         {
-            Apply(e, exchange, await CompressAsync(exchange, dialect, request.ContentType, request.RequestUri.Host, body));
+            var plan = await ccr.DecideAsync(dialect, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
+            if (plan.LedgerUnreadable)
+            {
+                Log.LedgerLookupFailed(logger, request.RequestUri.Host);
+                e.GenericResponse(
+                    CcrPlan.LedgerUnavailable,
+                    (System.Net.HttpStatusCode)529,
+                    [new Titanium.Web.Proxy.Models.HttpHeader("Content-Type", "application/json")],
+                    closeServerConnection: true);
+                return;
+            }
+
+            var compressed = await CompressAsync(exchange, dialect, request.ContentType, request.RequestUri.Host, body, plan.Mode);
+            if (plan.Relays)
+            {
+                await RelayAsync(e, exchange, plan, body, compressed);
+            }
+            else
+            {
+                Apply(e, exchange, compressed);
+            }
         }
 
-        exchange.Stages.Add("inspector", _time.GetElapsedTime(started));
+        exchange.Stages.Add("inspector", time.GetElapsedTime(started));
     }
 
     /// <summary>Returns the original-content handle when compression stored a request, and picks what a capture keeps of the body.</summary>
     public Task BeforeResponseAsync(object sender, SessionEventArgs e)
     {
         if (e.UserData is not CapturedExchange exchange)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (exchange.Relayed)
         {
             return Task.CompletedTask;
         }
@@ -118,7 +128,7 @@ public sealed partial class ProviderRequestInspector
     /// <summary>Keeps the response numbers of a captured request; a failure is logged and never reaches the exchange.</summary>
     public async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
-        if (_capture is null || e.UserData is not CapturedExchange { CaptureId: { } captureId } exchange)
+        if (!capture.Keeps || e.UserData is not CapturedExchange { CaptureId: { } captureId } exchange)
         {
             return;
         }
@@ -128,19 +138,19 @@ public sealed partial class ProviderRequestInspector
         try
         {
             var response = e.HttpClient.Response;
-            var stage = _time.GetTimestamp();
+            var stage = time.GetTimestamp();
             var reading = exchange.Dialect != Dialect.Anthropic
                 ? new UsageReading(null, ResponseUsageReader.NoUsage)
                 : kept.OverCap
                     ? new UsageReading(null, ResponseUsageReader.OverCap)
                     : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
-            exchange.Stages.Add("usage-read", _time.GetElapsedTime(stage));
+            exchange.Stages.Add("usage-read", time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
-            await _capture.StoreResponseAsync(
+            await capture.StoreResponseAsync(
                 new CapturedResponse(
                     captureId,
-                    _time.GetUtcNow(),
+                    time.GetUtcNow(),
                     response.StatusCode,
                     exchange.RequestBytes,
                     exchange.ForwardedBytes,
@@ -152,7 +162,7 @@ public sealed partial class ProviderRequestInspector
         }
         catch (Exception exception)
         {
-            Log.ResponseCaptureFailed(_logger, e.HttpClient.Request.RequestUri.Host, exception);
+            Log.ResponseCaptureFailed(logger, e.HttpClient.Request.RequestUri.Host, exception);
         }
         finally
         {
@@ -185,21 +195,54 @@ public sealed partial class ProviderRequestInspector
         }
     }
 
-    private async Task<CompressionResult?> CompressAsync(CapturedExchange exchange, Dialect dialect, string? contentType, string host, byte[] body)
+    private async Task<CompressionResult?> CompressAsync(CapturedExchange exchange, Dialect dialect, string? contentType, string host, byte[] body, CcrMode mode)
     {
-        var stage = _time.GetTimestamp();
+        var stage = time.GetTimestamp();
         try
         {
-            var compressed = await _compression.CompressAsync(new CompressionRequest(body, contentType, dialect), CancellationToken.None);
-            exchange.Stages.Add("compression", _time.GetElapsedTime(stage));
+            var compressed = await compression.CompressAsync(new CompressionRequest(body, contentType, dialect) { Ccr = mode }, CancellationToken.None);
+            exchange.Stages.Add("compression", time.GetElapsedTime(stage));
             exchange.Stages.Add("compression.", compressed.Stages);
             return compressed;
         }
         catch (Exception exception)
         {
-            exchange.Stages.Add("compression", _time.GetElapsedTime(stage));
-            Log.CompressionFailed(_logger, host, exception);
+            exchange.Stages.Add("compression", time.GetElapsedTime(stage));
+            Log.CompressionFailed(logger, host, exception);
             return null;
+        }
+    }
+
+    /// <summary>Forwards the request through the CCR relay with the tool appended and the thread pointed at its last message.</summary>
+    private async Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, CcrPlan plan, byte[] body, CompressionResult? compressed)
+    {
+        LogFailures(e, compressed);
+        var forwarded = compressed is { Changed: true } ? compressed.Body.ToArray() : body;
+        if (compressed is { Changed: true, Summary: { } summary })
+        {
+            exchange.ContentId = summary.RequestId;
+        }
+
+        if (plan.Action == CcrAction.RelayWithTool && CcrRequest.AppendTool(forwarded) is { } withTool)
+        {
+            forwarded = withTool;
+        }
+
+        if (plan.Action == CcrAction.RelayContinue)
+        {
+            forwarded = CcrRequest.ContinueFrom(forwarded, plan.ContinueFrom);
+        }
+
+        exchange.ForwardedBytes = forwarded.Length;
+        e.UserData = exchange;
+        await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
+    }
+
+    private void LogFailures(SessionEventArgs e, CompressionResult? compressed)
+    {
+        foreach (var failure in compressed?.PartFailures ?? [])
+        {
+            Log.PartFailed(logger, failure.ChunkId, failure.ContentType, e.HttpClient.Request.RequestUri.Host, failure.Exception);
         }
     }
 
@@ -211,21 +254,17 @@ public sealed partial class ProviderRequestInspector
             return;
         }
 
-        var host = e.HttpClient.Request.RequestUri.Host;
-        foreach (var failure in compressed.PartFailures)
-        {
-            Log.PartFailed(_logger, failure.ChunkId, failure.ContentType, host, failure.Exception);
-        }
+        LogFailures(e, compressed);
 
         if (!compressed.Changed)
         {
             return;
         }
 
-        var stage = _time.GetTimestamp();
+        var stage = time.GetTimestamp();
         var forwarded = compressed.Body.ToArray();
         e.SetRequestBody(forwarded);
-        exchange.Stages.Add("set-body", _time.GetElapsedTime(stage));
+        exchange.Stages.Add("set-body", time.GetElapsedTime(stage));
         exchange.ForwardedBytes = forwarded.Length;
         if (compressed.Summary is { } summary)
         {
@@ -236,18 +275,18 @@ public sealed partial class ProviderRequestInspector
 
     /// <summary>Keeps the body as sent; a failed write is logged and never reaches the request.</summary>
     /// <returns>Whether the request was kept.</returns>
-    private async Task<bool> CaptureAsync(IRequestCaptureStore capture, string captureId, Dialect dialect, Uri uri, byte[] body)
+    private async Task<bool> CaptureAsync(string captureId, Dialect dialect, Uri uri, byte[] body)
     {
         try
         {
             await capture.StoreAsync(
-                new CapturedRequest(captureId, _time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
+                new CapturedRequest(captureId, time.GetUtcNow(), dialect, uri.Host, uri.AbsolutePath, body),
                 CancellationToken.None);
             return true;
         }
         catch (Exception exception)
         {
-            Log.CaptureFailed(_logger, uri.Host, exception);
+            Log.CaptureFailed(logger, uri.Host, exception);
             return false;
         }
     }
@@ -265,5 +304,8 @@ public sealed partial class ProviderRequestInspector
 
         [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "Capturing the response from {ProviderHost} failed; the response was relayed and its numbers are not kept")]
         public static partial void ResponseCaptureFailed(ILogger logger, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1405, Level = LogLevel.Error, Message = "The CCR thread ledger could not be read for a request to {ProviderHost}; the client was told to retry")]
+        public static partial void LedgerLookupFailed(ILogger logger, string providerHost);
     }
 }

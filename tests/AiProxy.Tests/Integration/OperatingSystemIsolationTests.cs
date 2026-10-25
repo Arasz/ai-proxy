@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -23,7 +25,7 @@ public sealed class OperatingSystemIsolationTests
 
         await using (var service = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             new CanonicalProviderHosts(),
             NullLoggerFactory.Instance))
         {

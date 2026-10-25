@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -24,7 +26,7 @@ public sealed class HttpsInspectionTests
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         await using var proxy = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new MarkerCompressionPipeline(), hosts, compressionEnabled: true, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new MarkerCompressionPipeline(), hosts, new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             hosts,
             NullLoggerFactory.Instance);
         proxy.Server.ServerCertificateValidationCallback += (_, e) =>

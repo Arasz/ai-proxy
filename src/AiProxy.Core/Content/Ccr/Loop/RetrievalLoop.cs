@@ -21,6 +21,12 @@ public enum RetrievalState
     Failed,
 }
 
+/// <summary>One move of the retrieval loop and what triggered it.</summary>
+/// <param name="From">The state it left.</param>
+/// <param name="To">The state it entered.</param>
+/// <param name="Trigger">What made it move.</param>
+public sealed record RetrievalMove(RetrievalState From, RetrievalState To, string Trigger);
+
 /// <summary>What the host does after an upstream response ended.</summary>
 public enum RetrievalStep
 {
@@ -55,15 +61,15 @@ public sealed class RetrievalLoop
         [RetrievalState.Failed] = [],
     };
 
-    private readonly List<(RetrievalState From, RetrievalState To, string Trigger)> _history = [];
-    private RetrievalRound _round = new(first: true, nextIndex: 0);
+    private readonly List<RetrievalMove> _history = [];
+    private RetrievalRound _round = RetrievalRound.First();
     private long _outputTokens;
 
     /// <summary>The current state.</summary>
     public RetrievalState State { get; private set; } = RetrievalState.Forwarding;
 
     /// <summary>Every move the loop made, with what triggered it.</summary>
-    public IReadOnlyList<(RetrievalState From, RetrievalState To, string Trigger)> History => _history;
+    public IReadOnlyList<RetrievalMove> History => _history;
 
     /// <summary>The upstream response streaming now.</summary>
     public RetrievalRound Round => _round;
@@ -137,15 +143,14 @@ public sealed class RetrievalLoop
     public RetrievalRound NextRound()
     {
         Move(RetrievalState.Forwarding, "follow-up sent");
-        _round = new RetrievalRound(first: false, _round.NextIndex);
+        _round = _round.Next();
         return _round;
     }
 
     /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
     public IReadOnlyList<SseEvent> Finish()
     {
-        var index = _round.NextIndex;
-        var events = new List<SseEvent>(_round.Release(ref index, includeRetrievals: false));
+        var events = new List<SseEvent>(_round.Release());
         events.Add(Answered == 0 && _round.DeltaEvent is { } received ? received : MergedDelta());
         events.Add(_round.StopEvent ?? new SseEvent("message_stop", """{"type":"message_stop"}"""));
         return events;
@@ -182,7 +187,7 @@ public sealed class RetrievalLoop
             throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
         }
 
-        _history.Add((State, to, trigger));
+        _history.Add(new RetrievalMove(State, to, trigger));
         State = to;
     }
 }

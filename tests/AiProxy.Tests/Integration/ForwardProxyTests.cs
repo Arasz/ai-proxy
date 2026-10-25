@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Net;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
@@ -56,7 +58,7 @@ public sealed class ForwardProxyTests
             var directory = new TemporaryDirectory();
             var service = new TitaniumProxyService(
                 new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
                 new CanonicalProviderHosts(),
                 NullLoggerFactory.Instance);
             await service.StartAsync(TestContext.Current.CancellationToken);

@@ -4,18 +4,34 @@ using System.Text.Json.Nodes;
 
 namespace AiProxy.Core.Content.Ccr.Loop;
 
+/// <summary>Whether the client sees a round's <c>message_start</c>.</summary>
+public enum MessageStart
+{
+    /// <summary>Pass it on: the first round.</summary>
+    Pass,
+
+    /// <summary>Drop it: a follow-up round continues the client's message.</summary>
+    Drop,
+}
+
 /// <summary>
 /// One upstream response inside a client response. Text, thinking and server blocks pass on as they
 /// arrive under the client's block numbering; <c>tool_use</c> blocks, <c>message_delta</c> and
 /// <c>message_stop</c> are held until the loop decides. The assistant content is rebuilt as received.
 /// </summary>
-/// <param name="first">Whether this is the first round, the only one whose <c>message_start</c> the client sees.</param>
+/// <param name="start">Whether the client sees this round's <c>message_start</c>: only the first round's.</param>
 /// <param name="nextIndex">The client block index the first block passed on gets.</param>
-public sealed class RetrievalRound(bool first, int nextIndex)
+public sealed class RetrievalRound(MessageStart start, int nextIndex)
 {
     private readonly Dictionary<int, Block> _blocks = [];
     private readonly List<Block> _order = [];
     private int _nextIndex = nextIndex;
+
+    /// <summary>The round of the first upstream response.</summary>
+    public static RetrievalRound First() => new(MessageStart.Pass, 0);
+
+    /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
+    public RetrievalRound Next() => new(MessageStart.Drop, _nextIndex);
 
     /// <summary>The response's message id, from <c>message_start</c>.</summary>
     public string? MessageId { get; private set; }
@@ -67,7 +83,7 @@ public sealed class RetrievalRound(bool first, int nextIndex)
         {
             case "message_start":
                 MessageId = data?["message"]?["id"]?.GetValue<string>();
-                return first ? [sse] : [];
+                return start == MessageStart.Pass ? [sse] : [];
             case "content_block_start":
                 return Start(sse, data!);
             case "content_block_delta":
@@ -91,17 +107,13 @@ public sealed class RetrievalRound(bool first, int nextIndex)
         }
     }
 
-    /// <summary>Returns the held events of the tool calls the client should see, renumbered from <paramref name="index"/>.</summary>
-    public IReadOnlyList<SseEvent> Release(ref int index, bool includeRetrievals)
+    /// <summary>Returns the held events of the client's tool calls, numbered after the blocks passed on; <c>proxy_retrieve</c> calls are never released.</summary>
+    public IReadOnlyList<SseEvent> Release()
     {
         var released = new List<SseEvent>();
-        foreach (var block in _order.Where(static block => block.Held))
+        var index = _nextIndex;
+        foreach (var block in _order.Where(static block => block.Held && block.Content["name"]?.GetValue<string>() != CcrRetrieval.Name))
         {
-            if (!includeRetrievals && block.Content["name"]?.GetValue<string>() == CcrRetrieval.Name)
-            {
-                continue;
-            }
-
             var clientIndex = index++;
             released.AddRange(block.Events.Select(held => Renumber(held, block.Index, clientIndex)));
         }

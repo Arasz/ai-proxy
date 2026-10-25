@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -89,7 +91,7 @@ public sealed class RootCertificateStorageTests
             {
                 RootCertificatePassword = password,
             },
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             new CanonicalProviderHosts(),
             NullLoggerFactory.Instance);
         await service.StartAsync(TestContext.Current.CancellationToken);

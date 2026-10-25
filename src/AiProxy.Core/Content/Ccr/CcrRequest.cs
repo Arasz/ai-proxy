@@ -122,7 +122,7 @@ public sealed record CcrRequest(bool Stream, bool HasTools, CcrThread Thread, st
     public static byte[] ContinueFrom(ReadOnlySpan<byte> body, string messageId)
     {
         var replacement = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(messageId));
-        var spans = new List<(int Start, int Length)>();
+        var spans = new List<TokenSpan>();
         var reader = new Utf8JsonReader(body);
         var parent = "";
         while (reader.Read())
@@ -143,21 +143,24 @@ public sealed record CcrRequest(bool Stream, bool HasTools, CcrThread Thread, st
                 reader.Read();
                 if (reader.TokenType == JsonTokenType.String)
                 {
-                    spans.Add(((int)reader.TokenStartIndex, reader.ValueSpan.Length + 2));
+                    spans.Add(new TokenSpan((int)reader.TokenStartIndex, reader.ValueSpan.Length + 2));
                 }
             }
         }
 
         using var buffer = new MemoryStream(body.Length + replacement.Length * spans.Count);
         var position = 0;
-        foreach (var (start, length) in spans)
+        foreach (var span in spans)
         {
-            buffer.Write(body[position..start]);
+            buffer.Write(body[position..span.Start]);
             buffer.Write(replacement);
-            position = start + length;
+            position = span.Start + span.Length;
         }
 
         buffer.Write(body[position..]);
         return buffer.ToArray();
     }
+
+    /// <summary>Where a JSON string token sits in the body.</summary>
+    private sealed record TokenSpan(int Start, int Length);
 }

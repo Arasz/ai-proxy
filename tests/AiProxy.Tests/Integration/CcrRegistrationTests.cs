@@ -7,7 +7,7 @@ namespace AiProxy.Tests.Integration;
 public sealed class CcrRegistrationTests
 {
     [Fact]
-    public async Task Compression_registers_separate_transient_preview_and_retrieval_components_without_activating_ccr()
+    public async Task Compression_registers_separate_transient_preview_and_retrieval_components_and_the_ccr_runtime()
     {
         var builder = WebApplication.CreateBuilder();
         builder.Configuration["Proxy:Compression:Enabled"] = "true";
@@ -22,6 +22,7 @@ public sealed class CcrRegistrationTests
             Assert.NotSame(app.Services.GetRequiredService(descriptor.ServiceType), app.Services.GetRequiredService(descriptor.ServiceType));
         }
 
-        Assert.Null(app.Services.GetService<CcrOptions>());
+        Assert.Same(CcrOptions.Default, app.Services.GetService<CcrOptions>());
+        Assert.IsType<AiProxy.Ccr.CcrRuntime>(app.Services.GetRequiredService<AiProxy.Ccr.ICcrRuntime>());
     }
 }

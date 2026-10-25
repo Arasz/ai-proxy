@@ -59,6 +59,8 @@ internal sealed class ProxyHost : IAsyncDisposable
         var proxyPort = ((IPEndPoint)portListener.LocalEndpoint).Port;
         portListener.Stop();
 
+        // Compression is on by default for a person; a test turns it on and names its own database.
+        builder.Configuration["Proxy:Compression:Enabled"] = "false";
         foreach (var (key, value) in configuration)
         {
             builder.Configuration[key] = value;
