@@ -1,5 +1,10 @@
 # Environment variables
 
+Settings live in the `Proxy` configuration section, so each is also readable from the host's usual
+configuration sources. In the environment, a double underscore stands for the section separator:
+`PROXY__COMPRESSION__ENABLED` is the setting `Proxy:Compression:Enabled`. A switch takes `true` or
+`false`; `on` is no longer accepted.
+
 Provider routing needs no environment configuration. ai-proxy recognizes these destination
 hosts and sends all other HTTP traffic through unchanged. HTTPS for other hosts remains an
 opaque tunnel.
@@ -16,7 +21,7 @@ decrypt `mcp.openrouter.ai`, which is an MCP server and not the chat API. Anthro
 region with the `inference_geo` request field, so it has no regional host. The list was checked
 against each provider's documentation on 2026-10-24.
 
-ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` (or the port in `PROXY_PORT`) while it
+ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` (or the port in `PROXY__PORT`) while it
 runs, then restores the prior settings at shutdown. It creates a per-user root certificate
 for HTTPS inspection and asks the operating system to trust it. Clients that do not honor
 system proxy settings or user-root trust are outside this routing path.
@@ -27,10 +32,10 @@ Compression stays off unless enabled, because it changes provider request bodies
 
 | Variable | What it is |
 |---|---|
-| `PROXY_COMPRESSION` | `on` turns request compression on. |
-| `PROXY_COMPRESSION_DB` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
-| `PROXY_COMPRESSION_MINIMUM` | A minimum size applied to every content kind. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
-| `PROXY_COMPRESSION_MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
+| `PROXY__COMPRESSION__ENABLED` | `true` turns request compression on. Anything else, or unset, leaves it off. |
+| `PROXY__COMPRESSION__DATABASE` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
+| `PROXY__COMPRESSION__MINIMUM` | A minimum size applied to every content kind. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
+| `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
 
 The database contains the text tools returned to the agent. Keep it on the machine running
 ai-proxy and protect it like other local agent data.
@@ -42,11 +47,11 @@ is made up (system prompt, tool definitions, turns, tool results, thinking block
 
 | Variable | What it is |
 |---|---|
-| `PROXY_CAPTURE` | `on` or `true` keeps every provider request body the proxy reads, exactly as the client sent it. Anything else, or unset, keeps nothing. |
+| `PROXY__CAPTURE` | `true` keeps every provider request body the proxy reads, exactly as the client sent it. Anything else, or unset, keeps nothing. |
 
 Each request becomes one row of `capture_request` in `~/.ai-proxy/capture.db`: a request id, the
 time, the provider, the host, the path without its query string, and the body as bytes. The body
-is forwarded unchanged. With `PROXY_COMPRESSION=on` as well, the row holds the body from before
+is forwarded unchanged. With `PROXY__COMPRESSION__ENABLED=true` as well, the row holds the body from before
 compression. Bodies over 8 MiB, or sent without a `Content-Length`, are not read and not kept.
 
 Headers and the query string are not stored, so `Authorization`, `x-api-key`, cookies and a
@@ -105,9 +110,9 @@ next capture.
 
 | Variable | What it is |
 |---|---|
-| `PROXY_PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
+| `PROXY__PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
 
-A value that is not a whole number from 1 to 65535, including an empty value, stops startup with
-an error naming `PROXY_PORT`; it never falls back to `8080`. A port another program already holds
-also stops startup, before the system proxy setting is changed. Set `PROXY_PORT` to run beside
+A value that is not a whole number from 1 to 65535 stops startup with
+an error naming `Proxy:Port`; an empty value counts as unset and keeps `8080`; it never falls back to `8080`. A port another program already holds
+also stops startup, before the system proxy setting is changed. Set `PROXY__PORT` to run beside
 another proxy that holds `8080`.
