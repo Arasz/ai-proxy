@@ -174,13 +174,6 @@ jobs:
           VER=$(tr -d '[:space:]' < VERSION)
           if [ -z "$VER" ]; then echo "::error::VERSION at the repo root is empty or missing." >&2; exit 1; fi
           python3 scripts/patch-tool-shell.py "artifacts/osx-arm64/ai-proxy.$VER.nupkg" win-x64 win-arm64 osx-arm64 linux-x64 linux-arm64 linux-musl-x64
-      - name: Pack the client tools
-        if: needs.changes.outputs.code == 'true'
-        # ai-proxy-cli and ai-proxy-mcp are managed-only, so one portable pack each.
-        run: |
-          set -euo pipefail
-          dotnet pack src/AiProxy.Cli/AiProxy.Cli.csproj -c Release -o artifacts/clients --nologo
-          dotnet pack src/AiProxy.Mcp/AiProxy.Mcp.csproj -c Release -o artifacts/clients --nologo
       - name: Upload the packed runtime identifiers
         if: always() && needs.changes.outputs.code == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

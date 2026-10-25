@@ -8,7 +8,7 @@
     <Description>Spectre terminal views of ai-proxy statistics.</Description>
     <Authors>Rafał Araszkiewicz</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/Arasz/ai-proxy</RepositoryUrl><PackageProjectUrl>https://github.com/Arasz/ai-proxy</PackageProjectUrl><PackageTags>ai-proxy cli spectre dotnet-tool</PackageTags>
+    <RepositoryUrl>https://github.com/Arasz/ai-proxy</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../AiProxy.Client/AiProxy.Client.csproj" />
