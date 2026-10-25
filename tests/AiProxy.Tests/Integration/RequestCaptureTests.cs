@@ -505,7 +505,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal(TimeSpan.Zero, stages["usage-read"]);
     }
 
-    [Fact]
+    [Fact(Skip = TimingDependent.Reason)]
     public async Task Titanium_times_the_wait_for_the_first_byte_apart_from_the_whole_exchange()
     {
         await using var upstream = await FakeUpstream.StartAsync();

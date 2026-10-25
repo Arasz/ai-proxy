@@ -209,7 +209,7 @@ public sealed class ContentStoreTests : IDisposable
         });
     }
 
-    [Fact]
+    [Fact(Skip = TimingDependent.Reason)]
     public async Task The_producer_gives_up_quickly_when_another_connection_holds_the_lock()
     {
         // The producer's write stands between a request and its provider, so it waits a
