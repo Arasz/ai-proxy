@@ -1,6 +1,6 @@
 # ai-proxy
 
-[![M8ven Score](https://m8ven.ai/badge/mcp/arasz-ai-proxy-1h8736?v=142d422d66d0374c40803305f6d4dd6e)](https://m8ven.ai/mcp/arasz-ai-proxy-1h8736?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/arasz-ai-proxy-1h8736)](https://m8ven.ai/mcp/arasz-ai-proxy-1h8736?s=readme)
 
 ai-proxy installs itself as the current user's system HTTP and HTTPS proxy while it runs. It
 routes the standard API hosts for OpenAI, Anthropic, Google Gemini, and OpenRouter, and passes
