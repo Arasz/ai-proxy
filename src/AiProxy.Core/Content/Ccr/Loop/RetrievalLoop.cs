@@ -1,0 +1,188 @@
+using System.Text.Json.Nodes;
+
+namespace AiProxy.Core.Content.Ccr.Loop;
+
+/// <summary>Where a client response is in the retrieval loop.</summary>
+public enum RetrievalState
+{
+    /// <summary>An upstream response is streaming to the client.</summary>
+    Forwarding,
+
+    /// <summary>The upstream response ended; its tool calls are held while the loop decides.</summary>
+    HoldingTools,
+
+    /// <summary>The proxy is answering <c>proxy_retrieve</c> calls and sending the follow-up.</summary>
+    Retrieving,
+
+    /// <summary>The message is complete and ready to release.</summary>
+    Done,
+
+    /// <summary>The client got an error event.</summary>
+    Failed,
+}
+
+/// <summary>What the host does after an upstream response ended.</summary>
+public enum RetrievalStep
+{
+    /// <summary>Write <see cref="RetrievalLoop.Finish"/> and stop.</summary>
+    Release,
+
+    /// <summary>Answer the round's calls with <see cref="RetrievalLoop.ToolResults"/> and send a follow-up.</summary>
+    Retrieve,
+
+    /// <summary>Write <see cref="RetrievalLoop.Failure"/> and stop.</summary>
+    Fail,
+}
+
+/// <summary>
+/// The retrieval loop of one client response: the declared state transitions, the rounds, and the
+/// merge of every upstream response into the one message the client sees.
+/// </summary>
+public sealed class RetrievalLoop
+{
+    /// <summary>How many rounds of <c>proxy_retrieve</c> calls are answered with text.</summary>
+    public const int MaximumRounds = 3;
+
+    /// <summary>What a client call made next to <c>proxy_retrieve</c> gets instead of running.</summary>
+    public const string DeferredCall = "Not run: this call was made together with proxy_retrieve. Read the retrieved text, then issue this call again.";
+
+    private static readonly Dictionary<RetrievalState, RetrievalState[]> Transitions = new()
+    {
+        [RetrievalState.Forwarding] = [RetrievalState.HoldingTools, RetrievalState.Failed],
+        [RetrievalState.HoldingTools] = [RetrievalState.Retrieving, RetrievalState.Done, RetrievalState.Failed],
+        [RetrievalState.Retrieving] = [RetrievalState.Forwarding, RetrievalState.Failed],
+        [RetrievalState.Done] = [RetrievalState.Failed],
+        [RetrievalState.Failed] = [],
+    };
+
+    private readonly List<(RetrievalState From, RetrievalState To, string Trigger)> _history = [];
+    private RetrievalRound _round = new(first: true, nextIndex: 0);
+    private long _outputTokens;
+
+    /// <summary>The current state.</summary>
+    public RetrievalState State { get; private set; } = RetrievalState.Forwarding;
+
+    /// <summary>Every move the loop made, with what triggered it.</summary>
+    public IReadOnlyList<(RetrievalState From, RetrievalState To, string Trigger)> History => _history;
+
+    /// <summary>The upstream response streaming now.</summary>
+    public RetrievalRound Round => _round;
+
+    /// <summary>How many rounds of calls were answered.</summary>
+    public int Answered { get; private set; }
+
+    /// <summary>The message id of the first upstream response: the one the client saw.</summary>
+    public string? FirstMessageId { get; private set; }
+
+    /// <summary>Whether the round being answered gets <c>limit_reached</c> instead of text.</summary>
+    public bool AtLimit => Answered > MaximumRounds;
+
+    /// <summary>Decides what follows the current round, once its upstream response ended or failed.</summary>
+    public RetrievalStep Decide()
+    {
+        FirstMessageId ??= _round.MessageId;
+        if (_round.Failed || !_round.Ended)
+        {
+            Move(RetrievalState.Failed, _round.Failed ? "upstream error event" : "upstream ended without message_stop");
+            return RetrievalStep.Fail;
+        }
+
+        Move(RetrievalState.HoldingTools, "message_stop");
+        _outputTokens += _round.OutputTokens;
+        var retrieves = _round.StopReason == "tool_use" && _round.ToolCalls.Any(static call => call.IsRetrieval);
+        if (!retrieves)
+        {
+            Move(RetrievalState.Done, "no proxy_retrieve call");
+            return RetrievalStep.Release;
+        }
+
+        if (Answered > MaximumRounds)
+        {
+            Move(RetrievalState.Failed, "proxy_retrieve called after limit_reached");
+            return RetrievalStep.Fail;
+        }
+
+        Answered++;
+        Move(RetrievalState.Retrieving, Answered > MaximumRounds ? "proxy_retrieve over the limit" : "proxy_retrieve call");
+        return RetrievalStep.Retrieve;
+    }
+
+    /// <summary>The tool results of the round being answered: retrievals from <paramref name="answers"/>, every other call deferred.</summary>
+    public JsonArray ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers)
+    {
+        var results = new JsonArray();
+        foreach (var call in _round.ToolCalls)
+        {
+            var answer = call.IsRetrieval
+                ? answers[call.Id]
+                : new CcrRetrieval(DeferredCall, "deferred");
+            var result = new JsonObject
+            {
+                ["type"] = "tool_result",
+                ["tool_use_id"] = call.Id,
+                ["content"] = answer.Text,
+            };
+            if (answer.Error is not null)
+            {
+                result["is_error"] = true;
+            }
+
+            results.Add(result);
+        }
+
+        return results;
+    }
+
+    /// <summary>Starts the round of the follow-up response; its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
+    public RetrievalRound NextRound()
+    {
+        Move(RetrievalState.Forwarding, "follow-up sent");
+        _round = new RetrievalRound(first: false, _round.NextIndex);
+        return _round;
+    }
+
+    /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
+    public IReadOnlyList<SseEvent> Finish()
+    {
+        var index = _round.NextIndex;
+        var events = new List<SseEvent>(_round.Release(ref index, includeRetrievals: false));
+        events.Add(Answered == 0 && _round.DeltaEvent is { } received ? received : MergedDelta());
+        events.Add(_round.StopEvent ?? new SseEvent("message_stop", """{"type":"message_stop"}"""));
+        return events;
+    }
+
+    /// <summary>The last response's <c>message_delta</c> with the output tokens of every response.</summary>
+    private SseEvent MergedDelta()
+    {
+        var delta = _round.Delta?.DeepClone().AsObject() ?? new JsonObject { ["type"] = "message_delta", ["delta"] = new JsonObject() };
+        if (delta["usage"] is not JsonObject usage)
+        {
+            delta["usage"] = usage = [];
+        }
+
+        usage["output_tokens"] = _outputTokens;
+        return new SseEvent("message_delta", delta.ToJsonString(RetrievalJsonOptions.Relaxed));
+    }
+
+    /// <summary>The error event of a failed loop.</summary>
+    public SseEvent Failure(string message)
+    {
+        if (State != RetrievalState.Failed)
+        {
+            Move(RetrievalState.Failed, message);
+        }
+
+        return SseEvent.Error("api_error", message);
+    }
+
+    private void Move(RetrievalState to, string trigger)
+    {
+        if (!Transitions[State].Contains(to))
+        {
+            throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
+        }
+
+        _history.Add((State, to, trigger));
+        State = to;
+    }
+}
