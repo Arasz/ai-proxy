@@ -41,6 +41,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="JsonSchema.Net" />
       <PackageReference Include="Titanium.Web.Proxy" />
     </ItemGroup>
 

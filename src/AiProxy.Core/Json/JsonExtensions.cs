@@ -16,7 +16,7 @@ internal static class JsonExtensions
 
     extension(JsonDocument)
     {
-        /// <summary>Parses the text or returns null when it is not JSON.</summary>
+        /// <summary>Parses the text or returns null when it is not JSON or holds an unpaired surrogate.</summary>
         /// <param name="text">The text to parse.</param>
         public static JsonDocument? TryParse(string text)
         {
@@ -24,7 +24,7 @@ internal static class JsonExtensions
             {
                 return JsonDocument.Parse(text);
             }
-            catch (JsonException)
+            catch (Exception exception) when (exception is JsonException or ArgumentException)
             {
                 return null;
             }

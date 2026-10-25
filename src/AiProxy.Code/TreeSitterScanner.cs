@@ -52,16 +52,16 @@ internal static class TreeSitterScanner
     private static List<CodeToken>? Spans(string text, Node root, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
     {
         var spans = new List<CodeToken>();
-        var stack = new Stack<(Node? Node, int Start, int End)>();
-        stack.Push((root, 0, 0));
+        var stack = new Stack<ScanItem>();
+        stack.Push(ScanItem.Visit(root));
         while (stack.Count > 0)
         {
-            var (node, start, end) = stack.Pop();
-            if (node is null)
+            var item = stack.Pop();
+            if (item.Node is not { } node)
             {
-                if (end > start)
+                if (item.End > item.Start)
                 {
-                    spans.Add(new CodeToken(CodeTokenKind.String, text[start..end], start, 0));
+                    spans.Add(new CodeToken(CodeTokenKind.String, text[item.Start..item.End], item.Start, 0));
                 }
                 continue;
             }
@@ -85,26 +85,26 @@ internal static class TreeSitterScanner
             }
             for (var index = children.Count - 1; index >= 0; index--)
             {
-                stack.Push((children[index], 0, 0));
+                stack.Push(ScanItem.Visit(children[index]));
             }
         }
         return spans;
     }
 
-    private static void PushLiteral(Stack<(Node? Node, int Start, int End)> stack, Node node, IReadOnlyList<Node> children, string? embedded)
+    private static void PushLiteral(Stack<ScanItem> stack, Node node, IReadOnlyList<Node> children, string? embedded)
     {
-        var items = new List<(Node? Node, int Start, int End)>();
+        var items = new List<ScanItem>();
         var cursor = node.StartIndex;
         foreach (var child in children)
         {
             if (child.Type == embedded)
             {
-                items.Add((null, cursor, child.StartIndex));
-                items.Add((child, 0, 0));
+                items.Add(ScanItem.Literal(cursor, child.StartIndex));
+                items.Add(ScanItem.Visit(child));
                 cursor = child.EndIndex;
             }
         }
-        items.Add((null, cursor, node.EndIndex));
+        items.Add(ScanItem.Literal(cursor, node.EndIndex));
         for (var index = items.Count - 1; index >= 0; index--)
         {
             stack.Push(items[index]);
@@ -259,4 +259,12 @@ internal static class TreeSitterScanner
     }
 
     private static CodeLexResult Unsupported() => new(false, []);
+
+    /// <summary>One pending scan step: a node to visit, or the literal text between <c>Start</c> and <c>End</c>.</summary>
+    private sealed record ScanItem(Node? Node, int Start, int End)
+    {
+        public static ScanItem Visit(Node node) => new(node, 0, 0);
+
+        public static ScanItem Literal(int start, int end) => new(null, start, end);
+    }
 }

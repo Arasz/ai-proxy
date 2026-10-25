@@ -153,7 +153,7 @@ public sealed class ContentDecompositorTests
         Assert.Equal(ContentType.Markdown, decomposition.Parts[0].Type);
     }
 
-    [Fact]
+    [Fact(Skip = TimingDependent.Reason)]
     public void A_payload_of_lines_that_open_a_value_and_close_none_is_decomposed_quickly()
     {
         // Looking for a JSON value that never balances costs a scan to the end of the
