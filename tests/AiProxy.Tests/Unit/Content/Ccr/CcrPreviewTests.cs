@@ -165,6 +165,26 @@ public sealed partial class CcrPreviewTests
         Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
     }
 
+    [Fact]
+    public void A_built_preview_padded_back_over_the_minimum_is_not_previewed_again()
+    {
+        var preview = Build(Log(400));
+
+        Assert.True(CcrPreview.IsIn(preview.Text));
+        Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(preview.Text + "\n" + Log(400), Options));
+    }
+
+    [Theory]
+    [InlineData("    public const string Marker = \"[proxy preview \";")]
+    [InlineData("Use the id from a [proxy preview ...] line.")]
+    [InlineData("[proxy preview 0123456789ABCDEF: 1 of 2 lines shown.]")]
+    public void Text_that_only_mentions_the_marker_is_still_previewed(string mention)
+    {
+        var original = mention + "\n" + Log(400);
+
+        Assert.NotNull(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
+    }
+
     [Theory]
     [InlineData("plain")]
     [InlineData("signals")]

@@ -23,7 +23,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         try
         {
             if (options.TokensOf(original.Length) < options.MinimumTokens
-                || original.Contains(CcrPreview.Marker, StringComparison.Ordinal))
+                || CcrPreview.IsIn(original))
             {
                 return null;
             }
