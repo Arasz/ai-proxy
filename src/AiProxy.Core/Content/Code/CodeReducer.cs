@@ -9,29 +9,20 @@ public sealed record CodeReductionOptions(bool RemoveComments = true, bool Remov
 public sealed record CodeReductionResult(string Text, bool Changed, bool Supported, IReadOnlyDictionary<string, string> RenameMap);
 
 /// <summary>Builds compact source read views using an explicit path and caller-rendered retrieval hint.</summary>
-public sealed class CodeReducer
+public sealed class CodeReducer(ICodeLexer lexer)
 {
     private static readonly char[] Quotes = ['"', '\'', '`'];
 
-    private readonly ICodeLexer _lexer;
-
-    /// <summary>Creates a C# view builder with a caller-supplied syntax adapter.</summary>
-    public CodeReducer(ICodeLexer lexer)
-    {
-        ArgumentNullException.ThrowIfNull(lexer);
-        _lexer = lexer;
-    }
 
     /// <summary>Returns the original when safety or complete-view savings cannot be established.</summary>
     public CodeReductionResult Reduce(string text, string? filePath, CodeReductionOptions? options, string? retrievalHint)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        if (string.IsNullOrWhiteSpace(retrievalHint) || !_lexer.SupportsPath(filePath))
+        if (string.IsNullOrWhiteSpace(retrievalHint) || !lexer.SupportsPath(filePath))
         {
             return Original(text, false);
         }
         var (source, prefixes) = Unnumber(text);
-        var lexed = _lexer.Lex(source, filePath);
+        var lexed = lexer.Lex(source, filePath);
         if (!lexed.Supported)
         {
             return Original(text, false);
@@ -96,7 +87,7 @@ public sealed class CodeReducer
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2 || _lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
+            if (group.Count() < 2 || lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
             {
                 continue;
             }
@@ -105,7 +96,7 @@ public sealed class CodeReducer
             {
                 candidate = ShortName(next++);
             }
-            while (reserved.Contains(candidate) || _lexer.IsKeyword(candidate));
+            while (reserved.Contains(candidate) || lexer.IsKeyword(candidate));
             if (candidate.Length >= group.Key.Length)
             {
                 continue;

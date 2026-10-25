@@ -3,12 +3,12 @@ using TreeSitter;
 namespace AiProxy.Code;
 
 /// <summary>A Tree-sitter grammar loaded on first use; a grammar or native library that fails to load yields null, once.</summary>
-internal sealed class TreeSitterLanguage(string name)
+public sealed class TreeSitterLanguage(string name)
 {
     private readonly Lazy<Language?> _language = new(() => Load(name));
 
     /// <summary>The loaded grammar, or null when it could not be loaded.</summary>
-    public Language? Value => _language.Value;
+    internal Language? Value => _language.Value;
 
     private static Language? Load(string name)
     {

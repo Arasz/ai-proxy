@@ -6,11 +6,9 @@ using TreeSitter;
 namespace AiProxy.Code;
 
 /// <summary>Scans JavaScript and JSX with the Tree-sitter grammar; template text is string, <c>${}</c> is code.</summary>
-public sealed partial class JavaScriptCodeLexer : ICodeLexer
+public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : ICodeLexer
 {
     private static readonly TreeSitterLanguage JavaScript = new("JavaScript");
-
-    private readonly TreeSitterLanguage _language;
 
     /// <summary>Reserved words, contextual keywords and globals that change meaning when renamed.</summary>
     internal static readonly FrozenSet<string> Keywords =
@@ -38,8 +36,6 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
     {
     }
 
-    internal JavaScriptCodeLexer(TreeSitterLanguage language) => _language = language;
-
     /// <inheritdoc />
     public bool SupportsPath(string? filePath) =>
         filePath is not null
@@ -52,7 +48,7 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
     public bool IsKeyword(string text) => Keywords.Contains(text);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, _language, Grammar, IsKeyword);
+    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
 
     /// <summary>The JavaScript-family mapping, extended with a dialect's identifier and literal node types.</summary>
     internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, IReadOnlyDictionary<string, string?> strings)
