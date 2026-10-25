@@ -103,7 +103,7 @@ Expected compression under the fallback (owner question F13). The fallback (cach
 | code | 18% | 6% |
 | json | 30% (4% counted) | 0% |
 | build | 26% (0.4% counted) | 0% |
-| test | 25% (21% counted) | not scored |
+| test | 25% (21% counted) | 0% |
 | log | 24.6% (after the log reducer fix) | 0% |
 | prose, listing | 0% (no rule fires) | 0% |
 
