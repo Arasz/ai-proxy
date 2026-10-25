@@ -13,8 +13,8 @@ public sealed class ContentEndpointTests : IAsyncDisposable
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
-            ["PROXY_COMPRESSION"] = "on",
-            ["PROXY_COMPRESSION_DB"] = _databasePath,
+            ["Proxy:Compression:Enabled"] = "true",
+            ["Proxy:Compression:Database"] = _databasePath,
         });
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
         var store = proxy.Services.GetRequiredService<IContentStore>();

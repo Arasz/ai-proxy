@@ -139,7 +139,7 @@ public sealed class UpstreamDropTests
 
     private static Task<ProxyHost> StartProxyAsync(bool provider, bool capture, ILoggerProvider? logs = null) =>
         ProxyHost.StartAsync(
-            capture ? new Dictionary<string, string> { ["PROXY_CAPTURE"] = "on" } : new Dictionary<string, string>(),
+            capture ? new Dictionary<string, string> { ["Proxy:Capture"] = "true" } : new Dictionary<string, string>(),
             providerHosts: provider ? new LoopbackProviderHosts(Dialect.Anthropic) : new NoProviderHosts(),
             logging: logs);
 

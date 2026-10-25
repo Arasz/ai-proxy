@@ -19,11 +19,11 @@ Clients that ignore the operating system proxy, or do not trust the user's root 
 will connect directly or reject inspected provider HTTPS requests.
 
 When ai-proxy stops cleanly, it restores the operating system's previous proxy settings. The
-listener binds to loopback at `127.0.0.1:8080` (set `PROXY_PORT` to change the port); it is not exposed to the local network.
+listener binds to loopback at `127.0.0.1:8080` (set `PROXY__PORT` to change the port); it is not exposed to the local network.
 
 The proxy forwards the caller's credentials unchanged. It has no provider-owned API keys.
-Compression remains off unless enabled with `PROXY_COMPRESSION=on`; see the
-[compression guide](docs/how-to/turning-on-the-compression-stage.md). `PROXY_CAPTURE=on` keeps a
+Compression remains off unless enabled with `PROXY__COMPRESSION__ENABLED=true`; see the
+[compression guide](docs/how-to/turning-on-the-compression-stage.md). `PROXY__CAPTURE=true` keeps a
 local copy of every provider request body to measure what requests are made of; see
 [environment variables](docs/reference/environment-variables.md#request-capture).
 

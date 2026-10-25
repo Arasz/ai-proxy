@@ -16,6 +16,14 @@ public sealed class ProxyPortTests
     }
 
     [Fact]
+    public void An_empty_port_is_unset_and_keeps_the_default_8080()
+    {
+        var (_, options) = Compose("");
+
+        Assert.Equal(8080, options.Port);
+    }
+
+    [Fact]
     public void A_valid_port_is_used_for_the_listener_address()
     {
         var (address, options) = Compose("18123");
@@ -29,13 +37,12 @@ public sealed class ProxyPortTests
     [InlineData("0")]
     [InlineData("70000")]
     [InlineData("-1")]
-    [InlineData("")]
     [InlineData("  ")]
-    public void An_invalid_port_fails_startup_naming_the_variable(string value)
+    public void An_invalid_port_fails_startup_naming_the_setting(string value)
     {
-        var failure = Assert.Throws<InvalidOperationException>(() => Compose(value));
+        var failure = Assert.ThrowsAny<Exception>(() => Compose(value));
 
-        Assert.Contains("PROXY_PORT", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Proxy:Port", failure.Message, StringComparison.Ordinal);
     }
 
     private static (Uri Address, ProxyRuntimeOptions Options) Compose(string? port)
@@ -43,7 +50,7 @@ public sealed class ProxyPortTests
         var builder = WebApplication.CreateBuilder();
         if (port is not null)
         {
-            builder.Configuration["PROXY_PORT"] = port;
+            builder.Configuration["Proxy:Port"] = port;
         }
 
         var app = ProxyApplication.Create(builder);

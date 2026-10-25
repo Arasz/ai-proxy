@@ -28,7 +28,7 @@ forwarded without request-body inspection.
 
 The root certificate and its private key are kept in `~/.ai-proxy/root-ca.pfx`. On Linux and
 macOS the directory is created (or tightened) to mode `0700` and the file to `0600`, so file
-permissions are the main protection. Set `PROXY_ROOT_CERTIFICATE_PASSWORD` to also encrypt the
+permissions are the main protection. Set `PROXY__ROOTCERTIFICATEPASSWORD` to also encrypt the
 pfx; changing or removing the password later makes the existing file unreadable, and ai-proxy
 generates a new root that has to be trusted again. Per-host leaf certificates live in memory
 only. ai-proxy adds the root to the operating-system trust store only when root trust is
@@ -44,7 +44,7 @@ Compression is opt-in. When enabled, original request bodies that were changed a
 the local content database and can be retrieved through the local content endpoint. Protect
 that database as agent data.
 
-Request capture is opt-in too. With `PROXY_CAPTURE=on`, the full body of every provider request
+Request capture is opt-in too. With `PROXY__CAPTURE=true`, the full body of every provider request
 the proxy reads is stored locally in `~/.ai-proxy/capture.db`, whether or not compression changed
 it. That is prompts, code and tool output, and any secret pasted into them. Request headers and
 the query string are not stored, so credentials sent as headers or a `?key=` parameter are not

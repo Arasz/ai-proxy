@@ -167,7 +167,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await ProxyHost.StartAsync(
-            new Dictionary<string, string> { ["PROXY_CAPTURE"] = "on" },
+            new Dictionary<string, string> { ["Proxy:Capture"] = "true" },
             providerHosts: new SingleProviderHost("127.0.0.1", Dialect.Anthropic));
         var providerBody = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}""");
         var otherBody = Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}""");
@@ -416,7 +416,7 @@ public sealed class RequestCaptureTests : IDisposable
             return context.Response.WriteAsync(responseBody);
         };
         await using var proxy = await ProxyHost.StartAsync(
-            new Dictionary<string, string> { ["PROXY_CAPTURE"] = "on" },
+            new Dictionary<string, string> { ["Proxy:Capture"] = "true" },
             providerHosts: new LoopbackProviderHosts(dialect));
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
@@ -735,13 +735,13 @@ public sealed class RequestCaptureTests : IDisposable
         var configuration = new Dictionary<string, string>();
         if (capture)
         {
-            configuration["PROXY_CAPTURE"] = "on";
+            configuration["Proxy:Capture"] = "true";
         }
 
         if (compression)
         {
-            configuration["PROXY_COMPRESSION"] = "on";
-            configuration["PROXY_COMPRESSION_DB"] = _contentDatabasePath;
+            configuration["Proxy:Compression:Enabled"] = "true";
+            configuration["Proxy:Compression:Database"] = _contentDatabasePath;
         }
 
         return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs, time: time);

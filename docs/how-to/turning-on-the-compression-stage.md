@@ -25,11 +25,11 @@ survives is intact, and a fact that does not survive is in the store.
 Set the variable and start the proxy:
 
 ```bash
-export PROXY_COMPRESSION=on
-export PROXY_COMPRESSION_DB=~/.ai-proxy/content.db
+export PROXY__COMPRESSION__ENABLED=true
+export PROXY__COMPRESSION__DATABASE=~/.ai-proxy/content.db
 ```
 
-`PROXY_COMPRESSION_DB` is optional, and the default is the path above. The database is
+`PROXY__COMPRESSION__DATABASE` is optional, and the default is the path above. The database is
 created on the first request, and it holds the text your tools returned, so it belongs on the
 machine the proxy runs on.
 
@@ -61,12 +61,12 @@ problem details response and a 404, not with an empty body.
 
 Each kind has its own smallest part worth compressing: 200 characters for a log, 100 for JSON,
 512 for prose. A part under its threshold is left alone, because compressing a small part
-costs more than it saves. `PROXY_COMPRESSION_MINIMUM` sets one threshold for every kind and
+costs more than it saves. `PROXY__COMPRESSION__MINIMUM` sets one threshold for every kind and
 overrides them all.
 
 ## The model
 
-`PROXY_COMPRESSION_MODEL` points at the extractive model's artifact. The model is not in this
+`PROXY__COMPRESSION__MODEL` points at the extractive model's artifact. The model is not in this
 release, and the rule-based prose path runs until it is. The measurements that chose the rules
 are in the
 [compression research record](../work/2026-10-22-on-device-compression-models.md), and the

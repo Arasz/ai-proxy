@@ -64,7 +64,7 @@ public sealed class RootCertificateStorageTests
         byte[] bytes;
         await using (var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
-            ["PROXY_ROOT_CERTIFICATE_PASSWORD"] = "from config",
+            ["Proxy:RootCertificatePassword"] = "from config",
         }))
         {
             bytes = await File.ReadAllBytesAsync(

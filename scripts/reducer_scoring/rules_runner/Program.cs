@@ -19,8 +19,8 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRo
 builder.Configuration.Sources.Clear();
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
-    ["PROXY_COMPRESSION"] = "on",
-    ["PROXY_COMPRESSION_DB"] = Path.Combine(store.FullName, "content.db"),
+    ["Proxy:Compression:Enabled"] = "true",
+    ["Proxy:Compression:Database"] = Path.Combine(store.FullName, "content.db"),
 });
 builder.Logging.ClearProviders();
 
