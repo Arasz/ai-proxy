@@ -5,6 +5,15 @@ namespace AiProxy.Core.Json;
 /// <summary>Reads of a parsed <see cref="JsonElement" /> that tolerate a missing or mistyped value.</summary>
 internal static class JsonExtensions
 {
+    extension(string text)
+    {
+        public bool IsJson()
+        {
+            using var document = JsonDocument.TryParse(text);
+            return document is not null;
+        }
+    }
+
     extension(JsonDocument)
     {
         /// <summary>Parses the text or returns null when it is not JSON.</summary>

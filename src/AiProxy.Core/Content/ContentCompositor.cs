@@ -15,7 +15,7 @@ public sealed class ContentCompositor : ICompositor
         var placeholders = decomposition.Parts
             .Select(part => new
             {
-                Placeholder = ContentDecompositor.Placeholder(part.Type, part.ChunkId),
+                Placeholder = part.Type.Placeholder(part.ChunkId),
                 Text = reduced.TryGetValue(part.ChunkId, out var text) ? text : part.Text,
             })
             .ToList();

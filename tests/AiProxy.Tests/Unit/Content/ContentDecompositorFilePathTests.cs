@@ -102,7 +102,7 @@ public sealed class ContentDecompositorFilePathTests
     {
         var decomposition = Decompositor.Decompose(Text, "request", "src/Program.cs");
 
-        Assert.Equal(ContentDecompositor.Placeholder(ContentType.SourceCode, 1), decomposition.Template);
+        Assert.Equal(ContentType.SourceCode.Placeholder(1), decomposition.Template);
     }
 
     [Fact]
