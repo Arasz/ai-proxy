@@ -12,7 +12,6 @@ public sealed class CcrPreviewOverlay
     /// <summary>Lists identifiers absent from the shown text, within the supplied character budget.</summary>
     public string Build(string shownText, string hiddenText, int room)
     {
-        Reset();
         try
         {
             _known.UnionWith(MustKeepOverlay.Identifiers(shownText));

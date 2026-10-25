@@ -20,7 +20,6 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     /// <summary>Returns a preview, or null for a small region, an existing preview, or insufficient budget.</summary>
     public CcrPreview? Build(string original, CcrOptions options)
     {
-        Reset();
         try
         {
             if (options.TokensOf(original.Length) < options.MinimumTokens
@@ -142,10 +141,14 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
 
     private int AddShownLine(int index)
     {
-        _body.Add(index == 0 && _cut is not null ? _cut : _lines[index]);
         if (index == 0 && _cut is not null)
         {
+            _body.Add(_cut);
             _body.Add(Cut(_cut.Length, _lines[0].Length));
+        }
+        else
+        {
+            _body.Add(_lines[index]);
         }
 
         return index + 1;
