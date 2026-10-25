@@ -36,9 +36,9 @@ public sealed class ToolOutputRegionFinder
         return tokenCount > documentCount ? [] : regions;
     }
 
-    private static (Dictionary<int, string?> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
+    private static (Dictionary<int, FileRead?> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
     {
-        var indexes = new Dictionary<int, string?>();
+        var indexes = new Dictionary<int, FileRead?>();
 
         JsonDocument document;
         try
@@ -59,7 +59,7 @@ public sealed class ToolOutputRegionFinder
         }
     }
 
-    private static void Walk(JsonElement element, ref int counter, Dictionary<int, string?> indexes, ToolCallFiles files)
+    private static void Walk(JsonElement element, ref int counter, Dictionary<int, FileRead?> indexes, ToolCallFiles files)
     {
         switch (element.ValueKind)
         {
@@ -72,7 +72,7 @@ public sealed class ToolOutputRegionFinder
                 {
                     if (IsToolOutputProperty(element, property))
                     {
-                        WalkToolOutput(property.Value, ref counter, indexes, files, files.PathFor(element));
+                        WalkToolOutput(property.Value, ref counter, indexes, files, files.ReadFor(element));
                         continue;
                     }
 
@@ -97,9 +97,9 @@ public sealed class ToolOutputRegionFinder
     private static void WalkToolOutput(
         JsonElement value,
         ref int counter,
-        Dictionary<int, string?> indexes,
+        Dictionary<int, FileRead?> indexes,
         ToolCallFiles files,
-        string? path)
+        FileRead? path)
     {
         // A path names one whole file, so an output that spans more than one string keeps none.
         var first = counter;
@@ -122,9 +122,9 @@ public sealed class ToolOutputRegionFinder
     private static void WalkToolOutputStrings(
         JsonElement value,
         ref int counter,
-        Dictionary<int, string?> indexes,
+        Dictionary<int, FileRead?> indexes,
         ToolCallFiles files,
-        string? path)
+        FileRead? path)
     {
         switch (value.ValueKind)
         {
@@ -207,7 +207,7 @@ public sealed class ToolOutputRegionFinder
             ? value.GetString()
             : null;
 
-    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, Dictionary<int, string?> indexes)
+    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, Dictionary<int, FileRead?> indexes)
     {
         var regions = new List<ContentRegion>();
         var reader = new Utf8JsonReader(body);
@@ -220,11 +220,12 @@ public sealed class ToolOutputRegionFinder
                 continue;
             }
 
-            if (indexes.TryGetValue(counter, out var path))
+            if (indexes.TryGetValue(counter, out var read))
             {
                 var start = (int)reader.TokenStartIndex;
                 var end = EndOfStringToken(body, start);
-                regions.Add(new ContentRegion(start, end - start, reader.GetString() ?? "", path));
+                var text = reader.GetString() ?? "";
+                regions.Add(new ContentRegion(start, end - start, text, read?.PathFor(text)));
             }
 
             counter++;

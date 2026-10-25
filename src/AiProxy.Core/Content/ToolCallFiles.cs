@@ -11,7 +11,7 @@ internal sealed class ToolCallFiles
 {
     private static readonly string[] PathKeys = ["file_path", "path", "filePath"];
 
-    private readonly Dictionary<string, string?> _calls = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FileRead?> _calls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);
 
     /// <summary>Collects the calls and the result ids of the document.</summary>
@@ -23,9 +23,9 @@ internal sealed class ToolCallFiles
         return files;
     }
 
-    /// <summary>The whole file the call answered by this result read, or null.</summary>
+    /// <summary>The whole-file read the call answered by this result made, or null.</summary>
     /// <param name="result">The object that carries the tool output.</param>
-    public string? PathFor(JsonElement result)
+    public FileRead? ReadFor(JsonElement result)
     {
         var id = ResultId(result);
         if (id is null || _results.GetValueOrDefault(id) != 1)
@@ -101,7 +101,7 @@ internal sealed class ToolCallFiles
         }
     }
 
-    private void AddCall(string id, string? path)
+    private void AddCall(string id, FileRead? path)
     {
         // A second call with the same id makes both ambiguous, so the id keeps no path.
         _calls[id] = _calls.ContainsKey(id) ? null : path;
@@ -128,7 +128,7 @@ internal sealed class ToolCallFiles
         return GetString(element, "role") == "tool" ? GetString(element, "tool_call_id") : null;
     }
 
-    private static string? PathOf(string? name, string? arguments)
+    private static FileRead? PathOf(string? name, string? arguments)
     {
         if (arguments is null)
         {
@@ -146,7 +146,7 @@ internal sealed class ToolCallFiles
         }
     }
 
-    private static string? PathOf(string? name, JsonElement input)
+    private static FileRead? PathOf(string? name, JsonElement input)
     {
         if (name is null || !name.Contains("read", StringComparison.OrdinalIgnoreCase) ||
             input.ValueKind != JsonValueKind.Object)
@@ -155,17 +155,26 @@ internal sealed class ToolCallFiles
         }
 
         string? path = null;
-        var count = 0;
+        var paths = 0;
+        var allowLarge = false;
         foreach (var property in input.EnumerateObject())
         {
-            count++;
             if (PathKeys.Contains(property.Name, StringComparer.Ordinal) && property.Value.ValueKind == JsonValueKind.String)
             {
+                paths++;
                 path = property.Value.GetString();
+            }
+            else if (property.NameEquals("allow_large") && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                allowLarge = property.Value.GetBoolean();
+            }
+            else
+            {
+                return null;
             }
         }
 
-        return count == 1 && !string.IsNullOrWhiteSpace(path) ? path : null;
+        return paths == 1 && !string.IsNullOrWhiteSpace(path) ? new FileRead(path, allowLarge) : null;
     }
 
     private static string? GetString(JsonElement element, string name) =>

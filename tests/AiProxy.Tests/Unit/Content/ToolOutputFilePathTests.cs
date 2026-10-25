@@ -148,6 +148,90 @@ public sealed class ToolOutputFilePathTests
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
 
+    private static string Numbered(int from, int count) =>
+        string.Join("\n", Enumerable.Range(from, count).Select(number => $"{number}\tline {number}"));
+
+    private static string NumberedBody(string input, string content) =>
+        AnthropicBody(
+            AnthropicCall("call-a", input),
+            $$"""{"type":"tool_result","tool_use_id":"call-a","content":{{System.Text.Json.JsonSerializer.Serialize(content)}}}""");
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(1999)]
+    public void A_claude_code_read_numbered_from_one_under_the_cap_carries_its_path(int lines)
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", Numbered(1, lines));
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_claude_code_read_with_right_aligned_numbers_carries_its_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", "     1\tusing System;\n     2\t\n     3\tclass A {}");
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_claude_code_read_of_two_thousand_lines_without_allow_large_carries_no_path()
+    {
+        // The default read stops at 2000 lines, so a result that long may be cut short.
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", Numbered(1, 2000));
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_claude_code_read_of_two_thousand_lines_with_allow_large_carries_its_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs","allow_large":true}""", Numbered(1, 2000));
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_claude_code_read_with_allow_large_carries_its_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs","allow_large":true}""", Numbered(1, 3));
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_claude_code_read_with_allow_large_and_another_argument_carries_no_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs","allow_large":true,"offset":1}""", Numbered(1, 3));
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_numbered_result_with_a_gap_carries_no_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", "1\tone\n2\ttwo\n4\tfour");
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_numbered_result_that_does_not_start_at_one_carries_no_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", Numbered(5, 3));
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
+    public void A_numbered_result_with_a_trailing_system_reminder_carries_no_path()
+    {
+        var content = Numbered(1, 3) + "\n\n<system-reminder>\nWhenever you read a file, check it.\n</system-reminder>\n";
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", content);
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
     [Fact]
     public void A_result_split_over_two_text_blocks_carries_no_path()
     {
