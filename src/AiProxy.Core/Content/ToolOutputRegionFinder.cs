@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AiProxy.Core.Json;
 
 namespace AiProxy.Core.Content;
 
@@ -180,17 +181,12 @@ public sealed class ToolOutputRegionFinder
         var type = parent.StringProperty(ToolCallJson.Type);
         var role = parent.StringProperty(ToolCallJson.Role);
 
-        if ((type == ToolCallJson.ToolResult || role == ToolCallJson.Tool) && property.NameEquals(ToolCallJson.Content))
+        return (type, role) switch
         {
-            return property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array;
-        }
-
-        if (type == ToolCallJson.FunctionCallOutput && property.NameEquals(ToolCallJson.Output))
-        {
-            return property.Value.ValueKind == JsonValueKind.String;
-        }
-
-        return property.NameEquals(ToolCallJson.FunctionResponse) && property.Value.ValueKind == JsonValueKind.Object;
+            (ToolCallJson.ToolResult, _) or (_, ToolCallJson.Tool) when property.NameEquals(ToolCallJson.Content) => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array,
+            (ToolCallJson.FunctionCallOutput, _) when property.NameEquals(ToolCallJson.Output) => property.Value.ValueKind == JsonValueKind.String,
+            _ => property.NameEquals(ToolCallJson.FunctionResponse) && property.Value.ValueKind == JsonValueKind.Object
+        };
     }
 
     private static ToolOutputRegions FindRegions(ReadOnlySpan<byte> body, Dictionary<int, FileRead?> indexes)

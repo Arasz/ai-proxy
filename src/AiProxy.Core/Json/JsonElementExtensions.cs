@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace AiProxy.Core.Content;
+namespace AiProxy.Core.Json;
 
 /// <summary>Reads of a parsed <see cref="JsonElement" /> that tolerate a missing or mistyped value.</summary>
 internal static class JsonElementExtensions
@@ -22,6 +22,15 @@ internal static class JsonElementExtensions
     /// <param name="name">The property name.</param>
     public static bool IsTrue(this JsonElement element, string name) =>
         element.PropertyOrDefault(name).ValueKind == JsonValueKind.True;
+
+    /// <summary>The integer value of the property, or null when it is missing, not a number, or not an integer that fits.</summary>
+    /// <param name="element">The element to read from.</param>
+    /// <param name="name">The property name.</param>
+    public static long? Int64Property(this JsonElement element, string name)
+    {
+        var value = element.PropertyOrDefault(name);
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var count) ? count : null;
+    }
 
     /// <summary>The string the element holds, or null when it is not a string or does not transcode.</summary>
     /// <remarks>A string such as a lone surrogate does not transcode, so it reads as absent.</remarks>

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using AiProxy.Core.Json;
 
 namespace AiProxy.Core.Capture;
 
@@ -92,9 +93,7 @@ public static class ResponseUsageReader
         }
 
         using var document = JsonDocument.Parse(body);
-        var usage = document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("usage", out var counts)
-            ? Merge(null, counts)
-            : null;
+        var usage = Merge(null, document.RootElement.PropertyOrDefault(UsageJson.Usage));
         return usage is null ? new UsageReading(null, NoUsage) : new UsageReading(usage, null);
     }
 
@@ -139,7 +138,8 @@ public static class ResponseUsageReader
     {
         using var document = JsonDocument.Parse(data);
         var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("type", out var type))
+        var type = root.PropertyOrDefault(UsageJson.Type);
+        if (type.ValueKind == JsonValueKind.Undefined)
         {
             return usage;
         }
@@ -149,16 +149,13 @@ public static class ResponseUsageReader
             throw new JsonException("An event type must be a string.");
         }
 
-        if (type.ValueEquals("message_start")
-            && root.TryGetProperty("message", out var message)
-            && message.ValueKind == JsonValueKind.Object
-            && message.TryGetProperty("usage", out var startUsage))
+        if (type.ValueEquals(UsageJson.MessageStart))
         {
-            return Merge(usage, startUsage);
+            return Merge(usage, root.PropertyOrDefault(UsageJson.Message).PropertyOrDefault(UsageJson.Usage));
         }
 
-        return type.ValueEquals("message_delta") && root.TryGetProperty("usage", out var deltaUsage)
-            ? Merge(usage, deltaUsage)
+        return type.ValueEquals(UsageJson.MessageDelta)
+            ? Merge(usage, root.PropertyOrDefault(UsageJson.Usage))
             : usage;
     }
 
@@ -188,10 +185,10 @@ public static class ResponseUsageReader
             return current;
         }
 
-        var input = Count(usage, "input_tokens");
-        var output = Count(usage, "output_tokens");
-        var cacheCreation = Count(usage, "cache_creation_input_tokens");
-        var cacheRead = Count(usage, "cache_read_input_tokens");
+        var input = usage.Int64Property(UsageJson.InputTokens);
+        var output = usage.Int64Property(UsageJson.OutputTokens);
+        var cacheCreation = usage.Int64Property(UsageJson.CacheCreationInputTokens);
+        var cacheRead = usage.Int64Property(UsageJson.CacheReadInputTokens);
         if (input is null && output is null && cacheCreation is null && cacheRead is null)
         {
             return current;
@@ -203,11 +200,6 @@ public static class ResponseUsageReader
             cacheCreation ?? current?.CacheCreationInputTokens,
             cacheRead ?? current?.CacheReadInputTokens);
     }
-
-    private static long? Count(JsonElement usage, string name) =>
-        usage.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var count)
-            ? count
-            : null;
 
     /// <summary>A gzip body whose trailer does not hold the decoded length was cut short.</summary>
     private static ReadOnlyMemory<byte> DecodeGzip(ReadOnlyMemory<byte> body)
