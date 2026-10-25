@@ -9,7 +9,9 @@ namespace AiProxy.Code;
 /// <summary>Scans Python with the Tree-sitter grammar; docstrings are strings and f-string fields are code.</summary>
 public sealed partial class PythonCodeLexer : ICodeLexer
 {
-    private static readonly Language Language = new("Python");
+    private static readonly TreeSitterLanguage Python = new("Python");
+
+    private readonly TreeSitterLanguage _language;
 
     private static readonly TreeSitterGrammar Grammar = new(
         new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
@@ -51,6 +53,14 @@ public sealed partial class PythonCodeLexer : ICodeLexer
         "set", "setattr", "slice", "sorted", "staticmethod", "str", "sum", "super", "tuple", "vars", "zip",
     ];
 
+    /// <summary>Creates a lexer on the bundled Python grammar.</summary>
+    public PythonCodeLexer()
+        : this(Python)
+    {
+    }
+
+    internal PythonCodeLexer(TreeSitterLanguage language) => _language = language;
+
     /// <inheritdoc />
     public bool SupportsPath(string? filePath) => filePath is not null && filePath.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
 
@@ -59,7 +69,7 @@ public sealed partial class PythonCodeLexer : ICodeLexer
         Keywords.Contains(text) || text.Length > 4 && text.StartsWith("__", StringComparison.Ordinal) && text.EndsWith("__", StringComparison.Ordinal);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, Language, Grammar, IsKeyword);
+    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, _language, Grammar, IsKeyword);
 
     /// <summary>A type-checker, linter, coverage or formatter directive anywhere in a comment.</summary>
     [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|fmt:\s*(?:off|on)\b)")]

@@ -8,7 +8,9 @@ namespace AiProxy.Code;
 /// <summary>Scans JavaScript and JSX with the Tree-sitter grammar; template text is string, <c>${}</c> is code.</summary>
 public sealed partial class JavaScriptCodeLexer : ICodeLexer
 {
-    private static readonly Language Language = new("JavaScript");
+    private static readonly TreeSitterLanguage JavaScript = new("JavaScript");
+
+    private readonly TreeSitterLanguage _language;
 
     /// <summary>Reserved words, contextual keywords and globals that change meaning when renamed.</summary>
     internal static readonly FrozenSet<string> Keywords =
@@ -30,6 +32,14 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
         ["identifier", "property_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern", "statement_identifier"],
         new Dictionary<string, string?>());
 
+    /// <summary>Creates a lexer on the bundled JavaScript grammar.</summary>
+    public JavaScriptCodeLexer()
+        : this(JavaScript)
+    {
+    }
+
+    internal JavaScriptCodeLexer(TreeSitterLanguage language) => _language = language;
+
     /// <inheritdoc />
     public bool SupportsPath(string? filePath) =>
         filePath is not null
@@ -42,7 +52,7 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
     public bool IsKeyword(string text) => Keywords.Contains(text);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, Language, Grammar, IsKeyword);
+    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, _language, Grammar, IsKeyword);
 
     /// <summary>The JavaScript-family mapping, extended with a dialect's identifier and literal node types.</summary>
     internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, Dictionary<string, string?> strings)

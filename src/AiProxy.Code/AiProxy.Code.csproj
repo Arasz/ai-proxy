@@ -6,5 +6,6 @@
         <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp"/>
         <PackageReference Include="TreeSitter.DotNet"/>
+        <InternalsVisibleTo Include="AiProxy.Tests"/>
     </ItemGroup>
 </Project>

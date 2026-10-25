@@ -7,8 +7,11 @@ namespace AiProxy.Code;
 /// <summary>Scans TypeScript with the Tree-sitter grammar; <c>.tsx</c> paths use the TSX grammar.</summary>
 public sealed class TypeScriptCodeLexer : ICodeLexer
 {
-    private static readonly Language TypeScript = new("TypeScript");
-    private static readonly Language Tsx = new("Tsx");
+    private static readonly TreeSitterLanguage TypeScript = new("TypeScript");
+    private static readonly TreeSitterLanguage Tsx = new("Tsx");
+
+    private readonly TreeSitterLanguage _typeScript;
+    private readonly TreeSitterLanguage _tsx;
 
     private static readonly TreeSitterGrammar Grammar = JavaScriptCodeLexer.Script(
         ["identifier", "property_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern", "statement_identifier", "type_identifier"],
@@ -23,6 +26,18 @@ public sealed class TypeScriptCodeLexer : ICodeLexer
         "Capitalize", "Uncapitalize", "ReadonlyArray", "PromiseLike",
     ];
 
+    /// <summary>Creates a lexer on the bundled TypeScript and TSX grammars.</summary>
+    public TypeScriptCodeLexer()
+        : this(TypeScript, Tsx)
+    {
+    }
+
+    internal TypeScriptCodeLexer(TreeSitterLanguage typeScript, TreeSitterLanguage tsx)
+    {
+        _typeScript = typeScript;
+        _tsx = tsx;
+    }
+
     /// <inheritdoc />
     public bool SupportsPath(string? filePath) =>
         filePath is not null
@@ -36,7 +51,7 @@ public sealed class TypeScriptCodeLexer : ICodeLexer
 
     /// <inheritdoc />
     public CodeLexResult Lex(string text, string? filePath) =>
-        TreeSitterScanner.Lex(text, filePath is not null && IsTsx(filePath) ? Tsx : TypeScript, Grammar, IsKeyword);
+        TreeSitterScanner.Lex(text, filePath is not null && IsTsx(filePath) ? _tsx : _typeScript, Grammar, IsKeyword);
 
     private static bool IsTsx(string filePath) => filePath.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase);
 }

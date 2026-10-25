@@ -25,10 +25,14 @@ internal sealed record TreeSitterGrammar(
 /// <summary>Scans a file with a Tree-sitter grammar into tokens covering every character exactly once.</summary>
 internal static class TreeSitterScanner
 {
-    /// <summary>Tokens and removable imports, or an unsupported result for any error, missing node or unmodelled construct.</summary>
-    public static CodeLexResult Lex(string text, Language language, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
+    /// <summary>Tokens and removable imports, or unsupported for an unloadable grammar, any error, missing node or unmodelled construct.</summary>
+    public static CodeLexResult Lex(string text, TreeSitterLanguage language, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
     {
-        using var parser = new Parser(language);
+        if (language.Value is not { } loaded)
+        {
+            return Unsupported();
+        }
+        using var parser = new Parser(loaded);
         using var tree = parser.Parse(text);
         if (tree is null || tree.RootNode.HasError)
         {
