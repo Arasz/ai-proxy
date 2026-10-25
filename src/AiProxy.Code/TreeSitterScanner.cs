@@ -9,11 +9,13 @@ namespace AiProxy.Code;
 /// <param name="IsUnsupported">A construct the reducer must not transform, beyond error and missing nodes.</param>
 /// <param name="IsImport">A top-level statement that may be removed when it stands alone on its lines.</param>
 /// <param name="ImportNeedsTerminator">Whether the code before a removed import must end with a semicolon.</param>
+/// <param name="IsFixedName">An identifier whose spelling the markup fixes, such as a JSX tag or attribute name.</param>
 /// <param name="IsDirective">A comment, by text and one-based line, that a tool reads and the view must keep.</param>
 internal sealed record TreeSitterGrammar(
     FrozenDictionary<string, string?> Strings,
     FrozenSet<string> Comments,
     FrozenSet<string> Identifiers,
+    Func<Node, bool> IsFixedName,
     Func<Node, bool> IsUnsupported,
     Func<Node, bool> IsImport,
     bool ImportNeedsTerminator,
@@ -112,7 +114,7 @@ internal static class TreeSitterScanner
         {
             return new CodeToken(CodeTokenKind.Comment, spelling.TrimEnd('\r'), node.StartIndex, 0);
         }
-        if (node.IsNamed && grammar.Identifiers.Contains(node.Type))
+        if (node.IsNamed && grammar.Identifiers.Contains(node.Type) && !grammar.IsFixedName(node))
         {
             return new CodeToken(CodeTokenKind.Identifier, spelling, node.StartIndex, 0, grammar.ValueText(spelling));
         }

@@ -57,11 +57,22 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
             strings.ToFrozenDictionary(),
             ["comment", "html_comment"],
             identifierTypes,
+            IsJsxName,
             node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
             static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
             true,
             static _ => null,
             static (comment, _) => ToolDirective().IsMatch(comment));
+    }
+
+    private static bool IsJsxName(Node node)
+    {
+        var parent = node.Parent;
+        while (parent is { Type: "member_expression" or "nested_identifier" or "jsx_namespace_name" })
+        {
+            parent = parent.Parent;
+        }
+        return parent is { Type: "jsx_opening_element" or "jsx_closing_element" or "jsx_self_closing_element" or "jsx_attribute" };
     }
 
     /// <summary>Triple-slash directives, TypeScript and ESLint pragmas, license, source-map and JSX pragma comments.</summary>

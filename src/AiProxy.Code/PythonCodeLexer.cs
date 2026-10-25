@@ -15,6 +15,7 @@ public sealed partial class PythonCodeLexer : ICodeLexer
         new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
         ["comment"],
         ["identifier"],
+        static _ => false,
         static node => node.Type == "interpolation" && node.Children.Any(static child => !child.IsNamed && child.Type == "="),
         static node => node.Type is "import_statement" or "import_from_statement",
         false,

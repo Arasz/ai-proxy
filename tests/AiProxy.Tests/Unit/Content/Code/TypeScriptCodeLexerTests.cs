@@ -144,6 +144,25 @@ public sealed class TypeScriptCodeLexerTests
         Assert.Equal(comment, result.Tokens[0].Text);
     }
 
+    [Fact]
+    public void Renaming_never_touches_jsx_tag_or_attribute_names()
+    {
+        const string jsx = "<div className=\"card\"><Item className=\"x\" /><ui.Panel ns:label={long_value} /></div>";
+        const string source = Padding
+            + "const Item = (props: { className: string }) => props.className;\n"
+            + "const long_value = 1, long_other = long_value + long_value;\n"
+            + $"export const e = {jsx};\n";
+
+        var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Contains("long_value", result.RenameMap.Values);
+        Assert.DoesNotContain(result.RenameMap.Values, static name => name is "div" or "Item" or "className" or "ui" or "Panel" or "ns" or "label");
+        var renamed = result.RenameMap.Single(static pair => pair.Value == "long_value").Key;
+        Assert.Contains(jsx.Replace("long_value", renamed, StringComparison.Ordinal), result.Text, StringComparison.Ordinal);
+        Assert.Contains("const Item = ", result.Text, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("a.ts", true)]
     [InlineData("a.TSX", true)]

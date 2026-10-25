@@ -83,13 +83,17 @@ public sealed class CodeReducer
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
+        var fixedNames = tokens.Where(static token => token.Kind is CodeTokenKind.Other or CodeTokenKind.Keyword)
+            .Select(static token => token.Text)
+            .ToHashSet(StringComparer.Ordinal);
         var reserved = identifiers.Select(static token => token.ValueText ?? token.Text).ToHashSet(StringComparer.Ordinal);
+        reserved.UnionWith(fixedNames);
         var used = identifiers.Where(token => view.AsSpan(token.Offset, token.Text.Length).SequenceEqual(token.Text));
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2 || _lexer.IsKeyword(group.Key))
+            if (group.Count() < 2 || _lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
             {
                 continue;
             }
