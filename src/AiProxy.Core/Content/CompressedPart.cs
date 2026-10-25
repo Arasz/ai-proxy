@@ -7,10 +7,12 @@ namespace AiProxy.Core.Content;
 /// <param name="OriginalText">The text the reducer started from.</param>
 /// <param name="Path">The path of the reducer that produced the text.</param>
 /// <param name="Ratio">The reduced length over the original length.</param>
+/// <param name="RetrievalId">The id the text names for <c>proxy_retrieve</c>, or null when the text names none.</param>
 public sealed record CompressedPart(
     int ChunkId,
     ContentType Type,
     string Text,
     string OriginalText,
     string Path,
-    double Ratio);
+    double Ratio,
+    string? RetrievalId = null);

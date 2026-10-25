@@ -19,6 +19,13 @@ public sealed class CcrRelayTests : IDisposable
 
     private static readonly string Retrieve = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3 });
 
+    private const string CodeFile =
+        "using System;\nusing System.Collections.Generic;\n\n/// <summary>A type whose doc comment is long enough that the code view, hint included, is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 1; // the value the model reads back exactly\n\n    /// <summary>A second member, so the file is over the compression minimum for source code.</summary>\n    public int Other => 2; // another comment the view drops\n\n    /// <summary>A third member with its own doc comment, also dropped from the view.</summary>\n    public int Third => 3;\n}\n";
+
+    private static readonly string ViewId = CcrView.IdOf(CodeFile);
+
+    private static readonly string RetrieveFile = JsonSerializer.Serialize(new { id = ViewId, mode = "whole" });
+
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-ccr-{Guid.NewGuid():N}.db");
 
     public void Dispose()
@@ -173,6 +180,81 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Equal("7", response.Headers.GetValues("retry-after").Single());
         Assert.Contains("rate_limit_error", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_read_csharp_file_goes_up_as_its_view_and_a_retrieval_gets_the_exact_file_back()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 1, Sse.Tool("tu_r", CcrRetrieval.Name, RetrieveFile)),
+            Sse.Message("msg_2", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using var response = await SendAsync(proxy, upstream, CodeRequest().ToJsonString());
+
+        Assert.Contains("answer", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        var view = ToolResultOf(upstream.Requests[0].Body);
+        Assert.EndsWith(CcrView.Hint(ViewId), view, StringComparison.Ordinal);
+        Assert.DoesNotContain("doc comment", view, StringComparison.Ordinal);
+        Assert.EndsWith("\n" + CodeFile, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_continue_retrieves_a_view_from_an_earlier_turn_through_the_store()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_A", "end_turn", 1, Sse.Text("seen")),
+            Sse.Message("msg_C", "tool_use", 1, Sse.Tool("tu_r", CcrRetrieval.Name, RetrieveFile)),
+            Sse.Message("msg_D", "end_turn", 1, Sse.Text("done")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CodeRequest().Also(request => request["thread"] = new JsonObject { ["type"] = "create" }).ToJsonString()))
+        {
+        }
+
+        using var continued = await SendAsync(proxy, upstream, """{"model":"m","stream":true,"messages":[{"role":"user","content":"next"}],"thread":{"type":"continue","previous_message_id":"msg_A"}}""");
+
+        Assert.Contains("done", await continued.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(3, upstream.Requests.Count);
+        Assert.EndsWith("\n" + CodeFile, ToolResultOf(upstream.Requests[2].Body), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_code_views_off_a_read_csharp_file_goes_up_without_a_view()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Sse.Message("msg_1", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync(new KeyValuePair<string, string>("Proxy:Compression:CodeViews", "false"));
+
+        using (await SendAsync(proxy, upstream, CodeRequest().ToJsonString()))
+        {
+        }
+
+        Assert.DoesNotContain(CcrView.Marker, ToolResultOf(Assert.Single(upstream.Requests).Body), StringComparison.Ordinal);
+    }
+
+    private static string ToolResultOf(string body) =>
+        Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? string.Empty;
+
+    private static JsonObject CodeRequest() => new()
+    {
+        ["model"] = "m",
+        ["max_tokens"] = 5,
+        ["stream"] = true,
+        ["tools"] = new JsonArray(new JsonObject { ["name"] = "Read", ["input_schema"] = new JsonObject { ["type"] = "object" } }),
+        ["messages"] = new JsonArray(
+            new JsonObject
+            {
+                ["role"] = "assistant",
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["id"] = "t0", ["name"] = "Read", ["input"] = new JsonObject { ["file_path"] = "src/Example.cs" } }),
+            },
+            new JsonObject
+            {
+                ["role"] = "user",
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = CodeFile }),
+            }),
+    };
 
     private static string StatelessRequest() => Request().ToJsonString();
 
