@@ -22,6 +22,9 @@ public sealed class CcrRelayTests : IDisposable
     private const string CodeFile =
         "using System;\nusing System.Collections.Generic;\n\n/// <summary>A type whose doc comment is long enough that the code view, hint included, is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 1; // the value the model reads back exactly\n\n    /// <summary>A second member, so the file is over the compression minimum for source code.</summary>\n    public int Other => 2; // another comment the view drops\n\n    /// <summary>A third member with its own doc comment, also dropped from the view.</summary>\n    public int Third => 3;\n}\n";
 
+    private const string PythonFile =
+        "import os\nimport sys\nfrom typing import Any\n\n# A module comment long enough that the code view, hint included, is smaller than the file.\n\n\ndef value(item: Any) -> str:\n    \"\"\"Returns the item's text; the docstring stays in the view.\"\"\"\n    return os.fspath(item)  # the value the model reads back exactly\n\n\n# A second comment, so the file is over the compression minimum for source code.\ndef main() -> int:\n    # a third comment the view drops\n    print(value(sys.argv[0]))\n    return 0\n\n\n# Entry point; this comment goes too.\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
+
     private static readonly string ViewId = CcrView.IdOf(CodeFile);
 
     private static readonly string RetrieveFile = JsonSerializer.Serialize(new { id = ViewId, mode = "whole" });
@@ -200,6 +203,26 @@ public sealed class CcrRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task A_read_python_file_goes_up_as_its_view_and_a_retrieval_gets_the_exact_file_back()
+    {
+        var id = CcrView.IdOf(PythonFile);
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 1, Sse.Tool("tu_r", CcrRetrieval.Name, JsonSerializer.Serialize(new { id, mode = "whole" }))),
+            Sse.Message("msg_2", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CodeRequest("src/tool.py", PythonFile).ToJsonString()))
+        {
+        }
+
+        var view = ToolResultOf(upstream.Requests[0].Body);
+        Assert.EndsWith(CcrView.Hint(id), view, StringComparison.Ordinal);
+        Assert.DoesNotContain("module comment", view, StringComparison.Ordinal);
+        Assert.EndsWith("\n" + PythonFile, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_continue_retrieves_a_view_from_an_earlier_turn_through_the_store()
     {
         await using var upstream = await FakeUpstream.StartAsync();
@@ -237,7 +260,9 @@ public sealed class CcrRelayTests : IDisposable
     private static string ToolResultOf(string body) =>
         Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? string.Empty;
 
-    private static JsonObject CodeRequest() => new()
+    private static JsonObject CodeRequest() => CodeRequest("src/Example.cs", CodeFile);
+
+    private static JsonObject CodeRequest(string path, string text) => new()
     {
         ["model"] = "m",
         ["max_tokens"] = 5,
@@ -247,12 +272,12 @@ public sealed class CcrRelayTests : IDisposable
             new JsonObject
             {
                 ["role"] = "assistant",
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["id"] = "t0", ["name"] = "Read", ["input"] = new JsonObject { ["file_path"] = "src/Example.cs" } }),
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["id"] = "t0", ["name"] = "Read", ["input"] = new JsonObject { ["file_path"] = path } }),
             },
             new JsonObject
             {
                 ["role"] = "user",
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = CodeFile }),
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = text }),
             }),
     };
 

@@ -58,6 +58,22 @@ public sealed class SourceCodeCompressionHandlerTests
     }
 
     [Fact]
+    public async Task A_python_file_with_its_path_becomes_a_view_that_keeps_its_docstring()
+    {
+        const string python =
+            "import os\nfrom typing import Any\n\n# A long comment the view drops, so the view is smaller than the file.\ndef value(item: Any) -> str:\n    \"\"\"Returns the item's text.\"\"\"\n    return os.fspath(item)  # another comment the view drops\n";
+
+        var result = await new SourceCodeCompressionHandler([new CSharpCodeLexer(), new PythonCodeLexer()]).HandleAsync(Part(python, "/repo/value.py"), CancellationToken.None);
+
+        Assert.Equal(SourceCodeCompressionHandler.CodeViewPath, result.Path);
+        Assert.Equal(CcrView.IdOf(python), result.RetrievalId);
+        Assert.EndsWith(CcrView.Hint(CcrView.IdOf(python)), result.Text, StringComparison.Ordinal);
+        Assert.Contains("\"\"\"Returns the item's text.\"\"\"", result.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("long comment", result.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("from typing", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task With_ccr_off_a_csharp_file_keeps_the_blank_line_path()
     {
         var result = await Handler.HandleAsync(Part(Source, "/repo/Example.cs") with { Ccr = CcrMode.Off }, CancellationToken.None);
