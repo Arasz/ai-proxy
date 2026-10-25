@@ -1,6 +1,6 @@
 namespace AiProxy.Core.Content.Ccr;
 
-/// <summary>The numbers recoverable compression runs with; every default is the draft ADR's value.</summary>
+/// <summary>The numbers recoverable compression runs with; every default is an owner-approved ADR 0005 value.</summary>
 /// <param name="CharactersPerToken">Characters per estimated token.</param>
 /// <param name="MinimumTokens">The smallest whole region, in estimated tokens, that gets a preview.</param>
 /// <param name="BudgetTokens">The most a preview may hold, in estimated tokens, markers and overlay included.</param>
@@ -25,15 +25,15 @@ public sealed record CcrOptions(
     int MaximumContext,
     TimeSpan PatternTimeout)
 {
-    /// <summary>The draft ADR's values.</summary>
+    /// <summary>The owner-approved ADR 0005 values.</summary>
     public static CcrOptions Default { get; } = new(
         CharactersPerToken: 2.89m,
         MinimumTokens: 3_000,
-        BudgetTokens: 1_000,
+        BudgetTokens: 1_500,
         SignalShare: 0.40m,
         HeadShare: 2m / 3m,
         OverlayShare: 0.05m,
-        RetrievalTokens: 4_000,
+        RetrievalTokens: 3_000,
         MaximumMatches: 50,
         MatchWindow: 240,
         MaximumContext: 10,
