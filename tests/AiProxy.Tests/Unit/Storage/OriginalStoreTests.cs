@@ -77,6 +77,19 @@ public sealed class OriginalStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Reading_a_ledger_row_keeps_it_past_its_first_retention()
+    {
+        await _store.LinkThreadAsync("msg_read", "msg_last", CancellationToken.None);
+        _time.Advance(TimeSpan.FromDays(10));
+        Assert.Equal("msg_last", await _store.FindThreadAsync("msg_read", CancellationToken.None));
+        _time.Advance(TimeSpan.FromDays(10));
+
+        await _store.EvictAsync(CancellationToken.None);
+
+        Assert.Equal("msg_last", await _store.FindThreadAsync("msg_read", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task A_database_from_the_previous_schema_gets_the_new_tables_and_keeps_its_rows()
     {
         await using (var connection = ContentSchema.Open(_path))

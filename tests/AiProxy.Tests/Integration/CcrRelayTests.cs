@@ -61,7 +61,13 @@ public sealed class CcrRelayTests : IDisposable
         var answer = followUp[2]!["content"]![0]!["content"]!.GetValue<string>();
         Assert.Contains("2\tstep 0002", answer, StringComparison.Ordinal);
         Assert.Contains("3\tstep 0003", answer, StringComparison.Ordinal);
-        Assert.Equal("Bearer secret", upstream.Requests[1].Headers["Authorization"]);
+        Assert.True(client.TrimEnd().EndsWith("data: {\"type\":\"message_stop\"}", StringComparison.Ordinal), "message_stop must be the last event");
+        foreach (var sent in upstream.Requests)
+        {
+            Assert.Equal("Bearer secret", sent.Headers["Authorization"]);
+            Assert.Equal("2023-06-01", sent.Headers["anthropic-version"]);
+            Assert.Equal("context-1", sent.Headers["anthropic-beta"]);
+        }
     }
 
     [Fact]
@@ -130,6 +136,23 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Equal(10, row.OutputTokens);
         Assert.Contains("ccr.round-1", row.Stages, StringComparison.Ordinal);
         Assert.Contains("ccr.round-2", row.Stages, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_stream_cut_off_before_message_stop_ends_in_an_error_event_and_no_message_stop()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var whole = Sse.Message("msg_1", "end_turn", 1, Sse.Text("partial"));
+        upstream.Handler = Script(whole[..whole.IndexOf("event: message_delta", StringComparison.Ordinal)]);
+        await using var proxy = await StartProxyAsync();
+
+        using var response = await SendAsync(proxy, upstream, StatelessRequest());
+        var client = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("partial", client, StringComparison.Ordinal);
+        Assert.Contains("event: error", client, StringComparison.Ordinal);
+        Assert.Contains("ended before the message did", client, StringComparison.Ordinal);
+        Assert.DoesNotContain("message_stop", client, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -218,6 +241,8 @@ public sealed class CcrRelayTests : IDisposable
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
         };
         message.Headers.TryAddWithoutValidation("Authorization", "Bearer secret");
+        message.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+        message.Headers.TryAddWithoutValidation("anthropic-beta", "context-1");
         var response = await client.SendAsync(message, TestContext.Current.CancellationToken);
         await response.Content.LoadIntoBufferAsync(TestContext.Current.CancellationToken);
         return response;

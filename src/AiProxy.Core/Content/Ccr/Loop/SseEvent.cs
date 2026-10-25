@@ -8,7 +8,7 @@ namespace AiProxy.Core.Content.Ccr.Loop;
 public sealed record SseEvent(string Name, string Data)
 {
     /// <summary>The event as it goes on the wire.</summary>
-    public byte[] ToBytes() => Encoding.UTF8.GetBytes($"event: {Name}\ndata: {Data}\n\n");
+    public byte[] ToBytes() => Encoding.UTF8.GetBytes($"event: {Name}\n{string.Concat(Data.Split('\n').Select(static line => $"data: {line}\n"))}\n");
 
     /// <summary>A keep-alive the client ignores.</summary>
     public static SseEvent Ping { get; } = new("ping", """{"type": "ping"}""");

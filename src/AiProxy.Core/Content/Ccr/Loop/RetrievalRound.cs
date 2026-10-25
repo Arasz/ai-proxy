@@ -125,7 +125,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     {
         var index = data["index"]!.GetValue<int>();
         var content = data["content_block"]!.AsObject().DeepClone().AsObject();
-        var block = new Block(index, content, content["type"]?.GetValue<string>() == "tool_use");
+        var block = new Block(index, content);
         _blocks[index] = block;
         _order.Add(block);
         if (block.Held)
@@ -229,13 +229,14 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
         return sse with { Data = data.ToJsonString(RetrievalJsonOptions.Relaxed) };
     }
 
-    private sealed class Block(int index, JsonObject content, bool held)
+    private sealed class Block(int index, JsonObject content)
     {
         public int Index { get; } = index;
 
         public JsonObject Content { get; } = content;
 
-        public bool Held { get; } = held;
+        /// <summary>A client tool call, held until the loop decides; every other block passes on.</summary>
+        public bool Held { get; } = content["type"]?.GetValue<string>() == "tool_use";
 
         public int ClientIndex { get; set; }
 

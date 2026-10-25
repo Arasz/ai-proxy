@@ -160,7 +160,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             {
                 await LoopAsync(first).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is HttpRequestException or IOException or JsonException && !cancellationToken.IsCancellationRequested)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 Log.LoopFailed(relay.Logger, uri.Host, exception);
                 await WriteAsync(SseEvent.Error("api_error", "ai-proxy lost the provider response.")).ConfigureAwait(false);
@@ -178,7 +178,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 using (response)
                 {
                     await using var upstream = await response.Content.ReadAsStreamAsync(_cancellation).ConfigureAwait(false);
-                    await foreach (var sse in SseReader.ReadAsync(upstream, _cancellation).ConfigureAwait(false))
+                    await foreach (var sse in new SseReader().ReadAsync(upstream, _cancellation).ConfigureAwait(false))
                     {
                         foreach (var passed in loop.Round.Accept(sse))
                         {
@@ -190,13 +190,15 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 exchange.Stages.Add($"ccr.round-{loop.Answered + 1}", Stopwatch.GetElapsedTime(started));
                 switch (loop.Decide())
                 {
+                    case RetrievalStep.Fail when loop.Round.Failed:
+                        return;
+                    case RetrievalStep.Fail when !loop.Round.Ended:
+                        Log.StreamCutOff(relay.Logger, uri.Host, loop.Answered + 1);
+                        await WriteAsync(loop.Failure("The provider stream ended before the message did; retry the turn.")).ConfigureAwait(false);
+                        return;
                     case RetrievalStep.Fail:
-                        if (!loop.Round.Failed)
-                        {
-                            Log.LimitExceeded(relay.Logger, uri.Host, loop.Answered);
-                            await WriteAsync(loop.Failure("The model kept calling proxy_retrieve after its limit; retry the turn.")).ConfigureAwait(false);
-                        }
-
+                        Log.LimitExceeded(relay.Logger, uri.Host, loop.Answered);
+                        await WriteAsync(loop.Failure("The model kept calling proxy_retrieve after its limit; retry the turn.")).ConfigureAwait(false);
                         return;
                     case RetrievalStep.Release:
                         if (!await LinkAsync(loop).ConfigureAwait(false))
@@ -362,5 +364,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         [LoggerMessage(EventId = 1607, Level = LogLevel.Warning, Message = "{ProviderHost} refused a retrieval follow-up with {StatusCode}: {Error}")]
         public static partial void FollowUpRefused(ILogger logger, string providerHost, int statusCode, string error);
+
+        [LoggerMessage(EventId = 1608, Level = LogLevel.Warning, Message = "The stream from {ProviderHost} ended before message_stop in round {Round}; the client got an error event")]
+        public static partial void StreamCutOff(ILogger logger, string providerHost, int round);
     }
 }

@@ -9,7 +9,7 @@ namespace AiProxy.Storage;
 /// <param name="time">Stamps rows and decides which are old enough to evict.</param>
 public sealed class SqliteOriginalStore(ContentStoreOptions options, TimeProvider time) : IOriginalStore
 {
-    /// <summary>How long originals and ledger rows are kept after they are first written.</summary>
+    /// <summary>How long originals are kept after they are written, and ledger rows after they are last read or written.</summary>
     public static readonly TimeSpan Retention = TimeSpan.FromDays(14);
 
     /// <inheritdoc />
@@ -37,8 +37,8 @@ public sealed class SqliteOriginalStore(ContentStoreOptions options, TimeProvide
     {
         await using var connection = Open();
         return await connection.QuerySingleOrDefaultAsync<string>(Command(
-            "SELECT continue_from FROM ccr_thread WHERE message_id = @MessageId;",
-            new { MessageId = messageId },
+            "UPDATE ccr_thread SET created_at = @Now WHERE message_id = @MessageId RETURNING continue_from;",
+            new { MessageId = messageId, Now = Now() },
             cancellationToken)).ConfigureAwait(false);
     }
 
@@ -49,7 +49,7 @@ public sealed class SqliteOriginalStore(ContentStoreOptions options, TimeProvide
         await connection.ExecuteAsync(Command(
             """
             INSERT INTO ccr_thread (message_id, continue_from, created_at) VALUES (@MessageId, @ContinueFrom, @CreatedAt)
-            ON CONFLICT (message_id) DO UPDATE SET continue_from = excluded.continue_from;
+            ON CONFLICT (message_id) DO UPDATE SET continue_from = excluded.continue_from, created_at = excluded.created_at;
             """,
             new { MessageId = messageId, ContinueFrom = continueFrom, CreatedAt = Now() },
             cancellationToken)).ConfigureAwait(false);

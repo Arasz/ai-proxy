@@ -63,7 +63,7 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         ReadOnlyMemory<byte> body,
         CancellationToken cancellationToken)
     {
-        if (dialect != Dialect.Anthropic || method != "POST" || path != MessagesPath || CcrRequest.Read(body) is not { } request || !request.Stream)
+        if (dialect != Dialect.Anthropic || method != "POST" || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
         {
             return Forward;
         }
@@ -71,8 +71,8 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         return request.Thread switch
         {
             CcrThread.Continue when request.PreviousMessageId is { } previous => await LookUpAsync(store, previous, cancellationToken).ConfigureAwait(false),
-            CcrThread.Create when settings.Enabled && request.HasTools => Create,
-            CcrThread.None when settings.Enabled && request.HasTools => Stateless,
+            CcrThread.Create when settings.Enabled && request.Tools == CcrTools.Defined => Create,
+            CcrThread.None when settings.Enabled && request.Tools == CcrTools.Defined => Stateless,
             _ => Forward,
         };
     }

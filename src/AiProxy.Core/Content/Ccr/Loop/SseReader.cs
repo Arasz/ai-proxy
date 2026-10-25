@@ -4,10 +4,10 @@ using System.Text;
 namespace AiProxy.Core.Content.Ccr.Loop;
 
 /// <summary>Reads server-sent events from a stream.</summary>
-public static class SseReader
+public sealed class SseReader
 {
     /// <summary>Yields each complete event; a trailing event without its blank line is yielded at the end.</summary>
-    public static async IAsyncEnumerable<SseEvent> ReadAsync(Stream stream, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<SseEvent> ReadAsync(Stream stream, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
         var name = "message";

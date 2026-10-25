@@ -15,8 +15,8 @@ public sealed class CcrRequestTests
         var request = CcrRequest.Read(Bytes("""{"model":"m","stream":true,"messages":[],"thread":{"type":"continue","previous_message_id":"msg_1"}}"""));
 
         Assert.NotNull(request);
-        Assert.True(request.Stream);
-        Assert.False(request.HasTools);
+        Assert.Equal(CcrResponse.Streamed, request.Response);
+        Assert.Equal(CcrTools.None, request.Tools);
         Assert.Equal(CcrThread.Continue, request.Thread);
         Assert.Equal("msg_1", request.PreviousMessageId);
     }
@@ -27,7 +27,7 @@ public sealed class CcrRequestTests
         var request = CcrRequest.Read(Bytes("""{"stream":true,"tools":[{"name":"Read"}],"messages":[],"thread":{"type":"create"}}"""));
 
         Assert.NotNull(request);
-        Assert.True(request.HasTools);
+        Assert.Equal(CcrTools.Defined, request.Tools);
         Assert.Equal(CcrThread.Create, request.Thread);
         Assert.Null(request.PreviousMessageId);
     }
@@ -38,8 +38,8 @@ public sealed class CcrRequestTests
         var request = CcrRequest.Read(Bytes("""{"tools":[],"messages":[]}"""));
 
         Assert.NotNull(request);
-        Assert.False(request.Stream);
-        Assert.False(request.HasTools);
+        Assert.Equal(CcrResponse.Whole, request.Response);
+        Assert.Equal(CcrTools.None, request.Tools);
         Assert.Equal(CcrThread.None, request.Thread);
     }
 

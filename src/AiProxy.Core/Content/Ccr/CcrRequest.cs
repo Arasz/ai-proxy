@@ -17,12 +17,32 @@ public enum CcrThread
     Continue,
 }
 
+/// <summary>How the client asked for the response.</summary>
+public enum CcrResponse
+{
+    /// <summary>One JSON body.</summary>
+    Whole,
+
+    /// <summary>Server-sent events.</summary>
+    Streamed,
+}
+
+/// <summary>Whether the request defines tools.</summary>
+public enum CcrTools
+{
+    /// <summary>No tools, or an empty list.</summary>
+    None,
+
+    /// <summary>At least one tool.</summary>
+    Defined,
+}
+
 /// <summary>What CCR reads from a Messages request body, and the byte-exact edits it makes to one.</summary>
-/// <param name="Stream">Whether the client asked for a streamed response.</param>
-/// <param name="HasTools">Whether the request defines at least one tool.</param>
+/// <param name="Response">How the client asked for the response.</param>
+/// <param name="Tools">Whether the request defines tools.</param>
 /// <param name="Thread">The thread shape.</param>
 /// <param name="PreviousMessageId">The message a <c>continue</c> follows; null otherwise.</param>
-public sealed record CcrRequest(bool Stream, bool HasTools, CcrThread Thread, string? PreviousMessageId)
+public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread Thread, string? PreviousMessageId)
 {
     private static readonly byte[] DefinitionBytes = Encoding.UTF8.GetBytes(CcrRetrieval.Definition);
 
@@ -36,8 +56,8 @@ public sealed record CcrRequest(bool Stream, bool HasTools, CcrThread Thread, st
         }
 
         var root = document.RootElement;
-        var stream = root.TryGetProperty("stream", out var streamValue) && streamValue.ValueKind == JsonValueKind.True;
-        var hasTools = root.TryGetProperty("tools", out var tools) && tools.ValueKind == JsonValueKind.Array && tools.GetArrayLength() > 0;
+        var response = root.TryGetProperty("stream", out var stream) && stream.ValueKind == JsonValueKind.True ? CcrResponse.Streamed : CcrResponse.Whole;
+        var tools = root.TryGetProperty("tools", out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0 ? CcrTools.Defined : CcrTools.None;
         var thread = CcrThread.None;
         string? previous = null;
         if (root.TryGetProperty("thread", out var threadValue) && threadValue.ValueKind == JsonValueKind.Object)
@@ -51,7 +71,7 @@ public sealed record CcrRequest(bool Stream, bool HasTools, CcrThread Thread, st
             previous = threadValue.StringProperty("previous_message_id");
         }
 
-        return new CcrRequest(stream, hasTools, thread, previous);
+        return new CcrRequest(response, tools, thread, previous);
     }
 
     /// <summary>Appends the <c>proxy_retrieve</c> definition as the last tool; null when there are no tools or it is already there.</summary>
