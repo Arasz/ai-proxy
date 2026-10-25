@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.12.0](0.12.0-python-code-view.md) | A whole Python file a tool call read gets the code view: comments and `import` lines removed, exact text back through `proxy_retrieve`. | #PR |
 | [0.11.0](0.11.0-csharp-code-view-on-by-default.md) | A whole C# file a tool call read goes upstream with comments and `using` lines removed, and `proxy_retrieve` returns the exact file; on by default, `PROXY__COMPRESSION__CODEVIEWS=false` switches it off. | #72 |
 | [0.9.0](0.9.0-proxy-settings-section.md) | **Breaking.** Settings move from flat `PROXY_*` variables to the `Proxy` configuration section (`PROXY__PORT`, `PROXY__COMPRESSION__ENABLED`, ...); switches take `true` or `false`. | #69 |
 | [0.10.0](0.10.0-ccr-runtime-on-by-default.md) | CCR runs: large tool results become previews, `proxy_retrieve` is answered inside the request, and compression and CCR are on by default. | #71 |
