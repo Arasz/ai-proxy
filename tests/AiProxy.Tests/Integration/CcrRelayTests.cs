@@ -223,6 +223,28 @@ public sealed class CcrRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task A_read_typescript_file_goes_up_as_its_view_and_a_retrieval_gets_the_exact_file_back()
+    {
+        const string typeScript =
+            "import { readFile } from \"node:fs/promises\";\nimport type { Stats } from \"node:fs\";\n\n/** A doc comment long enough that the code view, hint included, is smaller than the file. */\nexport interface Entry {\n    name: string; // the name the model reads back exactly\n    stats?: Stats;\n}\n\n// A second comment, so the file is over the compression minimum for source code.\nexport async function load(entry: Entry): Promise<string> {\n    /* a block comment the view drops */\n    return readFile(entry.name, \"utf8\");\n}\n\n// A last comment, also dropped from the view.\nexport const empty: Entry = { name: \"\" };\n";
+        var id = CcrView.IdOf(typeScript);
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 1, Sse.Tool("tu_r", CcrRetrieval.Name, JsonSerializer.Serialize(new { id, mode = "whole" }))),
+            Sse.Message("msg_2", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CodeRequest("src/load.ts", typeScript).ToJsonString()))
+        {
+        }
+
+        var view = ToolResultOf(upstream.Requests[0].Body);
+        Assert.EndsWith(CcrView.Hint(id), view, StringComparison.Ordinal);
+        Assert.DoesNotContain("doc comment", view, StringComparison.Ordinal);
+        Assert.EndsWith("\n" + typeScript, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_continue_retrieves_a_view_from_an_earlier_turn_through_the_store()
     {
         await using var upstream = await FakeUpstream.StartAsync();

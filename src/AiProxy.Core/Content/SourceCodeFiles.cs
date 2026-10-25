@@ -10,6 +10,7 @@ public static class SourceCodeFiles
         [".js"] = "javascript",
         [".mjs"] = "javascript",
         [".cjs"] = "javascript",
+        [".jsx"] = "javascript",
         [".ts"] = "typescript",
         [".tsx"] = "tsx",
     };

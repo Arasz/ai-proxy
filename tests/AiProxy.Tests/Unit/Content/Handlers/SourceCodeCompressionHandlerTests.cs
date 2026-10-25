@@ -73,6 +73,29 @@ public sealed class SourceCodeCompressionHandlerTests
         Assert.DoesNotContain("from typing", result.Text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("/repo/app.js")]
+    [InlineData("/repo/app.mjs")]
+    [InlineData("/repo/app.cjs")]
+    [InlineData("/repo/app.jsx")]
+    [InlineData("/repo/app.ts")]
+    [InlineData("/repo/app.tsx")]
+    public async Task A_javascript_or_typescript_file_with_its_path_becomes_a_view(string path)
+    {
+        const string script =
+            "import { readFile } from \"node:fs/promises\";\nimport path from \"node:path\";\n\n// A long comment the view drops, so the view is smaller than the file.\nexport async function load(name) {\n    /* another comment the view drops */\n    return readFile(path.join(\"data\", name), \"utf8\");\n}\n";
+        var handler = new SourceCodeCompressionHandler([new CSharpCodeLexer(), new PythonCodeLexer(), new JavaScriptCodeLexer(), new TypeScriptCodeLexer()]);
+
+        var result = await handler.HandleAsync(Part(script, path), CancellationToken.None);
+
+        Assert.Equal(SourceCodeCompressionHandler.CodeViewPath, result.Path);
+        Assert.Equal(CcrView.IdOf(script), result.RetrievalId);
+        Assert.Contains("\"node:path\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("node:path", result.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("long comment", result.Text, StringComparison.Ordinal);
+        Assert.Contains("\"utf8\"", result.Text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task With_ccr_off_a_csharp_file_keeps_the_blank_line_path()
     {
