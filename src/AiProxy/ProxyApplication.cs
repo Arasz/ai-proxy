@@ -1,4 +1,5 @@
 using AiProxy.Configuration;
+using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
@@ -102,6 +103,7 @@ public static partial class ProxyApplication
 
         services.AddTransient<CcrPreviewOverlay>();
         services.AddTransient<CcrPreviewBuilder>();
+        services.AddSingleton<IToolArgumentSchema, RetrievalArgumentSchema>();
         services.AddTransient<CcrRetrievalParser>();
         services.AddTransient<CcrRetriever>();
         services.AddSingleton(options);

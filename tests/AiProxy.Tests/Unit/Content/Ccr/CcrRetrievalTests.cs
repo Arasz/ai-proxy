@@ -1,6 +1,7 @@
 using System.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
+using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
 
 namespace AiProxy.Tests.Unit.Content.Ccr;
@@ -23,7 +24,7 @@ public sealed class CcrRetrievalTests
     private static CcrRetrieval Answer(string arguments, string? original = null) =>
         Retriever().Answer(arguments, original ?? Original, Options);
 
-    private static CcrRetriever Retriever() => new(new CcrRetrievalParser());
+    private static CcrRetriever Retriever() => new(new CcrRetrievalParser(new RetrievalArgumentSchema()));
 
     private static string Lines(int start, int end) => $$"""{"id":"{{Id}}","mode":"lines","start":{{start}},"end":{{end}}}""";
 
@@ -62,7 +63,6 @@ public sealed class CcrRetrievalTests
     }
 
     [Theory]
-    [InlineData(0, 5)]
     [InlineData(401, 402)]
     [InlineData(12, 10)]
     [InlineData(395, 401)]
@@ -267,6 +267,7 @@ public sealed class CcrRetrievalTests
     [InlineData("""{"id":"ID","mode":"pattern"}""")]
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":11}""")]
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":-1}""")]
+    [InlineData("""{"id":"ID","mode":"lines","start":0,"end":5}""")]
     public void Malformed_arguments_are_bad_input(string arguments)
     {
         Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
@@ -308,5 +309,21 @@ public sealed class CcrRetrievalTests
         var result = Answer(Lines(1, 2), "some other text");
 
         Assert.Equal(CcrRetrieval.NotKept, result.Error);
+    }
+
+    [Fact]
+    public void A_schema_violation_is_bad_input_carrying_the_schema_reason()
+    {
+        var retriever = new CcrRetriever(new CcrRetrievalParser(new RejectingSchema("start must be at least 1")));
+
+        var result = retriever.Answer(Lines(1, 2), Original, Options);
+
+        Assert.Equal(CcrRetrieval.BadInput, result.Error);
+        Assert.Contains("start must be at least 1", result.Text, StringComparison.Ordinal);
+    }
+
+    private sealed class RejectingSchema(string violation) : IToolArgumentSchema
+    {
+        public string? Violation(JsonElement arguments) => violation;
     }
 }
