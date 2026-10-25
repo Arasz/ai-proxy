@@ -23,6 +23,12 @@ public sealed record CcrRetrieval(string Text, string? Error)
     /// <summary>The arguments do not follow the tool's schema.</summary>
     public const string BadInput = "bad_input";
 
+    /// <summary>The call came after the last round the loop answers.</summary>
+    public const string LimitReached = "limit_reached";
+
+    /// <summary>The answer every call gets once the loop has answered its last round.</summary>
+    public static CcrRetrieval Limit() => Fail(LimitReached, "The retrieval limit for this turn is reached. Answer with what you have read.");
+
     /// <summary>A successful answer.</summary>
     internal static CcrRetrieval Answered(string text) => new(text, null);
 

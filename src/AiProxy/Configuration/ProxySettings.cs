@@ -20,4 +20,7 @@ public sealed record ProxySettings
 
     /// <summary>The compression stage settings.</summary>
     public CompressionSettings Compression { get; init; } = new();
+
+    /// <summary>The recoverable compression settings.</summary>
+    public CcrSettings Ccr { get; init; } = new();
 }

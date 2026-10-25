@@ -43,30 +43,35 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton(options);
             services.AddSingleton(TimeProvider.System);
 
-            if (capturePath is not null)
-            {
-                services.AddSingleton<IRequestCaptureStore>(new SqliteCaptureStore(capturePath));
-            }
+            services.AddSingleton<IRequestCaptureStore>(capturePath is null ? new NoRequestCapture() : new SqliteCaptureStore(capturePath));
 
             if (compression.Enabled)
             {
                 services.AddCompression(compression);
+                services.AddCcr(settings.Ccr);
             }
             else
             {
                 services.AddSingleton<ICompressionPipeline, PassThroughCompressionPipeline>();
+                services.AddSingleton<ICcrRuntime, CcrOff>();
             }
 
             services.AddSingleton<IProviderHosts, CanonicalProviderHosts>();
-            services.AddSingleton(provider => new ProviderRequestInspector(
-                provider.GetRequiredService<ICompressionPipeline>(),
-                provider.GetRequiredService<IProviderHosts>(),
-                compression.Enabled,
-                provider.GetRequiredService<ILogger<ProviderRequestInspector>>(),
-                capturePath is null ? null : provider.GetRequiredService<IRequestCaptureStore>(),
-                provider.GetRequiredService<TimeProvider>()));
+            services.AddSingleton<ProviderRequestInspector>();
             services.AddSingleton<TitaniumProxyService>();
             services.AddHostedService(provider => provider.GetRequiredService<TitaniumProxyService>());
+
+            return services;
+        }
+
+        /// <summary>Registers the CCR relay, the eviction of its originals, and what the inspector runs it with.</summary>
+        /// <param name="settings">What the operator configured about CCR.</param>
+        public IServiceCollection AddCcr(CcrSettings settings)
+        {
+            services.AddSingleton(settings);
+            services.AddSingleton<CcrRelay>();
+            services.AddSingleton<ICcrRuntime, CcrRuntime>();
+            services.AddHostedService<OriginalEvictionWorker>();
 
             return services;
         }
@@ -84,6 +89,12 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton<IToolArgumentSchema, RetrievalArgumentSchema>();
             services.AddTransient<CcrRetrievalParser>();
             services.AddTransient<CcrRetriever>();
+            services.AddSingleton(CcrOptions.Default);
+            services.AddSingleton<Func<CcrPreviewBuilder>>(provider => provider.GetRequiredService<CcrPreviewBuilder>);
+            services.AddSingleton<Func<CcrRetriever>>(provider => provider.GetRequiredService<CcrRetriever>);
+            services.AddSingleton<SqliteOriginalStore>();
+            services.AddSingleton<IOriginalStore>(provider => provider.GetRequiredService<SqliteOriginalStore>());
+            services.AddSingleton<CcrPreviewer>();
             services.AddSingleton(options);
             services.AddSingleton(settings.Store);
             services.AddSingleton<ContentQueue>();

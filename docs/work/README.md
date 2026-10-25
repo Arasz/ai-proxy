@@ -11,6 +11,7 @@ Active records:
 | File | What it is |
 |---|---|
 | [2026-10-25-ccr-core.md](2026-10-25-ccr-core.md) | Inactive CCR preview and retrieval core, provisional settings, parent graph and review evidence. |
+| [2026-10-25-ccr-runtime-plan.md](2026-10-25-ccr-runtime-plan.md) | CCR runtime implementation plan: evidence, scope, shape, steps and gates for the in-request retrieval loop. |
 | [2026-10-25-ccr-design-feedback.md](2026-10-25-ccr-design-feedback.md) | Owner rulings on ADR 0005: the form (14 of 16, O2 1,500 and O12 3,000 tokens) and the chat follow-ups (O7 and F13 option A, CCR for unknown providers behind `Proxy:Ccr:UnknownProviders`). |
 | [2026-10-25-ccr-design-review.html](2026-10-25-ccr-design-review.html) | The review form for ADR 0005 (tool-result previews with in-request retrieval): fifteen open decisions plus the cache-strategies universal fallback, a verdict and a notes box each. |
 | [2026-10-25-ccr-design-tests.md](2026-10-25-ccr-design-tests.md) | Test list for ADR 0005 (recoverable tool-result previews): one row per test with the behaviour, the failure mode it targets and the mutation that proves it can go red, including a streamed response that calls retrieval. |

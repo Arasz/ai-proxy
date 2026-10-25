@@ -6,7 +6,7 @@ namespace AiProxy.Configuration;
 public sealed record CompressionSettings
 {
     /// <summary>Whether the stage runs at all.</summary>
-    public bool Enabled { get; init; }
+    public bool Enabled { get; init; } = true;
 
     /// <summary>Where the store keeps what the proxy compressed; blank means <see cref="ContentStoreOptions.DefaultDatabasePath"/>.</summary>
     public string? Database { get; init; }

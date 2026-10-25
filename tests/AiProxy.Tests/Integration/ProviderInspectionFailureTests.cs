@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -86,7 +88,7 @@ public sealed class ProviderInspectionFailureTests
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         var service = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, dataDirectory),
-            new ProviderRequestInspector(pipeline, hosts, compressionEnabled: true, loggers.CreateLogger<ProviderRequestInspector>()),
+            new ProviderRequestInspector(pipeline, hosts, new NoRequestCapture(), new CcrOff(), loggers.CreateLogger<ProviderRequestInspector>(), TimeProvider.System),
             hosts,
             loggers);
         await service.StartAsync(TestContext.Current.CancellationToken);

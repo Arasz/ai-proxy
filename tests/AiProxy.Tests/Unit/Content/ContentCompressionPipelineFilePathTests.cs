@@ -1,3 +1,5 @@
+using AiProxy.Core.Content.Ccr;
+using AiProxy.Tests.Unit.Content.Ccr;
 using System.Text;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
@@ -23,7 +25,8 @@ public sealed class ContentCompressionPipelineFilePathTests
             new ContentCompositor(),
             new NullContentStore(),
             CompressionOptions.WithMinimum(1),
-            TimeProvider.System);
+            TimeProvider.System,
+            new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
 
         var body = """
             {"messages":[
@@ -53,7 +56,8 @@ public sealed class ContentCompressionPipelineFilePathTests
             new ContentCompositor(),
             new NullContentStore(),
             CompressionOptions.WithMinimum(1),
-            TimeProvider.System);
+            TimeProvider.System,
+            new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
 
         var body = """
             {"messages":[

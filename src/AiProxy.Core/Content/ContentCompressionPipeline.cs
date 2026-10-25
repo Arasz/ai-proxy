@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
+using AiProxy.Core.Content.Ccr;
 
 namespace AiProxy.Core.Content;
 
@@ -13,6 +14,7 @@ namespace AiProxy.Core.Content;
 /// <param name="store">Keeps what the pipeline changed.</param>
 /// <param name="options">The operator's settings.</param>
 /// <param name="time">Stamps the records.</param>
+/// <param name="previewer">Turns a large region into its preview when the request has CCR on.</param>
 public sealed class ContentCompressionPipeline(
     ToolOutputRegionFinder finder,
     IDecompositor decomposer,
@@ -20,10 +22,17 @@ public sealed class ContentCompressionPipeline(
     ICompositor compositor,
     IContentStore store,
     CompressionOptions options,
-    TimeProvider time) : ICompressionPipeline
+    TimeProvider time,
+    CcrPreviewer previewer) : ICompressionPipeline
 {
     /// <summary>The path recorded for a part whose reducer threw, so the part kept its original text.</summary>
     public const string HandlerFailedPath = "compression.handler-failed";
+
+    /// <summary>The path recorded when at least one region was sent as a CCR preview.</summary>
+    public const string PreviewPath = "ccr.preview";
+
+    /// <summary>The chunk id a failed CCR keep is reported under, since it belongs to a region rather than a part.</summary>
+    public const int RegionChunkId = -1;
 
     /// <inheritdoc />
     public async ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
@@ -48,16 +57,24 @@ public sealed class ContentCompressionPipeline(
         var parts = new List<CompressedPart>();
         var replacements = new List<Replacement>();
         var failures = new List<PartFailure>();
+        var originals = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var region in WithoutOverlaps(regions))
         {
             var reduced = await ReduceAsync(region, requestId, parts, failures, stages, cancellationToken);
-            if (reduced is null)
+            var preview = await PreviewAsync(region, reduced ?? region.Text, request.Ccr, failures, stages, cancellationToken);
+            if (preview is not null)
+            {
+                originals[preview.Id] = region.Text;
+            }
+
+            var sent = preview?.Text ?? reduced;
+            if (sent is null)
             {
                 continue;
             }
 
-            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reduced))));
+            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sent))));
         }
 
         if (replacements.Count == 0)
@@ -70,7 +87,8 @@ public sealed class ContentCompressionPipeline(
         stages.Add("rebuild", time.GetElapsedTime(started));
         var compressedText = Encoding.UTF8.GetString(compressed);
         var ratio = body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length;
-        var path = string.Join(",", parts.Select(static part => part.Path).Distinct(StringComparer.Ordinal));
+        var paths = parts.Select(static part => part.Path);
+        var path = string.Join(",", (originals.Count > 0 ? paths.Append(PreviewPath) : paths).Distinct(StringComparer.Ordinal));
         var record = new ContentRecord(
             requestId,
             time.GetUtcNow(),
@@ -96,7 +114,7 @@ public sealed class ContentCompressionPipeline(
 
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
-        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToArray() };
+        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToArray(), Originals = originals };
     }
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>
@@ -141,6 +159,35 @@ public sealed class ContentCompressionPipeline(
         buffer.Write(body, position, body.Length - position);
 
         return buffer.ToArray();
+    }
+
+    private async ValueTask<CcrPreview?> PreviewAsync(
+        ContentRegion region,
+        string reduced,
+        CcrMode mode,
+        List<PartFailure> failures,
+        StageTimings stages,
+        CancellationToken cancellationToken)
+    {
+        if (mode == CcrMode.Off)
+        {
+            return null;
+        }
+
+        var started = time.GetTimestamp();
+        try
+        {
+            return await previewer.PreviewAsync(region.Text, reduced, mode, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            failures.Add(new PartFailure(RegionChunkId, PreviewPath, exception));
+            return null;
+        }
+        finally
+        {
+            stages.Add("ccr.preview", time.GetElapsedTime(started));
+        }
     }
 
     private async ValueTask<string?> ReduceAsync(

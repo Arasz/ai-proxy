@@ -52,7 +52,7 @@ public static class ContentSchema
     }
 
     /// <summary>The version of the schema this build writes.</summary>
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
 
     /// <param name="connection">The connection to prepare.</param>
     extension(SqliteConnection connection)
@@ -124,6 +124,23 @@ public static class ContentSchema
                                               created_at TEXT NOT NULL,
                                               payload    TEXT NOT NULL
                                           );
+
+                                          CREATE TABLE IF NOT EXISTS ccr_original (
+                                              id         TEXT PRIMARY KEY,
+                                              text       TEXT NOT NULL,
+                                              line_count INTEGER NOT NULL,
+                                              created_at TEXT NOT NULL
+                                          );
+
+                                          CREATE INDEX IF NOT EXISTS ccr_original_created ON ccr_original (created_at);
+
+                                          CREATE TABLE IF NOT EXISTS ccr_thread (
+                                              message_id    TEXT PRIMARY KEY,
+                                              continue_from TEXT NOT NULL,
+                                              created_at    TEXT NOT NULL
+                                          );
+
+                                          CREATE INDEX IF NOT EXISTS ccr_thread_created ON ccr_thread (created_at);
                                           """;
     }
 }

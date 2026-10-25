@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
 using AiProxy.Core.Compression;
@@ -144,7 +146,7 @@ public sealed class TitaniumProxyServiceTests
         await using var service = new TitaniumProxyService(
             new RecordingSystemProxyRegistrar(events),
             new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             new CanonicalProviderHosts(),
             new RecordingGuardLauncher(events),
             NullLoggerFactory.Instance,
@@ -263,7 +265,7 @@ public sealed class TitaniumProxyServiceTests
         new(
             registrar,
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: true, TrustRootCertificate: false, dataDirectory),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             new CanonicalProviderHosts(),
             launcher ?? new RecordingGuardLauncher([]),
             NullLoggerFactory.Instance,

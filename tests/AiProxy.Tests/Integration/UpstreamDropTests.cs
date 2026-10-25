@@ -1,3 +1,5 @@
+using AiProxy.Core.Capture;
+using AiProxy.Ccr;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -119,7 +121,7 @@ public sealed class UpstreamDropTests
         await using var service = new TitaniumProxyService(
             null,
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), compressionEnabled: false, NullLogger<ProviderRequestInspector>.Instance),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
             new CanonicalProviderHosts(),
             new ProcessSystemProxyGuardLauncher(),
             loggerFactory,

@@ -9,6 +9,9 @@ namespace AiProxy.Core.Compression;
 /// </remarks>
 public sealed class PassThroughCompressionPipeline : ICompressionPipeline
 {
+    /// <inheritdoc />
+    public bool Compresses => false;
+
     /// <summary>Returns the body unchanged.</summary>
     public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
     {

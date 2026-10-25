@@ -16,5 +16,6 @@
   <ItemGroup Label="Storage">
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
   </ItemGroup>
 </Project>

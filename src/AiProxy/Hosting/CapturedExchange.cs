@@ -6,7 +6,7 @@ using Titanium.Web.Proxy.StreamExtended.Network;
 namespace AiProxy.Hosting;
 
 /// <summary>What the inspector keeps about one exchange between BeforeRequest and AfterResponse.</summary>
-internal sealed class CapturedExchange
+public sealed class CapturedExchange
 {
     /// <summary>The provider dialect identified from the request host.</summary>
     public required Dialect Dialect { get; init; }
@@ -22,6 +22,9 @@ internal sealed class CapturedExchange
 
     /// <summary>The request body length as the proxy forwarded it.</summary>
     public long ForwardedBytes { get; set; }
+
+    /// <summary>Whether the proxy answers the client itself through the CCR relay, so the response is not Titanium's to read.</summary>
+    public bool Relayed { get; set; }
 
     /// <summary>The inspector's own stage timings.</summary>
     public StageTimings Stages { get; } = new();
