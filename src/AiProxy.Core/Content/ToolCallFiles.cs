@@ -9,7 +9,7 @@ namespace AiProxy.Core.Content;
 /// </remarks>
 internal sealed class ToolCallFiles
 {
-    private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal) { "file_path", "path", "filePath" };
+    private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal) { ToolCallJson.FilePathSnake, ToolCallJson.Path, ToolCallJson.FilePathCamel };
 
     private readonly Dictionary<string, FileRead?> _calls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);
@@ -28,8 +28,7 @@ internal sealed class ToolCallFiles
     public FileRead? ReadFor(JsonElement result)
     {
         var id = ResultId(result);
-        if (id is null || _results.GetValueOrDefault(id) != 1 ||
-            (result.TryGetProperty("is_error", out var error) && error.ValueKind == JsonValueKind.True))
+        if (id is null || _results.GetValueOrDefault(id) != 1 || result.IsTrue(ToolCallJson.IsError))
         {
             return null;
         }
@@ -65,32 +64,31 @@ internal sealed class ToolCallFiles
 
     private void Note(JsonElement element)
     {
-        var type = GetString(element, "type");
+        var type = element.StringProperty(ToolCallJson.Type);
 
-        if (type == "tool_use" && GetString(element, "id") is { } anthropicId)
+        if (type == ToolCallJson.ToolUse && element.StringProperty(ToolCallJson.Id) is { } anthropicId)
         {
-            var input = element.TryGetProperty("input", out var value) ? value : default;
-            AddCall(anthropicId, PathOf(GetString(element, "name"), input));
+            var input = element.PropertyOrDefault(ToolCallJson.Input);
+            AddCall(anthropicId, PathOf(element.StringProperty(ToolCallJson.Name), input));
         }
-        else if (type == "function_call" && GetString(element, "call_id") is { } responsesId)
+        else if (type == ToolCallJson.FunctionCall && element.StringProperty(ToolCallJson.CallId) is { } responsesId)
         {
-            AddCall(responsesId, PathOf(GetString(element, "name"), GetString(element, "arguments")));
+            AddCall(responsesId, PathOf(element.StringProperty(ToolCallJson.Name), element.StringProperty(ToolCallJson.Arguments)));
         }
 
-        if (element.TryGetProperty("tool_calls", out var calls) && calls.ValueKind == JsonValueKind.Array)
+        var calls = element.PropertyOrDefault(ToolCallJson.ToolCalls);
+        if (calls.ValueKind == JsonValueKind.Array)
         {
             foreach (var call in calls.EnumerateArray())
             {
-                if (call.ValueKind != JsonValueKind.Object || GetString(call, "id") is not { } chatId)
+                if (call.ValueKind != JsonValueKind.Object || call.StringProperty(ToolCallJson.Id) is not { } chatId)
                 {
                     continue;
                 }
 
-                var function = call.TryGetProperty("function", out var value) && value.ValueKind == JsonValueKind.Object
-                    ? value
-                    : default;
+                var function = call.PropertyOrDefault(ToolCallJson.Function);
                 var path = function.ValueKind == JsonValueKind.Object
-                    ? PathOf(GetString(function, "name"), GetString(function, "arguments"))
+                    ? PathOf(function.StringProperty(ToolCallJson.Name), function.StringProperty(ToolCallJson.Arguments))
                     : null;
                 AddCall(chatId, path);
             }
@@ -115,18 +113,18 @@ internal sealed class ToolCallFiles
             return null;
         }
 
-        var type = GetString(element, "type");
-        if (type == "tool_result")
+        var type = element.StringProperty(ToolCallJson.Type);
+        if (type == ToolCallJson.ToolResult)
         {
-            return GetString(element, "tool_use_id");
+            return element.StringProperty(ToolCallJson.ToolUseId);
         }
 
-        if (type == "function_call_output")
+        if (type == ToolCallJson.FunctionCallOutput)
         {
-            return GetString(element, "call_id");
+            return element.StringProperty(ToolCallJson.CallId);
         }
 
-        return GetString(element, "role") == "tool" ? GetString(element, "tool_call_id") : null;
+        return element.StringProperty(ToolCallJson.Role) == ToolCallJson.Tool ? element.StringProperty(ToolCallJson.ToolCallId) : null;
     }
 
     private static FileRead? PathOf(string? name, string? arguments)
@@ -162,9 +160,9 @@ internal sealed class ToolCallFiles
             if (PathKeys.Contains(property.Name) && property.Value.ValueKind == JsonValueKind.String)
             {
                 paths++;
-                path = ReadString(property.Value);
+                path = property.Value.ReadString();
             }
-            else if (property.NameEquals("allow_large") && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            else if (property.NameEquals(ToolCallJson.AllowLarge) && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
                 allowLarge = property.Value.GetBoolean();
             }
@@ -205,24 +203,5 @@ internal sealed class ToolCallFiles
         }
 
         return false;
-    }
-
-    private static string? GetString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? ReadString(value)
-            : null;
-
-    // A string that does not transcode, such as a lone surrogate, is a value this class cannot
-    // trust, so it reads as absent and the call it belongs to keeps no path.
-    private static string? ReadString(JsonElement value)
-    {
-        try
-        {
-            return value.GetString();
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
     }
 }

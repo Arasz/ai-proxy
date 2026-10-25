@@ -46,18 +46,18 @@ public sealed class ContentCompressionPipeline(
         var original = Encoding.UTF8.GetString(request.Body.Span);
         var body = request.Body.ToArray();
         var parts = new List<CompressedPart>();
-        var replacements = new List<(int Start, int Length, byte[] Bytes)>();
+        var replacements = new List<Replacement>();
         var failures = new List<PartFailure>();
 
         foreach (var region in WithoutOverlaps(regions))
         {
-            var reduced = await ReduceAsync(region, requestId, parts, failures, stages, cancellationToken).ConfigureAwait(false);
+            var reduced = await ReduceAsync(region, requestId, parts, failures, stages, cancellationToken);
             if (reduced is null)
             {
                 continue;
             }
 
-            replacements.Add((region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reduced))));
+            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reduced))));
         }
 
         if (replacements.Count == 0)
@@ -70,7 +70,7 @@ public sealed class ContentCompressionPipeline(
         stages.Add("rebuild", time.GetElapsedTime(started));
         var compressedText = Encoding.UTF8.GetString(compressed);
         var ratio = body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length;
-        var path = string.Join(",", parts.Select(part => part.Path).Distinct(StringComparer.Ordinal));
+        var path = string.Join(",", parts.Select(static part => part.Path).Distinct(StringComparer.Ordinal));
         var record = new ContentRecord(
             requestId,
             time.GetUtcNow(),
@@ -109,12 +109,10 @@ public sealed class ContentCompressionPipeline(
     /// <param name="regions">The regions the finder found.</param>
     public static IReadOnlyList<ContentRegion> WithoutOverlaps(IReadOnlyList<ContentRegion> regions)
     {
-        ArgumentNullException.ThrowIfNull(regions);
-
         var kept = new List<ContentRegion>(regions.Count);
         var end = 0;
 
-        foreach (var region in regions.OrderBy(candidate => candidate.Start))
+        foreach (var region in regions.OrderBy(static region => region.Start))
         {
             if (region.Start < end)
             {
@@ -128,7 +126,7 @@ public sealed class ContentCompressionPipeline(
         return kept;
     }
 
-    private static byte[] Rebuild(byte[] body, List<(int Start, int Length, byte[] Bytes)> replacements)
+    private static byte[] Rebuild(byte[] body, List<Replacement> replacements)
     {
         using var buffer = new MemoryStream(body.Length);
         var position = 0;

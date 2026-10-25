@@ -27,13 +27,13 @@ public sealed class ToolOutputRegionFinder
             return [];
         }
 
-        var (regions, tokenCount) = FindRegions(body.Span, found.Indexes);
+        var scan = FindRegions(body.Span, found.Indexes);
 
         // The two passes count the string values of the body in the same order, with the
         // same parser, so the counts agree unless one of them stopped early. A reader
         // that saw MORE strings than the document has would mean the two disagree about
         // the order, and a region found by position would then be the wrong region.
-        return tokenCount > found.Count ? [] : regions;
+        return scan.Count > found.Count ? [] : scan.Regions;
     }
 
     private static ToolOutputIndexes FindToolOutputIndexes(ReadOnlySpan<byte> body)
@@ -139,7 +139,7 @@ public sealed class ToolOutputRegionFinder
 
                     foreach (var property in item.EnumerateObject())
                     {
-                        if (property.NameEquals("text") && property.Value.ValueKind == JsonValueKind.String)
+                        if (property.NameEquals(ToolCallJson.Text) &&property.Value.ValueKind == JsonValueKind.String)
                         {
                             indexes[counter] = path;
                             counter++;
@@ -155,7 +155,7 @@ public sealed class ToolOutputRegionFinder
             case JsonValueKind.Object:
                 foreach (var property in value.EnumerateObject())
                 {
-                    if ((property.NameEquals("output") || property.NameEquals("result")) &&
+                    if ((property.NameEquals(ToolCallJson.Output) || property.NameEquals(ToolCallJson.Result)) &&
                         property.Value.ValueKind == JsonValueKind.String)
                     {
                         indexes[counter] = path;
@@ -177,22 +177,23 @@ public sealed class ToolOutputRegionFinder
 
     private static bool IsToolOutputProperty(JsonElement parent, JsonProperty property)
     {
-        var type = GetString(parent, "type");
+        var type = parent.StringProperty(ToolCallJson.Type);
+        var role = parent.StringProperty(ToolCallJson.Role);
 
-        return type switch
+        if ((type == ToolCallJson.ToolResult || role == ToolCallJson.Tool) && property.NameEquals(ToolCallJson.Content))
         {
-            "tool_result" or "tool" when property.NameEquals("content") => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array,
-            "function_call_output" when property.NameEquals("output") => property.Value.ValueKind == JsonValueKind.String,
-            _ => property.NameEquals("functionResponse") && property.Value.ValueKind == JsonValueKind.Object
-        };
+            return property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array;
+        }
+
+        if (type == ToolCallJson.FunctionCallOutput && property.NameEquals(ToolCallJson.Output))
+        {
+            return property.Value.ValueKind == JsonValueKind.String;
+        }
+
+        return property.NameEquals(ToolCallJson.FunctionResponse) && property.Value.ValueKind == JsonValueKind.Object;
     }
 
-    private static string? GetString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, Dictionary<int, FileRead?> indexes)
+    private static ToolOutputRegions FindRegions(ReadOnlySpan<byte> body, Dictionary<int, FileRead?> indexes)
     {
         var regions = new List<ContentRegion>();
         var reader = new Utf8JsonReader(body);
@@ -216,7 +217,7 @@ public sealed class ToolOutputRegionFinder
             counter++;
         }
 
-        return (regions, counter);
+        return new ToolOutputRegions(regions, counter);
     }
 
     private static int EndOfStringToken(ReadOnlySpan<byte> body, int start)
