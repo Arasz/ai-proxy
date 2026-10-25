@@ -151,6 +151,12 @@ public sealed class PythonCodeLexerTests
     [InlineData("# mypy: ignore-errors", 1, CodeTokenKind.Other)]
     [InlineData("# fmt: off", 1, CodeTokenKind.Other)]
     [InlineData("# fmt: on", 1, CodeTokenKind.Other)]
+    [InlineData("x = 1  # fmt: skip", 1, CodeTokenKind.Other)]
+    [InlineData("x = f()  # pyright: ignore[reportCallIssue]", 1, CodeTokenKind.Other)]
+    [InlineData("# ruff: noqa: E501", 1, CodeTokenKind.Other)]
+    [InlineData("import a  # isort: skip", 1, CodeTokenKind.Other)]
+    [InlineData("x = eval(s)  # nosec", 1, CodeTokenKind.Other)]
+    [InlineData("x = f()  # pyre-ignore[16]", 1, CodeTokenKind.Other)]
     [InlineData("#!/usr/bin/env python3", 1, CodeTokenKind.Other)]
     [InlineData("# vim: set fileencoding=utf-8 :", 2, CodeTokenKind.Other)]
     [InlineData("# -*- coding: latin-1 -*-", 3, CodeTokenKind.Comment)]
@@ -226,5 +232,14 @@ public sealed class PythonCodeLexerTests
         var shortName = Assert.Single(result.RenameMap, static pair => pair.Value == "file").Key;
         Assert.DoesNotContain("ﬁ", result.Text, StringComparison.Ordinal);
         Assert.Contains($"{shortName} = 1\n{shortName} = {shortName} + {shortName}\n", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_package_init_keeps_its_imports_because_they_are_its_exports()
+    {
+        const string source = "from .models import User\nfrom .views import render\n\n__all__ = [\"User\", \"render\"]\n";
+
+        Assert.Equal(2, new PythonCodeLexer().Lex(source, "pkg/models.py").Imports?.Count);
+        Assert.Empty(new PythonCodeLexer().Lex(source, "pkg/__init__.py").Imports ?? [new CodeSpan(0, 1)]);
     }
 }
