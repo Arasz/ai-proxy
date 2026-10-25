@@ -1,3 +1,5 @@
+using AiProxy.Core.Content.Ccr;
+using AiProxy.Tests.Unit.Content.Ccr;
 using System.Text;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
@@ -47,7 +49,8 @@ public sealed class ContentCompressionPipelineTests
             new ContentCompositor(),
             recording,
             options ?? CompressionOptions.Default,
-            time ?? TimeProvider.System);
+            time ?? TimeProvider.System,
+            new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
 
         return (pipeline, recording);
     }

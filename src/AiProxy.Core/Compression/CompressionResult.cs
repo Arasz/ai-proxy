@@ -25,4 +25,7 @@ public sealed record CompressionResult(
 
     /// <summary>How long each step of the pipeline took, in the order the steps first ran; empty when not measured.</summary>
     public IReadOnlyList<StageTiming> Stages { get; init; } = [];
+
+    /// <summary>The original of every region sent as a preview, by preview id; empty when nothing was previewed.</summary>
+    public IReadOnlyDictionary<string, string> Originals { get; init; } = new Dictionary<string, string>();
 }

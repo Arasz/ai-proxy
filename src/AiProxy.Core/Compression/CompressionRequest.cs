@@ -1,3 +1,4 @@
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
 
 namespace AiProxy.Core.Compression;
@@ -6,4 +7,8 @@ namespace AiProxy.Core.Compression;
 /// <param name="Body">The request body.</param>
 /// <param name="ContentType">The content type of the body, when it has one.</param>
 /// <param name="Dialect">The provider dialect the request speaks.</param>
-public sealed record CompressionRequest(ReadOnlyMemory<byte> Body, string? ContentType, Dialect Dialect);
+public sealed record CompressionRequest(ReadOnlyMemory<byte> Body, string? ContentType, Dialect Dialect)
+{
+    /// <summary>Whether large tool results become previews; off unless the host turned CCR on for this request.</summary>
+    public CcrMode Ccr { get; init; } = CcrMode.Off;
+}
