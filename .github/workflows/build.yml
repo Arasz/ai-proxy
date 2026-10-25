@@ -22,15 +22,6 @@ on:
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch: {}
 
-
-# The exact SDK setup-dotnet installs; global.json still decides which installed SDK builds.
-# An exact version downloads from builds.dotnet.microsoft.com. global-json-file would turn
-# global.json's latestPatch into a 10.0.4xx channel, which goes through an aka.ms link, and on
-# 2026-10-25 that link pointed at 10.0.403 before it was published (HTTP 409 on every job).
-# Keep this at the newest released 10.0.4xx SDK.
-env:
-  DOTNET_SDK: 10.0.402
-
 permissions:
   contents: read
 
@@ -113,7 +104,7 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         if: needs.changes.outputs.code == 'true'
         with:
-          dotnet-version: ${{ env.DOTNET_SDK }}
+          global-json-file: global.json
       - name: Build
         if: needs.changes.outputs.code == 'true'
         # nuget.config references the gitignored local feed .nupkg-local/; make it
@@ -148,7 +139,7 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         if: needs.changes.outputs.code == 'true'
         with:
-          dotnet-version: ${{ env.DOTNET_SDK }}
+          global-json-file: global.json
       - name: Build for every shipped runtime identifier
         if: needs.changes.outputs.code == 'true'
         # nuget.config references the gitignored local feed .nupkg-local/; make it
@@ -216,7 +207,7 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         if: needs.changes.outputs.code == 'true'
         with:
-          dotnet-version: ${{ env.DOTNET_SDK }}
+          global-json-file: global.json
       - name: Test through the Microsoft Testing Platform runner
         if: needs.changes.outputs.code == 'true'
         # nuget.config references the gitignored local feed .nupkg-local/; make it

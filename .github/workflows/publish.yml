@@ -21,15 +21,6 @@ name: publish
 on:
   workflow_dispatch:
 
-
-# The exact SDK setup-dotnet installs; global.json still decides which installed SDK builds.
-# An exact version downloads from builds.dotnet.microsoft.com. global-json-file would turn
-# global.json's latestPatch into a 10.0.4xx channel, which goes through an aka.ms link, and on
-# 2026-10-25 that link pointed at 10.0.403 before it was published (HTTP 409 on every job).
-# Keep this at the newest released 10.0.4xx SDK.
-env:
-  DOTNET_SDK: 10.0.402
-
 permissions:
   contents: read
 
@@ -58,7 +49,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: ${{ env.DOTNET_SDK }}
+          global-json-file: global.json
       - name: Pack (${{ matrix.rid }})
         # nuget.config references the gitignored local feed .nupkg-local/; make it
         # exist on the fresh runner or restore fails with NU1301.
@@ -108,7 +99,7 @@ jobs:
       # on PATH. Mirrors the pack job's setup-dotnet step.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: ${{ env.DOTNET_SDK }}
+          global-json-file: global.json
       - name: NuGet login (OIDC -> temp API key)
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         id: login
