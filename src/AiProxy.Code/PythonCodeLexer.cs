@@ -9,6 +9,8 @@ namespace AiProxy.Code;
 /// <summary>Scans Python with the Tree-sitter grammar; docstrings are strings and f-string fields are code.</summary>
 public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICodeLexer
 {
+    private const string PackageInit = "__init__.py";
+
     private static readonly TreeSitterLanguage Python = new("Python");
 
     private static readonly TreeSitterGrammar Grammar = new(
@@ -67,8 +69,12 @@ public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICode
     /// <inheritdoc />
     public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
 
+    /// <summary>Scans a file; a package's <c>__init__.py</c> keeps its imports, since they are what the package exports.</summary>
+    public CodeLexResult Lex(string text, string? filePath) =>
+        Path.GetFileName(filePath) == PackageInit ? Lex(text) with { Imports = [] } : Lex(text);
+
     /// <summary>A type-checker, linter, coverage or formatter directive anywhere in a comment.</summary>
-    [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|fmt:\s*(?:off|on)\b)")]
+    [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|pyright:|ruff:|isort:|nosec\b|pyre-|fmt:\s*(?:off|on|skip)\b)")]
     private static partial Regex ToolDirective();
 
     /// <summary>The PEP 263 source-encoding declaration.</summary>

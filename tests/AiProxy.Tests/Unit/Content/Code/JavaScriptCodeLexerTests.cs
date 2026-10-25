@@ -230,6 +230,10 @@ public sealed class JavaScriptCodeLexerTests
     [InlineData("// @ts-ignore", CodeTokenKind.Other)]
     [InlineData("/*! MIT */", CodeTokenKind.Other)]
     [InlineData("/* eslint-disable no-console */", CodeTokenKind.Other)]
+    [InlineData("// prettier-ignore", CodeTokenKind.Other)]
+    [InlineData("// biome-ignore lint/style: reason", CodeTokenKind.Other)]
+    [InlineData("/* istanbul ignore next */", CodeTokenKind.Other)]
+    [InlineData("/* c8 ignore next */", CodeTokenKind.Other)]
     [InlineData("// ts-ignore without the at sign", CodeTokenKind.Comment)]
     [InlineData("/* a license, but not a bang comment */", CodeTokenKind.Comment)]
     public void Comments_a_tool_reads_are_kept_as_code(string comment, CodeTokenKind expected)

@@ -85,6 +85,6 @@ public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : I
     }
 
     /// <summary>Triple-slash directives, TypeScript and ESLint pragmas, license, source-map and JSX pragma comments.</summary>
-    [GeneratedRegex(@"^///\s*<(?:reference|amd-)|@ts-(?:ignore|expect-error|nocheck|check)\b|\beslint-(?:disable|enable)|^/\*!|^//[#@]\s*sourceMappingURL=|@jsx")]
+    [GeneratedRegex(@"^///\s*<(?:reference|amd-)|@ts-(?:ignore|expect-error|nocheck|check)\b|\beslint-(?:disable|enable)|\bprettier-ignore\b|\bbiome-ignore\b|\b(?:istanbul|c8|v8) ignore\b|^/\*!|^//[#@]\s*sourceMappingURL=|@jsx")]
     private static partial Regex ToolDirective();
 }
