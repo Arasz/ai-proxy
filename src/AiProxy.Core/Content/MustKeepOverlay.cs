@@ -43,15 +43,15 @@ public static partial class MustKeepOverlay
     /// <param name="originalText">The text the reduction started from.</param>
     public static OverlayResult Apply(string reducedText, string originalText)
     {
-        var (decisions, others) = Tokens(originalText);
-        if (decisions.Count == 0 && others.Count == 0)
+        var tokens = Tokens(originalText);
+        if (tokens.Decisions.Count == 0 && tokens.Others.Count == 0)
         {
             return new OverlayResult(reducedText, 0, false);
         }
 
         var kept = TokenSet(reducedText);
-        var block = new List<string>(decisions.Where(token => !kept.Contains(token)));
-        var wanted = others.Where(token => !kept.Contains(token)).ToList();
+        var block = new List<string>(tokens.Decisions.Where(token => !kept.Contains(token)));
+        var wanted = tokens.Others.Where(token => !kept.Contains(token)).ToList();
 
         var ceiling = Math.Max(MinimumOverhead, (int)(MaximumOverhead * reducedText.Length));
         var length = BlockLabel.Length + string.Join(" ", block).Length;
@@ -85,11 +85,11 @@ public static partial class MustKeepOverlay
     /// <summary>The tokens a reduction may never lose, decision tokens first, each once, in text order.</summary>
     public static IReadOnlyList<string> Identifiers(string text)
     {
-        var (decisions, others) = Tokens(text);
-        return [.. decisions, .. others];
+        var tokens = Tokens(text);
+        return [.. tokens.Decisions, .. tokens.Others];
     }
 
-    private static (List<string> Decisions, List<string> Others) Tokens(string text)
+    private static OverlayTokens Tokens(string text)
     {
         var decisions = new List<string>();
         var others = new List<string>();
@@ -114,15 +114,15 @@ public static partial class MustKeepOverlay
             }
         }
 
-        return (decisions, others);
+        return new OverlayTokens(decisions, others);
     }
 
     private static HashSet<string> TokenSet(string text)
     {
-        var (decisions, others) = Tokens(text);
-        var set = new HashSet<string>(decisions, StringComparer.OrdinalIgnoreCase);
+        var tokens = Tokens(text);
+        var set = new HashSet<string>(tokens.Decisions, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var token in others)
+        foreach (var token in tokens.Others)
         {
             set.Add(token);
         }
@@ -149,4 +149,7 @@ public static partial class MustKeepOverlay
 
     [GeneratedRegex(@"(?i)\b(?:must-keep|never\s+drop|do\s+not\s+drop|keep\s+this)\b", RegexOptions.CultureInvariant)]
     private static partial Regex CreateMustKeepDecisionPattern();
+
+    /// <summary>The tokens of a text: decision tokens first, then the other identifiers, each once.</summary>
+    private sealed record OverlayTokens(List<string> Decisions, List<string> Others);
 }

@@ -21,7 +21,9 @@ public sealed class CodeReducer(ICodeLexer lexer)
         {
             return Original(text, false);
         }
-        var (source, prefixes) = Unnumber(text);
+        var numbered = Unnumber(text);
+        var source = numbered.Source;
+        var prefixes = numbered.Prefixes;
         var lexed = lexer.Lex(source, filePath);
         if (!lexed.Supported)
         {
@@ -56,23 +58,23 @@ public sealed class CodeReducer(ICodeLexer lexer)
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         var replacements = options.RenameIdentifiers
             ? Rename(view, lexed.Tokens, map)
-            : new Dictionary<int, (int Length, string Text)>();
+            : new Dictionary<int, IdentifierRename>();
         var rendered = Render(view, literals, prefixes, replacements);
         var newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
         if (rendered.Length > 0 && rendered[^1] is not ('\r' or '\n'))
         {
             rendered += newline;
         }
-        foreach (var (shortName, originalName) in map)
+        foreach (var entry in map)
         {
-            rendered += $"{shortName}:{originalName}{newline}";
+            rendered += $"{entry.Key}:{entry.Value}{newline}";
         }
         rendered += retrievalHint;
         return rendered.Length < text.Length
             ? new CodeReductionResult(rendered, true, true, new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(map))
             : Original(text, true);
     }
-    private Dictionary<int, (int Length, string Text)> Rename(
+    private Dictionary<int, IdentifierRename> Rename(
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
@@ -106,7 +108,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
             map.Add(candidate, group.Key);
         }
         return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
-            .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.ValueText ?? token.Text]));
+            .ToDictionary(token => token.Offset, token => new IdentifierRename(token.Text.Length, names[token.ValueText ?? token.Text]));
     }
 
     private static string StringValue(string literal)
@@ -187,7 +189,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
         return true;
     }
 
-    private static (string Source, IReadOnlyList<string> Prefixes) Unnumber(string text)
+    private static NumberedText Unnumber(string text)
     {
         var prefixes = new List<string>();
         var source = new StringBuilder();
@@ -206,7 +208,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
             }
             if (index == digits || index == text.Length || text[index] != '\t')
             {
-                return (text, Array.Empty<string>());
+                return new NumberedText(text, []);
             }
             prefixes.Add(text[start..++index]);
             var end = index;
@@ -221,7 +223,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
             source.Append(text, index, end - index);
             start = end;
         }
-        return (source.ToString(), prefixes);
+        return new NumberedText(source.ToString(), prefixes);
     }
 
     private static CodeReductionResult Original(string text, bool supported) =>
@@ -238,7 +240,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
         }
     }
 
-    private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, (int Length, string Text)> replacements)
+    private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, IdentifierRename> replacements)
     {
         var output = new StringBuilder();
         var start = 0;
@@ -285,4 +287,10 @@ public sealed class CodeReducer(ICodeLexer lexer)
         }
         return output.ToString();
     }
+
+    /// <summary>A shortened identifier: the length of the original text it replaces and the short name.</summary>
+    private sealed record IdentifierRename(int Length, string Text);
+
+    /// <summary>Source with its line-number prefixes removed, and the prefixes in line order; none when the text was not numbered.</summary>
+    private sealed record NumberedText(string Source, IReadOnlyList<string> Prefixes);
 }
