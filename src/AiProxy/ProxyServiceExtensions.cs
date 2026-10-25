@@ -3,6 +3,7 @@ using AiProxy.Ccr;
 using AiProxy.Code;
 using AiProxy.Configuration;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Gain;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
@@ -44,6 +45,9 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton(compression);
             services.AddSingleton(options);
             services.AddSingleton(TimeProvider.System);
+            services.AddProblemDetails();
+            services.AddSingleton(new GainStoreOptions(Path.Combine(options.DataDirectory, "gain.db")));
+            services.AddSingleton<IGainStore, SqliteGainStore>();
 
             services.AddSingleton<IRequestCaptureStore>(capturePath is null ? new NoRequestCapture() : new SqliteCaptureStore(capturePath));
 
@@ -148,8 +152,11 @@ public static partial class ProxyServiceExtensions
                 Log.CaptureOn(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(ProxyServiceExtensions)), capturePath);
             }
 
+            app.UseExceptionHandler();
+            app.UseStatusCodePages();
             app.UseMiddleware<RequestLoggingMiddleware>();
             app.MapGet("/health", () => Results.Json(new { status = "ok" }));
+            app.MapGainEndpoints();
 
             if (settings.Compression.Enabled)
             {

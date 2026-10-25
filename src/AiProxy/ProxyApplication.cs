@@ -14,6 +14,14 @@ public static class ProxyApplication
         Action<IServiceCollection>? configure = null,
         ProxyRuntimeOptions? runtimeOptions = null)
     {
+        if (string.IsNullOrWhiteSpace(builder.Configuration["urls"]) &&
+            string.IsNullOrWhiteSpace(builder.Configuration["HTTP_PORTS"]) &&
+            string.IsNullOrWhiteSpace(builder.Configuration["HTTPS_PORTS"]) &&
+            !builder.Configuration.GetSection("Kestrel:Endpoints").GetChildren().Any())
+        {
+            builder.WebHost.UseUrls(GainEndpoints.DefaultEndpoint);
+        }
+
         builder.Services.AddProxy(builder.Configuration, runtimeOptions);
 
         configure?.Invoke(builder.Services);

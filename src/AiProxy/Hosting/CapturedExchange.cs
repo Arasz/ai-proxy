@@ -3,11 +3,21 @@ using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Titanium.Web.Proxy.StreamExtended.Network;
 
+using AiProxy.Core.Gain;
+
 namespace AiProxy.Hosting;
 
 /// <summary>What the inspector keeps about one exchange between BeforeRequest and AfterResponse.</summary>
 public sealed class CapturedExchange
 {
+    public string GainId { get; } = Guid.CreateVersion7().ToString();
+    public string? GainProject { get; init; }
+    public string GainRule { get; set; } = "unknown";
+    public string GainMethod { get; set; } = "POST";
+    public string GainLayer { get; set; } = "unknown";
+    public string GainPipeline { get; set; } = "unknown";
+    public List<GainFailure> GainFailures { get; } = [];
+
     /// <summary>The provider dialect identified from the request host.</summary>
     public required Dialect Dialect { get; init; }
 

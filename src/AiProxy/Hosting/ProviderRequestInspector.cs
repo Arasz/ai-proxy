@@ -1,4 +1,6 @@
+using System.Text;
 using AiProxy.Ccr;
+using AiProxy.Core.Gain;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Timing;
@@ -21,7 +23,8 @@ public sealed partial class ProviderRequestInspector(
     IRequestCaptureStore capture,
     ICcrRuntime ccr,
     ILogger<ProviderRequestInspector> logger,
-    TimeProvider time)
+    TimeProvider time,
+    IGainStore? gain = null)
 {
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
@@ -31,12 +34,9 @@ public sealed partial class ProviderRequestInspector(
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
-        if (!compression.Compresses && !capture.Keeps)
-        {
-            return;
-        }
-
         var request = e.HttpClient.Request;
+        var project = request.Headers.GetFirstHeader(GainEndpoints.ProjectHeader)?.Value;
+        request.Headers.RemoveHeader(GainEndpoints.ProjectHeader);
         if (providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
         {
             return;
@@ -48,7 +48,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var started = time.GetTimestamp();
-        var exchange = new CapturedExchange { Dialect = dialect };
+        var exchange = new CapturedExchange { Dialect = dialect, GainProject = project };
         var captureId = Guid.NewGuid().ToString("N");
 
         var stage = time.GetTimestamp();
@@ -56,6 +56,7 @@ public sealed partial class ProviderRequestInspector(
         exchange.Stages.Add("body-read", time.GetElapsedTime(stage));
         exchange.RequestBytes = body.Length;
         exchange.ForwardedBytes = body.Length;
+        e.UserData = exchange;
 
         if (capture.Keeps)
         {
@@ -76,6 +77,8 @@ public sealed partial class ProviderRequestInspector(
             if (plan.Failure is { } failure)
             {
                 Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
+                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, project, "ccr-plan", failure.GetType().Name));
+                await RecordGainAsync(exchange, request.Method, body, body, "ccr-plan-failed");
                 e.GenericResponse(
                     CcrPlan.LedgerUnavailable,
                     (System.Net.HttpStatusCode)529,
@@ -92,7 +95,13 @@ public sealed partial class ProviderRequestInspector(
             else
             {
                 Apply(e, exchange, compressed);
+                await RecordGainAsync(exchange, request.Method, body,
+                    compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? "unchanged");
             }
+        }
+        else
+        {
+            await RecordGainAsync(exchange, request.Method, body, body, "unchanged");
         }
 
         exchange.Stages.Add("inspector", time.GetElapsedTime(started));
@@ -201,6 +210,10 @@ public sealed partial class ProviderRequestInspector(
         try
         {
             var compressed = await compression.CompressAsync(new CompressionRequest(body, contentType, dialect) { Ccr = mode }, CancellationToken.None);
+            if (compressed.Failure is not null)
+            {
+                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "content-store", "content_store_failed"));
+            }
             exchange.Stages.Add("compression", time.GetElapsedTime(stage));
             exchange.Stages.Add("compression.", compressed.Stages);
             return compressed;
@@ -209,6 +222,7 @@ public sealed partial class ProviderRequestInspector(
         {
             exchange.Stages.Add("compression", time.GetElapsedTime(stage));
             Log.CompressionFailed(logger, host, exception);
+            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "compression", exception.GetType().Name));
             return null;
         }
     }
@@ -234,6 +248,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         exchange.ForwardedBytes = forwarded.Length;
+        await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, compressed?.Summary?.Path ?? "unchanged");
         e.UserData = exchange;
         await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
     }
@@ -243,6 +258,10 @@ public sealed partial class ProviderRequestInspector(
         foreach (var failure in compressed?.PartFailures ?? [])
         {
             Log.PartFailed(logger, failure.ChunkId, failure.ContentType, e.HttpClient.Request.RequestUri.Host, failure.Exception);
+            if (e.UserData is CapturedExchange exchange)
+            {
+                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, failure.ContentType, failure.Exception.GetType().Name));
+            }
         }
     }
 
@@ -291,8 +310,31 @@ public sealed partial class ProviderRequestInspector(
         }
     }
 
+    private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule)
+    {
+        exchange.GainRule = rule;
+        exchange.GainMethod = method;
+        exchange.GainLayer = rule == "unchanged" ? "unknown" : "tool_result";
+        exchange.GainPipeline = compression.Compresses ? "content" : "passthrough";
+        if (gain is null) { return; }
+        try
+        {
+            await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,
+                exchange.Dialect.ToString().ToLowerInvariant(), method, rule, exchange.GainLayer, exchange.GainPipeline,
+                GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length)),
+                exchange.GainFailures, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            Log.GainWriteFailed(logger, exchange.GainId, exception);
+        }
+    }
+
     private static partial class Log
     {
+        [LoggerMessage(EventId = 1406, Level = LogLevel.Warning, Message = "Gain metadata for request {RequestId} could not be recorded")]
+        public static partial void GainWriteFailed(ILogger logger, string requestId, Exception exception);
+
         [LoggerMessage(EventId = 1401, Level = LogLevel.Warning, Message = "Compression failed for a request to {ProviderHost}; forwarding the original body")]
         public static partial void CompressionFailed(ILogger logger, string providerHost, Exception exception);
 

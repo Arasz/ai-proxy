@@ -27,7 +27,7 @@ public sealed class ProxyClient(HttpClient http)
     public async Task<RetrievalResponse> RetrieveAsync(RetrievalRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await http.PostAsJsonAsync("retrieval", request, Json, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<RetrievalResponse>(Json, cancellationToken).ConfigureAwait(false)
             ?? throw new HttpRequestException("The proxy returned an empty retrieval response.");
     }
@@ -35,7 +35,7 @@ public sealed class ProxyClient(HttpClient http)
     public async Task<GainReport> GetGainAsync(GainQuery query, CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync("gain" + QueryString(query), cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainReport>(Json, cancellationToken).ConfigureAwait(false)
             ?? throw new HttpRequestException("The proxy returned an empty gain response.");
     }
@@ -43,9 +43,26 @@ public sealed class ProxyClient(HttpClient http)
     public async Task<GainResetResult> ResetGainAsync(GainQuery query, CancellationToken cancellationToken = default)
     {
         using var response = await http.PostAsJsonAsync("gain/reset", query, Json, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainResetResult>(Json, cancellationToken).ConfigureAwait(false)
             ?? throw new HttpRequestException("The proxy returned an empty reset response.");
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode) { return; }
+        var detail = response.ReasonPhrase;
+        try
+        {
+            using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+            if (problem.RootElement.ValueKind == JsonValueKind.Object &&
+                problem.RootElement.TryGetProperty("detail", out var value) && value.ValueKind == JsonValueKind.String)
+            {
+                detail = value.GetString();
+            }
+        }
+        catch (JsonException) { }
+        throw new HttpRequestException($"Proxy API returned {(int)response.StatusCode}: {detail}", null, response.StatusCode);
     }
 
     private static string QueryString(GainQuery query)

@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using AiProxy.Core.Gain;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -77,7 +79,15 @@ public sealed class CcrRelayTests : IDisposable
             Assert.Equal("Bearer secret", sent.Headers["Authorization"]);
             Assert.Equal("2023-06-01", sent.Headers["anthropic-version"]);
             Assert.Equal("context-1", sent.Headers["anthropic-beta"]);
+            Assert.DoesNotContain(sent.Headers.Keys, key => key.Equals("X-Ai-Proxy-Project", StringComparison.OrdinalIgnoreCase));
         }
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+        Assert.Equal(1, gain!.Summary.Requests);
+        Assert.Equal(1, gain.Summary.Recalls);
+        Assert.Equal(Id, Assert.Single(gain.Recalls).PreviewId);
+        Assert.False(gain.Measurement.NetSavingsAvailable);
+        Assert.Equal(Encoding.UTF8.GetByteCount(upstream.Requests[0].Body), gain.Summary.ForwardedBytes);
     }
 
     [Fact]

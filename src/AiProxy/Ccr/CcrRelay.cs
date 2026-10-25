@@ -4,6 +4,7 @@ using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Gain;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Ccr.Loop;
 using AiProxy.Hosting;
@@ -21,7 +22,7 @@ namespace AiProxy.Ccr;
 /// <param name="retrievers">Makes a retriever for one answer.</param>
 /// <param name="options">The CCR numbers.</param>
 /// <param name="logger">Where each retrieval and failure is logged.</param>
-public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger) : IDisposable
+public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore? gain = null, TimeProvider? time = null) : IDisposable
 {
     /// <summary>The header naming the id the original request is kept under.</summary>
     public const string ContentIdHeader = "x-ai-proxy-content-id";
@@ -58,7 +59,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     public async Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals)
     {
         var request = e.HttpClient.Request;
-        var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name)).Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
+        var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainEndpoints.ProjectHeader, StringComparison.OrdinalIgnoreCase)).Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
         exchange.Relayed = true;
         if (exchange.CaptureId is not null)
         {
@@ -80,7 +81,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         var answer = ClientResponse(response, exchange.ContentId);
         var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
-        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http), exchange, headers, request.RequestUri, body, plan, originals);
+        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time ?? TimeProvider.System), exchange, headers, request.RequestUri, body, plan, originals);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), closeServerConnection: true);
     }
 
@@ -134,7 +135,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private sealed record ForwardedHeader(string Name, string Value);
 
     /// <summary>What a conversation reads and writes through.</summary>
-    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http);
+    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore? Gain, TimeProvider Time);
 
     /// <summary>One client response across its upstream rounds.</summary>
     private sealed class Conversation(
@@ -280,9 +281,44 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 var answer = loop.AtLimit ? CcrRetrieval.Limit() : relay.Retrievers().Answer(call.Input, await OriginalAsync(call.Input).ConfigureAwait(false), relay.Options);
                 answers[call.Id] = answer;
                 Log.Retrieved(relay.Logger, call.Input, answer.Error ?? "ok", answer.Text.Length, loop.Answered);
+                await RecordRecallAsync(call.Input, answer).ConfigureAwait(false);
             }
 
             return answers;
+        }
+
+        private async Task RecordRecallAsync(string input, CcrRetrieval answer)
+        {
+            if (relay.Gain is null) { return; }
+            try
+            {
+                string id = "";
+                string mode = "unknown";
+                try
+                {
+                    using var arguments = JsonDocument.Parse(input);
+                    if (arguments.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        if (arguments.RootElement.TryGetProperty("id", out var identifier) && identifier.ValueKind == JsonValueKind.String)
+                        {
+                            id = identifier.GetString() ?? "";
+                        }
+                        if (arguments.RootElement.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String)
+                        {
+                            mode = selected.GetString() ?? "unknown";
+                        }
+                    }
+                }
+                catch (JsonException) { }
+                await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
+                    exchange.GainProject is null ? "unknown" : "caller", mode, answer.Text.Length,
+                    GainReportBuilder.Tokens(answer.Text.Length), answer.Error), exchange.Dialect.ToString().ToLowerInvariant(),
+                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (!_cancellation.IsCancellationRequested)
+            {
+                Log.RecallWriteFailed(relay.Logger, exchange.GainId, exception);
+            }
         }
 
         private async Task<string?> OriginalAsync(string input)
@@ -356,6 +392,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
     private static partial class Log
     {
+        [LoggerMessage(EventId = 1609, Level = LogLevel.Warning, Message = "Recall metadata for request {RequestId} could not be recorded")]
+        public static partial void RecallWriteFailed(ILogger logger, string requestId, Exception exception);
+
         [LoggerMessage(EventId = 1601, Level = LogLevel.Information, Message = "proxy_retrieve {Arguments} answered {Outcome}, {Characters} characters, round {Round}")]
         public static partial void Retrieved(ILogger logger, string arguments, string outcome, int characters, int round);
 
