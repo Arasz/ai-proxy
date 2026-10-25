@@ -164,7 +164,7 @@ public sealed class ToolOutputRegionFinder
 
         foreach (var property in block.EnumerateObject())
         {
-            counter = IsString(property, ToolCallJson.Text)
+            counter = property.IsString(ToolCallJson.Text)
                 ? Record(counter, indexes, path)
                 : Walk(property.Value, counter, indexes, files);
         }
@@ -180,7 +180,7 @@ public sealed class ToolOutputRegionFinder
         ToolCallFiles files,
         FileRead? path)
     {
-        if (IsString(property, ToolCallJson.Output) || IsString(property, ToolCallJson.Result))
+        if (property.IsString(ToolCallJson.Output) || property.IsString(ToolCallJson.Result))
         {
             return Record(counter, indexes, path);
         }
@@ -195,9 +195,6 @@ public sealed class ToolOutputRegionFinder
         indexes[counter] = path;
         return counter + 1;
     }
-
-    private static bool IsString(JsonProperty property, string name) =>
-        property.NameEquals(name) && property.Value.ValueKind == JsonValueKind.String;
 
     private static bool IsToolOutputProperty(JsonElement parent, JsonProperty property)
     {
@@ -228,7 +225,7 @@ public sealed class ToolOutputRegionFinder
             if (indexes.TryGetValue(counter, out var read))
             {
                 var start = (int)reader.TokenStartIndex;
-                var end = EndOfStringToken(body, start);
+                var end = body.EndOfStringToken(start);
                 var text = reader.GetString() ?? "";
                 regions.Add(new ContentRegion(start, end - start, text, read?.PathFor(text)));
             }
@@ -238,28 +235,37 @@ public sealed class ToolOutputRegionFinder
 
         return new ToolOutputRegions(regions, counter);
     }
+}
 
-    private static int EndOfStringToken(ReadOnlySpan<byte> body, int start)
+file static class EndOfStringTokenExtensions
+{
+    private const byte A = (byte)'\\';
+    private const byte B = (byte)'"';
+
+    extension(ReadOnlySpan<byte> body)
     {
-        var index = start + 1;
-
-        while (index < body.Length)
+        internal int EndOfStringToken(int start)
         {
-            var current = body[index];
+            var index = start + 1;
 
-            switch (current)
+            while (index < body.Length)
             {
-                case (byte)'\\':
-                    index += 2;
-                    continue;
-                case (byte)'"':
-                    return index + 1;
-                default:
-                    index++;
-                    break;
-            }
-        }
+                var current = body[index];
 
-        return body.Length;
+                switch (current)
+                {
+                    case A:
+                        index += 2;
+                        continue;
+                    case B:
+                        return index + 1;
+                    default:
+                        index++;
+                        break;
+                }
+            }
+
+            return body.Length;
+        }
     }
 }
