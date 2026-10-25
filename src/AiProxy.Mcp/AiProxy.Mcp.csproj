@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>
     <PackAsTool>true</PackAsTool><PackageId>ai-proxy-mcp</PackageId><ToolCommandName>ai-proxy-mcp</ToolCommandName>
     <Description>Retrieves original proxy content through the Model Context Protocol.</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression><Authors>Rafał Araszkiewicz</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression><Authors>Rafał Araszkiewicz</Authors><RepositoryUrl>https://github.com/Arasz/ai-proxy</RepositoryUrl><PackageProjectUrl>https://github.com/Arasz/ai-proxy</PackageProjectUrl><PackageTags>mcp model-context-protocol ai-proxy dotnet-tool</PackageTags>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../AiProxy.Client/AiProxy.Client.csproj"/><ProjectReference Include="../AiProxy.Generators/AiProxy.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/></ItemGroup>
   <ItemGroup><PackageReference Include="ModelContextProtocol"/><PackageReference Include="Microsoft.Extensions.Hosting"/></ItemGroup>

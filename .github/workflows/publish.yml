@@ -73,8 +73,31 @@ jobs:
           name: nupkg-${{ matrix.rid }}
           path: artifacts/*.nupkg
 
+  pack-clients:
+    # The CLI and the MCP server are managed-only tools (no native payload), so each
+    # packs once, portable across RIDs, and is pushed with the payloads below.
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Pack ai-proxy-cli and ai-proxy-mcp
+        run: |
+          set -euo pipefail
+          mkdir -p .nupkg-local
+          dotnet pack src/AiProxy.Cli/AiProxy.Cli.csproj -c Release -o artifacts --nologo
+          dotnet pack src/AiProxy.Mcp/AiProxy.Mcp.csproj -c Release -o artifacts --nologo
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nupkg-clients
+          path: artifacts/*.nupkg
+
   publish:
-    needs: pack
+    needs: [pack, pack-clients]
     runs-on: ubuntu-slim
     timeout-minutes: 15
     environment: production
