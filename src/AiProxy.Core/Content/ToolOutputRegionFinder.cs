@@ -36,9 +36,9 @@ public sealed class ToolOutputRegionFinder
         return tokenCount > documentCount ? [] : regions;
     }
 
-    private static (HashSet<int> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
+    private static (Dictionary<int, string?> Indexes, int Count) FindToolOutputIndexes(ReadOnlySpan<byte> body)
     {
-        var indexes = new HashSet<int>();
+        var indexes = new Dictionary<int, string?>();
 
         JsonDocument document;
         try
@@ -53,12 +53,13 @@ public sealed class ToolOutputRegionFinder
         using (document)
         {
             var counter = 0;
-            Walk(document.RootElement, ref counter, indexes);
+            var files = ToolCallFiles.Collect(document.RootElement);
+            Walk(document.RootElement, ref counter, indexes, files);
             return (indexes, counter);
         }
     }
 
-    private static void Walk(JsonElement element, ref int counter, HashSet<int> indexes)
+    private static void Walk(JsonElement element, ref int counter, Dictionary<int, string?> indexes, ToolCallFiles files)
     {
         switch (element.ValueKind)
         {
@@ -71,11 +72,11 @@ public sealed class ToolOutputRegionFinder
                 {
                     if (IsToolOutputProperty(element, property))
                     {
-                        WalkToolOutput(property.Value, ref counter, indexes);
+                        WalkToolOutput(property.Value, ref counter, indexes, files, files.PathFor(element));
                         continue;
                     }
 
-                    Walk(property.Value, ref counter, indexes);
+                    Walk(property.Value, ref counter, indexes, files);
                 }
 
                 break;
@@ -83,7 +84,7 @@ public sealed class ToolOutputRegionFinder
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
                 {
-                    Walk(item, ref counter, indexes);
+                    Walk(item, ref counter, indexes, files);
                 }
 
                 break;
@@ -93,12 +94,42 @@ public sealed class ToolOutputRegionFinder
         }
     }
 
-    private static void WalkToolOutput(JsonElement value, ref int counter, HashSet<int> indexes)
+    private static void WalkToolOutput(
+        JsonElement value,
+        ref int counter,
+        Dictionary<int, string?> indexes,
+        ToolCallFiles files,
+        string? path)
+    {
+        // A path names one whole file, so an output that spans more than one string keeps none.
+        var first = counter;
+        var before = indexes.Count;
+        WalkToolOutputStrings(value, ref counter, indexes, files, path);
+        if (path is null || indexes.Count - before <= 1)
+        {
+            return;
+        }
+
+        for (var index = first; index < counter; index++)
+        {
+            if (indexes.ContainsKey(index))
+            {
+                indexes[index] = null;
+            }
+        }
+    }
+
+    private static void WalkToolOutputStrings(
+        JsonElement value,
+        ref int counter,
+        Dictionary<int, string?> indexes,
+        ToolCallFiles files,
+        string? path)
     {
         switch (value.ValueKind)
         {
             case JsonValueKind.String:
-                indexes.Add(counter);
+                indexes[counter] = path;
                 counter++;
                 break;
 
@@ -107,7 +138,7 @@ public sealed class ToolOutputRegionFinder
                 {
                     if (item.ValueKind != JsonValueKind.Object)
                     {
-                        Walk(item, ref counter, indexes);
+                        Walk(item, ref counter, indexes, files);
                         continue;
                     }
 
@@ -115,12 +146,12 @@ public sealed class ToolOutputRegionFinder
                     {
                         if (property.NameEquals("text") && property.Value.ValueKind == JsonValueKind.String)
                         {
-                            indexes.Add(counter);
+                            indexes[counter] = path;
                             counter++;
                             continue;
                         }
 
-                        Walk(property.Value, ref counter, indexes);
+                        Walk(property.Value, ref counter, indexes, files);
                     }
                 }
 
@@ -132,18 +163,18 @@ public sealed class ToolOutputRegionFinder
                     if ((property.NameEquals("output") || property.NameEquals("result")) &&
                         property.Value.ValueKind == JsonValueKind.String)
                     {
-                        indexes.Add(counter);
+                        indexes[counter] = path;
                         counter++;
                         continue;
                     }
 
                     if (property.Value.ValueKind == JsonValueKind.Object)
                     {
-                        WalkToolOutput(property.Value, ref counter, indexes);
+                        WalkToolOutputStrings(property.Value, ref counter, indexes, files, path);
                         continue;
                     }
 
-                    Walk(property.Value, ref counter, indexes);
+                    Walk(property.Value, ref counter, indexes, files);
                 }
 
                 break;
@@ -176,7 +207,7 @@ public sealed class ToolOutputRegionFinder
             ? value.GetString()
             : null;
 
-    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, HashSet<int> indexes)
+    private static (List<ContentRegion> Regions, int Count) FindRegions(ReadOnlySpan<byte> body, Dictionary<int, string?> indexes)
     {
         var regions = new List<ContentRegion>();
         var reader = new Utf8JsonReader(body);
@@ -189,11 +220,11 @@ public sealed class ToolOutputRegionFinder
                 continue;
             }
 
-            if (indexes.Contains(counter))
+            if (indexes.TryGetValue(counter, out var path))
             {
                 var start = (int)reader.TokenStartIndex;
                 var end = EndOfStringToken(body, start);
-                regions.Add(new ContentRegion(start, end - start, reader.GetString() ?? ""));
+                regions.Add(new ContentRegion(start, end - start, reader.GetString() ?? "", path));
             }
 
             counter++;
