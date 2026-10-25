@@ -1,0 +1,11 @@
+<Project>
+    <!-- TreeSitter.DotNet ships ~25 grammars per RID; copy only the runtime and the Python, JavaScript, TypeScript and TSX grammars the lexers load. -->
+    <Target Name="TrimTreeSitterGrammars" AfterTargets="ResolvePackageAssets">
+        <ItemGroup>
+            <UnusedTreeSitterNative Include="@(RuntimeTargetsCopyLocalItems);@(NativeCopyLocalItems)"
+                                    Condition="'%(NuGetPackageId)' == 'TreeSitter.DotNet' and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(Filename)', '^(lib)?tree-sitter(-(python|javascript|typescript|tsx))?$'))"/>
+            <RuntimeTargetsCopyLocalItems Remove="@(UnusedTreeSitterNative)"/>
+            <NativeCopyLocalItems Remove="@(UnusedTreeSitterNative)"/>
+        </ItemGroup>
+    </Target>
+</Project>
