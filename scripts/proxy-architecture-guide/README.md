@@ -1,12 +1,45 @@
 # Proxy architecture guide
 
-Interactive research snapshot for 2026-10-25. The source snapshot is
-`c2cce0cf754ef84e6318305fedd8c087881ff65c`; it is not a live status dashboard.
+Interactive research snapshot for 2026-10-25. Runtime source is pinned to
+`c2cce0cf754ef84e6318305fedd8c087881ff65c`. Eleven exported plans include
+one new local draft and one locally updated export; those two carry embedded
+source text and SHA-256 rather than a link claiming they existed at that commit.
 
-The deliverable will be `docs/work/2026-10-25-proxy-architecture-guide.html`.
-It covers current provider paths, compression decisions, all ten exported task plans,
-and a glossary linked to code and primary technical sources.
+Open [the standalone guide](../../docs/work/2026-10-25-proxy-architecture-guide.html).
+It contains Anthropic, OpenAI and Default tabs, two interactive Archify charts,
+all plan steps and criteria, 34 research-record links and 32 sourced terms.
+The guide distinguishes wired behavior, staged code and proposals. It does not
+start the proxy or make provider requests.
 
-Acceptance: provider tabs work; current and proposed behavior have distinct labels;
-all exported plans are included; charts validate; the bundled file works offline and
-fits desktop and narrow screens. No proxy process or provider call is needed.
+## Build
+
+With Node 20+ and pnpm (lockfile produced by pnpm 12):
+
+```sh
+cd scripts/proxy-architecture-guide
+pnpm install --frozen-lockfile
+pnpm run bundle
+```
+
+`build.sh` type-checks the React 18/TypeScript source, bundles with Parcel and
+inlines JavaScript/CSS into the dated HTML. React, Tailwind and Vite setup began
+with web-artifacts-builder; unused scaffold dependencies were removed.
+`src/data.json` holds the frozen content and exact validated Archify HTML.
+The JSON specifications in `diagrams/` are the editable chart inputs. To revise
+a chart, validate and deliver it with Archify, then replace the matching HTML
+string in `data.json` and rebuild. The frontend build does not re-render charts.
+
+## Validation
+
+Provider and diagram tabs, keyboard selection, plan expansion/search, glossary
+filter/search and empty state, and theme switching were exercised in Chromium.
+The standalone HTML was also loaded with networking disabled. Widths 320, 390,
+1440, 1600, 1920 and 2048 were checked for horizontal overflow. Diagram viewers
+were checked at four desktop sizes in light and dark; each passed nine Archify
+artifact checks with zero composition errors or warnings. Screenshots were
+inspected, and independent review corrected failure-branch continuation and
+accessible diagram labels. A reader test corrected provider-host and plan-source
+ambiguities. Runtime behavior was checked against source, not a running proxy.
+
+The project pre-push build/test/docs/workflow gates also apply. This is a dated
+documentation artifact, not an application release; VERSION is unchanged.

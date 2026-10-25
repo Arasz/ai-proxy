@@ -46,3 +46,5 @@ Active records:
 | [2026-10-23-capture-first-look.md](2026-10-23-capture-first-look.md) | Research record: first `PROXY_CAPTURE` look at Claude Code requests — server-side threads, 89% of characters sent once, the region split, and what it changes in the cache plan. Seven findings, graded — 3 measured, 1 read, 2 inferred, 1 unverified. |
 
 | [2026-10-25-ccr-design-feedback.md](2026-10-25-ccr-design-feedback.md) | Owner feedback on proposed CCR decisions, including requested threshold changes and unresolved questions. |
+
+| [2026-10-25-proxy-architecture-guide.html](2026-10-25-proxy-architecture-guide.html) | Interactive architecture snapshot: provider tabs, data and logic charts, eleven plan exports, current/proposed distinctions and a sourced glossary. Source and rebuild instructions are in [the guide project](../../scripts/proxy-architecture-guide/README.md). |

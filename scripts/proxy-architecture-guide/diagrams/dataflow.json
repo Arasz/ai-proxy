@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Provider request data path",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1320,
+      700
+    ],
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "dashed": {
+          "label": "queued storage"
+        }
+      }
+    }
+  },
+  "stages": [
+    {
+      "label": "Client"
+    },
+    {
+      "label": "Inspect"
+    },
+    {
+      "label": "Reduce"
+    },
+    {
+      "label": "Forward"
+    },
+    {
+      "label": "Return"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "Agent client",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "inspect",
+      "type": "security",
+      "label": "Host inspection",
+      "stage": 1,
+      "row": 0
+    },
+    {
+      "id": "reduce",
+      "type": "backend",
+      "label": "Compression",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "upstream",
+      "type": "external",
+      "label": "Provider API",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "response",
+      "type": "frontend",
+      "label": "Client response",
+      "stage": 4,
+      "row": 0
+    },
+    {
+      "id": "capture",
+      "type": "database",
+      "label": "Request capture",
+      "stage": 1,
+      "row": 3
+    },
+    {
+      "id": "original",
+      "type": "database",
+      "label": "Content store",
+      "stage": 2,
+      "row": 3
+    },
+    {
+      "id": "metrics",
+      "type": "database",
+      "label": "Usage + timing",
+      "stage": 3,
+      "row": 3
+    }
+  ],
+  "flows": [
+    {
+      "from": "client",
+      "to": "inspect",
+      "label": "HTTP / TLS"
+    },
+    {
+      "from": "inspect",
+      "to": "reduce",
+      "label": "Request body"
+    },
+    {
+      "from": "reduce",
+      "to": "upstream",
+      "label": "Forwarded bytes"
+    },
+    {
+      "from": "upstream",
+      "to": "response",
+      "label": "Stream bytes"
+    },
+    {
+      "from": "inspect",
+      "to": "capture",
+      "label": "Original body",
+      "labelDy": 24
+    },
+    {
+      "from": "reduce",
+      "to": "original",
+      "label": "Enqueue",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "from": "upstream",
+      "to": "metrics",
+      "label": "Capture on",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Current behavior",
+      "items": [
+        "Compression is off by default. Credentials stay caller-owned.",
+        "Only known provider HTTPS destinations are inspected."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Separate paths",
+      "items": [
+        "Unknown HTTPS stays in an opaque CONNECT tunnel.",
+        "Capture is optional; response bodies are relayed to the client."
+      ]
+    }
+  ]
+}
