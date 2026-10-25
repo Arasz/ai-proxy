@@ -76,6 +76,8 @@ When an upstream response calls `proxy_retrieve`, the host answers every such ca
 
 If the same message also calls client tools, those are not passed to the client. Each gets a tool result `is_error: true` saying it was not run and should be issued again after the retrieved text is read. The model re-issues them in the next response, which the client receives. This needs no state across client requests.
 
+When this happens (owner question O7). It happens whenever the model makes parallel tool calls: one assistant message carries `proxy_retrieve` next to a client tool, for example a retrieval of a previewed test log plus a `Read` of the file the log names. Claude Code allows parallel calls. None of the 11,089 Anthropic requests in `~/.ai-proxy/capture.db` (read 2026-10-25) sets `tool_choice.disable_parallel_tool_use`. Of the 1,340 distinct assistant messages with tool calls, 117 (8.7%) carry two or more calls, and 80 (6.0%) mix two different tools, most often `Bash` with `Write` or `Edit`. So a mixed retrieving message is a normal case, not an edge case: the expected rate is the share of preview-reading turns that also act, on the order of the 6% seen for mixed tools today [INFERRED; no CCR traffic exists yet].
+
 The loop answers at most three rounds. A fourth call gets `limit_reached`. If the model still calls after that, the client gets an error. That bounds a client request at five upstream calls.
 
 Non-streaming: the client gets one message. Its content is the concatenated content of every upstream response with the `proxy_retrieve` blocks and their deferred client calls removed. Its id and `stop_reason` are the last response's. Its input and cache usage fields are the last call's and its output tokens are the sum (assumption; all calls are recorded in the capture).
@@ -93,6 +95,19 @@ For a thread client the tool can only go on `create`, because continuations carr
 For a stateless client every tool result is re-previewed on every send, identically, so the transcript stays prefix-stable (cache strategies F12). The hidden retrieval turn is not spliced back into later requests. The client re-sends the merged assistant message without it, the prefix still matches up to the preview, and only the tail is written, as it would be anyway. The retrieved slice is gone from history and the model can fetch it again.
 
 The other providers, for when their loops exist. OpenAI appends to `tools` and adds no `prompt_cache_breakpoint`, paying a one-time 1.25x write on GPT-5.6 and later and none before it. Gemini appends a function declaration at the end of `tools` (assumption: the API accepts it next to the client's tools), with no write fee, and requests that use `cachedContent` get no previews, because their tools are immutable in the cache object. OpenRouter follows the upstream named by the model prefix; tools are not in its sticky-routing hash, so injection does not move routing. Router and unknown models get the fallback, which means no CCR.
+
+Expected compression under the fallback (owner question F13). The fallback (cache strategies F13) forbids touching `tools`, so `proxy_retrieve` cannot be injected: a fallback provider gets no previews. It still gets every pure per-region reducer, because a tool result rewritten as a function of its own bytes is exactly what F13 rule 2 allows. Tool-result compression on a fallback provider is therefore the shipped-rules column of the scoring record, the same as on a known provider without CCR. Per kind, at the 1 s budget, with every answer kept:
+
+| kind | fallback (shipped rules, no CCR) | known provider with CCR (rtk CCR, retrieval allowed) |
+|---|---|---|
+| code | 18% | 6% |
+| json | 30% (4% counted) | 0% |
+| build | 26% (0.4% counted) | 0% |
+| test | 25% (21% counted) | not scored |
+| log | 24.6% (after the log reducer fix) | 0% |
+| prose, listing | 0% (no rule fires) | 0% |
+
+Sources: reducer scoring results, "Per kind, at the 1 s budget", "rtk CCR with retrieval allowed" and "log reducer keeps every value". The CCR column is rtk's preview, scored once a reader may retrieve: it keeps every answer, but retrieval re-sends the original, so its net compression falls to 0% to 6%. The fallback loses only what our own CCR adds over that, which the activation gate below has yet to measure. For thread clients the fallback also compresses only on first send (F13 rule 3), the same as on known providers.
 
 Enabling or disabling CCR changes `tools` and is a cache event for every conversation in flight, like a preview version change.
 
@@ -113,6 +128,8 @@ The client never sees a preview. The proxy rewrites requests, not what the clien
 ### Activation gate
 
 CCR stays off until a retrieval-aware re-score passes. The reader is `claude-opus-5-5` through `claude -p` (owner D3), with `proxy_retrieve` semantics, on the 13 scored payloads plus at least two over 3,000 tokens per kind. A kind is enabled only when it keeps every answer with retrieval allowed, retrieves on at most 25% of reader calls, and sends at most 80% of its original tokens net. Net means preview plus fetched slices plus the definition charged at full price per request, as the harness does today. A kind that fails stays off in `CompressionOptions`.
+
+Owner note on O4, no verdict yet: "we ship if we are at least on par with rtk but our goal is to improve." Read as a floor, a kind ships when it is at least as good as rtk CCR with retrieval on the same payloads (answers kept, net tokens). The absolute numbers above stay the target.
 
 ## Consequences
 
