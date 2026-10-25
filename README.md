@@ -1,5 +1,8 @@
 # ai-proxy
 
+[![build](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml/badge.svg)](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml)
+[![publish](https://github.com/Arasz/ai-proxy/actions/workflows/publish.yml/badge.svg)](https://github.com/Arasz/ai-proxy/actions/workflows/publish.yml)
+[![NuGet](https://img.shields.io/nuget/v/ai-proxy/.svg)](https://www.nuget.org/packages/ai-proxy)
 [![M8ven Score](https://m8ven.ai/badge/mcp/arasz-ai-proxy-1h8736)](https://m8ven.ai/mcp/arasz-ai-proxy-1h8736?s=readme)
 
 ai-proxy installs itself as the current user's system HTTP and HTTPS proxy while it runs. It
