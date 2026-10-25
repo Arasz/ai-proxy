@@ -104,4 +104,12 @@ public sealed class ContentDecompositorFilePathTests
 
         Assert.Equal(ContentDecompositor.Placeholder(ContentType.SourceCode, 1), decomposition.Template);
     }
+
+    [Fact]
+    public void A_whitespace_only_file_with_a_source_extension_is_no_source_code_part()
+    {
+        var decomposition = Decompositor.Decompose("  \n", "request", "a.cs");
+
+        Assert.DoesNotContain(decomposition.Parts, part => part.Type == ContentType.SourceCode || part.Language is not null);
+    }
 }

@@ -224,6 +224,24 @@ public sealed class ToolOutputFilePathTests
     }
 
     [Fact]
+    public void A_single_numbered_line_that_is_not_line_one_carries_no_path()
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", "5\tonly");
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(1999)]
+    public void A_numbered_result_ending_in_a_newline_carries_its_path(int lines)
+    {
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", Numbered(1, lines) + "\n");
+
+        Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
+    }
+
+    [Fact]
     public void A_numbered_result_with_a_trailing_system_reminder_carries_no_path()
     {
         var content = Numbered(1, 3) + "\n\n<system-reminder>\nWhenever you read a file, check it.\n</system-reminder>\n";
@@ -329,6 +347,35 @@ public sealed class ToolOutputFilePathTests
         var body = AnthropicBody(
             """{"type":"tool_use","id":"call-a","name":"Delete","input":{"file_path":"src/A.cs"}}""",
             AnthropicResult("call-a", "deleted"));
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Theory]
+    [InlineData("delete_file")]
+    [InlineData("thread")]
+    public void An_openai_chat_call_that_is_not_a_read_carries_no_path(string name)
+    {
+        var body = $$$"""
+            {"messages":[
+              {"role":"assistant","tool_calls":[
+                {"id":"call-a","type":"function","function":{"name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"}}]},
+              {"role":"tool","tool_call_id":"call-a","content":"content"}]}
+            """;
+
+        Assert.Null(Assert.Single(Find(body)).FilePath);
+    }
+
+    [Theory]
+    [InlineData("delete_file")]
+    [InlineData("thread")]
+    public void An_openai_responses_call_that_is_not_a_read_carries_no_path(string name)
+    {
+        var body = $$$"""
+            {"input":[
+              {"type":"function_call","call_id":"call-a","name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"},
+              {"type":"function_call_output","call_id":"call-a","output":"content"}]}
+            """;
 
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
