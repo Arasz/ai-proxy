@@ -1,7 +1,5 @@
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
-using AiProxy.Core.Json;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -72,97 +70,7 @@ public sealed partial class ContentDecompositor : IDecompositor
         return new Decomposition(requestId, content, template.ToString(), parts);
     }
 
-    private List<Span> FindParts(string content)
-    {
-        var spans = new List<Span>();
-        var position = 0;
-        var blockStart = -1;
-        var blockEnd = 0;
-        var failedAttempts = 0;
-
-        while (position < content.Length)
-        {
-            var lineEnd = content.IndexOf(StructureMarkers.NewLine, position);
-            var nextLine = lineEnd < 0 ? content.Length : lineEnd + 1;
-            var line = content[position..(lineEnd < 0 ? content.Length : lineEnd)];
-            var trimmed = line.TrimStart();
-
-            if (trimmed.StartsWith(StructureMarkers.Fence.Backticks, StringComparison.Ordinal))
-            {
-                var fenceEnd = FindFenceEnd(content, nextLine, trimmed[0]);
-                if (fenceEnd > 0)
-                {
-                    Flush(content, spans, ref blockStart, ref blockEnd);
-                    spans.Add(new Span(position, fenceEnd - position, ContentType.SourceCode, true));
-                    position = fenceEnd;
-                    continue;
-                }
-            }
-
-            if (failedAttempts < MaxFailedStructureAttempts)
-            {
-                if (trimmed.StartsWith(StructureMarkers.Json.ObjectOpen) || trimmed.StartsWith(StructureMarkers.Json.ArrayOpen))
-                {
-                    var valueEnd = FindJsonEnd(content, position);
-                    if (valueEnd > position && content[position..valueEnd].IsJson())
-                    {
-                        Flush(content, spans, ref blockStart, ref blockEnd);
-                        spans.Add(new Span(position, valueEnd - position, ContentType.Json, true));
-                        position = valueEnd;
-                        continue;
-                    }
-
-                    failedAttempts++;
-                }
-
-                if (trimmed.StartsWith(StructureMarkers.Xml.TagOpen) && !trimmed.StartsWith(StructureMarkers.Xml.CommentOpen, StringComparison.Ordinal))
-                {
-                    var elementEnd = FindXmlEnd(content, position);
-                    if (elementEnd > position && IsXml(content[position..elementEnd]))
-                    {
-                        Flush(content, spans, ref blockStart, ref blockEnd);
-                        spans.Add(new Span(position, elementEnd - position, ContentType.Xml, true));
-                        position = elementEnd;
-                        continue;
-                    }
-
-                    failedAttempts++;
-                }
-            }
-
-            if (trimmed.Length == 0)
-            {
-                Flush(content, spans, ref blockStart, ref blockEnd);
-                position = nextLine;
-                continue;
-            }
-
-            if (blockStart < 0)
-            {
-                blockStart = position;
-            }
-
-            blockEnd = lineEnd < 0 ? content.Length : lineEnd;
-            position = nextLine;
-        }
-
-        Flush(content, spans, ref blockStart, ref blockEnd);
-
-        return Merge(content, spans);
-    }
-
-    private static void Flush(string content, List<Span> spans, ref int blockStart, ref int blockEnd)
-    {
-        if (blockStart < 0)
-        {
-            return;
-        }
-
-        var text = content[blockStart..blockEnd];
-        spans.Add(new Span(blockStart, blockEnd - blockStart, Classify(text), false));
-        blockStart = -1;
-        blockEnd = 0;
-    }
+    private static List<Span> FindParts(string content) => new PartScanner(content).Scan();
 
     private static List<Span> Merge(string content, List<Span> spans)
     {
@@ -252,54 +160,13 @@ public sealed partial class ContentDecompositor : IDecompositor
 
     private static int FindJsonEnd(string content, int start)
     {
-        var depth = 0;
-        var inString = false;
-        var escaped = false;
+        var scanner = new JsonValueScanner();
 
         for (var index = start; index < content.Length; index++)
         {
-            var character = content[index];
-
-            if (inString)
+            if (scanner.Closes(content[index]))
             {
-                if (escaped)
-                {
-                    escaped = false;
-                }
-                else
-                {
-                    switch (character)
-                    {
-                        case StructureMarkers.Json.Escape:
-                            escaped = true;
-                            break;
-                        case StructureMarkers.Json.Quote:
-                            inString = false;
-                            break;
-                    }
-                }
-
-                continue;
-            }
-
-            switch (character)
-            {
-                case StructureMarkers.Json.Quote:
-                    inString = true;
-                    break;
-                case StructureMarkers.Json.ObjectOpen:
-                case StructureMarkers.Json.ArrayOpen:
-                    depth++;
-                    break;
-                case StructureMarkers.Json.ObjectClose:
-                case StructureMarkers.Json.ArrayClose:
-                    depth--;
-                    if (depth == 0)
-                    {
-                        return index + 1;
-                    }
-
-                    break;
+                return index + 1;
             }
         }
 
