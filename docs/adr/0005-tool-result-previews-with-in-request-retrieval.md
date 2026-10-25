@@ -19,7 +19,7 @@ The [activation record](../work/2026-10-24-csharp-reducer-activation.md) require
 
 ### Where it runs
 
-CCR runs after the kind reducers, on each tool result region the `ToolOutputRegionFinder` returns. A region is previewed only when its reduced text is still at least 3,000 estimated tokens (8,700 characters at the measured 2.89 characters per token). The size is judged on the whole region, never on a decomposed part. A region below that size gets today's reducer output and no hint. Both numbers are assumptions until the activation gate below confirms them.
+CCR runs after the kind reducers, on each tool result region the `ToolOutputRegionFinder` returns. A region is previewed only when its reduced text is still at least 3,000 estimated tokens (8,670 characters at the measured 2.89 characters per token). The size is judged on the whole region, never on a decomposed part. A region below that size gets today's reducer output and no hint. Both numbers are assumptions until the activation gate below confirms them.
 
 The first release covers Anthropic Messages on `api.anthropic.com`, thread and stateless. Placement for the other providers is decided below, but nothing is injected or previewed there until each has its own loop and passes the same gate. The universal fallback never gets CCR, because its rule 5 forbids touching `tools` (cache strategies F13).
 
@@ -64,7 +64,7 @@ One tool, appended to the request's tools:
 }
 ```
 
-`lines` returns original lines `start` to `end`, each prefixed with its line number and a tab. `pattern` returns every matching line with `context` lines around it, at most 50 matches. For a line over 240 characters it returns a 240-character window around the match. The pattern runs with `RegexOptions.NonBacktracking` and a 250 ms timeout. `whole` returns the original text exactly, with no prefixes, so an edit can use it. A `lines` or `pattern` result is capped at 4,000 estimated tokens and says where it stopped. The first line of every result names the id, the mode and the original's total line count.
+`lines` returns original lines `start` to `end`, each prefixed with its line number and a tab. `pattern` returns every matching line with `context` lines around it, at most 50 matches. For a line over 240 characters it returns a 240-character window around the match. The pattern runs with `RegexOptions.NonBacktracking` and a 250 ms timeout. `whole` returns the header line, a line feed, then the original text exactly, with no line-number prefixes, so an edit can use it; the host passes the result into the `tool_result` unchanged. A `lines` or `pattern` result is capped at 4,000 estimated tokens and says where it stopped. The first line of every result names the id, the mode and the original's total line count.
 
 Errors are tool results with `is_error: true` and one code: `not_kept` (unknown id, evicted, or never stored; the model is told to re-run the tool that produced it), `bad_range` (with the total line count), `bad_pattern`, `bad_input` (schema violation) or `limit_reached`. Zero matches is a normal result, not an error.
 
