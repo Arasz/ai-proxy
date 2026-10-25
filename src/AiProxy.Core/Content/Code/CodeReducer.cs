@@ -11,6 +11,8 @@ public sealed record CodeReductionResult(string Text, bool Changed, bool Support
 /// <summary>Builds compact source read views using an explicit path and caller-rendered retrieval hint.</summary>
 public sealed class CodeReducer
 {
+    private static readonly char[] Quotes = ['"', '\'', '`'];
+
     private readonly ICodeLexer _lexer;
 
     /// <summary>Creates a C# view builder with a caller-supplied syntax adapter.</summary>
@@ -88,6 +90,7 @@ public sealed class CodeReducer
             .ToHashSet(StringComparer.Ordinal);
         var reserved = identifiers.Select(static token => token.ValueText ?? token.Text).ToHashSet(StringComparer.Ordinal);
         reserved.UnionWith(fixedNames);
+        reserved.UnionWith(tokens.Where(static token => token.Kind == CodeTokenKind.String).Select(static token => StringValue(token.Text)));
         var used = identifiers.Where(token => view.AsSpan(token.Offset, token.Text.Length).SequenceEqual(token.Text));
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         var next = 0;
@@ -113,6 +116,12 @@ public sealed class CodeReducer
         }
         return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
             .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.ValueText ?? token.Text]));
+    }
+
+    private static string StringValue(string literal)
+    {
+        var start = literal.AsSpan().IndexOfAny(Quotes);
+        return start < 0 ? literal : literal.AsSpan(start).Trim(Quotes).ToString();
     }
 
     private static string ShortName(int value)

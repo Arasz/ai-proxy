@@ -168,6 +168,18 @@ public sealed class PythonCodeLexerTests
         Assert.Equal(lineNumber, comment.Line);
     }
 
+    [Fact]
+    public void Renaming_never_picks_a_name_spelled_by_a_string()
+    {
+        const string source = Padding + "alpha_name = 1\nprint(alpha_name, getattr(C, \"a\"), getattr(C, 'b'))\n";
+
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RenameIdentifiers: true), Hint);
+
+        Assert.True(result.Changed);
+        Assert.Equal("alpha_name", result.RenameMap["c"]);
+        Assert.Contains("getattr(C, \"a\"), getattr(C, 'b')", result.Text, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("example.py", true)]
     [InlineData("EXAMPLE.PY", true)]
