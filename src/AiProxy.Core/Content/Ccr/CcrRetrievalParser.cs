@@ -13,12 +13,12 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         using var document = JsonDocument.TryParse(arguments);
         if (document is null)
         {
-            return new(null, "The arguments are not JSON.");
+            return CcrParseResult.Refused("The arguments are not JSON.");
         }
 
         var root = document.RootElement;
         var violation = HasMalformedUnicode(root) ? "The arguments contain malformed Unicode." : schema.Violation(root);
-        return violation is null ? Validate(root, options) : new(null, violation);
+        return violation is null ? Validate(root, options) : CcrParseResult.Refused(violation);
     }
 
     private static bool HasMalformedUnicode(JsonElement root)
@@ -63,25 +63,25 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         var context = Integer(root, RetrievalJson.Context);
         if (!start.Valid || !end.Valid || !context.Valid)
         {
-            return new(null, "'start', 'end' and 'context' must be whole numbers in range.");
+            return CcrParseResult.Refused("'start', 'end' and 'context' must be whole numbers in range.");
         }
 
         if (context.Value > options.MaximumContext)
         {
-            return new(null, CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
+            return CcrParseResult.Refused(CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
         }
 
         if (mode == RetrievalJson.LinesMode && (start.Value is null || end.Value is null))
         {
-            return new(null, "Mode lines needs 'start' and 'end'.");
+            return CcrParseResult.Refused("Mode lines needs 'start' and 'end'.");
         }
 
         if (mode == RetrievalJson.PatternMode && pattern is null)
         {
-            return new(null, "Mode pattern needs 'pattern'.");
+            return CcrParseResult.Refused("Mode pattern needs 'pattern'.");
         }
 
-        return new(new CcrRetrievalRequest(id, mode, start.Value, end.Value, pattern, context.Value ?? 0), "");
+        return CcrParseResult.Accepted(new CcrRetrievalRequest(id, mode, start.Value, end.Value, pattern, context.Value ?? 0));
     }
 
     private static IntegerArgument Integer(JsonElement root, string name)
@@ -89,11 +89,18 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         var value = root.PropertyOrDefault(name);
         if (value.IsMissing)
         {
-            return new(null, true);
+            return IntegerArgument.Missing;
         }
 
-        return value.TryGetInt32(out var number) ? new(number, true) : new(null, false);
+        return value.TryGetInt32(out var number) ? IntegerArgument.Of(number) : IntegerArgument.Invalid;
     }
 
-    private sealed record IntegerArgument(int? Value, bool Valid);
+    private sealed record IntegerArgument(int? Value, bool Valid)
+    {
+        public static IntegerArgument Missing { get; } = new(null, true);
+
+        public static IntegerArgument Invalid { get; } = new(null, false);
+
+        public static IntegerArgument Of(int value) => new(value, true);
+    }
 }

@@ -31,7 +31,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         {
             RetrievalJson.LinesMode => AnswerLines(header, lines, request.Start!.Value, request.End!.Value, options),
             RetrievalJson.PatternMode => AnswerPattern(header, lines, request.Pattern!, request.Context, options),
-            _ => new CcrRetrieval(header + "\n" + original, null)
+            _ => CcrRetrieval.Answered(header + "\n" + original)
         };
     }
 
@@ -59,7 +59,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
             text.Append(entry);
         }
 
-        return new CcrRetrieval(text.ToString(), null);
+        return CcrRetrieval.Answered(text.ToString());
     }
 
     private static CcrRetrieval AnswerPattern(string header, string[] lines, string pattern, int context, CcrOptions options)
@@ -77,8 +77,8 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         }
 
         return scan.Matches.Count == 0
-            ? new CcrRetrieval(header + "\n[no line matches]", null)
-            : new CcrRetrieval(RenderMatches(header, lines, scan, context, options), null);
+            ? CcrRetrieval.Answered(header + "\n[no line matches]")
+            : CcrRetrieval.Answered(RenderMatches(header, lines, scan, context, options));
     }
 
     private static Regex? Compile(string pattern, CcrOptions options)
@@ -110,7 +110,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
 
                 if (matches.Count == maximum)
                 {
-                    return new(matches, true, null);
+                    return MatchScan.AtLimit(matches);
                 }
 
                 matches[current] = match;
@@ -118,10 +118,10 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         }
         catch (RegexMatchTimeoutException)
         {
-            return new(matches, false, current);
+            return MatchScan.TimedOut(matches, current);
         }
 
-        return new(matches, false, null);
+        return MatchScan.Complete(matches);
     }
 
     private static string RenderMatches(string header, string[] lines, MatchScan scan, int context, CcrOptions options)
@@ -181,5 +181,12 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         return Invariant($"{index + 1}\t[characters {start + 1}-{end} of {line.Length}] {line[start..end]}");
     }
 
-    private sealed record MatchScan(SortedDictionary<int, Match> Matches, bool Stopped, int? TimedOutAt);
+    private sealed record MatchScan(SortedDictionary<int, Match> Matches, bool Stopped, int? TimedOutAt)
+    {
+        public static MatchScan Complete(SortedDictionary<int, Match> matches) => new(matches, false, null);
+
+        public static MatchScan AtLimit(SortedDictionary<int, Match> matches) => new(matches, true, null);
+
+        public static MatchScan TimedOut(SortedDictionary<int, Match> matches, int line) => new(matches, false, line);
+    }
 }

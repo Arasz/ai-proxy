@@ -23,6 +23,9 @@ public sealed record CcrRetrieval(string Text, string? Error)
     /// <summary>The arguments do not follow the tool's schema.</summary>
     public const string BadInput = "bad_input";
 
+    /// <summary>A successful answer.</summary>
+    internal static CcrRetrieval Answered(string text) => new(text, null);
+
     /// <summary>A failed answer: the error code and the reason the model reads.</summary>
     internal static CcrRetrieval Fail(string code, string reason) => new(CcrText.Invariant($"[{Name} error {code}] {reason}"), code);
 }
