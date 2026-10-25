@@ -1,6 +1,6 @@
 """How captured model turns are billed: threads rebuilt from cache usage, and system-prompt churn.
 
-Reads the `PROXY_CAPTURE` store (`~/.ai-proxy/capture.db`), keeps `/v1/messages` requests that have
+Reads the `PROXY__CAPTURE` store (`~/.ai-proxy/capture.db`), keeps `/v1/messages` requests that have
 a `capture_response` usage row, and groups them by client session (`metadata.user_id`) and model.
 The capture holds no response message id, so a thread is rebuilt from the usage alone: a turn
 continues the open thread whose last turn's cache read plus cache creation equals this turn's cache
