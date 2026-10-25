@@ -10,6 +10,7 @@ Active records:
 
 | File | What it is |
 |---|---|
+| [2026-10-25-retrieval-mcp-cli-gain-research.md](2026-10-25-retrieval-mcp-cli-gain-research.md) | Retrieval-only MCP, proxy gain API and Spectre CLI research, proposed contracts, scope traceability and mutation-focused test design. |
 | [2026-10-25-ccr-core.md](2026-10-25-ccr-core.md) | Inactive CCR preview and retrieval core, provisional settings, parent graph and review evidence. |
 | [2026-10-25-ccr-runtime-plan.md](2026-10-25-ccr-runtime-plan.md) | CCR runtime implementation plan: evidence, scope, shape, steps and gates for the in-request retrieval loop. |
 | [2026-10-25-ccr-design-feedback.md](2026-10-25-ccr-design-feedback.md) | Owner rulings on ADR 0005: the form (14 of 16, O2 1,500 and O12 3,000 tokens) and the chat follow-ups (O7 and F13 option A, CCR for unknown providers behind `Proxy:Ccr:UnknownProviders`). |
