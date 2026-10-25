@@ -1,0 +1,148 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Tool-output reduction decisions",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "reduce",
+      "label": "Eligible provider body"
+    },
+    {
+      "id": "keep",
+      "label": "Keep original",
+      "variant": "exception"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "find",
+      "lane": "reduce",
+      "col": 0,
+      "type": "backend",
+      "label": "Find tool text",
+      "width": 150
+    },
+    {
+      "id": "size",
+      "lane": "reduce",
+      "col": 1,
+      "type": "security",
+      "label": "Large enough?",
+      "width": 150
+    },
+    {
+      "id": "handler",
+      "lane": "reduce",
+      "col": 2,
+      "type": "backend",
+      "label": "Run reducer",
+      "width": 150
+    },
+    {
+      "id": "compose",
+      "lane": "reduce",
+      "col": 3,
+      "type": "backend",
+      "label": "Rebuild JSON",
+      "width": 150
+    },
+    {
+      "id": "queue",
+      "lane": "reduce",
+      "col": 4,
+      "type": "database",
+      "label": "Enqueue original",
+      "width": 150
+    },
+    {
+      "id": "forward",
+      "lane": "reduce",
+      "col": 5,
+      "type": "external",
+      "label": "Forward body",
+      "width": 150
+    },
+    {
+      "id": "keep_part",
+      "lane": "keep",
+      "col": 2,
+      "type": "backend",
+      "label": "Keep original part",
+      "width": 160
+    }
+  ],
+  "mainPath": [
+    "find",
+    "size",
+    "handler",
+    "compose",
+    "queue",
+    "forward"
+  ],
+  "edges": [
+    {
+      "from": "find",
+      "to": "size",
+      "label": "Regions"
+    },
+    {
+      "from": "size",
+      "to": "handler",
+      "label": "Yes"
+    },
+    {
+      "from": "handler",
+      "to": "compose",
+      "label": "Reduced part"
+    },
+    {
+      "from": "compose",
+      "to": "queue",
+      "label": "Changed body"
+    },
+    {
+      "from": "queue",
+      "to": "forward",
+      "label": "Continue"
+    },
+    {
+      "from": "size",
+      "to": "keep_part",
+      "label": "No",
+      "role": "branch"
+    },
+    {
+      "from": "handler",
+      "to": "keep_part",
+      "label": "Exception",
+      "role": "error"
+    },
+    {
+      "from": "keep_part",
+      "to": "compose",
+      "label": "Retained part",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Current failure rules",
+      "items": [
+        "Small parts and failed parts keep their own original text.",
+        "No regions or an outer pipeline failure leaves the body unchanged."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Store caveat",
+      "items": [
+        "Queueing is not a guarantee of durable recovery.",
+        "A store exception can still return changed content today."
+      ]
+    }
+  ]
+}

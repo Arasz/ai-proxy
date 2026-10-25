@@ -1,0 +1,20 @@
+using System.Text.RegularExpressions;
+
+namespace AiProxy.Core.Content.Ccr;
+
+/// <summary>A large tool result shortened to original lines, with each hidden run named by its line range.</summary>
+/// <param name="Id">The first 16 hex characters of the original's UTF-8 SHA-256.</param>
+/// <param name="Text">The preview shown in place of the original.</param>
+/// <param name="ShownLines">The count of shown original lines, including a cut first line.</param>
+/// <param name="TotalLines">The original's line count.</param>
+public sealed partial record CcrPreview(string Id, string Text, int ShownLines, int TotalLines)
+{
+    /// <summary>The text every preview header starts with.</summary>
+    public const string Marker = "[proxy preview ";
+
+    /// <summary>True when the text holds a preview header, so it is never previewed again.</summary>
+    public static bool IsIn(string text) => Header().IsMatch(text);
+
+    [GeneratedRegex(@"\[proxy preview [0-9a-f]{16}: [0-9]+ of [0-9]+ lines shown\.", RegexOptions.CultureInvariant)]
+    private static partial Regex Header();
+}

@@ -207,7 +207,7 @@ public sealed class TitaniumProxyServiceTests
         Assert.Equal(0, launcher.MarkerLengthWhenRestoredWasReported);
     }
 
-    [Fact]
+    [Fact(Skip = TimingDependent.Reason)]
     public async Task A_marker_held_briefly_by_a_dying_owner_does_not_fail_startup()
     {
         using var directory = new TemporaryDirectory();

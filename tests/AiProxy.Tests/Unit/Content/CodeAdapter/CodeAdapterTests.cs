@@ -33,7 +33,7 @@ public sealed class CodeAdapterTests
         Assert.Equal("", error.ToString());
         Assert.NotEmpty(output.ToString());
         using var document = JsonDocument.Parse(output.ToString());
-        Assert.Equal(new[] { "text", "changed", "supported" }, document.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["text", "changed", "supported"], document.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal("class Example { }\n[fixture retrieve before editing]", document.RootElement.GetProperty("text").GetString());
         Assert.True(document.RootElement.GetProperty("changed").GetBoolean());
         Assert.True(document.RootElement.GetProperty("supported").GetBoolean());

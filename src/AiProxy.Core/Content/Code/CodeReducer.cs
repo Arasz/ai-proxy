@@ -8,28 +8,23 @@ public sealed record CodeReductionOptions(bool RemoveComments = true, bool Remov
 /// <summary>A read view, its change/support flags, and the short-name to original-name map.</summary>
 public sealed record CodeReductionResult(string Text, bool Changed, bool Supported, IReadOnlyDictionary<string, string> RenameMap);
 
-/// <summary>Builds compact C# read views using an explicit path and caller-rendered retrieval hint.</summary>
-public sealed class CodeReducer
+/// <summary>Builds compact source read views using an explicit path and caller-rendered retrieval hint.</summary>
+public sealed class CodeReducer(ICodeLexer lexer)
 {
-    private readonly ICodeLexer _lexer;
+    private static readonly char[] Quotes = ['"', '\'', '`'];
 
-    /// <summary>Creates a C# view builder with a caller-supplied syntax adapter.</summary>
-    public CodeReducer(ICodeLexer lexer)
-    {
-        ArgumentNullException.ThrowIfNull(lexer);
-        _lexer = lexer;
-    }
 
     /// <summary>Returns the original when safety or complete-view savings cannot be established.</summary>
     public CodeReductionResult Reduce(string text, string? filePath, CodeReductionOptions? options, string? retrievalHint)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        if (string.IsNullOrWhiteSpace(retrievalHint) || !_lexer.SupportsPath(filePath))
+        if (string.IsNullOrWhiteSpace(retrievalHint) || !lexer.SupportsPath(filePath))
         {
             return Original(text, false);
         }
-        var (source, prefixes) = Unnumber(text);
-        var lexed = _lexer.Lex(source);
+        var numbered = Unnumber(text);
+        var source = numbered.Source;
+        var prefixes = numbered.Prefixes;
+        var lexed = lexer.Lex(source, filePath);
         if (!lexed.Supported)
         {
             return Original(text, false);
@@ -48,40 +43,53 @@ public sealed class CodeReducer
                 Blank(view, token.Offset, token.Text.Length);
             }
         }
-        if (options.RemoveImports)
+        if (options.RemoveImports && lexed.Imports is { } imports)
+        {
+            foreach (var span in imports)
+            {
+                Blank(view, span.Offset, span.Length);
+                Array.Fill(literals, false, span.Offset, span.Length);
+            }
+        }
+        else if (options.RemoveImports)
         {
             RemoveImports(view, lexed.Tokens);
         }
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         var replacements = options.RenameIdentifiers
             ? Rename(view, lexed.Tokens, map)
-            : new Dictionary<int, (int Length, string Text)>();
+            : new Dictionary<int, IdentifierRename>();
         var rendered = Render(view, literals, prefixes, replacements);
         var newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
         if (rendered.Length > 0 && rendered[^1] is not ('\r' or '\n'))
         {
             rendered += newline;
         }
-        foreach (var (shortName, originalName) in map)
+        foreach (var entry in map)
         {
-            rendered += $"{shortName}:{originalName}{newline}";
+            rendered += $"{entry.Key}:{entry.Value}{newline}";
         }
         rendered += retrievalHint;
         return rendered.Length < text.Length
             ? new CodeReductionResult(rendered, true, true, new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(map))
             : Original(text, true);
     }
-    private Dictionary<int, (int Length, string Text)> Rename(
+    private Dictionary<int, IdentifierRename> Rename(
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
         var identifiers = tokens.Where(token => token.Kind == CodeTokenKind.Identifier).ToArray();
+        var fixedNames = tokens.Where(static token => token.Kind is CodeTokenKind.Other or CodeTokenKind.Keyword)
+            .Select(static token => token.Text)
+            .ToHashSet(StringComparer.Ordinal);
         var reserved = identifiers.Select(static token => token.ValueText ?? token.Text).ToHashSet(StringComparer.Ordinal);
+        reserved.UnionWith(fixedNames);
+        reserved.UnionWith(tokens.Where(static token => token.Kind == CodeTokenKind.String).Select(static token => StringValue(token.Text)));
         var used = identifiers.Where(token => view.AsSpan(token.Offset, token.Text.Length).SequenceEqual(token.Text));
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2 || _lexer.IsKeyword(group.Key))
+            if (group.Count() < 2 || lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
             {
                 continue;
             }
@@ -90,7 +98,7 @@ public sealed class CodeReducer
             {
                 candidate = ShortName(next++);
             }
-            while (reserved.Contains(candidate) || _lexer.IsKeyword(candidate));
+            while (reserved.Contains(candidate) || lexer.IsKeyword(candidate));
             if (candidate.Length >= group.Key.Length)
             {
                 continue;
@@ -100,7 +108,13 @@ public sealed class CodeReducer
             map.Add(candidate, group.Key);
         }
         return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
-            .ToDictionary(token => token.Offset, token => (token.Text.Length, names[token.ValueText ?? token.Text]));
+            .ToDictionary(token => token.Offset, token => new IdentifierRename(token.Text.Length, names[token.ValueText ?? token.Text]));
+    }
+
+    private static string StringValue(string literal)
+    {
+        var start = literal.AsSpan().IndexOfAny(Quotes);
+        return start < 0 ? literal : literal.AsSpan(start).Trim(Quotes).ToString();
     }
 
     private static string ShortName(int value)
@@ -175,7 +189,7 @@ public sealed class CodeReducer
         return true;
     }
 
-    private static (string Source, IReadOnlyList<string> Prefixes) Unnumber(string text)
+    private static NumberedText Unnumber(string text)
     {
         var prefixes = new List<string>();
         var source = new StringBuilder();
@@ -194,7 +208,7 @@ public sealed class CodeReducer
             }
             if (index == digits || index == text.Length || text[index] != '\t')
             {
-                return (text, Array.Empty<string>());
+                return new NumberedText(text, []);
             }
             prefixes.Add(text[start..++index]);
             var end = index;
@@ -209,7 +223,7 @@ public sealed class CodeReducer
             source.Append(text, index, end - index);
             start = end;
         }
-        return (source.ToString(), prefixes);
+        return new NumberedText(source.ToString(), prefixes);
     }
 
     private static CodeReductionResult Original(string text, bool supported) =>
@@ -226,7 +240,7 @@ public sealed class CodeReducer
         }
     }
 
-    private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, (int Length, string Text)> replacements)
+    private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, IdentifierRename> replacements)
     {
         var output = new StringBuilder();
         var start = 0;
@@ -273,4 +287,10 @@ public sealed class CodeReducer
         }
         return output.ToString();
     }
+
+    /// <summary>A shortened identifier: the length of the original text it replaces and the short name.</summary>
+    private sealed record IdentifierRename(int Length, string Text);
+
+    /// <summary>Source with its line-number prefixes removed, and the prefixes in line order; none when the text was not numbered.</summary>
+    private sealed record NumberedText(string Source, IReadOnlyList<string> Prefixes);
 }

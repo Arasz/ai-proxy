@@ -83,9 +83,9 @@ public sealed class PartIsolationTests : IDisposable
         ProxyHost.StartAsync(
             new Dictionary<string, string>
             {
-                ["PROXY_COMPRESSION"] = "on",
-                ["PROXY_COMPRESSION_DB"] = _databasePath,
-                ["PROXY_COMPRESSION_MINIMUM"] = "1",
+                ["Proxy:Compression:Enabled"] = "true",
+                ["Proxy:Compression:Database"] = _databasePath,
+                ["Proxy:Compression:Minimum"] = "1",
             },
             providerHosts: new LoopbackProviderHosts(Dialect.Anthropic),
             configure: services =>

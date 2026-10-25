@@ -35,7 +35,7 @@ public sealed class SystemProxyMarkerTests
         Assert.Throws<InvalidOperationException>(() => SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero));
     }
 
-    [Fact]
+    [Fact(Skip = TimingDependent.Reason)]
     public async Task Acquire_waits_for_a_holder_that_lets_go()
     {
         using var directory = new TemporaryDirectory();

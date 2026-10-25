@@ -1,6 +1,6 @@
 """Where the characters in captured model requests go, by region kind, and how much of each is new.
 
-Reads the `PROXY_CAPTURE` store (`~/.ai-proxy/capture.db`), keeps `/v1/messages` requests only,
+Reads the `PROXY__CAPTURE` store (`~/.ai-proxy/capture.db`), keeps `/v1/messages` requests only,
 and splits each body into regions: system blocks, tool definitions, and message blocks by role
 and type. A region is identified by a hash of its kind and content, so `new` counts a region the
 first time it is sent and `sent` counts every send. A cache-safe compressor runs once per new

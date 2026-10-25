@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -29,6 +28,12 @@ public sealed partial class ContentDecompositor : IDecompositor
     /// </remarks>
     private const int MaxFailedStructureAttempts = 32;
 
+    /// <summary>How many lines must look alike before a block is classed by them.</summary>
+    private const int MinimumMatchingLines = 2;
+
+    /// <summary>The share of the lines of a block that must look alike for the whole block to be classed by them.</summary>
+    private const double MajorityShare = 0.8;
+
     private static readonly Regex MarkdownLinePattern = CreateMarkdownLinePattern();
     private static readonly Regex PathLinePattern = CreatePathLinePattern();
     private static readonly Regex ConfigurationLinePattern = CreateConfigurationLinePattern();
@@ -36,9 +41,13 @@ public sealed partial class ContentDecompositor : IDecompositor
     private static readonly Regex LogLinePattern = CreateLogLinePattern();
 
     /// <inheritdoc />
-    public Decomposition Decompose(string content, string requestId)
+    public Decomposition Decompose(string content, string requestId, string? filePath = null)
     {
-        var spans = FindParts(content);
+        // Only a whole file named by its extension carries a language; a guessed kind never does.
+        var language = content.Trim().Length > 0 ? SourceCodeFiles.LanguageOf(filePath) : null;
+        var spans = language is not null
+            ? [new Span(0, content.Length, ContentType.SourceCode, true)]
+            : FindParts(content);
         var parts = new List<ContentPart>(spans.Count);
         var template = new StringBuilder(content.Length);
         var position = 0;
@@ -49,9 +58,9 @@ public sealed partial class ContentDecompositor : IDecompositor
             template.Append(content, position, span.Start - position);
             chunkId++;
 
-            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length));
+            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length), filePath, language);
             parts.Add(part);
-            template.Append(Placeholder(span.Type, chunkId));
+            template.Append(span.Type.Placeholder(chunkId));
 
             position = span.Start + span.Length;
         }
@@ -61,117 +70,7 @@ public sealed partial class ContentDecompositor : IDecompositor
         return new Decomposition(requestId, content, template.ToString(), parts);
     }
 
-    /// <summary>The placeholder that holds a part's place in the template.</summary>
-    /// <param name="type">The kind of the part.</param>
-    /// <param name="chunkId">The part's number within the request.</param>
-    public static string Placeholder(ContentType type, int chunkId) => $"{{{ShortName(type)}_{chunkId}}}";
-
-    private static string ShortName(ContentType type) =>
-        type switch
-        {
-            ContentType.Prose => "prose",
-            ContentType.Log => "log",
-            ContentType.Json => "json",
-            ContentType.Xml => "xml",
-            ContentType.Toml => "toml",
-            ContentType.Markdown => "markdown",
-            ContentType.SourceCode => "code",
-            ContentType.DirectoryListing => "listing",
-            ContentType.ShellTranscript => "shell",
-            _ => "unknown"
-        };
-
-    private List<Span> FindParts(string content)
-    {
-        var spans = new List<Span>();
-        var position = 0;
-        var blockStart = -1;
-        var blockEnd = 0;
-        var failedAttempts = 0;
-
-        while (position < content.Length)
-        {
-            var lineEnd = content.IndexOf('\n', position);
-            var nextLine = lineEnd < 0 ? content.Length : lineEnd + 1;
-            var line = content[position..(lineEnd < 0 ? content.Length : lineEnd)];
-            var trimmed = line.TrimStart();
-
-            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
-            {
-                var fenceEnd = FindFenceEnd(content, nextLine, trimmed[0]);
-                if (fenceEnd > 0)
-                {
-                    Flush(content, spans, ref blockStart, ref blockEnd);
-                    spans.Add(new Span(position, fenceEnd - position, ContentType.SourceCode, true));
-                    position = fenceEnd;
-                    continue;
-                }
-            }
-
-            if (failedAttempts < MaxFailedStructureAttempts)
-            {
-                if (trimmed.StartsWith('{') || trimmed.StartsWith('['))
-                {
-                    var valueEnd = FindJsonEnd(content, position);
-                    if (valueEnd > position && IsJson(content[position..valueEnd]))
-                    {
-                        Flush(content, spans, ref blockStart, ref blockEnd);
-                        spans.Add(new Span(position, valueEnd - position, ContentType.Json, true));
-                        position = valueEnd;
-                        continue;
-                    }
-
-                    failedAttempts++;
-                }
-
-                if (trimmed.StartsWith('<') && !trimmed.StartsWith("<!--", StringComparison.Ordinal))
-                {
-                    var elementEnd = FindXmlEnd(content, position);
-                    if (elementEnd > position && IsXml(content[position..elementEnd]))
-                    {
-                        Flush(content, spans, ref blockStart, ref blockEnd);
-                        spans.Add(new Span(position, elementEnd - position, ContentType.Xml, true));
-                        position = elementEnd;
-                        continue;
-                    }
-
-                    failedAttempts++;
-                }
-            }
-
-            if (trimmed.Length == 0)
-            {
-                Flush(content, spans, ref blockStart, ref blockEnd);
-                position = nextLine;
-                continue;
-            }
-
-            if (blockStart < 0)
-            {
-                blockStart = position;
-            }
-
-            blockEnd = lineEnd < 0 ? content.Length : lineEnd;
-            position = nextLine;
-        }
-
-        Flush(content, spans, ref blockStart, ref blockEnd);
-
-        return Merge(content, spans);
-    }
-
-    private static void Flush(string content, List<Span> spans, ref int blockStart, ref int blockEnd)
-    {
-        if (blockStart < 0)
-        {
-            return;
-        }
-
-        var text = content[blockStart..blockEnd];
-        spans.Add(new Span(blockStart, blockEnd - blockStart, Classify(text), false));
-        blockStart = -1;
-        blockEnd = 0;
-    }
+    private static List<Span> FindParts(string content) => new PartScanner(content).Scan();
 
     private static List<Span> Merge(string content, List<Span> spans)
     {
@@ -186,7 +85,7 @@ public sealed partial class ContentDecompositor : IDecompositor
 
                 if (!previous.Structural && !span.Structural && previous.Type == span.Type && gap.IsWhiteSpace())
                 {
-                    merged[^1] = new Span(previous.Start, span.Start + span.Length - previous.Start, previous.Type, false);
+                    merged[^1] = previous with { Length = span.Start + span.Length - previous.Start, Structural = false };
                     continue;
                 }
             }
@@ -199,33 +98,33 @@ public sealed partial class ContentDecompositor : IDecompositor
 
     private static ContentType Classify(string text)
     {
-        var lines = text.Split('\n').Where(static line => line.Trim().Length > 0).ToArray();
+        var lines = text.Split(StructureMarkers.NewLine).Where(static line => line.Trim().Length > 0).ToArray();
         if (lines.Length == 0)
         {
             return ContentType.Prose;
         }
 
-        if (lines[0].TrimStart().StartsWith('$'))
+        if (lines[0].TrimStart().StartsWith(StructureMarkers.Shell.Prompt))
         {
             return ContentType.ShellTranscript;
         }
 
-        if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= 2)
+        if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= MinimumMatchingLines)
         {
             return ContentType.Log;
         }
 
-        if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= 2)
+        if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= MinimumMatchingLines)
         {
             return ContentType.SourceCode;
         }
 
-        if (lines.Length >= 2 && lines.Count(static line => PathLinePattern.IsMatch(line) && line.Contains('.', StringComparison.Ordinal)) >= lines.Length * 0.8)
+        if (lines.Length >= MinimumMatchingLines && lines.Count(static line => PathLinePattern.IsMatch(line) && line.Contains(StructureMarkers.ExtensionSeparator, StringComparison.Ordinal)) >= lines.Length * MajorityShare)
         {
             return ContentType.DirectoryListing;
         }
 
-        if (lines.Length >= 2 && lines.Count(static line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * 0.8)
+        if (lines.Length >= MinimumMatchingLines && lines.Count(static line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * MajorityShare)
         {
             return ContentType.Toml;
         }
@@ -239,7 +138,7 @@ public sealed partial class ContentDecompositor : IDecompositor
 
         while (position < content.Length)
         {
-            var lineEnd = content.IndexOf('\n', position);
+            var lineEnd = content.IndexOf(StructureMarkers.NewLine, position);
             var line = content[position..(lineEnd < 0 ? content.Length : lineEnd)];
             var trimmed = line.Trim();
 
@@ -261,54 +160,13 @@ public sealed partial class ContentDecompositor : IDecompositor
 
     private static int FindJsonEnd(string content, int start)
     {
-        var depth = 0;
-        var inString = false;
-        var escaped = false;
+        var scanner = new JsonValueScanner();
 
         for (var index = start; index < content.Length; index++)
         {
-            var character = content[index];
-
-            if (inString)
+            if (scanner.Closes(content[index]))
             {
-                if (escaped)
-                {
-                    escaped = false;
-                }
-                else
-                {
-                    switch (character)
-                    {
-                        case '\\':
-                            escaped = true;
-                            break;
-                        case '"':
-                            inString = false;
-                            break;
-                    }
-                }
-
-                continue;
-            }
-
-            switch (character)
-            {
-                case '"':
-                    inString = true;
-                    break;
-                case '{':
-                case '[':
-                    depth++;
-                    break;
-                case '}':
-                case ']':
-                    depth--;
-                    if (depth == 0)
-                    {
-                        return index + 1;
-                    }
-
-                    break;
+                return index + 1;
             }
         }
 
@@ -317,13 +175,13 @@ public sealed partial class ContentDecompositor : IDecompositor
 
     private static int FindXmlEnd(string content, int start)
     {
-        var open = content.IndexOf('>', start);
+        var open = content.IndexOf(StructureMarkers.Xml.TagClose, start);
         if (open < 0)
         {
             return -1;
         }
 
-        if (open > start && content[open - 1] == '/')
+        if (open > start && content[open - 1] == StructureMarkers.Xml.SelfClosingSlash)
         {
             return open + 1;
         }
@@ -334,38 +192,25 @@ public sealed partial class ContentDecompositor : IDecompositor
             return -1;
         }
 
-        var close = content.IndexOf($"</{name}", open, StringComparison.Ordinal);
+        var close = content.IndexOf($"{StructureMarkers.Xml.ClosingTagOpen}{name}", open, StringComparison.Ordinal);
         if (close < 0)
         {
             return -1;
         }
 
-        var closeEnd = content.IndexOf('>', close);
+        var closeEnd = content.IndexOf(StructureMarkers.Xml.TagClose, close);
         return closeEnd < 0 ? -1 : closeEnd + 1;
     }
 
     private static string ReadTagName(string content, int start, int open)
     {
         var index = start;
-        while (index < open && !char.IsWhiteSpace(content[index]) && content[index] != '>')
+        while (index < open && !char.IsWhiteSpace(content[index]) && content[index] != StructureMarkers.Xml.TagClose)
         {
             index++;
         }
 
-        return content[start..index].TrimStart('<');
-    }
-
-    private static bool IsJson(string text)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(text);
-            return document.RootElement.ValueKind != JsonValueKind.Undefined;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
+        return content[start..index].TrimStart(StructureMarkers.Xml.TagOpen);
     }
 
     private static bool IsXml(string text)

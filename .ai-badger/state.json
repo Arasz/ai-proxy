@@ -1,7 +1,20 @@
 {
-  "lastUpdated": "2026-10-24",
-  "next": "Owner ordering: smallest ready step first, one at a time. Ready: reducer follow-ups untouched-payloads and log-reducer-retention; whole-request ccr-retrieval-scoring (cache-stability-probe needs 3+ sessions of capture data); rtk-replacement rtk-replacement-scope and model-decision (needs owner ruling per kind).",
+  "lastUpdated": "2026-10-25",
+  "next": "Goal: CCR plus Python/JS/TS minifiers hooked up. Order: ccr-design ADR 0005 (owner gate) -> activation S2 file context -> CCR runtime -> exact-file retention -> wire C# reducer -> Tree-sitter lexers py/js/ts. One implementation lane at a time.",
   "completedTasks": [
+    {
+      "taskId": "aip-log-reducer-keeps-scored-answers",
+      "date": "2026-10-24",
+      "title": "Log reducer keeps scored answers",
+      "pr": 52,
+      "version": null,
+      "summary": "Log reducer dedupes lines first, then collapses lines of the same shape (LineShapes.Collapse), keeping key=value tokens and changed tokens. rtk_proxy_log 5/5 at 34.0% removed; log kind 24.6% with 13/13. Follow-ups merged: #53 invariants, #54 cache probe passive arm, #55 CCR scored with retrieval (+9% net loss), #56 untouched payloads, #57 n/a means under minimum, #59 size-normalized score.",
+      "followUps": [
+        "Owner gate on retrieval activation D1-D6 approved (#61)",
+        "cache-strategies research #62",
+        "CCR design ADR 0005"
+      ]
+    },
     {
       "taskId": "aip-measure-sizes-in-provider-tokens",
       "date": "2026-10-24",

@@ -56,7 +56,7 @@ are in [ADR 0002](../adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md
 
 Because the stage changes what the provider is sent, and that is the operator's call, not the
 tool's. The proxy's other job is to be transparent, and a proxy that quietly rewrites a
-request is not that. `PROXY_COMPRESSION=on` is the switch, and
+request is not that. `PROXY__COMPRESSION__ENABLED=true` is the switch, and
 [the how-to](../how-to/turning-on-the-compression-stage.md) is what an operator reads first.
 
 ## What is still open

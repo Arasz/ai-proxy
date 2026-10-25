@@ -11,8 +11,6 @@ public sealed class StageTimings
     /// <summary>Adds <paramref name="elapsed"/> to the stage called <paramref name="name"/>.</summary>
     public void Add(string name, TimeSpan elapsed)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
         var index = _stages.FindIndex(stage => string.Equals(stage.Name, name, StringComparison.Ordinal));
         if (index < 0)
         {
@@ -27,15 +25,12 @@ public sealed class StageTimings
     /// <summary>Adds every stage of <paramref name="stages"/>, each name prefixed with <paramref name="prefix"/>.</summary>
     public void Add(string prefix, IEnumerable<StageTiming> stages)
     {
-        ArgumentNullException.ThrowIfNull(prefix);
-        ArgumentNullException.ThrowIfNull(stages);
-
         foreach (var stage in stages)
         {
-            Add(prefix + stage.Name, stage.Elapsed);
+            Add($"{prefix}{stage.Name}", stage.Elapsed);
         }
     }
 
     /// <summary>The stages so far, in the order they first ran.</summary>
-    public StageTiming[] ToArray() => _stages.ToArray();
+    public StageTiming[] ToArray() => [.. _stages];
 }

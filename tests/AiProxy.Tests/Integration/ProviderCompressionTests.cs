@@ -108,8 +108,8 @@ public sealed class ProviderCompressionTests : IDisposable
         var configuration = new Dictionary<string, string>();
         if (compression)
         {
-            configuration["PROXY_COMPRESSION"] = "on";
-            configuration["PROXY_COMPRESSION_DB"] = _databasePath;
+            configuration["Proxy:Compression:Enabled"] = "true";
+            configuration["Proxy:Compression:Database"] = _databasePath;
         }
 
         return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
