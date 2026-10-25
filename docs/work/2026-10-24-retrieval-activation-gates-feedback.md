@@ -1,6 +1,6 @@
 # Refinement feedback — Retrieval activation: six decisions
 
-<!-- refinement-form: refinement:2026-10-24-retrieval-activation-gates:v1 · saved 2026-10-24T20:40:38.869Z · answered 6/6 -->
+<!-- refinement-form: refinement:2026-10-24-retrieval-activation-gates:v1 · saved 2026-10-24T20:39:49.736Z · answered 6/6 -->
 
 Source document: `docs/work/2026-10-24-reducer-scoring-results.md, docs/work/2026-10-24-thread-cache-billing.md, docs/work/2026-10-24-untouched-payloads.md`
 
