@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -18,4 +19,6 @@ internal static class CcrText
         var lines = text.Split('\n');
         return text.EndsWith('\n') ? lines[..^1] : lines;
     }
+
+    public static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 }

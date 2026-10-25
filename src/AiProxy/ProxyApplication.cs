@@ -102,6 +102,8 @@ public static partial class ProxyApplication
 
         services.AddTransient<CcrPreviewOverlay>();
         services.AddTransient<CcrPreviewBuilder>();
+        services.AddTransient<CcrRetrievalParser>();
+        services.AddTransient<CcrRetriever>();
         services.AddSingleton(options);
         services.AddSingleton(settings.Store);
         services.AddSingleton<ContentQueue>();
