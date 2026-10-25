@@ -5,4 +5,5 @@ namespace AiProxy.Core.Content;
 /// <param name="ChunkId">The part's number within the request, counted from one.</param>
 /// <param name="Type">The kind of content the part carries.</param>
 /// <param name="Text">The part's text, exactly as the client sent it.</param>
-public sealed record ContentPart(string RequestId, int ChunkId, ContentType Type, string Text);
+/// <param name="FilePath">The whole file the part was read from, or null when that is not certain.</param>
+public sealed record ContentPart(string RequestId, int ChunkId, ContentType Type, string Text, string? FilePath = null);

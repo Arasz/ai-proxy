@@ -36,9 +36,11 @@ public sealed partial class ContentDecompositor : IDecompositor
     private static readonly Regex LogLinePattern = CreateLogLinePattern();
 
     /// <inheritdoc />
-    public Decomposition Decompose(string content, string requestId)
+    public Decomposition Decompose(string content, string requestId, string? filePath = null)
     {
-        var spans = FindParts(content);
+        var spans = SourceCodeFiles.IsSourceCode(filePath) && content.Trim().Length > 0
+            ? [new Span(0, content.Length, ContentType.SourceCode, true)]
+            : FindParts(content);
         var parts = new List<ContentPart>(spans.Count);
         var template = new StringBuilder(content.Length);
         var position = 0;
@@ -49,7 +51,7 @@ public sealed partial class ContentDecompositor : IDecompositor
             template.Append(content, position, span.Start - position);
             chunkId++;
 
-            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length));
+            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length), filePath);
             parts.Add(part);
             template.Append(Placeholder(span.Type, chunkId));
 

@@ -81,7 +81,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
 
         foreach (var region in WithoutOverlaps(regions))
         {
-            var reduced = await ReduceAsync(region.Text, requestId, parts, failures, stages, cancellationToken).ConfigureAwait(false);
+            var reduced = await ReduceAsync(region, requestId, parts, failures, stages, cancellationToken).ConfigureAwait(false);
             if (reduced is null)
             {
                 continue;
@@ -176,7 +176,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
     }
 
     private async ValueTask<string?> ReduceAsync(
-        string region,
+        ContentRegion region,
         string requestId,
         List<CompressedPart> parts,
         List<PartFailure> failures,
@@ -184,7 +184,7 @@ public sealed class ContentCompressionPipeline : ICompressionPipeline
         CancellationToken cancellationToken)
     {
         var started = _time.GetTimestamp();
-        var decomposition = _decomposer.Decompose(region, requestId);
+        var decomposition = _decomposer.Decompose(region.Text, requestId, region.FilePath);
         stages.Add("decompose", _time.GetElapsedTime(started));
         if (decomposition.Parts.Count == 0)
         {
