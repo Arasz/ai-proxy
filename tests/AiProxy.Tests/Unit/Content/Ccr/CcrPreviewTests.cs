@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content;
@@ -14,14 +15,36 @@ public sealed partial class CcrPreviewTests
 {
     private static readonly CcrOptions Options = CcrOptions.Default;
 
+    // The baseline digests were captured before the component refactor, at these sizes.
+    private static readonly CcrOptions BaselineOptions = CcrOptions.Default with { BudgetTokens = 1_000, RetrievalTokens = 4_000 };
+
     private static string Log(int lines, Func<int, string>? line = null)
     {
         line ??= index => $"step {index}: compiling module m{index} in the usual way";
         return string.Join("\n", Enumerable.Range(1, lines).Select(line));
     }
 
+    private static string IdOf(string original) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
+
     private static CcrPreview Build(string original) =>
-        CcrPreview.Build(original, Options) ?? throw new InvalidOperationException("expected a preview");
+        new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options) ?? throw new InvalidOperationException("expected a preview");
+
+    [Theory]
+    [InlineData("plain", "c5ff72de3e0f8dff", "be371a8c77ae6bbe06630d1c6d98a44b0864917cced3574edb7241329524dbc5")]
+    [InlineData("sparse-signals", "a6f74466a4409648", "e5a2cde62d5e1b23a8eeab3bc1c5a16113f7ce9a85151526c3d687db1a1003ce")]
+    [InlineData("crlf", "894e6f7c3e9e5769", "693c602ddafde4308dc360e27d900cb4004565d01fe03681df5eee22ad0095af")]
+    [InlineData("identifiers", "b5c105026b5cdf97", "26d1a62bb4944188834e8072f01eeccd9c83a489dcaf87cda31ea898b8646b08")]
+    [InlineData("wide", "7b718402c1d9fc6d", "2a6602ce18255c5db1ecfc076dda017c65f9173509484cb5f12648caa9cfee87")]
+    [InlineData("unicode-cut", "d46017f5dfa0eb65", "f76f5c4ced2a2f24d795fd53dc7229bd3422ba8b219d727228144eb3c1fad7ae")]
+    public void Preview_bytes_match_the_captured_core_baseline(string shape, string id, string digest)
+    {
+        var preview = new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(Shape(shape), BaselineOptions)
+            ?? throw new InvalidOperationException("expected a preview");
+
+        Assert.Equal(id, preview.Id);
+        Assert.Equal(digest, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(preview.Text))));
+    }
 
     [Fact]
     public void The_same_original_gives_the_same_bytes_every_time()
@@ -29,6 +52,44 @@ public sealed partial class CcrPreviewTests
         var original = Log(400);
 
         Assert.Equal(Build(original).Text, Build(original).Text);
+    }
+
+    [Fact]
+    public void Reusing_the_builder_after_skips_and_different_options_preserves_each_result()
+    {
+        var builder = new CcrPreviewBuilder(new CcrPreviewOverlay());
+        var first = builder.Build(Shape("plain"), Options);
+        var differentOptions = Options with { BudgetTokens = 700, SignalShare = 0.2m };
+
+        Assert.Null(builder.Build("small", Options));
+        Assert.Null(builder.Build(first!.Text + Shape("plain"), Options));
+        var different = builder.Build(Shape("sparse-signals"), differentOptions);
+
+        Assert.Equal(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(Shape("sparse-signals"), differentOptions), different);
+        Assert.NotEqual(first, different);
+        Assert.Equal(first, builder.Build(Shape("plain"), Options));
+    }
+
+    [Fact]
+    public void A_failed_build_does_not_affect_the_next_preview()
+    {
+        var builder = new CcrPreviewBuilder(new CcrPreviewOverlay());
+        var expected = builder.Build(Shape("plain"), Options);
+
+        Assert.Throws<OverflowException>(() => builder.Build(Shape("wide"), Options with { BudgetTokens = int.MaxValue }));
+
+        Assert.Equal(expected, builder.Build(Shape("plain"), Options));
+    }
+
+    [Fact]
+    public void Reusing_the_overlay_does_not_retain_previous_identifiers_or_budget()
+    {
+        var overlay = new CcrPreviewOverlay();
+
+        Assert.Equal("\n[retained identifiers] AlphaWidget", overlay.Build("", "AlphaWidget", 100));
+        Assert.Equal("\n[retained identifiers] BetaWidget", overlay.Build("AlphaWidget", "AlphaWidget BetaWidget", 100));
+        Assert.Equal("", overlay.Build("", "AlphaWidget", 0));
+        Assert.Equal("\n[retained identifiers] AlphaWidget", overlay.Build("", "AlphaWidget", 100));
     }
 
     [Fact]
@@ -52,7 +113,7 @@ public sealed partial class CcrPreviewTests
     [Fact]
     public void The_id_is_the_first_sixteen_hex_characters_of_the_sha256_of_the_text()
     {
-        Assert.Equal("ba7816bf8f01cfea", CcrPreview.IdOf("abc"));
+        Assert.Equal("c5ff72de3e0f8dff", Build(Shape("plain")).Id);
     }
 
     [Fact]
@@ -64,9 +125,9 @@ public sealed partial class CcrPreviewTests
 
         var header = preview.Text.Split('\n')[0];
         Assert.Equal(
-            $"[proxy preview {CcrPreview.IdOf(original)}: {preview.ShownLines} of 400 lines shown. Call proxy_retrieve with this id for a line range, a pattern, or the whole text.]",
+            $"[proxy preview {IdOf(original)}: {preview.ShownLines} of 400 lines shown. Call proxy_retrieve with this id for a line range, a pattern, or the whole text.]",
             header);
-        Assert.Equal(CcrPreview.IdOf(original), preview.Id);
+        Assert.Equal(IdOf(original), preview.Id);
     }
 
     [Fact]
@@ -74,7 +135,7 @@ public sealed partial class CcrPreviewTests
     {
         var original = Log(400);
 
-        Assert.NotEqual(CcrPreview.IdOf(original + "a"), CcrPreview.IdOf(original + "b"));
+        Assert.NotEqual(Build(original + "a").Id, Build(original + "b").Id);
     }
 
     [Fact]
@@ -84,7 +145,7 @@ public sealed partial class CcrPreviewTests
         var original = new string('x', 59) + string.Concat(Enumerable.Repeat("\n" + new string('y', 99), 86));
 
         Assert.Equal(8_659, original.Length);
-        Assert.Null(CcrPreview.Build(original + new string('z', 10), Options));
+        Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original + new string('z', 10), Options));
     }
 
     [Fact]
@@ -93,7 +154,7 @@ public sealed partial class CcrPreviewTests
         var original = new string('x', 59) + string.Concat(Enumerable.Repeat("\n" + new string('y', 99), 86)) + new string('z', 11);
 
         Assert.Equal(8_670, original.Length);
-        Assert.NotNull(CcrPreview.Build(original, Options));
+        Assert.NotNull(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
     }
 
     [Fact]
@@ -101,7 +162,7 @@ public sealed partial class CcrPreviewTests
     {
         var original = "[proxy preview 0123456789abcdef: 1 of 2 lines shown.]\n" + Log(400);
 
-        Assert.Null(CcrPreview.Build(original, Options));
+        Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
     }
 
     [Theory]
@@ -239,6 +300,7 @@ public sealed partial class CcrPreviewTests
         "identifiers" => Log(800, index => $"call SomeServiceName{index}.HandleRequest{index} /usr/lib/x{index}.so 0x{index:x4}"),
         "crlf" => Log(400, index => $"step {index}: compiling module m{index}   \r"),
         "one-line" => new string('q', 20_000),
+        "unicode-cut" => "a" + string.Concat(Enumerable.Repeat("😀", 10_000)),
         _ => throw new ArgumentOutOfRangeException(nameof(shape))
     };
 

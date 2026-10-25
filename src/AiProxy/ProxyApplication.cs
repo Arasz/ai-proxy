@@ -3,6 +3,7 @@ using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Hosting;
 using AiProxy.Storage;
 
@@ -99,6 +100,8 @@ public static partial class ProxyApplication
             ? CompressionOptions.WithMinimum(minimum)
             : CompressionOptions.Default;
 
+        services.AddTransient<CcrPreviewOverlay>();
+        services.AddTransient<CcrPreviewBuilder>();
         services.AddSingleton(options);
         services.AddSingleton(settings.Store);
         services.AddSingleton<ContentQueue>();

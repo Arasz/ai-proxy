@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using AiProxy.Core.Content.Ccr;
 
@@ -14,7 +15,10 @@ public sealed class CcrRetrievalTests
 
     private static readonly string Original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"line {index}: value v{index}"));
 
-    private static readonly string Id = CcrPreview.IdOf(Original);
+    private static readonly string Id = IdOf(Original);
+
+    private static string IdOf(string original) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
 
     private static CcrRetrieval Answer(string arguments, string? original = null) =>
         CcrRetrieval.Answer(arguments, original ?? Original, Options);
@@ -73,7 +77,7 @@ public sealed class CcrRetrievalTests
     {
         var original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"{index} " + new string('w', 100)));
 
-        var result = CcrRetrieval.Answer($$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"lines","start":1,"end":400}""", original, Options);
+        var result = CcrRetrieval.Answer($$"""{"id":"{{IdOf(original)}}","mode":"lines","start":1,"end":400}""", original, Options);
 
         Assert.Null(result.Error);
         Assert.True(result.Text.Length <= Options.CharactersOf(Options.RetrievalTokens), $"{result.Text.Length} characters is over the cap");
@@ -81,6 +85,45 @@ public sealed class CcrRetrievalTests
         var next = body.Length;
         Assert.Equal($"[stopped at the size cap: call again with start {next}]", body[^1]);
         Assert.StartsWith($"{next - 1}\t{next - 1} ", body[^2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_first_requested_line_over_the_cap_says_how_to_retrieve_it()
+    {
+        var original = new string('x', Options.CharactersOf(Options.RetrievalTokens) + 1);
+
+        var result = CcrRetrieval.Answer($$"""{"id":"{{IdOf(original)}}","mode":"lines","start":1,"end":1}""", original, Options);
+
+        Assert.Null(result.Error);
+        Assert.Equal(["[line 1 is longer than the size cap: ask for a pattern or the whole text]"], Body(result));
+        Assert.True(result.Text.Length <= Options.CharactersOf(Options.RetrievalTokens));
+    }
+
+    [Fact]
+    public void An_empty_original_has_no_line_range_and_no_pattern_matches()
+    {
+        var id = IdOf("");
+
+        var range = CcrRetrieval.Answer($$"""{"id":"{{id}}","mode":"lines","start":1,"end":1}""", "", Options);
+        var pattern = CcrRetrieval.Answer(Pattern("value", id: id), "", Options);
+
+        Assert.Equal(CcrRetrieval.BadRange, range.Error);
+        Assert.Contains("0 lines", range.Text, StringComparison.Ordinal);
+        Assert.Null(pattern.Error);
+        Assert.Equal(["[no line matches]"], Body(pattern));
+    }
+
+    [Fact]
+    public void Pattern_accepts_the_context_limit_and_rejects_one_more()
+    {
+        var accepted = Answer(Pattern("v10$", Options.MaximumContext));
+        var rejected = Answer(Pattern("v10$", Options.MaximumContext + 1));
+
+        Assert.Null(accepted.Error);
+        Assert.Equal(20, Body(accepted).Length);
+        Assert.Equal("1\tline 1: value v1", Body(accepted)[0]);
+        Assert.Equal("20\tline 20: value v20", Body(accepted)[^1]);
+        Assert.Equal(CcrRetrieval.BadInput, rejected.Error);
     }
 
     [Fact]
@@ -93,6 +136,17 @@ public sealed class CcrRetrievalTests
             ["9\tline 9: value v9", "10\tline 10: value v10", "11\tline 11: value v11", "12\tline 12: value v12", "13\tline 13: value v13",
              "--", "29\tline 29: value v29", "30\tline 30: value v30", "31\tline 31: value v31"],
             Body(result));
+    }
+
+    [Fact]
+    public void Pattern_anchors_match_crlf_lines_without_changing_the_returned_text()
+    {
+        const string original = "other\r\nexpected value\r\nother\r\n";
+
+        var result = CcrRetrieval.Answer(Pattern("^expected value$", id: IdOf(original)), original, Options);
+
+        Assert.Null(result.Error);
+        Assert.Equal(["2\texpected value\r"], Body(result));
     }
 
     [Fact]
@@ -113,7 +167,7 @@ public sealed class CcrRetrievalTests
         var options = Options with { MaximumMatches = 400 };
 
         var result = CcrRetrieval.Answer(
-            $$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"pattern","pattern":"match"}""", original, options);
+            $$"""{"id":"{{IdOf(original)}}","mode":"pattern","pattern":"match"}""", original, options);
 
         Assert.True(result.Text.Length <= options.CharactersOf(options.RetrievalTokens), $"{result.Text.Length} characters is over the cap");
         var body = Body(result);
@@ -127,7 +181,7 @@ public sealed class CcrRetrievalTests
         var original = "short\n" + new string('a', 600) + "NEEDLE" + new string('b', 600) + "\nshort";
 
         var result = CcrRetrieval.Answer(
-            $$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"pattern","pattern":"NEEDLE"}""", original, Options);
+            $$"""{"id":"{{IdOf(original)}}","mode":"pattern","pattern":"NEEDLE"}""", original, Options);
 
         var line = Assert.Single(Body(result));
         var window = line[(line.IndexOf("] ", StringComparison.Ordinal) + 2)..];
@@ -145,7 +199,7 @@ public sealed class CcrRetrievalTests
             ? new string('a', 120) + "😀" + new string('b', 119) + "X" + new string('c', 500)
             : new string('a', 120) + "X" + new string('b', 118) + "😀" + new string('c', 500);
 
-        var result = CcrRetrieval.Answer(Pattern("X", id: CcrPreview.IdOf(original)), original, Options);
+        var result = CcrRetrieval.Answer(Pattern("X", id: IdOf(original)), original, Options);
 
         Assert.Null(result.Error);
         var line = Assert.Single(Body(result));
@@ -178,7 +232,7 @@ public sealed class CcrRetrievalTests
     public void A_catastrophic_backtracking_pattern_returns_a_normal_answer()
     {
         var original = string.Join("\n", Enumerable.Range(1, 50).Select(_ => new string('a', 40) + "!"));
-        var arguments = $$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"pattern","pattern":"^(a+)+$"}""";
+        var arguments = $$"""{"id":"{{IdOf(original)}}","mode":"pattern","pattern":"^(a+)+$"}""";
 
         var result = CcrRetrieval.Answer(arguments, original, Options);
 
@@ -191,7 +245,7 @@ public sealed class CcrRetrievalTests
     {
         var original = "first\r\n\tsecond  \r\nthird\r\n";
 
-        var result = CcrRetrieval.Answer($$"""{"id":"{{CcrPreview.IdOf(original)}}","mode":"whole"}""", original, Options);
+        var result = CcrRetrieval.Answer($$"""{"id":"{{IdOf(original)}}","mode":"whole"}""", original, Options);
 
         Assert.Null(result.Error);
         Assert.Equal(original, result.Text[(result.Text.IndexOf('\n', StringComparison.Ordinal) + 1)..]);
@@ -225,6 +279,16 @@ public sealed class CcrRetrievalTests
     public void Malformed_unicode_arguments_are_bad_input(string arguments)
     {
         Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
+    }
+
+    [Theory]
+    [InlineData('\uD800')]
+    [InlineData('\uDC00')]
+    public void A_raw_unpaired_surrogate_in_the_arguments_is_bad_input(char surrogate)
+    {
+        var arguments = "{\"id\":\"" + Id + "\",\"mode\":\"pattern\",\"pattern\":\"" + surrogate + "\"}";
+
+        Assert.Equal(CcrRetrieval.BadInput, Answer(arguments).Error);
     }
 
     [Fact]

@@ -32,8 +32,10 @@ which credential travels with a request, not about how bytes move. A rule that c
 tested without a socket is a rule that gets tested.
 
 The composition runs the other way: the host registers the implementations of the core's
-interfaces, and the core never learns who implements them. Every collaborator in the
-composition is a singleton, because every one of them is stateless.
+interfaces, and the core never learns who implements them. Stateless collaborators use
+singleton lifetimes. The CCR preview builder and its overlay hold operation state, so the
+host registers them as transients. Each instance serves one operation at a time; a future
+consumer must resolve a fresh builder per operation. These registrations do not activate CCR.
 
 ## Consequences
 

@@ -42,12 +42,12 @@ public sealed record CcrRetrieval(string Text, string? Error)
             return Fail(BadInput, reason);
         }
 
-        if (original is null || CcrPreview.IdOf(original) != request.Id)
+        if (original is null || CcrText.IdOf(original) != request.Id)
         {
             return Fail(NotKept, Invariant($"No text is kept for {request.Id}. Re-run the tool that produced it."));
         }
 
-        var lines = CcrPreview.LinesOf(original);
+        var lines = CcrText.LinesOf(original);
         var header = Invariant($"[{Name} {request.Id} {request.Mode}: {lines.Length} lines]");
 
         return request.Mode switch
@@ -104,7 +104,8 @@ public sealed record CcrRetrieval(string Text, string? Error)
         {
             for (; current < lines.Length; current++)
             {
-                var match = regex.Match(lines[current]);
+                var line = lines[current];
+                var match = regex.Match(line, 0, line.EndsWith('\r') ? line.Length - 1 : line.Length);
                 if (!match.Success)
                 {
                     continue;
@@ -200,6 +201,10 @@ public sealed record CcrRetrieval(string Text, string? Error)
         catch (JsonException)
         {
             return (null, "The arguments are not JSON.");
+        }
+        catch (ArgumentException)
+        {
+            return (null, "The arguments contain malformed Unicode.");
         }
 
         using (document)
