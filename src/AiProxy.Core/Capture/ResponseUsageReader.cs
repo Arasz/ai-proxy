@@ -139,12 +139,12 @@ public static class ResponseUsageReader
         using var document = JsonDocument.Parse(data);
         var root = document.RootElement;
         var type = root.PropertyOrDefault(UsageJson.Type);
-        if (type.ValueKind == JsonValueKind.Undefined)
+        if (type.IsMissing)
         {
             return usage;
         }
 
-        if (type.ValueKind != JsonValueKind.String)
+        if (!type.IsString)
         {
             throw new JsonException("An event type must be a string.");
         }
@@ -180,7 +180,7 @@ public static class ResponseUsageReader
     /// <summary>Takes the Anthropic counts of a usage object; one with none of them leaves <paramref name="current"/> as it was.</summary>
     private static ResponseUsage? Merge(ResponseUsage? current, JsonElement usage)
     {
-        if (usage.ValueKind != JsonValueKind.Object)
+        if (!usage.IsObject)
         {
             return current;
         }

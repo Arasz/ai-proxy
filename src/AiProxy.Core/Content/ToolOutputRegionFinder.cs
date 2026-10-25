@@ -41,22 +41,15 @@ public sealed class ToolOutputRegionFinder
     {
         var indexes = new Dictionary<int, FileRead?>();
 
-        JsonDocument document;
-        try
-        {
-            document = JsonDocument.Parse(body.ToArray());
-        }
-        catch (JsonException)
+        using var document = JsonDocument.TryParse(body.ToArray());
+        if (document is null)
         {
             return new ToolOutputIndexes(indexes, 0);
         }
 
-        using (document)
-        {
-            var files = ToolCallFiles.Collect(document.RootElement);
-            var count = Walk(document.RootElement, 0, indexes, files);
-            return new ToolOutputIndexes(indexes, count);
-        }
+        var files = ToolCallFiles.Collect(document.RootElement);
+        var count = Walk(document.RootElement, 0, indexes, files);
+        return new ToolOutputIndexes(indexes, count);
     }
 
     /// <summary>Walks the element and returns the counter after its last string.</summary>
@@ -157,7 +150,7 @@ public sealed class ToolOutputRegionFinder
         ToolCallFiles files,
         FileRead? path)
     {
-        if (block.ValueKind != JsonValueKind.Object)
+        if (!block.IsObject)
         {
             return Walk(block, counter, indexes, files);
         }
@@ -185,7 +178,7 @@ public sealed class ToolOutputRegionFinder
             return Record(counter, indexes, path);
         }
 
-        return property.Value.ValueKind == JsonValueKind.Object
+        return property.Value.IsObject
             ? WalkToolOutputStrings(property.Value, counter, indexes, files, path)
             : Walk(property.Value, counter, indexes, files);
     }
@@ -203,9 +196,9 @@ public sealed class ToolOutputRegionFinder
 
         return (type, role) switch
         {
-            (ToolCallJson.ToolResult, _) or (_, ToolCallJson.Tool) when property.NameEquals(ToolCallJson.Content) => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Array,
-            (ToolCallJson.FunctionCallOutput, _) when property.NameEquals(ToolCallJson.Output) => property.Value.ValueKind == JsonValueKind.String,
-            _ => property.NameEquals(ToolCallJson.FunctionResponse) && property.Value.ValueKind == JsonValueKind.Object
+            (ToolCallJson.ToolResult, _) or (_, ToolCallJson.Tool) when property.NameEquals(ToolCallJson.Content) => property.Value.IsString || property.Value.IsArray,
+            (ToolCallJson.FunctionCallOutput, _) when property.NameEquals(ToolCallJson.Output) => property.Value.IsString,
+            _ => property.NameEquals(ToolCallJson.FunctionResponse) && property.Value.IsObject
         };
     }
 

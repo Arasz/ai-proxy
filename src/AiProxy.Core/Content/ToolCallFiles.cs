@@ -39,27 +39,14 @@ internal sealed class ToolCallFiles
 
     private void Visit(JsonElement element)
     {
-        switch (element.ValueKind)
+        if (element.IsObject)
         {
-            case JsonValueKind.Object:
-                Note(element);
-                foreach (var property in element.EnumerateObject())
-                {
-                    Visit(property.Value);
-                }
+            Note(element);
+        }
 
-                break;
-
-            case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray())
-                {
-                    Visit(item);
-                }
-
-                break;
-
-            default:
-                break;
+        foreach (var child in element.Children())
+        {
+            Visit(child);
         }
     }
 
@@ -78,17 +65,17 @@ internal sealed class ToolCallFiles
         }
 
         var calls = element.PropertyOrDefault(ToolCallJson.ToolCalls);
-        if (calls.ValueKind == JsonValueKind.Array)
+        if (calls.IsArray)
         {
             foreach (var call in calls.EnumerateArray())
             {
-                if (call.ValueKind != JsonValueKind.Object || call.StringProperty(ToolCallJson.Id) is not { } chatId)
+                if (!call.IsObject || call.StringProperty(ToolCallJson.Id) is not { } chatId)
                 {
                     continue;
                 }
 
                 var function = call.PropertyOrDefault(ToolCallJson.Function);
-                var path = function.ValueKind == JsonValueKind.Object
+                var path = function.IsObject
                     ? PathOf(function.StringProperty(ToolCallJson.Name), function.StringProperty(ToolCallJson.Arguments))
                     : null;
                 AddCall(chatId, path);
@@ -109,7 +96,7 @@ internal sealed class ToolCallFiles
 
     private static string? ResultId(JsonElement element)
     {
-        if (element.ValueKind != JsonValueKind.Object)
+        if (!element.IsObject)
         {
             return null;
         }
@@ -135,20 +122,13 @@ internal sealed class ToolCallFiles
             return null;
         }
 
-        try
-        {
-            using var document = JsonDocument.Parse(arguments);
-            return PathOf(name, document.RootElement);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
+        using var document = JsonDocument.TryParse(arguments);
+        return document is null ? null : PathOf(name, document.RootElement);
     }
 
     private static FileRead? PathOf(string? name, JsonElement input)
     {
-        if (!IsReadName(name) || input.ValueKind != JsonValueKind.Object)
+        if (!IsReadName(name) || !input.IsObject)
         {
             return null;
         }
@@ -158,12 +138,12 @@ internal sealed class ToolCallFiles
         var allowLarge = false;
         foreach (var property in input.EnumerateObject())
         {
-            if (PathKeys.Contains(property.Name) && property.Value.ValueKind == JsonValueKind.String)
+            if (PathKeys.Contains(property.Name) && property.Value.IsString)
             {
                 paths++;
                 path = property.Value.ReadString();
             }
-            else if (property.NameEquals(ToolCallJson.AllowLarge) && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            else if (property.NameEquals(ToolCallJson.AllowLarge) && property.Value.IsBoolean)
             {
                 allowLarge = property.Value.GetBoolean();
             }

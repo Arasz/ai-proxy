@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using AiProxy.Core.Json;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -100,7 +101,7 @@ public sealed partial class ContentDecompositor : IDecompositor
             var line = content[position..(lineEnd < 0 ? content.Length : lineEnd)];
             var trimmed = line.TrimStart();
 
-            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
+            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("```", StringComparison.Ordinal))
             {
                 var fenceEnd = FindFenceEnd(content, nextLine, trimmed[0]);
                 if (fenceEnd > 0)
@@ -190,7 +191,7 @@ public sealed partial class ContentDecompositor : IDecompositor
 
                 if (!previous.Structural && !span.Structural && previous.Type == span.Type && gap.IsWhiteSpace())
                 {
-                    merged[^1] = new Span(previous.Start, span.Start + span.Length - previous.Start, previous.Type, false);
+                    merged[^1] = previous with { Length = span.Start + span.Length - previous.Start, Structural = false };
                     continue;
                 }
             }
@@ -361,15 +362,8 @@ public sealed partial class ContentDecompositor : IDecompositor
 
     private static bool IsJson(string text)
     {
-        try
-        {
-            using var document = JsonDocument.Parse(text);
-            return document.RootElement.ValueKind != JsonValueKind.Undefined;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
+        using var document = JsonDocument.TryParse(text);
+        return document is not null;
     }
 
     private static bool IsXml(string text)
