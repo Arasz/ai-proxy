@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Json;
+using static AiProxy.Core.Content.Ccr.MessagesApi;
 
 namespace AiProxy.Core.Content.Ccr;
 
@@ -56,19 +57,19 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
         }
 
         var root = document.RootElement;
-        var response = root.TryGetProperty("stream", out var stream) && stream.ValueKind == JsonValueKind.True ? CcrResponse.Streamed : CcrResponse.Whole;
-        var tools = root.TryGetProperty("tools", out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0 ? CcrTools.Defined : CcrTools.None;
+        var response = root.TryGetProperty(Fields.Stream, out var stream) && stream.ValueKind == JsonValueKind.True ? CcrResponse.Streamed : CcrResponse.Whole;
+        var tools = root.TryGetProperty(Fields.Tools, out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0 ? CcrTools.Defined : CcrTools.None;
         var thread = CcrThread.None;
         string? previous = null;
-        if (root.TryGetProperty("thread", out var threadValue) && threadValue.ValueKind == JsonValueKind.Object)
+        if (root.TryGetProperty(Fields.Thread, out var threadValue) && threadValue.ValueKind == JsonValueKind.Object)
         {
-            thread = threadValue.StringProperty("type") switch
+            thread = threadValue.StringProperty(Fields.Type) switch
             {
-                "create" => CcrThread.Create,
-                "continue" => CcrThread.Continue,
+                ThreadTypes.Create => CcrThread.Create,
+                ThreadTypes.Continue => CcrThread.Continue,
                 _ => CcrThread.None,
             };
-            previous = threadValue.StringProperty("previous_message_id");
+            previous = threadValue.StringProperty(Fields.PreviousMessageId);
         }
 
         return new CcrRequest(response, tools, thread, previous);
@@ -86,7 +87,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
         {
             if (!inTools)
             {
-                if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1 && reader.ValueTextEquals("tools"u8))
+                if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1 && reader.ValueTextEquals(Fields.Tools))
                 {
                     reader.Read();
                     if (reader.TokenType != JsonTokenType.StartArray)
@@ -110,7 +111,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
                     count++;
                     break;
                 case JsonTokenType.PropertyName when reader.CurrentDepth == 3:
-                    nameIsNext = reader.ValueTextEquals("name"u8);
+                    nameIsNext = reader.ValueTextEquals(Fields.Name);
                     break;
                 case JsonTokenType.String when nameIsNext && reader.ValueTextEquals(CcrRetrieval.Name):
                     return null;
@@ -158,7 +159,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
                 continue;
             }
 
-            if (reader.CurrentDepth == 2 && parent is "thread" or "diagnostics" && reader.ValueTextEquals("previous_message_id"u8))
+            if (reader.CurrentDepth == 2 && parent is Fields.Thread or Fields.Diagnostics && reader.ValueTextEquals(Fields.PreviousMessageId))
             {
                 reader.Read();
                 if (reader.TokenType == JsonTokenType.String)

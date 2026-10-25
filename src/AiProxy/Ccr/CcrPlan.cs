@@ -1,6 +1,7 @@
 using AiProxy.Configuration;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
+using Microsoft.AspNetCore.Http;
 
 namespace AiProxy.Ccr;
 
@@ -35,8 +36,11 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     /// <summary>Forward as before.</summary>
     public static CcrPlan Forward { get; } = new(CcrAction.Forward, CcrMode.Off, "");
 
-    /// <summary>Refuse the request.</summary>
-    public static CcrPlan Refuse { get; } = new(CcrAction.Refuse, CcrMode.Off, "");
+    /// <summary>Why the ledger could not be read; set only on a refusal.</summary>
+    public Exception? Failure { get; private init; }
+
+    /// <summary>Refuse the request because the ledger read failed.</summary>
+    public static CcrPlan Refuse(Exception failure) => new(CcrAction.Refuse, CcrMode.Off, "") { Failure = failure };
 
     /// <summary>Relay a thread <c>create</c>.</summary>
     public static CcrPlan Create { get; } = new(CcrAction.RelayWithTool, CcrMode.Thread, "");
@@ -50,9 +54,6 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     /// <summary>Whether the proxy answers the client itself.</summary>
     public bool Relays => Action is CcrAction.RelayWithTool or CcrAction.RelayContinue;
 
-    /// <summary>Whether the ledger could not be read.</summary>
-    public bool LedgerUnreadable => Action == CcrAction.Refuse;
-
     /// <summary>Decides the plan of a request; a <c>continue</c> is looked up in the ledger whatever the settings, so a thread with hidden turns keeps working.</summary>
     public static async Task<CcrPlan> DecideAsync(
         CcrSettings settings,
@@ -63,7 +64,7 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         ReadOnlyMemory<byte> body,
         CancellationToken cancellationToken)
     {
-        if (dialect != Dialect.Anthropic || method != "POST" || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
+        if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
         {
             return Forward;
         }
@@ -87,7 +88,7 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            return Refuse;
+            return Refuse(exception);
         }
     }
 }

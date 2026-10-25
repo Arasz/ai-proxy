@@ -50,15 +50,15 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Contains("\"output_tokens\":10", client, StringComparison.Ordinal);
 
         Assert.Equal(2, upstream.Requests.Count);
-        var first = JsonNode.Parse(upstream.Requests[0].Body)!;
-        Assert.Equal(CcrRetrieval.Name, first["tools"]!.AsArray()[^1]!["name"]!.GetValue<string>());
-        Assert.StartsWith(CcrPreview.Marker, first["messages"]![0]!["content"]![0]!["content"]!.GetValue<string>(), StringComparison.Ordinal);
+        var first = Json(upstream.Requests[0].Body);
+        Assert.Equal(CcrRetrieval.Name, first.GetProperty("tools").EnumerateArray().Last().GetProperty("name").GetString());
+        Assert.StartsWith(CcrPreview.Marker, first.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("content").GetString(), StringComparison.Ordinal);
 
-        var followUp = JsonNode.Parse(upstream.Requests[1].Body)!["messages"]!.AsArray();
-        Assert.Equal(3, followUp.Count);
-        Assert.Equal("assistant", followUp[1]!["role"]!.GetValue<string>());
-        Assert.Equal("tu_r", followUp[1]!["content"]![1]!["id"]!.GetValue<string>());
-        var answer = followUp[2]!["content"]![0]!["content"]!.GetValue<string>();
+        var followUp = Json(upstream.Requests[1].Body).GetProperty("messages");
+        Assert.Equal(3, followUp.GetArrayLength());
+        Assert.Equal("assistant", followUp[1].GetProperty("role").GetString());
+        Assert.Equal("tu_r", followUp[1].GetProperty("content")[1].GetProperty("id").GetString());
+        var answer = followUp[2].GetProperty("content")[0].GetProperty("content").GetString();
         Assert.Contains("2\tstep 0002", answer, StringComparison.Ordinal);
         Assert.Contains("3\tstep 0003", answer, StringComparison.Ordinal);
         Assert.True(client.TrimEnd().EndsWith("data: {\"type\":\"message_stop\"}", StringComparison.Ordinal), "message_stop must be the last event");
@@ -87,21 +87,20 @@ public sealed class CcrRelayTests : IDisposable
             Assert.DoesNotContain("tu_c", client, StringComparison.Ordinal);
         }
 
-        var followUp = JsonNode.Parse(upstream.Requests[1].Body)!;
-        Assert.Equal("continue", followUp["thread"]!["type"]!.GetValue<string>());
-        Assert.Equal("msg_A", followUp["thread"]!["previous_message_id"]!.GetValue<string>());
-        Assert.Null(followUp["tools"]);
-        var results = followUp["messages"]!.AsArray().Single()!["content"]!.AsArray();
-        Assert.Equal(["tu_r", "tu_c"], results.Select(result => result!["tool_use_id"]!.GetValue<string>()));
-        Assert.True(results[1]!["is_error"]!.GetValue<bool>());
+        var followUp = Json(upstream.Requests[1].Body);
+        Assert.Equal("continue", followUp.GetProperty("thread").GetProperty("type").GetString());
+        Assert.Equal("msg_A", followUp.GetProperty("thread").GetProperty("previous_message_id").GetString());
+        Assert.False(followUp.TryGetProperty("tools", out _));
+        var results = Assert.Single(followUp.GetProperty("messages").EnumerateArray()).GetProperty("content");
+        Assert.Equal(["tu_r", "tu_c"], results.EnumerateArray().Select(result => result.GetProperty("tool_use_id").GetString()));
+        Assert.True(results[1].GetProperty("is_error").GetBoolean());
 
         using (var continued = await SendAsync(proxy, upstream, """{"model":"m","stream":true,"messages":[{"role":"user","content":"next"}],"thread":{"type":"continue","previous_message_id":"msg_A"}}"""))
         {
             Assert.Contains("next answer", await continued.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
         }
 
-        var next = JsonNode.Parse(upstream.Requests[2].Body)!;
-        Assert.Equal("msg_B", next["thread"]!["previous_message_id"]!.GetValue<string>());
+        Assert.Equal("msg_B", Json(upstream.Requests[2].Body).GetProperty("thread").GetProperty("previous_message_id").GetString());
     }
 
     [Fact]
@@ -191,6 +190,8 @@ public sealed class CcrRelayTests : IDisposable
             ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = Large }),
         }),
     };
+
+    private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement.Clone();
 
     private static Func<FakeUpstream, HttpContext, Task> Script(params string[] streams)
     {

@@ -14,7 +14,7 @@ public sealed class OriginalStoreTests : IDisposable
 
     public OriginalStoreTests()
     {
-        _store = new SqliteOriginalStore(new ContentStoreOptions(_path), _time);
+        _store = new SqliteOriginalStore(new ContentStoreOptions(_path), _time, Microsoft.Extensions.Logging.Abstractions.NullLogger<SqliteOriginalStore>.Instance);
     }
 
     public void Dispose()

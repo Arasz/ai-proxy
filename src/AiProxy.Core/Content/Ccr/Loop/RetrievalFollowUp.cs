@@ -1,5 +1,6 @@
-using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using static AiProxy.Core.Content.Ccr.MessagesApi;
 
 namespace AiProxy.Core.Content.Ccr.Loop;
 
@@ -10,28 +11,36 @@ public static class RetrievalFollowUp
     /// A thread follow-up: the forwarded request with its messages replaced by the tool results and the
     /// thread continued from the retrieving response. A <c>create</c> becomes a <c>continue</c> and drops its tools.
     /// </summary>
-    public static byte[] Thread(ReadOnlySpan<byte> forwarded, string previousMessageId, JsonArray toolResults)
+    public static byte[] Thread(ReadOnlySpan<byte> forwarded, string previousMessageId, IReadOnlyList<ToolResult> toolResults)
     {
-        var request = JsonNode.Parse(forwarded)!.AsObject();
-        request["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = toolResults });
-        request.Remove("tools");
-        request.Remove("tool_choice");
-        request["thread"] = new JsonObject { ["type"] = "continue", ["previous_message_id"] = previousMessageId };
-        if (request["diagnostics"] is JsonObject diagnostics && diagnostics.ContainsKey("previous_message_id"))
+        var request = RequestOf(forwarded);
+        request[Fields.Messages] = JsonSerializer.SerializeToNode(new[] { new Turn<IReadOnlyList<ToolResult>>(Roles.User, toolResults) }, MessagesApi.Json);
+        request.Remove(Fields.Tools);
+        request.Remove(Fields.ToolChoice);
+        request[Fields.Thread] = new JsonObject { [Fields.Type] = ThreadTypes.Continue, [Fields.PreviousMessageId] = previousMessageId };
+        if (request[Fields.Diagnostics] is JsonObject diagnostics && diagnostics.ContainsKey(Fields.PreviousMessageId))
         {
-            diagnostics["previous_message_id"] = previousMessageId;
+            diagnostics[Fields.PreviousMessageId] = previousMessageId;
         }
 
-        return Encoding.UTF8.GetBytes(request.ToJsonString(RetrievalJsonOptions.Relaxed));
+        return JsonSerializer.SerializeToUtf8Bytes(request, MessagesApi.Json);
     }
 
     /// <summary>A stateless follow-up: the forwarded request plus the assistant message as received and the tool results.</summary>
-    public static byte[] Stateless(ReadOnlySpan<byte> forwarded, JsonArray assistantContent, JsonArray toolResults)
+    public static byte[] Stateless(ReadOnlySpan<byte> forwarded, JsonArray assistantContent, IReadOnlyList<ToolResult> toolResults)
     {
-        var request = JsonNode.Parse(forwarded)!.AsObject();
-        var messages = request["messages"]!.AsArray();
-        messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = assistantContent });
-        messages.Add(new JsonObject { ["role"] = "user", ["content"] = toolResults });
-        return Encoding.UTF8.GetBytes(request.ToJsonString(RetrievalJsonOptions.Relaxed));
+        var request = RequestOf(forwarded);
+        if (request[Fields.Messages] is not JsonArray messages)
+        {
+            throw new InvalidOperationException("The forwarded request has no messages array to continue.");
+        }
+
+        messages.Add(JsonSerializer.SerializeToNode(new Turn<JsonArray>(Roles.Assistant, assistantContent), MessagesApi.Json));
+        messages.Add(JsonSerializer.SerializeToNode(new Turn<IReadOnlyList<ToolResult>>(Roles.User, toolResults), MessagesApi.Json));
+        return JsonSerializer.SerializeToUtf8Bytes(request, MessagesApi.Json);
     }
+
+    private static JsonObject RequestOf(ReadOnlySpan<byte> forwarded) =>
+        JsonNode.Parse(forwarded) as JsonObject
+        ?? throw new InvalidOperationException("The forwarded request is not a JSON object.");
 }

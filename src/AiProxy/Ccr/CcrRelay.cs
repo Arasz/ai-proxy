@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Ccr.Loop;
 using AiProxy.Hosting;
+using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
 
@@ -21,13 +23,20 @@ namespace AiProxy.Ccr;
 /// <param name="logger">Where each retrieval and failure is logged.</param>
 public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger) : IDisposable
 {
+    /// <summary>The header naming the id the original request is kept under.</summary>
+    public const string ContentIdHeader = "x-ai-proxy-content-id";
+
+    private const string EventStream = "text/event-stream";
+    private const string Chunked = "chunked";
+
     /// <summary>How often the client gets a <c>ping</c> while a follow-up has not answered yet.</summary>
     public static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(5);
 
     private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Host", "Content-Length", "Transfer-Encoding", "Connection", "Keep-Alive", "Proxy-Connection", "Proxy-Authorization",
-        "Proxy-Authenticate", "TE", "Trailer", "Upgrade", "Expect", "Accept-Encoding", "Content-Encoding",
+        HeaderNames.Host, HeaderNames.ContentLength, HeaderNames.TransferEncoding, HeaderNames.Connection, HeaderNames.KeepAlive,
+        HeaderNames.ProxyConnection, HeaderNames.ProxyAuthorization, HeaderNames.ProxyAuthenticate, HeaderNames.TE, HeaderNames.Trailer,
+        HeaderNames.Upgrade, HeaderNames.Expect, HeaderNames.AcceptEncoding, HeaderNames.ContentEncoding,
     };
 
     private readonly HttpClient _http = new(new SocketsHttpHandler
@@ -51,7 +60,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         var request = e.HttpClient.Request;
         var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name)).Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
         exchange.Relayed = true;
-        exchange.Response = ResponseBuffer.For("text/event-stream", null);
+        if (exchange.CaptureId is not null)
+        {
+            exchange.Response = ResponseBuffer.For(EventStream, null);
+        }
 
         HttpResponseMessage response;
         try
@@ -61,13 +73,13 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
             Log.UpstreamUnreachable(logger, request.RequestUri.Host, exception);
-            var error = Encoding.UTF8.GetBytes(SseEvent.Error("api_error", "ai-proxy could not reach the provider.").Data);
-            e.GenericResponse(error, HttpStatusCode.BadGateway, [new Titanium.Web.Proxy.Models.HttpHeader("Content-Type", "application/json")], closeServerConnection: true);
+            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, "ai-proxy could not reach the provider.").Data);
+            e.GenericResponse(error, HttpStatusCode.BadGateway, [new Titanium.Web.Proxy.Models.HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], closeServerConnection: true);
             return;
         }
 
         var answer = ClientResponse(response, exchange.ContentId);
-        var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == "text/event-stream";
+        var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
         var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http), exchange, headers, request.RequestUri, body, plan, originals);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), closeServerConnection: true);
     }
@@ -109,10 +121,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             }
         }
 
-        response.Headers.AddHeader("Transfer-Encoding", "chunked");
+        response.Headers.AddHeader(HeaderNames.TransferEncoding, Chunked);
         if (contentId is not null)
         {
-            response.Headers.AddHeader("x-ai-proxy-content-id", contentId);
+            response.Headers.AddHeader(ContentIdHeader, contentId);
         }
 
         return response;
@@ -163,7 +175,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 Log.LoopFailed(relay.Logger, uri.Host, exception);
-                await WriteAsync(SseEvent.Error("api_error", "ai-proxy lost the provider response.")).ConfigureAwait(false);
+                await WriteAsync(SseEvent.Error(MessagesApi.Errors.Api, "ai-proxy lost the provider response.")).ConfigureAwait(false);
             }
         };
 
@@ -223,7 +235,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
                 var results = loop.ToolResults(await AnswerAsync(loop).ConfigureAwait(false));
                 forwarded = plan.Mode == CcrMode.Thread
-                    ? RetrievalFollowUp.Thread(forwarded, loop.Round.MessageId!, results)
+                    ? RetrievalFollowUp.Thread(forwarded, loop.Round.MessageId, results)
                     : RetrievalFollowUp.Stateless(forwarded, loop.Round.Content(), results);
                 loop.NextRound();
                 response = await SendWithPingsAsync(forwarded).ConfigureAwait(false);
@@ -233,7 +245,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     {
                         var error = await response.Content.ReadAsStringAsync(_cancellation).ConfigureAwait(false);
                         Log.FollowUpRefused(relay.Logger, uri.Host, (int)response.StatusCode, error);
-                        await WriteAsync(IsJson(error) ? new SseEvent("error", error) : SseEvent.Error("api_error", $"The provider refused a retrieval follow-up with {(int)response.StatusCode}.")).ConfigureAwait(false);
+                        await WriteAsync(IsJson(error) ? new SseEvent(MessagesApi.Events.Error, error) : SseEvent.Error(MessagesApi.Errors.Api, $"The provider refused a retrieval follow-up with {(int)response.StatusCode}.")).ConfigureAwait(false);
                         loop.Failure("follow-up refused");
                         return;
                     }
@@ -243,19 +255,19 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         private async Task<bool> LinkAsync(RetrievalLoop loop)
         {
-            if (plan.Mode != CcrMode.Thread || loop.FirstMessageId is not { } first || loop.Round.MessageId is not { } last)
+            if (plan.Mode != CcrMode.Thread || loop.FirstMessageId.Length == 0 || loop.Round.MessageId.Length == 0)
             {
                 return true;
             }
 
             try
             {
-                await relay.Store.LinkThreadAsync(first, last, _cancellation).ConfigureAwait(false);
+                await relay.Store.LinkThreadAsync(loop.FirstMessageId, loop.Round.MessageId, _cancellation).ConfigureAwait(false);
                 return true;
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
             {
-                Log.LedgerWriteFailed(relay.Logger, first, exception);
+                Log.LedgerWriteFailed(relay.Logger, loop.FirstMessageId, exception);
                 return false;
             }
         }
@@ -279,7 +291,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             try
             {
                 using var arguments = JsonDocument.Parse(input);
-                id = arguments.RootElement.ValueKind == JsonValueKind.Object && arguments.RootElement.TryGetProperty("id", out var value) && value.ValueKind == JsonValueKind.String
+                id = arguments.RootElement.ValueKind == JsonValueKind.Object && arguments.RootElement.TryGetProperty(MessagesApi.Fields.Id, out var value) && value.ValueKind == JsonValueKind.String
                     ? value.GetString()
                     : null;
             }

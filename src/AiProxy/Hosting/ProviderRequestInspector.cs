@@ -73,13 +73,13 @@ public sealed partial class ProviderRequestInspector(
         if (compression.Compresses)
         {
             var plan = await ccr.DecideAsync(dialect, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
-            if (plan.LedgerUnreadable)
+            if (plan.Failure is { } failure)
             {
-                Log.LedgerLookupFailed(logger, request.RequestUri.Host);
+                Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
                 e.GenericResponse(
                     CcrPlan.LedgerUnavailable,
                     (System.Net.HttpStatusCode)529,
-                    [new Titanium.Web.Proxy.Models.HttpHeader("Content-Type", "application/json")],
+                    [new Titanium.Web.Proxy.Models.HttpHeader(Microsoft.Net.Http.Headers.HeaderNames.ContentType, System.Net.Mime.MediaTypeNames.Application.Json)],
                     closeServerConnection: true);
                 return;
             }
@@ -119,7 +119,7 @@ public sealed partial class ProviderRequestInspector(
 
         if (exchange.ContentId is { } contentId)
         {
-            response.Headers.AddHeader("x-ai-proxy-content-id", contentId);
+            response.Headers.AddHeader(CcrRelay.ContentIdHeader, contentId);
         }
 
         return Task.CompletedTask;
@@ -306,6 +306,6 @@ public sealed partial class ProviderRequestInspector(
         public static partial void ResponseCaptureFailed(ILogger logger, string providerHost, Exception exception);
 
         [LoggerMessage(EventId = 1405, Level = LogLevel.Error, Message = "The CCR thread ledger could not be read for a request to {ProviderHost}; the client was told to retry")]
-        public static partial void LedgerLookupFailed(ILogger logger, string providerHost);
+        public static partial void LedgerLookupFailed(ILogger logger, string providerHost, Exception exception);
     }
 }

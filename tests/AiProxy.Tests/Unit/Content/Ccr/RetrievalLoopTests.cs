@@ -53,10 +53,7 @@ public sealed class RetrievalLoopTests
         Assert.Equal(RetrievalStep.Retrieve, loop.Decide());
         var results = loop.ToolResults(new Dictionary<string, CcrRetrieval> { ["tu_r"] = new("the whole text", null) });
         Assert.Equal(2, results.Count);
-        Assert.Equal("the whole text", results[0]!["content"]!.GetValue<string>());
-        Assert.Null(results[0]!["is_error"]);
-        Assert.Equal("tu_c", results[1]!["tool_use_id"]!.GetValue<string>());
-        Assert.True(results[1]!["is_error"]!.GetValue<bool>());
+        Assert.Equal([new ToolResult("tu_r", "the whole text", ToolOutcome.Succeeded), ToolResult.Deferred("tu_c")], results);
 
         loop.NextRound();
         written.AddRange(await RunRound(loop, Sse.Message("msg_2", "end_turn", 5, Sse.Text("done"))));
@@ -66,11 +63,11 @@ public sealed class RetrievalLoopTests
         Assert.Single(written, sse => sse.Name == "message_start");
         Assert.Contains("msg_1", written.Single(sse => sse.Name == "message_start").Data, StringComparison.Ordinal);
         Assert.DoesNotContain(written, sse => sse.Data.Contains("tu_r", StringComparison.Ordinal) || sse.Data.Contains("tu_c", StringComparison.Ordinal));
-        var starts = written.Where(sse => sse.Name == "content_block_start").Select(sse => JsonNode.Parse(sse.Data)!["index"]!.GetValue<int>());
+        var starts = written.Where(sse => sse.Name == "content_block_start").Select(sse => Data(sse).GetProperty("index").GetInt32());
         Assert.Equal([0, 1, 2], starts);
-        var delta = JsonNode.Parse(written.Single(sse => sse.Name == "message_delta").Data)!;
-        Assert.Equal("end_turn", delta["delta"]!["stop_reason"]!.GetValue<string>());
-        Assert.Equal(15, delta["usage"]!["output_tokens"]!.GetValue<long>());
+        var delta = Data(written.Single(sse => sse.Name == "message_delta"));
+        Assert.Equal("end_turn", delta.GetProperty("delta").GetProperty("stop_reason").GetString());
+        Assert.Equal(15, delta.GetProperty("usage").GetProperty("output_tokens").GetInt64());
         Assert.Equal("msg_1", loop.FirstMessageId);
         Assert.Equal("msg_2", loop.Round.MessageId);
     }
@@ -148,11 +145,11 @@ public sealed class RetrievalLoopTests
     public void A_thread_follow_up_keeps_every_field_and_continues_from_the_retrieving_response()
     {
         const string forwarded = """{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"tools":[{"name":"Read"}],"messages":[{"role":"user","content":"old"}],"thread":{"type":"create"},"diagnostics":{"previous_message_id":"msg_0"},"metadata":{"user_id":"u"}}""";
-        var results = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "tu_r", ["content"] = "zażółć <x>" });
+        ToolResult[] results = [new("tu_r", "zażółć <x>", ToolOutcome.Succeeded), ToolResult.Deferred("tu_c")];
 
-        var body = JsonNode.Parse(RetrievalFollowUp.Thread(Encoding.UTF8.GetBytes(forwarded), "msg_1", results))!;
+        var body = Encoding.UTF8.GetString(RetrievalFollowUp.Thread(Encoding.UTF8.GetBytes(forwarded), "msg_1", results));
 
-        Assert.Equal("""{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"zażółć <x>"}]}],"thread":{"type":"continue","previous_message_id":"msg_1"},"diagnostics":{"previous_message_id":"msg_1"},"metadata":{"user_id":"u"}}""", body.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        Assert.Equal($$$"""{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"zażółć <x>"},{"type":"tool_result","tool_use_id":"tu_c","content":"{{{RetrievalLoop.DeferredCall}}}","is_error":true}]}],"thread":{"type":"continue","previous_message_id":"msg_1"},"diagnostics":{"previous_message_id":"msg_1"},"metadata":{"user_id":"u"}}""", body);
     }
 
     [Fact]
@@ -160,9 +157,9 @@ public sealed class RetrievalLoopTests
     {
         const string forwarded = """{"model":"m","messages":[{"role":"user","content":"q"}],"tools":[{"name":"Read"}]}""";
 
-        var body = Encoding.UTF8.GetString(RetrievalFollowUp.Stateless(Encoding.UTF8.GetBytes(forwarded), [new JsonObject { ["type"] = "text", ["text"] = "a" }], [new JsonObject { ["type"] = "tool_result" }]));
+        var body = Encoding.UTF8.GetString(RetrievalFollowUp.Stateless(Encoding.UTF8.GetBytes(forwarded), [new JsonObject { ["type"] = "text", ["text"] = "a" }], [new ToolResult("tu_r", "b", ToolOutcome.Succeeded)]));
 
-        Assert.Equal("""{"model":"m","messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"text","text":"a"}]},{"role":"user","content":[{"type":"tool_result"}]}],"tools":[{"name":"Read"}]}""", body);
+        Assert.Equal("""{"model":"m","messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"text","text":"a"}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"b"}]}],"tools":[{"name":"Read"}]}""", body);
     }
 
     private static async Task<List<SseEvent>> RunRound(RetrievalLoop loop, string wire)
@@ -175,6 +172,8 @@ public sealed class RetrievalLoopTests
 
         return written;
     }
+
+    private static JsonElement Data(SseEvent sse) => JsonDocument.Parse(sse.Data).RootElement.Clone();
 
     private static string Wire(IEnumerable<SseEvent> events) => string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
 
