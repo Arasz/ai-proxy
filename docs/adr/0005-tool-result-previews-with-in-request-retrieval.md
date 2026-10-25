@@ -1,7 +1,7 @@
 # 0005: Tool result previews with retrieval answered inside the request
 
 Date: 2026-10-25
-Status: Draft
+Status: Accepted (owner, 2026-10-25)
 
 ## Context
 
@@ -76,7 +76,7 @@ When an upstream response calls `proxy_retrieve`, the host answers every such ca
 
 If the same message also calls client tools, those are not passed to the client. Each gets a tool result `is_error: true` saying it was not run and should be issued again after the retrieved text is read. The model re-issues them in the next response, which the client receives. This needs no state across client requests.
 
-When this happens (owner question O7). It happens whenever the model makes parallel tool calls: one assistant message carries `proxy_retrieve` next to a client tool, for example a retrieval of a previewed test log plus a `Read` of the file the log names. Claude Code allows parallel calls. None of the 11,089 Anthropic requests in `~/.ai-proxy/capture.db` (read 2026-10-25) sets `tool_choice.disable_parallel_tool_use`. Of the 1,340 distinct assistant messages with tool calls, 117 (8.7%) carry two or more calls, and 80 (6.0%) mix two different tools, most often `Bash` with `Write` or `Edit`. So a mixed retrieving message is a normal case, not an edge case: the expected rate is the share of preview-reading turns that also act, on the order of the 6% seen for mixed tools today [INFERRED; no CCR traffic exists yet].
+When this happens (owner question O7; owner ruled option A on 2026-10-25: the client call gets `is_error` and is re-issued, as above). It happens whenever the model makes parallel tool calls: one assistant message carries `proxy_retrieve` next to a client tool, for example a retrieval of a previewed test log plus a `Read` of the file the log names. Claude Code allows parallel calls. None of the 11,089 Anthropic requests in `~/.ai-proxy/capture.db` (read 2026-10-25) sets `tool_choice.disable_parallel_tool_use`. Of the 1,340 distinct assistant messages with tool calls, 117 (8.7%) carry two or more calls, and 80 (6.0%) mix two different tools, most often `Bash` with `Write` or `Edit`. So a mixed retrieving message is a normal case, not an edge case: the expected rate is the share of preview-reading turns that also act, on the order of the 6% seen for mixed tools today [INFERRED; no CCR traffic exists yet].
 
 The loop answers at most three rounds. A fourth call gets `limit_reached`. If the model still calls after that, the client gets an error. That bounds a client request at five upstream calls.
 
@@ -96,7 +96,7 @@ For a stateless client every tool result is re-previewed on every send, identica
 
 The other providers, for when their loops exist. OpenAI appends to `tools` and adds no `prompt_cache_breakpoint`, paying a one-time 1.25x write on GPT-5.6 and later and none before it. Gemini appends a function declaration at the end of `tools` (assumption: the API accepts it next to the client's tools), with no write fee, and requests that use `cachedContent` get no previews, because their tools are immutable in the cache object. OpenRouter follows the upstream named by the model prefix; tools are not in its sticky-routing hash, so injection does not move routing. Router and unknown models get the fallback, which means no CCR.
 
-Expected compression under the fallback (owner question F13). The fallback (cache strategies F13) forbids touching `tools`, so `proxy_retrieve` cannot be injected: a fallback provider gets no previews. It still gets every pure per-region reducer, because a tool result rewritten as a function of its own bytes is exactly what F13 rule 2 allows. Tool-result compression on a fallback provider is therefore the shipped-rules column of the scoring record, the same as on a known provider without CCR. Per kind, at the 1 s budget, with every answer kept:
+Expected compression under the fallback (owner question F13; owner approved the fallback as stated on 2026-10-25). The fallback (cache strategies F13) forbids touching `tools`, so `proxy_retrieve` cannot be injected: a fallback provider gets no previews. It still gets every pure per-region reducer, because a tool result rewritten as a function of its own bytes is exactly what F13 rule 2 allows. Tool-result compression on a fallback provider is therefore the shipped-rules column of the scoring record, the same as on a known provider without CCR. Per kind, at the 1 s budget, with every answer kept:
 
 | kind | fallback (shipped rules, no CCR) | known provider with CCR (rtk CCR, retrieval allowed) |
 |---|---|---|

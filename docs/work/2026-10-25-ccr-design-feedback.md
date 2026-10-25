@@ -154,5 +154,10 @@ _(none)_
 
   > we ship if we are at least on par with rtk but our goal is to improve
 
+## Follow-up rulings (2026-10-25, in chat)
+
+- **O7** — APPROVE option A. Asked when mixed messages happen: answered in ADR 0005 (parallel tool calls; 0 of 11,089 captured requests disable them, 6.0% of tool-call messages mix tools). Options shown in the review page `https://claude.ai/artifact/KzzhzfhgfmxJDcFfEcrofN`.
+- **F13** — APPROVE option A (the fallback as stated: per-region reducers, no CCR, no tool or marker changes). Expected compression answered in ADR 0005: code 18%, json 30%, build 26%, test 25%, log 24.6%, prose and listing 0%.
+- **O4** — the note stands as the ship floor (at least on par with rtk CCR with retrieval); no separate verdict.
 
 <!-- end refinement feedback -->
