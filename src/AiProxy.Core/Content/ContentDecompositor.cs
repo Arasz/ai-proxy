@@ -38,7 +38,9 @@ public sealed partial class ContentDecompositor : IDecompositor
     /// <inheritdoc />
     public Decomposition Decompose(string content, string requestId, string? filePath = null)
     {
-        var spans = SourceCodeFiles.IsSourceCode(filePath) && content.Trim().Length > 0
+        // Only a whole file named by its extension carries a language; a guessed kind never does.
+        var language = content.Trim().Length > 0 ? SourceCodeFiles.LanguageOf(filePath) : null;
+        var spans = language is not null
             ? [new Span(0, content.Length, ContentType.SourceCode, true)]
             : FindParts(content);
         var parts = new List<ContentPart>(spans.Count);
@@ -51,7 +53,7 @@ public sealed partial class ContentDecompositor : IDecompositor
             template.Append(content, position, span.Start - position);
             chunkId++;
 
-            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length), filePath);
+            var part = new ContentPart(requestId, chunkId, span.Type, content.Substring(span.Start, span.Length), filePath, language);
             parts.Add(part);
             template.Append(Placeholder(span.Type, chunkId));
 

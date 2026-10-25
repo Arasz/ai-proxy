@@ -59,6 +59,44 @@ public sealed class ContentDecompositorFilePathTests
         Assert.All(decomposition.Parts, part => Assert.Equal("notes.txt", part.FilePath));
     }
 
+    [Theory]
+    [InlineData("src/Program.cs", "csharp")]
+    [InlineData("src/PROGRAM.CS", "csharp")]
+    [InlineData("tools/run.py", "python")]
+    [InlineData("web/app.js", "javascript")]
+    [InlineData("web/app.mjs", "javascript")]
+    [InlineData("web/app.cjs", "javascript")]
+    [InlineData("web/app.ts", "typescript")]
+    [InlineData("web/App.tsx", "tsx")]
+    public void A_source_code_file_names_the_language_of_its_extension(string path, string language)
+    {
+        var part = Assert.Single(Decompositor.Decompose(Text, "request", path).Parts);
+
+        Assert.Equal(language, part.Language);
+    }
+
+    [Theory]
+    [InlineData("notes.md")]
+    [InlineData(null)]
+    public void A_fenced_csharp_block_outside_a_source_file_is_source_code_with_no_language(string? path)
+    {
+        const string notes = """
+            Some notes.
+
+            ```csharp
+            public sealed class A
+            {
+            }
+            ```
+            """;
+
+        var decomposition = Decompositor.Decompose(notes, "request", path);
+
+        var code = Assert.Single(decomposition.Parts, part => part.Type == ContentType.SourceCode);
+        Assert.Null(code.Language);
+        Assert.All(decomposition.Parts, part => Assert.Null(part.Language));
+    }
+
     [Fact]
     public void A_source_code_file_keeps_its_place_in_the_template()
     {
