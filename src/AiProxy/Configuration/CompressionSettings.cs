@@ -11,6 +11,9 @@ public sealed record CompressionSettings
     /// <summary>Where the store keeps what the proxy compressed; blank means <see cref="ContentStoreOptions.DefaultDatabasePath"/>.</summary>
     public string? Database { get; init; }
 
+    /// <summary>Whether a whole C# file a tool call read goes out as its code view, with its original kept for <c>proxy_retrieve</c> (environment form <c>PROXY__COMPRESSION__CODEVIEWS</c>).</summary>
+    public bool CodeViews { get; init; } = true;
+
     /// <summary>The smallest part that is compressed, when the operator set one.</summary>
     public int? Minimum { get; init; }
 

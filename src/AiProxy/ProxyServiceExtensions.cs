@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using AiProxy.Ccr;
+using AiProxy.Code;
 using AiProxy.Configuration;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Hosting;
 using AiProxy.Storage;
@@ -110,6 +112,11 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton<ICompressionHandler, XmlCompressionHandler>();
             services.AddSingleton<ICompressionHandler, TomlCompressionHandler>();
             services.AddSingleton<ICompressionHandler, MarkdownCompressionHandler>();
+            if (settings.CodeViews)
+            {
+                services.AddSingleton<ICodeLexer, CSharpCodeLexer>();
+            }
+
             services.AddSingleton<ICompressionHandler, SourceCodeCompressionHandler>();
             services.AddSingleton<ICompressionHandler, ProseCompressionHandler>();
             services.AddSingleton<ICompressionHandler, DirectoryListingCompressionHandler>();
