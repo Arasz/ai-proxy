@@ -55,24 +55,27 @@ public sealed partial class JavaScriptCodeLexer : ICodeLexer
     public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, _language, Grammar, IsKeyword);
 
     /// <summary>The JavaScript-family mapping, extended with a dialect's identifier and literal node types.</summary>
-    internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, Dictionary<string, string?> strings)
+    internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, IReadOnlyDictionary<string, string?> strings)
     {
-        strings["string"] = null;
-        strings["template_string"] = "template_substitution";
-        strings["regex"] = null;
-        strings["jsx_text"] = null;
-        strings["html_character_reference"] = null;
+        var literals = new Dictionary<string, string?>(strings)
+        {
+            ["string"] = null,
+            ["template_string"] = "template_substitution",
+            ["regex"] = null,
+            ["jsx_text"] = null,
+            ["html_character_reference"] = null,
+        };
         var identifierTypes = identifiers.ToFrozenSet();
         return new TreeSitterGrammar(
-            strings.ToFrozenDictionary(),
-            ["comment", "html_comment"],
-            identifierTypes,
-            IsJsxName,
-            node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
-            static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
-            true,
-            static _ => null,
-            static (comment, _) => ToolDirective().IsMatch(comment));
+            Strings: literals.ToFrozenDictionary(),
+            Comments: ["comment", "html_comment"],
+            Identifiers: identifierTypes,
+            IsFixedName: IsJsxName,
+            IsUnsupported: node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
+            IsImport: static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
+            ImportNeedsTerminator: true,
+            ValueText: static _ => null,
+            IsDirective: static (comment, _) => ToolDirective().IsMatch(comment));
     }
 
     private static bool IsJsxName(Node node)

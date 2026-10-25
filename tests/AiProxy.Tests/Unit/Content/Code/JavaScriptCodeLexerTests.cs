@@ -134,4 +134,16 @@ public sealed class JavaScriptCodeLexerTests
     [InlineData(null, false)]
     public void Supports_javascript_paths(string? path, bool expected) =>
         Assert.Equal(expected, new JavaScriptCodeLexer().SupportsPath(path));
+
+    [Fact]
+    public void Dialect_grammar_leaves_its_literal_map_untouched()
+    {
+        var strings = new Dictionary<string, string?> { ["template_literal_type"] = "template_type" };
+
+        var grammar = JavaScriptCodeLexer.Script(["identifier"], strings);
+
+        Assert.Equal(["template_literal_type"], strings.Keys);
+        Assert.Equal("template_type", grammar.Strings["template_literal_type"]);
+        Assert.Equal("template_substitution", grammar.Strings["template_string"]);
+    }
 }

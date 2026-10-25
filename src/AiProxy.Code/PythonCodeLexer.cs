@@ -14,15 +14,15 @@ public sealed partial class PythonCodeLexer : ICodeLexer
     private readonly TreeSitterLanguage _language;
 
     private static readonly TreeSitterGrammar Grammar = new(
-        new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
-        ["comment"],
-        ["identifier"],
-        static _ => false,
-        static node => node.Type == "interpolation" && node.Children.Any(static child => !child.IsNamed && child.Type == "="),
-        static node => node.Type is "import_statement" or "import_from_statement",
-        false,
-        static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),
-        static (comment, line) => line == 1 && comment.StartsWith("#!", StringComparison.Ordinal)
+        Strings: new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
+        Comments: ["comment"],
+        Identifiers: ["identifier"],
+        IsFixedName: static _ => false,
+        IsUnsupported: static node => node.Type == "interpolation" && node.Children.Any(static child => !child.IsNamed && child.Type == "="),
+        IsImport: static node => node.Type is "import_statement" or "import_from_statement",
+        ImportNeedsTerminator: false,
+        ValueText: static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),
+        IsDirective: static (comment, line) => line == 1 && comment.StartsWith("#!", StringComparison.Ordinal)
             || line <= 2 && EncodingCookie().IsMatch(comment)
             || ToolDirective().IsMatch(comment));
 
