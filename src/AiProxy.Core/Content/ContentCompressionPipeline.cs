@@ -3,6 +3,7 @@ using System.Text.Json;
 using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Core.Content.Handlers;
 
 namespace AiProxy.Core.Content;
 
@@ -34,6 +35,9 @@ public sealed class ContentCompressionPipeline(
     /// <summary>The chunk id a failed CCR keep is reported under, since it belongs to a region rather than a part.</summary>
     public const int RegionChunkId = -1;
 
+    /// <summary>The path a failure is reported under when a code view's original could not be kept, so the region went out unchanged.</summary>
+    public const string OriginalNotKeptPath = "ccr.original-not-kept";
+
     /// <inheritdoc />
     public async ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
     {
@@ -61,7 +65,14 @@ public sealed class ContentCompressionPipeline(
 
         foreach (var region in WithoutOverlaps(regions))
         {
-            var reduced = await ReduceAsync(region, requestId, parts, failures, stages, cancellationToken);
+            var before = parts.Count;
+            var reduced = await ReduceAsync(region, requestId, request.Ccr, parts, failures, stages, cancellationToken);
+            if (reduced is not null && !await KeepViewsAsync(parts.Skip(before).ToArray(), request.Ccr, originals, failures, cancellationToken))
+            {
+                parts.RemoveRange(before, parts.Count - before);
+                continue;
+            }
+
             var preview = await PreviewAsync(region, reduced ?? region.Text, request.Ccr, failures, stages, cancellationToken);
             if (preview is not null)
             {
@@ -190,9 +201,34 @@ public sealed class ContentCompressionPipeline(
         }
     }
 
+    /// <summary>Keeps the original of every code view under the id its hint names; false when one could not be kept.</summary>
+    private async ValueTask<bool> KeepViewsAsync(
+        IReadOnlyList<CompressedPart> reduced,
+        CcrMode mode,
+        Dictionary<string, string> originals,
+        List<PartFailure> failures,
+        CancellationToken cancellationToken)
+    {
+        foreach (var part in reduced.Where(static part => part.Path == SourceCodeCompressionHandler.CodeViewPath))
+        {
+            try
+            {
+                originals[await previewer.KeepAsync(part.OriginalText, mode, cancellationToken).ConfigureAwait(false)] = part.OriginalText;
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                failures.Add(new PartFailure(part.ChunkId, OriginalNotKeptPath, exception));
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private async ValueTask<string?> ReduceAsync(
         ContentRegion region,
         string requestId,
+        CcrMode mode,
         List<CompressedPart> parts,
         List<PartFailure> failures,
         StageTimings stages,
@@ -221,7 +257,7 @@ public sealed class ContentCompressionPipeline(
             started = time.GetTimestamp();
             try
             {
-                compressed = await executor.ExecuteAsync(part, cancellationToken).ConfigureAwait(false);
+                compressed = await executor.ExecuteAsync(part with { Ccr = mode }, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {

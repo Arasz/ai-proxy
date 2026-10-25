@@ -13,7 +13,7 @@ public sealed class ContentRoutingTableTests
         new XmlCompressionHandler(),
         new TomlCompressionHandler(),
         new MarkdownCompressionHandler(),
-        new SourceCodeCompressionHandler(),
+        new SourceCodeCompressionHandler([]),
         new ProseCompressionHandler(),
         new DirectoryListingCompressionHandler(),
         new ShellTranscriptCompressionHandler(),
@@ -86,7 +86,7 @@ public sealed class ContentRoutingTableTests
             (ContentType.Log, new LogCompressionHandler()),
             (ContentType.Toml, new TomlCompressionHandler()),
             (ContentType.Markdown, new MarkdownCompressionHandler()),
-            (ContentType.SourceCode, new SourceCodeCompressionHandler()),
+            (ContentType.SourceCode, new SourceCodeCompressionHandler([])),
             (ContentType.Prose, new ProseCompressionHandler()),
             (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler()),
         };

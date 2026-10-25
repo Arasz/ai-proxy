@@ -8,7 +8,7 @@ public sealed class TextCompressionHandlerTests
 {
     private static readonly TomlCompressionHandler Toml = new();
     private static readonly MarkdownCompressionHandler Markdown = new();
-    private static readonly SourceCodeCompressionHandler SourceCode = new();
+    private static readonly SourceCodeCompressionHandler SourceCode = new([]);
     private static readonly ProseCompressionHandler Prose = new();
     private static readonly DirectoryListingCompressionHandler Listing = new();
     private static readonly PassThroughCompressionHandler PassThrough = new();
@@ -141,7 +141,7 @@ public sealed class TextCompressionHandlerTests
             (ContentType.Xml, new XmlCompressionHandler(), "<root>\n  <a>1</a>\n</root>", "xml.compact"),
             (ContentType.Toml, new TomlCompressionHandler(), "key = \"value\"", "toml.strip-comments"),
             (ContentType.Markdown, new MarkdownCompressionHandler(), "# Title", "markdown.strip-comments"),
-            (ContentType.SourceCode, new SourceCodeCompressionHandler(), "var a = 1;", "sourcecode.blank-lines"),
+            (ContentType.SourceCode, new SourceCodeCompressionHandler([]), "var a = 1;", "sourcecode.blank-lines"),
             (ContentType.Prose, new ProseCompressionHandler(), "a line", "prose.dedupe"),
             (ContentType.Log, new LogCompressionHandler(), "2026-03-12 10:00:00 INFO a", "log.signal-filter"),
             (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler(), "$ echo hi", "shell.log-rules"),
@@ -174,7 +174,7 @@ public sealed class TextCompressionHandlerTests
         {
             ContentType.Toml => new TomlCompressionHandler(),
             ContentType.Markdown => new MarkdownCompressionHandler(),
-            ContentType.SourceCode => new SourceCodeCompressionHandler(),
+            ContentType.SourceCode => new SourceCodeCompressionHandler([]),
             ContentType.Prose => new ProseCompressionHandler(),
             ContentType.DirectoryListing => new DirectoryListingCompressionHandler(),
             ContentType.Unknown => new PassThroughCompressionHandler(),
@@ -191,7 +191,7 @@ public sealed class TextCompressionHandlerTests
     {
         Assert.True(new TomlCompressionHandler().CanHandle(ContentType.Toml));
         Assert.True(new MarkdownCompressionHandler().CanHandle(ContentType.Markdown));
-        Assert.True(new SourceCodeCompressionHandler().CanHandle(ContentType.SourceCode));
+        Assert.True(new SourceCodeCompressionHandler([]).CanHandle(ContentType.SourceCode));
         Assert.True(new ProseCompressionHandler().CanHandle(ContentType.Prose));
         Assert.True(new DirectoryListingCompressionHandler().CanHandle(ContentType.DirectoryListing));
         Assert.True(new PassThroughCompressionHandler().CanHandle(ContentType.Unknown));
