@@ -29,8 +29,8 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
 
         return request.Mode switch
         {
-            "lines" => AnswerLines(header, lines, request.Start!.Value, request.End!.Value, options),
-            "pattern" => AnswerPattern(header, lines, request.Pattern!, request.Context, options),
+            RetrievalJson.LinesMode => AnswerLines(header, lines, request.Start!.Value, request.End!.Value, options),
+            RetrievalJson.PatternMode => AnswerPattern(header, lines, request.Pattern!, request.Context, options),
             _ => new CcrRetrieval(header + "\n" + original, null)
         };
     }
