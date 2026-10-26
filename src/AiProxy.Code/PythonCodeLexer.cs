@@ -18,7 +18,7 @@ public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguag
         Comments: ["comment"],
         Identifiers: ["identifier"],
         IsFixedName: static _ => false,
-        IsUnsupported: static node => node.Type == "interpolation" && node.Children.Any(static child => !child.IsNamed && child.Type == "="),
+        IsUnsupported: static node => node.Type == "interpolation" && node.Children.Any(static child => child is { IsNamed: false, Type: "=" }),
         IsImport: static node => node.Type is "import_statement" or "import_from_statement",
         ImportNeedsTerminator: false,
         ValueText: static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),

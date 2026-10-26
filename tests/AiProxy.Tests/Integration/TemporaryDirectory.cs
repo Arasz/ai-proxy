@@ -6,7 +6,7 @@ internal sealed class TemporaryDirectory : IDisposable
     /// <summary>Creates the directory path; the directory itself is created by whoever uses it.</summary>
     public TemporaryDirectory()
     {
-        Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ai-proxy-tests", Guid.NewGuid().ToString("N"));
+        Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
     }
 
     /// <summary>The absolute directory path.</summary>

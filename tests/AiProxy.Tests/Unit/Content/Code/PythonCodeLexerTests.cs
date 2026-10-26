@@ -16,8 +16,8 @@ public sealed class PythonCodeLexerTests
         var result = new PythonCodeLexer().Lex(source);
 
         LexedSource.AssertCovers(source, result);
-        Assert.Contains(result.Tokens, static token => token.Kind == CodeTokenKind.NewLine && token.Text == "\r\n");
-        Assert.Contains(result.Tokens, static token => token.Kind == CodeTokenKind.Whitespace && token.Text == "    ");
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.NewLine, Text: "\r\n" });
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Whitespace, Text: "    " });
         Assert.Equal(5, LexedSource.Single(new PythonCodeLexer().Lex(source), CodeTokenKind.Comment, "# trailing").Line);
     }
 

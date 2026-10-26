@@ -31,7 +31,7 @@ public sealed class RequestCaptureTests : IDisposable
 
     private const int CaptureFailedEventId = 1403;
 
-    private readonly string _contentDatabasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.NewGuid():N}.db");
+    private readonly string _contentDatabasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {

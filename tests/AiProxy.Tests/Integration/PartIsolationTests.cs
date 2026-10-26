@@ -30,7 +30,7 @@ public sealed class PartIsolationTests : IDisposable
         the line after it
         """;
 
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-isolation-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-isolation-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {
