@@ -1,15 +1,13 @@
 using System.Collections.Frozen;
 using AiProxy.Core.Content.Code;
 using TreeSitter;
+using Microsoft.Extensions.Logging;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans TypeScript with the Tree-sitter grammar; <c>.tsx</c> paths use the TSX grammar.</summary>
 public sealed class TypeScriptCodeLexer(TreeSitterLanguage typeScript, TreeSitterLanguage tsx) : ICodeLexer
 {
-    private static readonly TreeSitterLanguage TypeScript = new("TypeScript");
-    private static readonly TreeSitterLanguage Tsx = new("Tsx");
-
     private static readonly TreeSitterGrammar Grammar = JavaScriptCodeLexer.Script(
         ["identifier", "property_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern", "statement_identifier", "type_identifier"],
         new Dictionary<string, string?> { ["template_literal_type"] = "template_type" });
@@ -25,7 +23,15 @@ public sealed class TypeScriptCodeLexer(TreeSitterLanguage typeScript, TreeSitte
 
     /// <summary>Creates a lexer on the bundled TypeScript and TSX grammars.</summary>
     public TypeScriptCodeLexer()
-        : this(TypeScript, Tsx)
+        : this(new TreeSitterLanguage("TypeScript"), new TreeSitterLanguage("Tsx"))
+    {
+    }
+
+    /// <summary>Creates a lexer whose native grammar load failures are reported to the application logger.</summary>
+    public TypeScriptCodeLexer(ILoggerFactory loggerFactory)
+        : this(
+            new TreeSitterLanguage("TypeScript", loggerFactory.CreateLogger<TreeSitterLanguage>()),
+            new TreeSitterLanguage("Tsx", loggerFactory.CreateLogger<TreeSitterLanguage>()))
     {
     }
 

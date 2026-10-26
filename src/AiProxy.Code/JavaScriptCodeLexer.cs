@@ -2,14 +2,13 @@ using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
 using TreeSitter;
+using Microsoft.Extensions.Logging;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans JavaScript and JSX with the Tree-sitter grammar; template text is string, <c>${}</c> is code.</summary>
 public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : ICodeLexer
 {
-    private static readonly TreeSitterLanguage JavaScript = new("JavaScript");
-
     /// <summary>Reserved words, contextual keywords and globals that change meaning when renamed.</summary>
     internal static readonly FrozenSet<string> Keywords =
     [
@@ -32,7 +31,13 @@ public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : I
 
     /// <summary>Creates a lexer on the bundled JavaScript grammar.</summary>
     public JavaScriptCodeLexer()
-        : this(JavaScript)
+        : this(new TreeSitterLanguage("JavaScript"))
+    {
+    }
+
+    /// <summary>Creates a lexer whose native grammar load failures are reported to the application logger.</summary>
+    public JavaScriptCodeLexer(ILoggerFactory loggerFactory)
+        : this(new TreeSitterLanguage("JavaScript", loggerFactory.CreateLogger<TreeSitterLanguage>()))
     {
     }
 

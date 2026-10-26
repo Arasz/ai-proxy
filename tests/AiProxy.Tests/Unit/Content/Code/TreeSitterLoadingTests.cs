@@ -1,5 +1,7 @@
 using AiProxy.Code;
+using AiProxy.Tests.Integration;
 using AiProxy.Core.Content.Code;
+using Microsoft.Extensions.Logging;
 using TreeSitter;
 
 namespace AiProxy.Tests.Unit.Content.Code;
@@ -51,5 +53,19 @@ public sealed class TreeSitterLoadingTests
         Assert.False(reduced.Changed);
         Assert.Equal(source, reduced.Text);
         Assert.Null(missing.Value);
+    }
+
+    [Fact]
+    public void A_grammar_load_failure_is_logged_once()
+    {
+        using var provider = new RecordingLoggerProvider();
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(provider));
+        var missing = new TreeSitterLanguage("NoSuchGrammar", loggerFactory.CreateLogger<TreeSitterLanguage>());
+
+        Assert.Null(missing.Value);
+        Assert.Null(missing.Value);
+        var entry = Assert.Single(provider.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal(1, entry.EventId);
     }
 }

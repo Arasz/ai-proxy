@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
 using TreeSitter;
+using Microsoft.Extensions.Logging;
 
 namespace AiProxy.Code;
 
@@ -10,8 +11,6 @@ namespace AiProxy.Code;
 public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICodeLexer
 {
     private const string PackageInit = "__init__.py";
-
-    private static readonly TreeSitterLanguage Python = new("Python");
 
     private static readonly TreeSitterGrammar Grammar = new(
         Strings: new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
@@ -55,7 +54,13 @@ public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICode
 
     /// <summary>Creates a lexer on the bundled Python grammar.</summary>
     public PythonCodeLexer()
-        : this(Python)
+        : this(new TreeSitterLanguage("Python"))
+    {
+    }
+
+    /// <summary>Creates a lexer whose native grammar load failures are reported to the application logger.</summary>
+    public PythonCodeLexer(ILoggerFactory loggerFactory)
+        : this(new TreeSitterLanguage("Python", loggerFactory.CreateLogger<TreeSitterLanguage>()))
     {
     }
 
