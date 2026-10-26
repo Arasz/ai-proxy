@@ -42,22 +42,50 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     {
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
-        var rows = await connection.QueryAsync<Row>(new CommandDefinition(
-            "SELECT kind AS Kind,method AS Method,rule AS Rule,layer AS Layer,pipeline AS Pipeline,payload AS Payload FROM gain_event WHERE " + Predicate,
-            Parameters(query), cancellationToken: cancellationToken));
-        var requests = new List<GainHistoryEntry>();
-        var failures = new List<GainFailure>();
-        var recalls = new List<GainRecallEvent>();
-        foreach (var row in rows)
+        connection.CreateCollation("ordinal", string.CompareOrdinal);
+        using var transaction = connection.BeginTransaction(deferred: true);
+        var parameters = Parameters(query);
+        var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
+            AggregateSql, parameters, transaction, cancellationToken: cancellationToken))).ToArray();
+        var history = await DetailsAsync<GainHistoryEntry>(connection, transaction, parameters, Kinds.Request,
+            "at DESC,id COLLATE ordinal,sequence", cancellationToken);
+        var failures = await DetailsAsync<GainFailure>(connection, transaction, parameters, Kinds.Failure,
+            "at DESC,sequence", cancellationToken);
+        var recalls = await DetailsAsync<GainRecall>(connection, transaction, parameters, Kinds.Recall,
+            "at DESC,sequence", cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var attributions = new[] { "method", "rule", "layer", "pipeline" }.SelectMany(dimension =>
+            rows.Where(row => row.View == dimension).OrderBy(static row => row.Name, StringComparer.Ordinal)
+                .Select(row => new GainAttribution(dimension, row.Name, Totals(row)))).ToArray();
+        return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
         {
-            switch (row.Kind)
-            {
-                case Kinds.Request when JsonSerializer.Deserialize<GainHistoryEntry>(row.Payload) is { } request: requests.Add(request); break;
-                case Kinds.Failure when JsonSerializer.Deserialize<GainFailure>(row.Payload) is { } failure: failures.Add(failure); break;
-                case Kinds.Recall when JsonSerializer.Deserialize<GainRecall>(row.Payload) is { } recall: recalls.Add(new GainRecallEvent(recall, new GainPath(row.Method, row.Rule, row.Layer, row.Pipeline))); break;
-            }
-        }
-        return GainReportBuilder.Build(query, time.GetUtcNow(), requests, failures, recalls);
+            Summary = Totals(rows.Single(static row => row.View == "summary")),
+            History = history,
+            Daily = Buckets(rows, "daily"),
+            Weekly = Buckets(rows, "weekly"),
+            Monthly = Buckets(rows, "monthly"),
+            Attributions = attributions,
+            Failures = failures,
+            Recalls = recalls,
+        };
+    }
+
+    private static GainTotals Totals(AggregateRow row) => JsonSerializer.Deserialize<GainTotals>(row.Totals)!;
+
+    private static GainBucket[] Buckets(IEnumerable<AggregateRow> rows, string view) =>
+        rows.Where(row => row.View == view).OrderBy(static row => row.Start)
+            .Select(static row => new GainBucket(new DateTimeOffset(row.Start, TimeSpan.Zero), Totals(row))).ToArray();
+
+    private static async Task<T[]> DetailsAsync<T>(SqliteConnection connection, SqliteTransaction transaction,
+        object filters, string kind, string order, CancellationToken cancellationToken) where T : class
+    {
+        var parameters = new DynamicParameters(filters);
+        parameters.Add("Kind", kind);
+        var payloads = await connection.QueryAsync<string>(new CommandDefinition(
+            "SELECT payload FROM gain_event WHERE kind = @Kind AND " + Predicate + " ORDER BY " + order + " LIMIT @HistoryLimit",
+            parameters, transaction, cancellationToken: cancellationToken));
+        return payloads.Select(static payload => JsonSerializer.Deserialize<T>(payload)).OfType<T>().ToArray();
     }
 
     public async ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken)
@@ -89,7 +117,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     private static object Parameters(GainQuery query) => new
     {
         query.Project, From = query.From?.UtcTicks, To = query.To?.UtcTicks,
-        query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline,
+        query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline, HistoryLimit = Math.Max(0, query.HistoryLimit),
     };
 
     private static async Task InsertAsync(SqliteConnection connection, string kind, string id, DateTimeOffset at,
@@ -160,7 +188,52 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record Row(string Kind, string Method, string Rule, string Layer, string Pipeline, string Payload);
+    private sealed record AggregateRow(string View, long Start, string Name, string Totals);
+
+    private const string SumJson = """
+        json_object(
+            'Requests',COALESCE(SUM(json_extract(totals,'$.Requests')),0),
+            'OriginalCharacters',COALESCE(SUM(json_extract(totals,'$.OriginalCharacters')),0),
+            'ForwardedCharacters',COALESCE(SUM(json_extract(totals,'$.ForwardedCharacters')),0),
+            'OriginalBytes',COALESCE(SUM(json_extract(totals,'$.OriginalBytes')),0),
+            'ForwardedBytes',COALESCE(SUM(json_extract(totals,'$.ForwardedBytes')),0),
+            'EstimatedOriginalTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedOriginalTokens')),0),
+            'EstimatedForwardedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedForwardedTokens')),0),
+            'EstimatedSavedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedSavedTokens')),0),
+            'Recalls',COALESCE(SUM(json_extract(totals,'$.Recalls')),0),
+            'RetrievedCharacters',COALESCE(SUM(json_extract(totals,'$.RetrievedCharacters')),0),
+            'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0))
+        """;
+
+    private const string AggregateSql = """
+        WITH metrics AS (
+            SELECT kind,at,method,rule,layer,pipeline,
+                CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
+                    ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
+                        'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
+            FROM gain_event WHERE kind IN ('request','recall') AND
+        """ + Predicate + """
+        )
+        SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set(
+        """ + SumJson + """
+            ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
+            '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
+            '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
+        FROM metrics
+        UNION ALL SELECT 'daily',at - at % 864000000000,'',
+        """ + SumJson + """
+        FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
+        UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'',
+        """ + SumJson + """
+        FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+        UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',
+        """ + SumJson + """
+        FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+        UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,
+        """ + SumJson + """
+        FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
+        GROUP BY dimension,Name
+        """;
 
     /// <summary>Whether a write is on a proxied request's path, which must not wait long, or is a reset, which may.</summary>
     private enum WritePath

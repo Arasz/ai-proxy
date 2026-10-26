@@ -40,9 +40,33 @@ the proxy removes it before the request goes upstream. For Claude Code, start it
 ANTHROPIC_CUSTOM_HEADERS="X-Ai-Proxy-Project: $PWD" claude
 ```
 
-and then `ai-proxy gain --project` in the same directory filters to it (`--project-path <PATH>` names
+For Codex, add `env_http_headers` to the selected custom model provider's existing table in
+`~/.codex/config.toml`. Replace `work` below with that provider's ID and keep its connection and
+authentication settings:
+
+```toml
+[model_providers.work]
+env_http_headers = { "X-Ai-Proxy-Project" = "AI_PROXY_CODEX_PROJECT" }
+```
+
+Then launch Codex from the project directory:
+
+```bash
+AI_PROXY_CODEX_PROJECT="$PWD" codex
+```
+
+The provider must be selected by `model_provider`. If you use a built-in provider, first define
+and select a [custom model provider](https://learn.chatgpt.com/docs/config-file/config-advanced#custom-model-providers);
+the built-in IDs `openai`, `ollama` and `lmstudio` are reserved. Keep the provider's upstream base
+URL: ai-proxy's port 8080 is a forward proxy, so Codex traffic still needs to follow the proxy
+settings and trust its inspection certificate.
+
+The header setting was verified with Codex CLI 0.164.0, a loopback HTTP server and a fake API key.
+Live provider authentication and ChatGPT sign-in were outside that check.
+
+Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
 another). Requests without the header have no project and show up only in unfiltered views.
-Statistics start with this release; older requests are not backfilled.
+Statistics start with version 0.15.0; older requests are not backfilled.
 
 ## Let an agent read originals back
 

@@ -38,8 +38,11 @@ public sealed class ClientCommandTests
         var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
         var error = process.StandardError.ReadToEndAsync(timeout.Token);
         await process.WaitForExitAsync(timeout.Token);
-        return new ProcessResult(process.ExitCode, await output, await error);
+        return new ProcessResult(process.ExitCode, Plain(await output), Plain(await error));
     }
+
+    /// <summary>The text without ANSI styling, which a terminal or CI log detection may add.</summary>
+    private static string Plain(string text) => System.Text.RegularExpressions.Regex.Replace(text, "\u001b\\[[0-9;]*m", string.Empty);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

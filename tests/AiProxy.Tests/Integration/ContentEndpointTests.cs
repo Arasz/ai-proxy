@@ -1,5 +1,6 @@
 using System.Net;
 using AiProxy.Core.Content;
+using AiProxy.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Tests.Integration;
@@ -11,6 +12,11 @@ public sealed class ContentEndpointTests : IAsyncDisposable
     [Fact]
     public async Task A_stored_original_is_served_and_an_unknown_id_returns_not_found()
     {
+        using (var connection = ContentSchema.Open(_databasePath))
+        {
+            ContentSchema.Ensure(connection);
+        }
+
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["Proxy:Compression:Enabled"] = "true",
