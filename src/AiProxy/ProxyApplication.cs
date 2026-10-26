@@ -15,18 +15,18 @@ public static class ProxyApplication
         Action<IServiceCollection>? configure = null,
         ProxyRuntimeOptions? runtimeOptions = null)
     {
-        if (string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.Urls]) &&
-            string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.HttpPorts]) &&
-            string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.HttpsPorts]) &&
-            !builder.Configuration.GetSection(Strings.Configuration.KestrelEndpoints).GetChildren().Any())
+        if (string.IsNullOrWhiteSpace(builder.Configuration[KnownNames.Configuration.Urls]) &&
+            string.IsNullOrWhiteSpace(builder.Configuration[KnownNames.Configuration.HttpPorts]) &&
+            string.IsNullOrWhiteSpace(builder.Configuration[KnownNames.Configuration.HttpsPorts]) &&
+            !builder.Configuration.GetSection(KnownNames.Configuration.KestrelEndpoints).GetChildren().Any())
         {
             builder.WebHost.UseUrls(GainApi.DefaultEndpoint);
         }
 
-        if (string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.AllowedHosts]))
+        if (string.IsNullOrWhiteSpace(builder.Configuration[KnownNames.Configuration.AllowedHosts]))
             // Only loopback names: a page rebound to 127.0.0.1 sends its own host and is refused.
         {
-            builder.Configuration[Strings.Configuration.AllowedHosts] = Strings.Network.LoopbackHosts;
+            builder.Configuration[KnownNames.Configuration.AllowedHosts] = KnownNames.Network.LoopbackHosts;
         }
 
         builder.Services.AddProxy(builder.Configuration, runtimeOptions);

@@ -30,12 +30,12 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
             if (proxy is null)
             {
                 var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-                var port = configuration.GetValue<int?>(Strings.Configuration.ProxyPort) ?? ProxyRuntimeOptions.Default.Port;
-                proxy = string.Format(CultureInfo.InvariantCulture, Strings.Network.ProxyUrlFormat, port);
+                var port = configuration.GetValue<int?>(KnownNames.Configuration.ProxyPort) ?? ProxyRuntimeOptions.Default.Port;
+                proxy = string.Format(CultureInfo.InvariantCulture, KnownNames.Network.ProxyUrlFormat, port);
             }
 
             if (!Uri.TryCreate(proxy, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttp
-                                                                          || endpoint.UserInfo.Length != 0 || endpoint.AbsolutePath != Strings.Network.RootPath || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0)
+                                                                          || endpoint.UserInfo.Length != 0 || endpoint.AbsolutePath != KnownNames.Network.RootPath || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0)
             {
                 throw new ArgumentException(Messages.InvalidProxy);
             }
@@ -62,24 +62,24 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
                 start.ArgumentList.Add(argument);
             }
 
-            foreach (var key in new[] { Strings.EnvironmentVariables.HttpProxy, Strings.EnvironmentVariables.HttpsProxy, Strings.EnvironmentVariables.LowerHttpProxy, Strings.EnvironmentVariables.LowerHttpsProxy })
+            foreach (var key in new[] { KnownNames.EnvironmentVariables.HttpProxy, KnownNames.EnvironmentVariables.HttpsProxy, KnownNames.EnvironmentVariables.LowerHttpProxy, KnownNames.EnvironmentVariables.LowerHttpsProxy })
             {
                 start.Environment[key] = endpoint.GetLeftPart(UriPartial.Authority);
             }
 
-            start.Environment.TryGetValue(Strings.EnvironmentVariables.NoProxy, out var upperBypass);
-            start.Environment.TryGetValue(Strings.EnvironmentVariables.LowerNoProxy, out var lowerBypass);
-            start.Environment.TryGetValue(Strings.EnvironmentVariables.AnthropicCustomHeaders, out var customHeaders);
-            var bypass = string.Join(',', new[] { upperBypass, lowerBypass, Strings.Network.LoopbackBypass }
+            start.Environment.TryGetValue(KnownNames.EnvironmentVariables.NoProxy, out var upperBypass);
+            start.Environment.TryGetValue(KnownNames.EnvironmentVariables.LowerNoProxy, out var lowerBypass);
+            start.Environment.TryGetValue(KnownNames.EnvironmentVariables.AnthropicCustomHeaders, out var customHeaders);
+            var bypass = string.Join(',', new[] { upperBypass, lowerBypass, KnownNames.Network.LoopbackBypass }
                 .Where(static value => !string.IsNullOrWhiteSpace(value)));
-            start.Environment[Strings.EnvironmentVariables.NoProxy] = bypass;
-            start.Environment[Strings.EnvironmentVariables.LowerNoProxy] = bypass;
-            start.Environment[Strings.EnvironmentVariables.NodeExtraCaCerts] = ca;
+            start.Environment[KnownNames.EnvironmentVariables.NoProxy] = bypass;
+            start.Environment[KnownNames.EnvironmentVariables.LowerNoProxy] = bypass;
+            start.Environment[KnownNames.EnvironmentVariables.NodeExtraCaCerts] = ca;
             var headers = (customHeaders ?? "")
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Where(static header => !header.Split(':', 2)[0].Trim().Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase))
                 .ToHashSet();
-            start.Environment[Strings.EnvironmentVariables.AnthropicCustomHeaders] = string.Join('\n', headers.Append(Strings.Headers.ProjectPrefix + project));
+            start.Environment[KnownNames.EnvironmentVariables.AnthropicCustomHeaders] = string.Join('\n', headers.Append(KnownNames.Headers.ProjectPrefix + project));
 
             Console.CancelKeyPress += OnCancel;
             try

@@ -45,6 +45,6 @@ public sealed class RetrievalArgumentSchemaTests
     {
         using var definition = JsonDocument.Parse(CcrRetrieval.Definition);
 
-        Assert.Equal(definition.RootElement.GetProperty("input_schema").GetRawText(), Schema.Text);
+        Assert.Equal(definition.RootElement.GetProperty("input_schema").GetRawText(), RetrievalArgumentSchema.Text);
     }
 }

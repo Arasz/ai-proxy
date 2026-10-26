@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace AiProxy.Core.Json;
 
 /// <summary>Reads of a parsed <see cref="JsonElement" /> that tolerate a missing or mistyped value.</summary>
-internal static class JsonExtensions
+public static class JsonExtensions
 {
     extension(string text)
     {
@@ -12,6 +12,13 @@ internal static class JsonExtensions
             using var document = JsonDocument.TryParse(text);
             return document is not null;
         }
+
+        public string ReadRawProperty(string property)
+        {
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.GetProperty(property).GetRawText();
+        }
+
     }
 
     extension(JsonDocument)

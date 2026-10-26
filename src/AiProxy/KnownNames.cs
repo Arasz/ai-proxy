@@ -2,7 +2,7 @@ using AiProxy.Core.Gain;
 
 namespace AiProxy;
 
-internal static class Strings
+internal static class KnownNames
 {
     internal static class Configuration
     {
