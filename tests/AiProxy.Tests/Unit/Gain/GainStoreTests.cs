@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AiProxy.Core.Gain;
 using AiProxy.Storage;
 using AiProxy.Tests.Integration;
@@ -58,6 +59,82 @@ public sealed class GainStoreTests
         var report = await store.QueryAsync(new GainQuery(),TestContext.Current.CancellationToken);
         Assert.Equal(2,report.Summary.Requests);
         Assert.DoesNotContain(report.History, row => row.Id == "old");
+    }
+
+    [Fact]
+    public async Task A_request_path_write_gives_up_quickly_when_another_process_holds_the_database()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "gain.db");
+        var store = new SqliteGainStore(new GainStoreOptions(path), TimeProvider.System);
+        await store.RecordAsync(Entry("first", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await using var holder = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}");
+        await holder.OpenAsync(TestContext.Current.CancellationToken);
+        await using var exclusive = holder.CreateCommand();
+        exclusive.CommandText = "BEGIN EXCLUSIVE";
+        await exclusive.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        var clock = Stopwatch.StartNew();
+
+        await Assert.ThrowsAnyAsync<Exception>(async () =>
+            await store.RecordAsync(Entry("blocked", "2026-11-01T11:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken));
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"waited {clock.Elapsed}");
+    }
+
+    [Theory]
+    [InlineData("provider")]
+    [InlineData("method")]
+    [InlineData("layer")]
+    [InlineData("pipeline")]
+    public async Task Each_filter_narrows_the_report_and_the_reset_to_its_own_rows(string dimension)
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        var kept = Entry("kept", "2026-11-01T10:00Z", "/a", "log", 289, 100);
+        var other = dimension switch
+        {
+            "provider" => kept with { Id = "other", Provider = "openai" },
+            "method" => kept with { Id = "other", Method = "GET" },
+            "layer" => kept with { Id = "other", Layer = "message" },
+            _ => kept with { Id = "other", Pipeline = "passthrough" },
+        };
+        await store.RecordAsync(kept, [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(other, [], TestContext.Current.CancellationToken);
+        var query = dimension switch
+        {
+            "provider" => new GainQuery(Provider: "anthropic"),
+            "method" => new GainQuery(Method: "POST"),
+            "layer" => new GainQuery(Layer: "tool_result"),
+            _ => new GainQuery(Pipeline: "content"),
+        };
+
+        var report = await store.QueryAsync(query, TestContext.Current.CancellationToken);
+        var reset = await store.ResetAsync(query, TestContext.Current.CancellationToken);
+
+        Assert.Equal("kept", Assert.Single(report.History).Id);
+        Assert.Equal(1, reset.Removed);
+        Assert.Equal("other", Assert.Single((await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken)).History).Id);
+    }
+
+    [Fact]
+    public async Task From_is_inclusive_to_is_exclusive_and_a_sunday_belongs_to_the_week_that_began_on_monday()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-10T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        await store.RecordAsync(Entry("before", "2026-11-01T23:59:59Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("sunday", "2026-11-08T00:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("monday", "2026-11-09T00:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(
+            new GainQuery(From: DateTimeOffset.Parse("2026-11-08T00:00Z"), To: DateTimeOffset.Parse("2026-11-09T00:00Z")),
+            TestContext.Current.CancellationToken);
+        var all = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Equal("sunday", Assert.Single(report.History).Id);
+        Assert.Contains(all.Weekly, bucket => bucket.Start == DateTimeOffset.Parse("2026-11-02T00:00Z") && bucket.Totals.Requests == 1);
+        Assert.Contains(all.Weekly, bucket => bucket.Start == DateTimeOffset.Parse("2026-11-09T00:00Z") && bucket.Totals.Requests == 1);
     }
 
     private static GainHistoryEntry Entry(string id,string at,string project,string rule,long original,long forwarded) =>

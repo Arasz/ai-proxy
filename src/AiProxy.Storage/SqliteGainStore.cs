@@ -11,6 +11,9 @@ public sealed record GainStoreOptions(string DatabasePath);
 /// <summary>Persists content-free statistics separately from originals and optional captures.</summary>
 public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time) : IGainStore
 {
+    /// <summary>How long a request-path write waits for the ledger before it gives up; the request goes on unrecorded.</summary>
+    public static readonly TimeSpan RequestWait = TimeSpan.FromSeconds(ContentSchema.RequestCommandTimeoutSeconds);
+
     private readonly SemaphoreSlim _writer = new(1, 1);
     private bool _initialized;
 
@@ -19,21 +22,21 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await WriteAsync(async connection =>
         {
             using var transaction = connection.BeginTransaction();
-            await InsertAsync(connection, "request", entry.Id, entry.At, entry.Project, entry.Provider,
+            await InsertAsync(connection, Kinds.Request, entry.Id, entry.At, entry.Project, entry.Provider,
                 entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(entry), transaction, cancellationToken);
             foreach (var failure in failures)
             {
-                await InsertAsync(connection, "failure", Guid.NewGuid().ToString("N"), failure.At, failure.Project,
+                await InsertAsync(connection, Kinds.Failure, Guid.NewGuid().ToString("N"), failure.At, failure.Project,
                     entry.Provider, entry.Method, entry.Rule, entry.Layer, entry.Pipeline,
                     JsonSerializer.Serialize(failure), transaction, cancellationToken);
             }
             await transaction.CommitAsync(cancellationToken);
-        }, cancellationToken);
+        }, WritePath.Request, cancellationToken);
     }
 
     public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) =>
-        WriteAsync(connection => InsertAsync(connection, "recall", Guid.NewGuid().ToString("N"), recall.At,
-            recall.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(recall), null, cancellationToken), cancellationToken);
+        WriteAsync(connection => InsertAsync(connection, Kinds.Recall, Guid.NewGuid().ToString("N"), recall.At,
+            recall.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(recall), null, cancellationToken), WritePath.Request, cancellationToken);
 
     public async ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
     {
@@ -49,9 +52,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         {
             switch (row.Kind)
             {
-                case "request": requests.Add(JsonSerializer.Deserialize<GainHistoryEntry>(row.Payload)!); break;
-                case "failure": failures.Add(JsonSerializer.Deserialize<GainFailure>(row.Payload)!); break;
-                case "recall": recalls.Add(JsonSerializer.Deserialize<GainRecall>(row.Payload)!); break;
+                case Kinds.Request when JsonSerializer.Deserialize<GainHistoryEntry>(row.Payload) is { } request: requests.Add(request); break;
+                case Kinds.Failure when JsonSerializer.Deserialize<GainFailure>(row.Payload) is { } failure: failures.Add(failure); break;
+                case Kinds.Recall when JsonSerializer.Deserialize<GainRecall>(row.Payload) is { } recall: recalls.Add(recall); break;
             }
         }
         return GainReportBuilder.Build(query, time.GetUtcNow(), requests, failures, recalls);
@@ -73,7 +76,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                 "DELETE FROM gain_event WHERE sequence <= @Snapshot AND at <= @Cutoff AND " + Predicate,
                 parameters, transaction, cancellationToken: cancellationToken));
             await transaction.CommitAsync(cancellationToken);
-        }, cancellationToken);
+        }, WritePath.Reset, cancellationToken);
         return new GainResetResult(removed, cutoff);
     }
 
@@ -97,15 +100,28 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             INSERT INTO gain_event(kind,id,at,project,provider,method,rule,layer,pipeline,payload)
             VALUES(@kind,@id,@at,@project,@provider,@method,@rule,@layer,@pipeline,@payload)
             """, new { kind, id, at = at.UtcTicks, project, provider, method, rule, layer, pipeline, payload },
-            transaction, cancellationToken: cancellationToken));
+            transaction, ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken));
     }
 
-    private async ValueTask WriteAsync(Func<SqliteConnection, Task> write, CancellationToken cancellationToken)
+    private async ValueTask WriteAsync(Func<SqliteConnection, Task> write, WritePath path, CancellationToken cancellationToken)
     {
-        await _writer.WaitAsync(cancellationToken);
+        if (path == WritePath.Reset)
+        {
+            await _writer.WaitAsync(cancellationToken);
+        }
+        else if (!await _writer.WaitAsync(RequestWait, cancellationToken))
+        {
+            throw new TimeoutException("The gain ledger is busy; this request is not recorded.");
+        }
+
         try
         {
             await using var connection = Open();
+            if (path == WritePath.Request)
+            {
+                connection.DefaultTimeout = ContentSchema.RequestCommandTimeoutSeconds;
+            }
+
             await InitializeAsync(connection, cancellationToken);
             await write(connection);
         }
@@ -118,13 +134,16 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     private async Task EnsureAsync(CancellationToken cancellationToken)
     {
         if (_initialized) { return; }
-        await WriteAsync(static _ => Task.CompletedTask, cancellationToken);
+        await WriteAsync(static _ => Task.CompletedTask, WritePath.Reset, cancellationToken);
     }
 
     private SqliteConnection Open()
     {
-        var directory = Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath));
-        Directory.CreateDirectory(directory!);
+        if (Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath)) is { } directory)
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         return ContentSchema.Open(options.DatabasePath);
     }
 
@@ -142,4 +161,19 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     }
 
     private sealed record Row(string Kind, string Payload);
+
+    /// <summary>Whether a write is on a proxied request's path, which must not wait long, or is a reset, which may.</summary>
+    private enum WritePath
+    {
+        Request,
+        Reset,
+    }
+
+    /// <summary>The kinds of ledger rows.</summary>
+    private static class Kinds
+    {
+        public const string Request = "request";
+        public const string Failure = "failure";
+        public const string Recall = "recall";
+    }
 }
