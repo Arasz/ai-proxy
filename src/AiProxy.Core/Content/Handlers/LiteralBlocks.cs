@@ -93,6 +93,7 @@ public static class LiteralBlocks
 
         var segments = new List<LiteralSegment>();
         var inRawString = false;
+        var rawStringDelimiter = "";
         var inBlockComment = false;
 
         foreach (var line in SplitLines(text))
@@ -100,10 +101,23 @@ public static class LiteralBlocks
             var literal = inRawString || inBlockComment;
             segments.Add(new LiteralSegment(line, literal));
 
-            var rawStrings = CountOf(line, "\"\"\"");
-            if (rawStrings % 2 == 1)
+            if (inRawString)
             {
-                inRawString = !inRawString;
+                if (CountOf(line, rawStringDelimiter) % 2 == 1)
+                {
+                    inRawString = false;
+                    rawStringDelimiter = "";
+                }
+            }
+            else if (CountOf(line, "\"\"\"") % 2 == 1)
+            {
+                inRawString = true;
+                rawStringDelimiter = "\"\"\"";
+            }
+            else if (CountOf(line, "'''") % 2 == 1)
+            {
+                inRawString = true;
+                rawStringDelimiter = "'''";
             }
 
             if (inBlockComment)

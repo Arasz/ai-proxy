@@ -3,6 +3,7 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
@@ -71,6 +72,18 @@ public sealed class SourceCodeCompressionHandlerTests
         Assert.Contains("\"\"\"Returns the item's text.\"\"\"", result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("long comment", result.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("from typing", result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Blank_lines_inside_python_triple_single_quoted_strings_survive_the_fallback()
+    {
+        const string python = "value = '''start\n\nend'''\n\nnext = 1\n";
+        var missingGrammar = new TreeSitterLanguage("NoSuchGrammar", NullLogger<TreeSitterLanguage>.Instance);
+        var handler = new SourceCodeCompressionHandler([new PythonCodeLexer(missingGrammar)]);
+
+        var result = await handler.HandleAsync(Part(python, "/repo/value.py"), CancellationToken.None);
+
+        Assert.Equal("value = '''start\n\nend'''\nnext = 1", result.Text);
     }
 
     [Theory]

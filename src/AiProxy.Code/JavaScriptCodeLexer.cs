@@ -1,15 +1,15 @@
 using System.Collections.Frozen;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using TreeSitter;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans JavaScript and JSX with the Tree-sitter grammar; template text is string, <c>${}</c> is code.</summary>
-public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : ICodeLexer
+public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLanguage.JavaScriptKey)] TreeSitterLanguage language) : ICodeLexer
 {
-    private static readonly TreeSitterLanguage JavaScript = new("JavaScript");
-
     /// <summary>Reserved words, contextual keywords and globals that change meaning when renamed.</summary>
     internal static readonly FrozenSet<string> Keywords =
     [
@@ -32,7 +32,7 @@ public sealed partial class JavaScriptCodeLexer(TreeSitterLanguage language) : I
 
     /// <summary>Creates a lexer on the bundled JavaScript grammar.</summary>
     public JavaScriptCodeLexer()
-        : this(JavaScript)
+        : this(new TreeSitterLanguage(TreeSitterLanguage.JavaScriptKey, NullLogger<TreeSitterLanguage>.Instance))
     {
     }
 

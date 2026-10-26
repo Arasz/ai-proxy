@@ -1,5 +1,10 @@
 using AiProxy.Code;
+using AiProxy.Configuration;
+using AiProxy.Tests.Integration;
 using AiProxy.Core.Content.Code;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TreeSitter;
 
 namespace AiProxy.Tests.Unit.Content.Code;
@@ -33,7 +38,7 @@ public sealed class TreeSitterLoadingTests
     [MemberData(nameof(UnloadableLexers))]
     public void A_grammar_that_fails_to_load_makes_the_lexer_unsupported_and_the_reducer_return_the_original(string lexer, string path)
     {
-        var missing = new TreeSitterLanguage("NoSuchGrammar");
+        var missing = new TreeSitterLanguage("NoSuchGrammar", NullLogger<TreeSitterLanguage>.Instance);
         ICodeLexer subject = lexer switch
         {
             "python" => new PythonCodeLexer(missing),
@@ -51,5 +56,35 @@ public sealed class TreeSitterLoadingTests
         Assert.False(reduced.Changed);
         Assert.Equal(source, reduced.Text);
         Assert.Null(missing.Value);
+    }
+
+    [Fact]
+    public void A_grammar_load_failure_is_logged_once()
+    {
+        using var provider = new RecordingLoggerProvider();
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(provider));
+        var missing = new TreeSitterLanguage("NoSuchGrammar", loggerFactory.CreateLogger<TreeSitterLanguage>());
+
+        Assert.Null(missing.Value);
+        Assert.Null(missing.Value);
+        var entry = Assert.Single(provider.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal(1, entry.EventId);
+    }
+
+    [Fact]
+    public void Compression_registers_each_tree_sitter_language_with_the_standard_logger()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddCompression(new CompressionSettings());
+        using var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<ILogger<TreeSitterLanguage>>());
+        Assert.NotNull(provider.GetRequiredKeyedService<TreeSitterLanguage>("Python"));
+        Assert.NotNull(provider.GetRequiredKeyedService<TreeSitterLanguage>("JavaScript"));
+        Assert.NotNull(provider.GetRequiredKeyedService<TreeSitterLanguage>("TypeScript"));
+        Assert.NotNull(provider.GetRequiredKeyedService<TreeSitterLanguage>("Tsx"));
+        Assert.Equal(4, provider.GetServices<ICodeLexer>().Count());
     }
 }

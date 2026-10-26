@@ -2,16 +2,16 @@ using System.Collections.Frozen;
 using System.Text;
 using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using TreeSitter;
 
 namespace AiProxy.Code;
 
 /// <summary>Scans Python with the Tree-sitter grammar; docstrings are strings and f-string fields are code.</summary>
-public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICodeLexer
+public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguage.PythonKey)] TreeSitterLanguage language) : ICodeLexer
 {
     private const string PackageInit = "__init__.py";
-
-    private static readonly TreeSitterLanguage Python = new("Python");
 
     private static readonly TreeSitterGrammar Grammar = new(
         Strings: new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
@@ -55,7 +55,7 @@ public sealed partial class PythonCodeLexer(TreeSitterLanguage language) : ICode
 
     /// <summary>Creates a lexer on the bundled Python grammar.</summary>
     public PythonCodeLexer()
-        : this(Python)
+        : this(new TreeSitterLanguage(TreeSitterLanguage.PythonKey, NullLogger<TreeSitterLanguage>.Instance))
     {
     }
 
