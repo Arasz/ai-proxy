@@ -1,7 +1,68 @@
 {
-  "lastUpdated": "2026-10-25",
-  "next": "Goal: CCR plus Python/JS/TS minifiers hooked up. Order: ccr-design ADR 0005 (owner gate) -> activation S2 file context -> CCR runtime -> exact-file retention -> wire C# reducer -> Tree-sitter lexers py/js/ts. One implementation lane at a time.",
+  "lastUpdated": "2026-10-26",
+  "next": "Goal reached: CCR + C#/Python/JS/TS code views + gain/mcp clients (0.10.0-0.15.0). Owner restarts proxy from main and gathers data (ai-proxy gain; [proxy view in upstream bodies; log 1601). Follow-ups: aggregate GET /gain in SQL (watch reloads all rows); log Tree-sitter grammar-load failure (musl package lacks natives); ''' strings in blank-line fallback; verify Codex custom-header option for X-Ai-Proxy-Project; CI setup-dotnet 409.",
   "completedTasks": [
+    {
+      "taskId": "aip-retrieval-mcp-cli-gain-api",
+      "date": "2026-10-26",
+      "title": "Gain ledger and loopback API; ai-proxy gain and ai-proxy mcp in the one tool",
+      "pr": 73,
+      "version": "0.15.0",
+      "summary": "Taken over from a Codex session (owner stopped it; lane WIP saved and integrated). One ai-proxy package: Program.cs dispatches 'gain' (Spectre CLI) and 'mcp' (stdio MCP retrieve_original); clients use AiProxy.Client HTTP only (dependency test). Loopback API on 127.0.0.1:17432 (health/content moved from 5000), AllowedHosts defaults to loopback names (DNS rebinding). Gain ledger: request-path writes give up after 1 s; recalls attributed along their path; X-Ai-Proxy-Project stripped before forwarding. ClientsAgainstProxyTests runs both commands as processes against one proxy. ADR 0006 Draft."
+    },
+    {
+      "taskId": "aip-trust-root-certificate-once-start",
+      "date": "2026-10-25",
+      "title": "Trust the root certificate once, not three times per start",
+      "pr": 76,
+      "version": "0.14.1",
+      "summary": "Titanium EnsureRootCertificate(userTrust:true) set UserTrustRoot, so Start and TrySetAsSystemProxy re-ran security add-trusted-cert: 3 macOS prompts. IRootCertificate seam: load, check, TrustRootCertificate() only when untrusted."
+    },
+    {
+      "taskId": "aip-javascript-typescript-code-view-default",
+      "date": "2026-10-25",
+      "title": "JavaScript and TypeScript code views on by default",
+      "pr": 75,
+      "version": "0.14.0",
+      "summary": "Merged 3394d72. JavaScriptCodeLexer/TypeScriptCodeLexer registered under CodeViews; .jsx added to SourceCodeFiles (was never source code). From #74 review: Python views keep pyright/ruff/isort/nosec/pyre/fmt-skip comments, JS/TS keep prettier/biome/istanbul/c8/v8 ignore; __init__.py keeps imports (its exports). Open: grammar-load failure is silent (musl package lacks Tree-sitter natives); blank-line fallback ignores ''' strings."
+    },
+    {
+      "taskId": "aip-python-code-view-on-default",
+      "date": "2026-10-25",
+      "title": "Python code view on by default",
+      "pr": 74,
+      "version": "0.12.0",
+      "summary": "Merged 5737c9b (owner merged over the CI setup-dotnet 409). PythonCodeLexer registered next to CSharpCodeLexer under Proxy:Compression:CodeViews; handler + real-proxy relay tests (relay red before registration). Tree-sitter parser per call, grammar Lazy-loaded; unloadable native lib falls back to blank lines."
+    },
+    {
+      "taskId": "aip-activate-csharp-reducer-with-retrieval",
+      "date": "2026-10-25",
+      "title": "C# code view on by default, original retrievable via proxy_retrieve",
+      "pr": 72,
+      "version": "0.11.0",
+      "summary": "Merged a0b5141. SourceCodeCompressionHandler takes registered ICodeLexers; a whole-file .cs part (trusted path) in a CCR request becomes a CodeReducer view ending in [proxy view <id>: ...]; handler returns RetrievalId, pipeline keeps the original under it (stateless Originals / thread store first; keep failure sends region unchanged). ContentPart.Ccr gates the view (off keeps blank-line path). Proxy:Compression:CodeViews (default true) registers CSharpCodeLexer. proxy_retrieve definition unchanged (ADR 0005 pins it). Owner cut the 36 edit runs; live data replaces them."
+    },
+    {
+      "taskId": "aip-ccr-runtime-retrieval-loop-default",
+      "date": "2026-10-25",
+      "title": "CCR runtime: previews, proxy_retrieve, in-request retrieval loop; on by default",
+      "pr": 71,
+      "version": "0.10.0",
+      "summary": "Merged 856a479. Pipeline previews regions >=3,000 est. tokens (thread originals kept first in ccr_original); proxy_retrieve spliced last into tools of streamed Anthropic requests with tools; CcrRelay answers via Titanium RespondStreaming (no spike needed) with RetrievalLoop state machine, O7 deferral, 3 rounds + limit_reached; thread ledger ccr_thread rewrites continue to the hidden turn, 529 on ledger read failure. Compression and CCR default on. Live gate (thread continue across hidden turn, merged thinking) is the owner's run on this machine."
+    },
+    {
+      "taskId": "aip-finish-ccr-core-review",
+      "date": "2026-10-25",
+      "title": "CCR Core: deterministic preview and proxy_retrieve executor",
+      "pr": 66,
+      "version": null,
+      "summary": "Inactive CCR core merged (43d8aac). Transient components CcrPreviewBuilder/CcrPreviewOverlay and CcrRetriever/CcrRetrievalParser (owner structure request); arguments validated with JSON Schema from CcrRetrieval.Definition (JsonSchema.Net 8.0.5, last MIT, owner choice); preview detection matches the full header; defaults 1,500-token preview and 3,000-token retrieval cap (O2, O12); records with factories instead of tuples and null args across src; six wall-clock tests skipped (TimingDependent.Reason). ADR 0005 accepted on PR #64 (O7 and F13 option A).",
+      "followUps": [
+        "CCR runtime: in-request loop, streaming hold, storage, cache placement (ccr-implement roundtrip)",
+        "Wire C#/Python/JS/TS reducers into the pipeline after exact-file retention",
+        "Merge PR #64 (ADR 0005)"
+      ]
+    },
     {
       "taskId": "aip-log-reducer-keeps-scored-answers",
       "date": "2026-10-24",
