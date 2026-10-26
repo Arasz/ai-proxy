@@ -26,6 +26,8 @@ public sealed class ClientCommandTests
     private static async Task<ProcessResult> RunAsync(params string[] arguments)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
+        start.Environment["NO_COLOR"] = "1";
+        start.Environment["TERM"] = "dumb";
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
         foreach (var argument in arguments)
         {
