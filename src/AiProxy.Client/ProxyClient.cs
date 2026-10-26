@@ -6,13 +6,6 @@ using AiProxy.Core.Gain;
 
 namespace AiProxy.Client;
 
-/// <summary>The shared loopback endpoint used by the CLI and MCP adapters.</summary>
-public static class ProxyClientOptions
-{
-    public const string DefaultEndpoint = "http://127.0.0.1:17432";
-    public const string ProjectHeader = "X-Ai-Proxy-Project";
-}
-
 /// <summary>Calls the proxy's JSON API without opening its databases.</summary>
 public sealed class ProxyClient(HttpClient http)
 {
@@ -21,7 +14,7 @@ public sealed class ProxyClient(HttpClient http)
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static HttpClient CreateHttpClient(string endpoint = ProxyClientOptions.DefaultEndpoint) =>
+    public static HttpClient CreateHttpClient(string endpoint = GainApi.DefaultEndpoint) =>
         new(new SocketsHttpHandler { UseProxy = false }) { BaseAddress = new Uri(endpoint.TrimEnd('/') + "/") };
 
     public async Task<RetrievalResponse> RetrieveAsync(RetrievalRequest request, CancellationToken cancellationToken = default)

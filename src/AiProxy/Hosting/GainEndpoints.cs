@@ -9,8 +9,6 @@ namespace AiProxy.Hosting;
 /// <summary>Maps the proxy-owned retrieval and statistics API.</summary>
 public static partial class GainEndpoints
 {
-    public const string DefaultEndpoint = "http://127.0.0.1:17432";
-    public const string ProjectHeader = "X-Ai-Proxy-Project";
     private static readonly JsonSerializerOptions RetrievalJson = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -47,7 +45,7 @@ public static partial class GainEndpoints
             var parsed = parser.Parse(arguments, options);
             var original = parsed.Request is { } valid ? await store.FindAsync(valid.Id, cancellationToken) : null;
             var answer = retriever.Answer(arguments, original, options);
-            var project = context.Request.Headers[ProjectHeader].FirstOrDefault();
+            var project = context.Request.Headers[GainApi.ProjectHeader].FirstOrDefault();
             try
             {
                 await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? "unknown" : "caller",

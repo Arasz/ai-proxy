@@ -1,3 +1,4 @@
+using AiProxy.Core.Gain;
 using AiProxy.Hosting;
 
 namespace AiProxy;
@@ -23,7 +24,7 @@ public static class ProxyApplication
             string.IsNullOrWhiteSpace(builder.Configuration["HTTPS_PORTS"]) &&
             !builder.Configuration.GetSection("Kestrel:Endpoints").GetChildren().Any())
         {
-            builder.WebHost.UseUrls(GainEndpoints.DefaultEndpoint);
+            builder.WebHost.UseUrls(GainApi.DefaultEndpoint);
         }
 
         if (string.IsNullOrWhiteSpace(builder.Configuration[AllowedHostsKey]))

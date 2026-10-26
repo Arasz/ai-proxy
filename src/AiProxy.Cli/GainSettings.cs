@@ -1,3 +1,4 @@
+using AiProxy.Core.Gain;
 using System.ComponentModel;
 using AiProxy.Client;
 using Spectre.Console.Cli;
@@ -10,8 +11,8 @@ public sealed class GainSettings : CommandSettings
     public bool Project { get; init; }
     [CommandOption("-f|--format <FORMAT>"), DefaultValue("text"), Description("Output format: text, json, csv.")]
     public string Format { get; init; } = "text";
-    [CommandOption("--endpoint <URL>"), DefaultValue(ProxyClientOptions.DefaultEndpoint)]
-    public string Endpoint { get; init; } = ProxyClientOptions.DefaultEndpoint;
+    [CommandOption("--endpoint <URL>"), DefaultValue(GainApi.DefaultEndpoint)]
+    public string Endpoint { get; init; } = GainApi.DefaultEndpoint;
     [CommandOption("-g|--graph"), Description("Show an ASCII graph of daily estimated savings.")]
     public bool Graph { get; init; }
     [CommandOption("-H|--history"), Description("Show recent provider request history.")]

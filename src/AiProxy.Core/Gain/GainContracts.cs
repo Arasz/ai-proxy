@@ -12,7 +12,7 @@ public sealed record RetrievalRequest(string Id, string Mode, int? Start = null,
 public sealed record RetrievalResponse(string Text, string? Error);
 
 /// <summary>How estimated initial-request reductions are counted.</summary>
-public sealed record GainMeasurement(string Kind = "estimated", decimal CharactersPerToken = 2.89m,
+public sealed record GainMeasurement(string Kind = "estimated", decimal CharactersPerToken = GainReportBuilder.CharactersPerToken,
     string Scope = "initial-request", bool NetSavingsAvailable = false);
 
 /// <summary>Measured sizes and estimated token counts; saved counts may be negative.</summary>

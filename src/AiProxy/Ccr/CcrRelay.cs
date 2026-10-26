@@ -59,7 +59,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     public async Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals)
     {
         var request = e.HttpClient.Request;
-        var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainEndpoints.ProjectHeader, StringComparison.OrdinalIgnoreCase)).Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
+        var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase)).Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
         exchange.Relayed = true;
         if (exchange.CaptureId is not null)
         {

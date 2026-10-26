@@ -35,8 +35,8 @@ public sealed partial class ProviderRequestInspector(
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
         var request = e.HttpClient.Request;
-        var project = request.Headers.GetFirstHeader(GainEndpoints.ProjectHeader)?.Value;
-        request.Headers.RemoveHeader(GainEndpoints.ProjectHeader);
+        var project = request.Headers.GetFirstHeader(GainApi.ProjectHeader)?.Value;
+        request.Headers.RemoveHeader(GainApi.ProjectHeader);
         if (providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
         {
             return;

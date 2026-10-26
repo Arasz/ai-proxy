@@ -27,7 +27,7 @@ public sealed record CcrOptions(
 {
     /// <summary>The owner-approved ADR 0005 values.</summary>
     public static CcrOptions Default { get; } = new(
-        CharactersPerToken: 2.89m,
+        CharactersPerToken: Gain.GainReportBuilder.CharactersPerToken,
         MinimumTokens: 3_000,
         BudgetTokens: 1_500,
         SignalShare: 0.40m,

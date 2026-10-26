@@ -1,3 +1,4 @@
+using AiProxy.Core.Gain;
 using AiProxy.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,7 +25,7 @@ public sealed class McpServerProcess
             return 2;
         }
 
-        var endpoint = options.Length == 2 ? options[1] : ProxyClientOptions.DefaultEndpoint;
+        var endpoint = options.Length == 2 ? options[1] : GainApi.DefaultEndpoint;
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
         {
             await Console.Error.WriteLineAsync("--endpoint must be an absolute HTTP or HTTPS proxy URL.").ConfigureAwait(false);
