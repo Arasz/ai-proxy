@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.15.3](0.15.3-nuget-readme-images.md) | The token icon uses NuGet-supported Markdown, the version badge URL is fixed, and M8ven uses a text link. | #82 |
 | [0.15.2](0.15.2-public-ca-and-install-guide.md) | Startup exports the public CA as PEM; the README documents installed-tool and agent setup and shows the package icon. | #80 |
 | [0.15.1](0.15.1-sql-gain-and-codex-project-header.md) | Gain reports aggregate in SQLite with bounded detail reads; the guide documents verified Codex project headers. Grammar-load warnings and Python fallback literal preservation also ship. | #77, #78 |
 | [0.15.0](0.15.0-gain-and-retrieval-clients.md) | `ai-proxy gain` and `ai-proxy mcp` read a new gain ledger and kept originals over a loopback API on port 17432; the health and content endpoints move there from 5000. | #73 |
