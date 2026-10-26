@@ -10,6 +10,7 @@ using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Hosting;
 using AiProxy.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace AiProxy;
 
@@ -114,6 +115,14 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton<ICompressionHandler, MarkdownCompressionHandler>();
             if (settings.CodeViews)
             {
+                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.PythonKey, static (provider, _) =>
+                    new TreeSitterLanguage(TreeSitterLanguage.PythonKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
+                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.JavaScriptKey, static (provider, _) =>
+                    new TreeSitterLanguage(TreeSitterLanguage.JavaScriptKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
+                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.TypeScriptKey, static (provider, _) =>
+                    new TreeSitterLanguage(TreeSitterLanguage.TypeScriptKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
+                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.TsxKey, static (provider, _) =>
+                    new TreeSitterLanguage(TreeSitterLanguage.TsxKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
                 services.AddSingleton<ICodeLexer, CSharpCodeLexer>();
                 services.AddSingleton<ICodeLexer, PythonCodeLexer>();
                 services.AddSingleton<ICodeLexer, JavaScriptCodeLexer>();
