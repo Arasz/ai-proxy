@@ -18,7 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.15.1](0.15.1-sql-gain-and-codex-project-header.md) | Gain reports aggregate in SQLite with bounded detail reads; the guide documents verified Codex project headers. Grammar-load warnings and Python fallback literal preservation also ship. | #77 |
+| [0.15.1](0.15.1-sql-gain-and-codex-project-header.md) | Gain reports aggregate in SQLite with bounded detail reads; the guide documents verified Codex project headers. Grammar-load warnings and Python fallback literal preservation also ship. | #77, #78 |
 | [0.15.0](0.15.0-gain-and-retrieval-clients.md) | `ai-proxy gain` and `ai-proxy mcp` read a new gain ledger and kept originals over a loopback API on port 17432; the health and content endpoints move there from 5000. | #73 |
 | [0.14.1](0.14.1-trust-root-certificate-once.md) | macOS start no longer asks three times to approve keychain trust: the root certificate is trusted only when it is not trusted already. | #76 |
 | [0.14.0](0.14.0-javascript-typescript-code-views.md) | A whole JavaScript or TypeScript file (`.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`) a tool call read gets the code view; `.jsx` now counts as source code. | #75 |
