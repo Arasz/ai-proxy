@@ -5,43 +5,43 @@
 
 ## Findings
 
-### F1 — Main has internal CCR retrieval and one public content endpoint [READ]
+### F1: Main has internal CCR retrieval and one public content endpoint [READ]
 
 The existing tool is `proxy_retrieve`, answered inside the provider request loop. It reads a retained original by its 16-hex preview ID and supports lines, pattern and whole modes. The public `GET /content/{requestId}` instead returns the complete original request body by a GUID request ID. The namespaces must stay distinct.
 
 **Evidence:** `src/AiProxy.Core/Content/Ccr/CcrRetrieval.cs`, `CcrRetriever.cs`, `CcrRetrievalRequest.cs`; `src/AiProxy/Hosting/ContentEndpoints.cs`; `src/AiProxy.Storage/SqliteOriginalStore.cs`.
 
-### F2 — The three named quality-report tools do not exist here [READ]
+### F2: The three named quality-report tools do not exist here [READ]
 
 There is no MCP host project on main. `read_file` occurs in input fixtures and tool-call path recognition; there are no `retrieve_original` or `edit_file` handlers. The owner clarified this task adds retrieval only. Adding filesystem reads or edits would expand the domain without serving this request.
 
 **Evidence:** main `856a479`, `AiProxy.slnx`, `src/AiProxy.Core/Content/ToolCallFiles.cs`, `tests/AiProxy.Tests/Unit/Content/ToolOutputFilePathTests.cs`, and the owner's task clarification relayed by the orchestrator on 2026-10-25.
 
-### F3 — Port 5000 serves administration, while 8080 carries forward traffic [READ]
+### F3: Port 5000 serves administration, while 8080 carries forward traffic [READ]
 
 Program creates an ASP.NET host without a URL default; the documentation names its default as localhost:5000. Titanium's separate forward listener defaults to loopback:8080. Changing the communication default must preserve explicit ASP.NET URL overrides and leave the forward listener under `Proxy:Port`.
 
 **Evidence:** `src/AiProxy/Program.cs:18-22`, `src/AiProxy/Hosting/ProxyRuntimeOptions.cs`, `docs/reference/environment-variables.md:107`.
 
-### F4 — Persisted metadata cannot yet answer a gain report [READ]
+### F4: Persisted metadata cannot yet answer a gain report [READ]
 
 Content storage has original/compressed text, timestamps, reducer paths and content type. Capture, when enabled, has provider, request/forwarded bytes, reported input/output/cache token usage and timings. It has no project identity, recall events, shadow runs or dedicated statistics interface. Compression and capture IDs are generated separately.
 
 **Evidence:** `src/AiProxy.Storage/ContentSchema.cs`, `SqliteCaptureStore.cs:142-178`, `src/AiProxy.Core/Content/ContentRecord.cs`, `ContentCompressionPipeline.cs`, `src/AiProxy/Hosting/CapturedExchange.cs`, `ProviderRequestInspector.cs`.
 
-### F5 — Existing token counts are estimates with a documented calibration boundary [READ]
+### F5: Existing token counts are estimates with a documented calibration boundary [READ]
 
 CCR uses 2.89 characters per estimated token. The calibration record describes a Claude request-body fit, warns about provider/model and per-payload extrapolation, and does not establish billed-token savings. The API should expose the coefficient and method label alongside character/byte measurements. Provider-reported usage remains a separate nullable fact.
 
 **Evidence:** `src/AiProxy.Core/Content/Ccr/CcrOptions.cs`, `docs/work/2026-10-24-claude-token-calibration.md`.
 
-### F6 — AiRaccoon's generator is a useful pattern with project-specific coupling [READ]
+### F6: AiRaccoon's generator is a useful pattern with project-specific coupling [READ]
 
 Its incremental generator derives tool names from MCP attributes and rejects missing names. It also emits AiRaccoon-specific scope metadata. Directly referencing that project would retain its hardcoded namespace and scope types. Adapt only the inventory and validation mechanism, with explicit annotation validation appropriate to this server.
 
-**Evidence:** `/Users/arasz/RiderProjects/ai-raccoon/src/AiRaccoon.Generators/McpToolInventoryGenerator.cs:100-135`, `ToolScopeFacts.cs:13-19,31-36`.
+**Evidence:** the ai-raccoon repository, `src/AiRaccoon.Generators/McpToolInventoryGenerator.cs:100-135` and `ToolScopeFacts.cs:13-19,31-36`.
 
-### F7 — Explicit false hints need a wire-level assertion [INFERRED]
+### F7: Explicit false hints need a wire-level assertion [INFERRED]
 
 The MCP schema makes all four hints optional booleans with conservative defaults. The owner requires every hint explicitly emitted. A source attribute check alone cannot prove SDK serialization includes false values; test the actual `tools/list` JSON as well. For retained local originals the values are read-only true, destructive false, idempotent true and open-world false.
 
@@ -49,7 +49,7 @@ This follows the schema and the existing retained-original lookup, which perform
 
 **Evidence:** [MCP ToolAnnotations schema](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/schema.mdx); `src/AiProxy.Storage/SqliteOriginalStore.cs`, `FindAsync`.
 
-### F8 — Thin clients are enough for both requested interfaces [INFERRED]
+### F8: Thin clients are enough for both requested interfaces [INFERRED]
 
 The proxy already owns originals and SQLite. A small HTTP client/contracts library lets a stdio MCP adapter and a Spectre CLI share its API without granting either a database writer. Spectre's documented CommandApp registration and settings supply the requested command surface. A new local RPC protocol or a general plugin framework adds no required behavior.
 

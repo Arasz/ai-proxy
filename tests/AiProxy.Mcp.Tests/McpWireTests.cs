@@ -135,40 +135,46 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
     }
 }
 
-internal sealed class McpProcess : IAsyncDisposable
+internal sealed class McpProcess(string endpoint) : IAsyncDisposable
 {
-    private readonly Process _process;
-    private readonly Task<string> _errors;
+    private readonly Launched _launched = Start(endpoint);
     private int _id;
 
-    public McpProcess(string endpoint)
+    private Process Server => _launched.Process;
+
+    private Task<string> Errors => _launched.Errors;
+
+    private static Launched Start(string endpoint)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
         start.ArgumentList.Add("mcp");
         start.ArgumentList.Add("--endpoint");
         start.ArgumentList.Add(endpoint);
-        _process = Process.Start(start)!;
-        _errors = _process.StandardError.ReadToEndAsync();
+        var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start the MCP server.");
+        return new Launched(process, process.StandardError.ReadToEndAsync());
     }
+
+    /// <summary>The server process and its stderr, read from the start so the pipe never fills.</summary>
+    private sealed record Launched(Process Process, Task<string> Errors);
 
     public async Task InitializeAsync()
     {
         await CallAsync("initialize", new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "wire-test", version = "1" } });
-        await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", method = "notifications/initialized" }));
-        await _process.StandardInput.FlushAsync();
+        await Server.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", method = "notifications/initialized" }));
+        await Server.StandardInput.FlushAsync();
     }
 
     public async Task<JsonElement> CallAsync(string method, object parameters)
     {
         var id = ++_id;
-        await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters }));
-        await _process.StandardInput.FlushAsync();
+        await Server.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters }));
+        await Server.StandardInput.FlushAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         while (true)
         {
-            var line = await _process.StandardOutput.ReadLineAsync(timeout.Token);
-            Assert.True(line is not null, "MCP process closed stdout: " + (_errors.IsCompleted ? await _errors : "stderr still open"));
+            var line = await Server.StandardOutput.ReadLineAsync(timeout.Token);
+            Assert.True(line is not null, "MCP process closed stdout: " + (Errors.IsCompleted ? await Errors : "stderr still open"));
             using var document = JsonDocument.Parse(line!);
             if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id)
             {
@@ -179,12 +185,12 @@ internal sealed class McpProcess : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _process.StandardInput.Close();
-        if (!_process.HasExited)
+        Server.StandardInput.Close();
+        if (!Server.HasExited)
         {
-            _process.Kill(entireProcessTree: true);
+            Server.Kill(entireProcessTree: true);
         }
-        await _process.WaitForExitAsync();
-        _process.Dispose();
+        await Server.WaitForExitAsync();
+        Server.Dispose();
     }
 }
