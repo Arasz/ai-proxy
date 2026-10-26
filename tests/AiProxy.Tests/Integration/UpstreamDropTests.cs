@@ -121,7 +121,7 @@ public sealed class UpstreamDropTests
         await using var service = new TitaniumProxyService(
             null,
             new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             new ProcessSystemProxyGuardLauncher(),
             loggerFactory,

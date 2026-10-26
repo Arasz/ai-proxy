@@ -27,10 +27,13 @@ When ai-proxy stops cleanly, it restores the operating system's previous proxy s
 listener binds to loopback at `127.0.0.1:8080` (set `PROXY__PORT` to change the port); it is not exposed to the local network.
 
 The proxy forwards the caller's credentials unchanged. It has no provider-owned API keys.
-Compression remains off unless enabled with `PROXY__COMPRESSION__ENABLED=true`; see the
+Compression and recoverable previews are on by default (`PROXY__COMPRESSION__ENABLED=false` turns them off); see the
 [compression guide](docs/how-to/turning-on-the-compression-stage.md). `PROXY__CAPTURE=true` keeps a
 local copy of every provider request body to measure what requests are made of; see
 [environment variables](docs/reference/environment-variables.md#request-capture).
+
+`ai-proxy gain` shows what the proxy saved, and `ai-proxy mcp` lets an agent read originals back;
+see [reading gain and retrieving originals](docs/how-to/reading-gain-and-retrieving-originals.md).
 
 ## Install
 

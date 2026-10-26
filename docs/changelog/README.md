@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.15.0](0.15.0-gain-and-retrieval-clients.md) | `ai-proxy gain` and `ai-proxy mcp` read a new gain ledger and kept originals over a loopback API on port 17432; the health and content endpoints move there from 5000. | #73 |
 | [0.14.1](0.14.1-trust-root-certificate-once.md) | macOS start no longer asks three times to approve keychain trust: the root certificate is trusted only when it is not trusted already. | #76 |
 | [0.14.0](0.14.0-javascript-typescript-code-views.md) | A whole JavaScript or TypeScript file (`.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`) a tool call read gets the code view; `.jsx` now counts as source code. | #75 |
 | [0.12.0](0.12.0-python-code-view.md) | A whole Python file a tool call read gets the code view: comments and `import` lines removed, exact text back through `proxy_retrieve`. | #74 |

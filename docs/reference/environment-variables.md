@@ -104,7 +104,10 @@ next capture.
 
 ## Local health endpoint
 
-`ASPNETCORE_URLS` controls the ASP.NET health and content endpoints (default `http://localhost:5000`).
+`ASPNETCORE_URLS` controls the ASP.NET health, content, gain and retrieval endpoints (default
+`http://127.0.0.1:17432`, loopback only). `ai-proxy gain` and `ai-proxy mcp` use the same default;
+give them `--endpoint` when you move it. See
+[reading gain and retrieving originals](../how-to/reading-gain-and-retrieving-originals.md).
 
 ## Proxy port
 

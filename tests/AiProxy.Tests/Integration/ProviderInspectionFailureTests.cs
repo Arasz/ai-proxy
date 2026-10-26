@@ -88,7 +88,7 @@ public sealed class ProviderInspectionFailureTests
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         var service = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, dataDirectory),
-            new ProviderRequestInspector(pipeline, hosts, new NoRequestCapture(), new CcrOff(), loggers.CreateLogger<ProviderRequestInspector>(), TimeProvider.System),
+            new ProviderRequestInspector(pipeline, hosts, new NoRequestCapture(), new CcrOff(), loggers.CreateLogger<ProviderRequestInspector>(), TimeProvider.System, new NoGainLedger()),
             hosts,
             loggers);
         await service.StartAsync(TestContext.Current.CancellationToken);
