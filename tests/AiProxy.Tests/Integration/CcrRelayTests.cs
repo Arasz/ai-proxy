@@ -49,7 +49,13 @@ public sealed class CcrRelayTests : IDisposable
         upstream.Handler = Script(
             Sse.Message("msg_1", "tool_use", 4, Sse.Text("reading"), Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
             Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
-        await using var proxy = await StartProxyAsync();
+        var logs = new RecordingLoggerProvider();
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string>
+            {
+                ["Proxy:Compression:Enabled"] = "true",
+                ["Proxy:Compression:Database"] = _databasePath
+            }, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), logging: logs);
 
         using var response = await SendAsync(proxy, upstream, StatelessRequest());
         var client = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
@@ -62,6 +68,9 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Contains("\"output_tokens\":10", client, StringComparison.Ordinal);
 
         Assert.Equal(2, upstream.Requests.Count);
+        var summary = Assert.Single(logs.Entries, entry => entry.EventId == 1407);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Information, summary.Level);
+        Assert.Contains($"{Encoding.UTF8.GetByteCount(StatelessRequest())} bytes to", summary.Message, StringComparison.Ordinal);
         var first = Json(upstream.Requests[0].Body);
         Assert.Equal(CcrRetrieval.Name, first.GetProperty("tools").EnumerateArray().Last().GetProperty("name").GetString());
         Assert.StartsWith(CcrPreview.Marker, first.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("content").GetString(), StringComparison.Ordinal);

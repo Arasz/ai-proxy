@@ -17,14 +17,33 @@ if (GuardCommand.IsRequested(args))
     return new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, TimeSpan.FromSeconds(5)).Run(input);
 }
 
-if (args is [CliProcess.Command, ..])
+var commands = new (string Name, string Description, Func<string[], Task<int>> Run)[]
 {
-    return await new CliProcess().RunAsync(args);
+    (CliProcess.Command, "Show compression savings", options => new CliProcess().RunAsync([CliProcess.Command, .. options])),
+    (McpServerProcess.Command, "Run the retrieval MCP server", options => new McpServerProcess().RunAsync(options)),
+    (ClaudeProcess.Command, "Launch Claude Code through the running proxy", options => new ClaudeProcess().RunAsync(options))
+};
+
+if (args is ["-h" or "--help"])
+{
+    Console.WriteLine("Usage: ai-proxy [server options]\n\nWithout a command, start the proxy. Commands:");
+    foreach (var command in commands)
+    {
+        Console.WriteLine($"  ai-proxy {command.Name,-8} {command.Description}");
+    }
+    Console.WriteLine("\nUse ai-proxy <command> --help for command options.");
+    return 0;
 }
 
-if (args is [McpServerProcess.Command, .. var options])
+if (args is [var name, .. var options])
 {
-    return await new McpServerProcess().RunAsync(options);
+    foreach (var command in commands)
+    {
+        if (command.Name == name)
+        {
+            return await command.Run(options);
+        }
+    }
 }
 
 var builder = WebApplication.CreateBuilder(args);

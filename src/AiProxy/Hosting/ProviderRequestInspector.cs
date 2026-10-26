@@ -214,6 +214,11 @@ public sealed partial class ProviderRequestInspector(
             {
                 exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "content-store", "content_store_failed"));
             }
+            if (compressed is { Changed: true, Summary: { } summary })
+            {
+                Log.Compressed(logger, summary.Path, summary.ChunkCount, body.Length, compressed.Body.Length,
+                    body.Length == 0 ? 1 : (double)compressed.Body.Length / body.Length);
+            }
             exchange.Stages.Add("compression", time.GetElapsedTime(stage));
             exchange.Stages.Add("compression.", compressed.Stages);
             return compressed;
@@ -331,6 +336,9 @@ public sealed partial class ProviderRequestInspector(
 
     private static partial class Log
     {
+        [LoggerMessage(EventId = 1407, Level = LogLevel.Information, Message = "compressed the body with {Path} over {ChunkCount} parts, {OriginalBytes} bytes to {CompressedBytes}, ratio {Ratio:F3}")]
+        public static partial void Compressed(ILogger logger, string path, int chunkCount, int originalBytes, int compressedBytes, double ratio);
+
         [LoggerMessage(EventId = 1406, Level = LogLevel.Warning, Message = "Gain metadata for request {RequestId} could not be recorded")]
         public static partial void GainWriteFailed(ILogger logger, string requestId, Exception exception);
 

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>One log call as a test sees it.</summary>
-internal sealed record LogEntry(string Category, LogLevel Level, int EventId, Exception? Exception);
+internal sealed record LogEntry(string Category, LogLevel Level, int EventId, Exception? Exception, string Message);
 
 /// <summary>Keeps every log call of every logger it creates, so a test can assert on event ids.</summary>
 internal sealed class RecordingLoggerProvider : ILoggerProvider
@@ -27,6 +27,6 @@ internal sealed class RecordingLoggerProvider : ILoggerProvider
         public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-            entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, exception));
+            entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, exception, formatter(state, exception)));
     }
 }
