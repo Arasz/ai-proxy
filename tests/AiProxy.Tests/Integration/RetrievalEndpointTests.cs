@@ -51,5 +51,40 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
         Assert.Equal(0,resetGain!.Summary.Recalls);
     }
 
+    [Fact]
+    public async Task A_recall_the_ledger_cannot_write_still_returns_the_original()
+    {
+        Directory.CreateDirectory(_directory.Path);
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string>
+            {
+                ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = Path.Combine(_directory.Path, "content.db"),
+            },
+            configure: services => services.AddSingleton<IGainStore, FailingGainStore>());
+        const string text = "only line";
+        var id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
+        await proxy.Services.GetRequiredService<IOriginalStore>().KeepAsync(new KeptOriginal(id, text, 1), TestContext.Current.CancellationToken);
+        using var http = new HttpClient { BaseAddress = proxy.BaseAddress };
+
+        using var response = await http.PostAsJsonAsync("/retrieval", new RetrievalRequest(id, "whole"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var answer = await response.Content.ReadFromJsonAsync<RetrievalResponse>(TestContext.Current.CancellationToken);
+        Assert.EndsWith(text, answer?.Text ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private sealed class FailingGainStore : IGainStore
+    {
+        public ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken) =>
+            throw new IOException("disk full");
+
+        public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) =>
+            throw new IOException("disk full");
+
+        public ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken) => throw new IOException("disk full");
+
+        public ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken) => throw new IOException("disk full");
+    }
+
     public ValueTask DisposeAsync() { _directory.Dispose(); return ValueTask.CompletedTask; }
 }

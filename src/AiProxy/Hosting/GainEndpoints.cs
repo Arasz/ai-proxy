@@ -7,7 +7,7 @@ using AiProxy.Core.Content.Ccr;
 namespace AiProxy.Hosting;
 
 /// <summary>Maps the proxy-owned retrieval and statistics API.</summary>
-public static class GainEndpoints
+public static partial class GainEndpoints
 {
     public const string DefaultEndpoint = "http://127.0.0.1:17432";
     public const string ProjectHeader = "X-Ai-Proxy-Project";
@@ -48,9 +48,17 @@ public static class GainEndpoints
             var original = parsed.Request is { } valid ? await store.FindAsync(valid.Id, cancellationToken) : null;
             var answer = retriever.Answer(arguments, original, options);
             var project = context.Request.Headers[ProjectHeader].FirstOrDefault();
-            await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? "unknown" : "caller",
-                request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
-                null, "retrieve_original", "unknown", "retrieval", "ccr", cancellationToken);
+            try
+            {
+                await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? "unknown" : "caller",
+                    request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
+                    null, "retrieve_original", "unknown", "retrieval", "ccr", cancellationToken);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                Log.RecallWriteFailed(context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(GainEndpoints)), exception);
+            }
+
             return Results.Json(new RetrievalResponse(answer.Text, answer.Error));
         });
     }
@@ -103,5 +111,11 @@ public static class GainEndpoints
             }
         }
         return null;
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(EventId = 1410, Level = LogLevel.Warning, Message = "A retrieval was answered but its recall could not be recorded")]
+        public static partial void RecallWriteFailed(ILogger logger, Exception exception);
     }
 }
