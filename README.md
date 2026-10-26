@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Arasz/ai-proxy/main/content/icon.png" width="128" alt="ai-proxy">
+</p>
+
 # ai-proxy
 
 [![build](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml/badge.svg)](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml)
@@ -37,14 +41,79 @@ see [reading gain and retrieving originals](docs/how-to/reading-gain-and-retriev
 
 ## Install
 
-The tool package is not published yet. To run from a checkout:
+Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), then install the tool:
+
+```bash
+dotnet tool install --global ai-proxy
+```
+
+To update an existing installation, run `dotnet tool update --global ai-proxy`.
+
+## Start the proxy
+
+```bash
+ai-proxy
+```
+
+Or run from a checkout:
 
 ```bash
 dotnet run --project src/AiProxy
 ```
 
-This registers the system proxy and may ask once for permission to trust the HTTPS inspection
-certificate. Stop the process with Ctrl+C to restore the previous system proxy settings.
+Keep this process running while using your agents. On macOS, startup registers the system
+proxy and may ask once for permission to trust the HTTPS inspection certificate. Stop it with
+Ctrl+C to restore the previous proxy settings.
+
+The forward proxy listens on `127.0.0.1:8080`. Its separate local API listens on
+`127.0.0.1:17432`; check it from another terminal:
+
+```bash
+curl http://127.0.0.1:17432/health
+```
+
+## Connect an agent
+
+Clients can require explicit proxy and certificate settings even when macOS's system proxy
+is configured. Start ai-proxy once before launching them: it writes its public inspection
+certificate to `~/.ai-proxy/root-ca.pem`. The private certificate and key remain in
+`root-ca.pfx`; use the public PEM file for client trust.
+
+For Claude Code, launch it from the project directory with:
+
+```bash
+HTTP_PROXY=http://127.0.0.1:8080 \
+HTTPS_PROXY=http://127.0.0.1:8080 \
+NO_PROXY=localhost,127.0.0.1,::1 \
+NODE_EXTRA_CA_CERTS="$HOME/.ai-proxy/root-ca.pem" \
+ANTHROPIC_CUSTOM_HEADERS="X-Ai-Proxy-Project: $PWD" \
+claude
+```
+
+The proxy settings route traffic through ai-proxy, and `NODE_EXTRA_CA_CERTS` lets the Node
+client trust its inspection certificate. The optional project header attributes gain to this
+directory; ai-proxy removes that header before forwarding. See the
+[gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project)
+for the verified Codex project-header configuration. Keep each provider's upstream base URL;
+port 8080 is a forward proxy, not an API base URL.
+
+## Read gain and retrieve originals
+
+```bash
+ai-proxy gain
+ai-proxy gain --project
+ai-proxy gain --watch
+```
+
+These commands query the running proxy's local API. To expose kept originals to Claude Code
+over MCP, register the same installed tool:
+
+```bash
+claude mcp add ai-proxy -- ai-proxy mcp
+```
+
+The [gain and retrieval guide](docs/how-to/reading-gain-and-retrieving-originals.md) describes
+filters, reset, and retrieval limits.
 
 ## Build and test
 

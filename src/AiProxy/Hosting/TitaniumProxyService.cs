@@ -12,6 +12,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// <summary>File name of the root CA pfx inside <see cref="ProxyRuntimeOptions.DataDirectory"/>.</summary>
     public const string RootCertificateFileName = "root-ca.pfx";
 
+    /// <summary>The public root certificate as PEM, for clients that trust a CA file (such as <c>NODE_EXTRA_CA_CERTS</c>).</summary>
+    public const string RootCertificatePemFileName = "root-ca.pem";
+
     private readonly ProxyServer _server;
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly ISystemProxyGuardLauncher _guardLauncher;
@@ -262,6 +265,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        if (certificates.RootCertificate is { } root)
+        {
+            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), root.ExportCertificatePem() + "\n");
         }
     }
 
