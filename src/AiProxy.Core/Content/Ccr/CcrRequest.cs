@@ -15,7 +15,7 @@ public enum CcrThread
     Create,
 
     /// <summary>A later request of a server-side thread; it carries only the new blocks.</summary>
-    Continue,
+    Continue
 }
 
 /// <summary>How the client asked for the response.</summary>
@@ -25,7 +25,7 @@ public enum CcrResponse
     Whole,
 
     /// <summary>Server-sent events.</summary>
-    Streamed,
+    Streamed
 }
 
 /// <summary>Whether the request defines tools.</summary>
@@ -35,7 +35,7 @@ public enum CcrTools
     None,
 
     /// <summary>At least one tool.</summary>
-    Defined,
+    Defined
 }
 
 /// <summary>What CCR reads from a Messages request body, and the byte-exact edits it makes to one.</summary>
@@ -51,10 +51,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
     public static CcrRequest? Read(ReadOnlyMemory<byte> body)
     {
         using var document = JsonDocument.TryParse(body);
-        if (document is null || document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
+        if (document is null || document.RootElement.ValueKind != JsonValueKind.Object) return null;
 
         var root = document.RootElement;
         var response = root.TryGetProperty(Fields.Stream, out var stream) && stream.ValueKind == JsonValueKind.True ? CcrResponse.Streamed : CcrResponse.Whole;
@@ -67,7 +64,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
             {
                 ThreadTypes.Create => CcrThread.Create,
                 ThreadTypes.Continue => CcrThread.Continue,
-                _ => CcrThread.None,
+                _ => CcrThread.None
             };
             previous = threadValue.StringProperty(Fields.PreviousMessageId);
         }
@@ -90,10 +87,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
                 if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1 && reader.ValueTextEquals(Fields.Tools))
                 {
                     reader.Read();
-                    if (reader.TokenType != JsonTokenType.StartArray)
-                    {
-                        return null;
-                    }
+                    if (reader.TokenType != JsonTokenType.StartArray) return null;
 
                     inTools = true;
                 }
@@ -120,16 +114,10 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
                     break;
             }
 
-            if (insertAt >= 0)
-            {
-                break;
-            }
+            if (insertAt >= 0) break;
         }
 
-        if (insertAt < 0 || count == 0)
-        {
-            return null;
-        }
+        if (insertAt < 0 || count == 0) return null;
 
         var result = new byte[body.Length + 1 + DefinitionBytes.Length];
         body[..insertAt].CopyTo(result);
@@ -148,10 +136,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
         var parent = "";
         while (reader.Read())
         {
-            if (reader.TokenType != JsonTokenType.PropertyName)
-            {
-                continue;
-            }
+            if (reader.TokenType != JsonTokenType.PropertyName) continue;
 
             if (reader.CurrentDepth == 1)
             {
@@ -162,10 +147,7 @@ public sealed record CcrRequest(CcrResponse Response, CcrTools Tools, CcrThread 
             if (reader.CurrentDepth == 2 && parent is Fields.Thread or Fields.Diagnostics && reader.ValueTextEquals(Fields.PreviousMessageId))
             {
                 reader.Read();
-                if (reader.TokenType == JsonTokenType.String)
-                {
-                    spans.Add(new TokenSpan((int)reader.TokenStartIndex, reader.ValueSpan.Length + 2));
-                }
+                if (reader.TokenType == JsonTokenType.String) spans.Add(new TokenSpan((int)reader.TokenStartIndex, reader.ValueSpan.Length + 2));
             }
         }
 

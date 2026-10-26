@@ -11,31 +11,36 @@ namespace AiProxy.Tests.Unit.Content.Ccr;
 /// <summary>The CCR stage of the pipeline: a large tool result becomes its preview, and its original is kept first when the thread needs it.</summary>
 public sealed class ContentCompressionPipelineCcrTests
 {
+    private const string Small = "one line of output";
     private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
 
-    private const string Small = "one line of output";
-
-    private static byte[] Body(params string[] outputs) => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] Body(params string[] outputs)
     {
-        messages = new[]
+        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
-            new
+            messages = new[]
             {
-                role = "user",
-                content = outputs.Select((output, index) => new { type = "tool_result", tool_use_id = $"t{index}", content = output }).ToArray(),
-            },
-        },
-    }));
+                new
+                {
+                    role = "user",
+                    content = outputs.Select((output, index) => new { type = "tool_result", tool_use_id = $"t{index}", content = output }).ToArray()
+                }
+            }
+        }));
+    }
 
-    private static ContentCompressionPipeline Build(MemoryOriginalStore store) => new(
-        new ToolOutputRegionFinder(),
-        new ContentDecompositor(),
-        new CompressionExecutor(new ContentRouter([], new PassThroughCompressionHandler())),
-        new ContentCompositor(),
-        new NullContentStore(),
-        CompressionOptions.Default,
-        TimeProvider.System,
-        new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+    private static ContentCompressionPipeline Build(MemoryOriginalStore store)
+    {
+        return new ContentCompressionPipeline(
+            new ToolOutputRegionFinder(),
+            new ContentDecompositor(),
+            new CompressionExecutor(new ContentRouter([], new PassThroughCompressionHandler())),
+            new ContentCompositor(),
+            new NullContentStore(),
+            CompressionOptions.Default,
+            TimeProvider.System,
+            new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+    }
 
     private static string[] ToolResults(CompressionResult result)
     {
@@ -110,8 +115,14 @@ public sealed class ContentCompressionPipelineCcrTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult<ContentRecord?>(null);
+        }
     }
 }

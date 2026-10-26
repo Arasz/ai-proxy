@@ -1,6 +1,7 @@
+using System.Globalization;
 using AiProxy.Core.Capture;
-using AiProxy.Core.Timing;
 using AiProxy.Core.Providers;
+using AiProxy.Core.Timing;
 using AiProxy.Storage;
 using Dapper;
 using Microsoft.Data.Sqlite;
@@ -10,8 +11,8 @@ namespace AiProxy.Tests.Unit.Storage;
 /// <summary>The capture store, tested against a real database file.</summary>
 public sealed class CaptureStoreTests : IDisposable
 {
-    private readonly string _directory = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
     private readonly string _databasePath;
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
     private readonly SqliteCaptureStore _store;
 
     public CaptureStoreTests()
@@ -23,10 +24,7 @@ public sealed class CaptureStoreTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
+        if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
     }
 
     [Fact]
@@ -42,7 +40,7 @@ public sealed class CaptureStoreTests : IDisposable
 
         var row = Assert.Single(await ReadRowsAsync());
         Assert.Equal("r1", row.RequestId);
-        Assert.Equal(capturedAt, DateTimeOffset.Parse(row.CapturedAt, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(capturedAt, DateTimeOffset.Parse(row.CapturedAt, CultureInfo.InvariantCulture));
         Assert.Equal("Gemini", row.Provider);
         Assert.Equal("generativelanguage.googleapis.com", row.Host);
         Assert.Equal("/v1beta/models/x:generateContent", row.Path);
@@ -80,17 +78,11 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file modes do not apply on Windows.");
         Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
         await File.WriteAllBytesAsync(_databasePath, [], TestContext.Current.CancellationToken);
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(_databasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
-        }
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(_databasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
 
         await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
 
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_databasePath));
-        }
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_databasePath));
     }
 
     [Fact]
@@ -101,7 +93,7 @@ public sealed class CaptureStoreTests : IDisposable
         if (!OperatingSystem.IsWindows())
         {
             var openToOthers = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
-                | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
+                               | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute;
             Directory.CreateDirectory(directory);
             File.SetUnixFileMode(directory, openToOthers);
             Assert.Equal(openToOthers, File.GetUnixFileMode(directory));
@@ -109,10 +101,7 @@ public sealed class CaptureStoreTests : IDisposable
 
         await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
 
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory));
-        }
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory));
     }
 
     [Fact]
@@ -127,7 +116,7 @@ public sealed class CaptureStoreTests : IDisposable
 
         var row = Assert.Single(await ReadResponsesAsync());
         Assert.Equal("r1", row.RequestId);
-        Assert.Equal(completedAt, DateTimeOffset.Parse(row.CompletedAt, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(completedAt, DateTimeOffset.Parse(row.CompletedAt, CultureInfo.InvariantCulture));
         Assert.Equal(200, row.Status);
         Assert.Equal(1000, row.RequestBytes);
         Assert.Equal(600, row.ForwardedBytes);
@@ -164,16 +153,16 @@ public sealed class CaptureStoreTests : IDisposable
         {
             await old.OpenAsync(TestContext.Current.CancellationToken);
             await old.ExecuteAsync("""
-                CREATE TABLE capture_request (
-                    request_id  TEXT PRIMARY KEY,
-                    captured_at TEXT NOT NULL,
-                    provider    TEXT NOT NULL,
-                    host        TEXT NOT NULL,
-                    path        TEXT NOT NULL,
-                    body        BLOB NOT NULL
-                );
-                INSERT INTO capture_request VALUES ('old', '2026-10-22T00:00:00.0000000+00:00', 'Anthropic', 'api.anthropic.com', '/v1/messages', x'7B7D');
-                """);
+                                   CREATE TABLE capture_request (
+                                       request_id  TEXT PRIMARY KEY,
+                                       captured_at TEXT NOT NULL,
+                                       provider    TEXT NOT NULL,
+                                       host        TEXT NOT NULL,
+                                       path        TEXT NOT NULL,
+                                       body        BLOB NOT NULL
+                                   );
+                                   INSERT INTO capture_request VALUES ('old', '2026-10-22T00:00:00.0000000+00:00', 'Anthropic', 'api.anthropic.com', '/v1/messages', x'7B7D');
+                                   """);
         }
 
         var store = new SqliteCaptureStore(_databasePath);
@@ -191,13 +180,30 @@ public sealed class CaptureStoreTests : IDisposable
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _databasePath, Mode = SqliteOpenMode.ReadOnly }.ToString());
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         var rows = await connection.QueryAsync<ResponseRow>("""
-            SELECT request_id AS RequestId, completed_at AS CompletedAt, status AS Status,
-                   request_bytes AS RequestBytes, forwarded_bytes AS ForwardedBytes, response_bytes AS ResponseBytes,
-                   input_tokens AS InputTokens, output_tokens AS OutputTokens,
-                   cache_creation_input_tokens AS CacheCreationInputTokens, cache_read_input_tokens AS CacheReadInputTokens,
-                   usage_error AS UsageError, stages AS Stages
-            FROM capture_response;
-            """);
+                                                            SELECT request_id AS RequestId, completed_at AS CompletedAt, status AS Status,
+                                                                   request_bytes AS RequestBytes, forwarded_bytes AS ForwardedBytes, response_bytes AS ResponseBytes,
+                                                                   input_tokens AS InputTokens, output_tokens AS OutputTokens,
+                                                                   cache_creation_input_tokens AS CacheCreationInputTokens, cache_read_input_tokens AS CacheReadInputTokens,
+                                                                   usage_error AS UsageError, stages AS Stages
+                                                            FROM capture_response;
+                                                            """);
+        return rows.ToList();
+    }
+
+    private static CapturedRequest Capture(string requestId)
+    {
+        return new CapturedRequest(requestId, DateTimeOffset.UnixEpoch, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", "{}"u8.ToArray());
+    }
+
+    private async Task<IReadOnlyList<CaptureRow>> ReadRowsAsync()
+    {
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _databasePath, Mode = SqliteOpenMode.ReadOnly }.ToString());
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        var rows = await connection.QueryAsync<CaptureRow>("""
+                                                           SELECT request_id AS RequestId, captured_at AS CapturedAt, provider AS Provider,
+                                                                  host AS Host, path AS Path, body AS Body
+                                                           FROM capture_request;
+                                                           """);
         return rows.ToList();
     }
 
@@ -214,21 +220,6 @@ public sealed class CaptureStoreTests : IDisposable
         long? CacheReadInputTokens,
         string? UsageError,
         string Stages);
-
-    private static CapturedRequest Capture(string requestId) =>
-        new(requestId, DateTimeOffset.UnixEpoch, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", "{}"u8.ToArray());
-
-    private async Task<IReadOnlyList<CaptureRow>> ReadRowsAsync()
-    {
-        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _databasePath, Mode = SqliteOpenMode.ReadOnly }.ToString());
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
-        var rows = await connection.QueryAsync<CaptureRow>("""
-            SELECT request_id AS RequestId, captured_at AS CapturedAt, provider AS Provider,
-                   host AS Host, path AS Path, body AS Body
-            FROM capture_request;
-            """);
-        return rows.ToList();
-    }
 
     private sealed record CaptureRow(string RequestId, string CapturedAt, string Provider, string Host, string Path, byte[] Body);
 }

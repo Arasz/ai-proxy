@@ -5,6 +5,7 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -14,34 +15,30 @@ namespace AiProxy.Tests.Integration;
 public sealed class PartIsolationTests : IDisposable
 {
     private const string Log = """
-        2026-03-12 10:00:00 INFO worker=api-1 request started
-        2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
-        2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:05 INFO worker=api-1 the last line
-        """;
+                               2026-03-12 10:00:00 INFO worker=api-1 request started
+                               2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
+                               2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
+                               2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
+                               2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
+                               2026-03-12 10:00:05 INFO worker=api-1 the last line
+                               """;
 
     private const string Prose = """
-        the same line said again
-        the same line said again
-        the same line said again
-        the same line said again
-        the line after it
-        """;
+                                 the same line said again
+                                 the same line said again
+                                 the same line said again
+                                 the same line said again
+                                 the line after it
+                                 """;
 
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-isolation-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
             if (File.Exists(file))
-            {
                 File.Delete(file);
-            }
-        }
     }
 
     [Fact]
@@ -51,8 +48,8 @@ public sealed class PartIsolationTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(logs);
         var body = $$"""
-            {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}},{"type":"tool_result","content":{{JsonSerializer.Serialize(Prose)}}}]}]}
-            """;
+                     {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}},{"type":"tool_result","content":{{JsonSerializer.Serialize(Prose)}}}]}]}
+                     """;
 
         await SendAsync(proxy, upstream, body);
 
@@ -70,8 +67,8 @@ public sealed class PartIsolationTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(logs);
         var body = $$"""
-            {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}}]}]}
-            """;
+                     {"model":"m","messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(Log)}}}]}]}
+                     """;
 
         await SendAsync(proxy, upstream, body);
 
@@ -79,13 +76,14 @@ public sealed class PartIsolationTests : IDisposable
         AssertOnePartFailureLogged(logs);
     }
 
-    private Task<ProxyHost> StartProxyAsync(RecordingLoggerProvider logs) =>
-        ProxyHost.StartAsync(
+    private Task<ProxyHost> StartProxyAsync(RecordingLoggerProvider logs)
+    {
+        return ProxyHost.StartAsync(
             new Dictionary<string, string>
             {
                 ["Proxy:Compression:Enabled"] = "true",
                 ["Proxy:Compression:Database"] = _databasePath,
-                ["Proxy:Compression:Minimum"] = "1",
+                ["Proxy:Compression:Minimum"] = "1"
             },
             providerHosts: new LoopbackProviderHosts(Dialect.Anthropic),
             configure: services =>
@@ -94,6 +92,7 @@ public sealed class PartIsolationTests : IDisposable
                 services.AddSingleton<ICompressionHandler, ThrowingLogHandler>();
                 services.AddSingleton<ILoggerProvider>(logs);
             });
+    }
 
     private static async Task SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
@@ -115,9 +114,14 @@ public sealed class PartIsolationTests : IDisposable
 
     private sealed class ThrowingLogHandler : ICompressionHandler
     {
-        public bool CanHandle(ContentType type) => type == ContentType.Log;
+        public bool CanHandle(ContentType type)
+        {
+            return type == ContentType.Log;
+        }
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) =>
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
+        {
             throw new InvalidOperationException("boom");
+        }
     }
 }

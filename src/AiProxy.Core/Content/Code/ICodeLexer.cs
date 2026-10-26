@@ -13,5 +13,8 @@ public interface ICodeLexer
     CodeLexResult Lex(string text);
 
     /// <summary>Scans a complete file whose grammar may depend on its path, such as TSX.</summary>
-    CodeLexResult Lex(string text, string? filePath) => Lex(text);
+    CodeLexResult Lex(string text, string? filePath)
+    {
+        return Lex(text);
+    }
 }

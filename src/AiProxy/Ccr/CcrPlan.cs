@@ -1,7 +1,6 @@
 using AiProxy.Configuration;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
-using Microsoft.AspNetCore.Http;
 
 namespace AiProxy.Ccr;
 
@@ -18,7 +17,7 @@ public enum CcrAction
     RelayContinue,
 
     /// <summary>Refuse it: the ledger could not be read, so a <c>continue</c> must not go out as sent.</summary>
-    Refuse,
+    Refuse
 }
 
 /// <summary>The plan for one provider request; build it with the factories.</summary>
@@ -39,20 +38,26 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     /// <summary>Why the ledger could not be read; set only on a refusal.</summary>
     public Exception? Failure { get; private init; }
 
-    /// <summary>Refuse the request because the ledger read failed.</summary>
-    public static CcrPlan Refuse(Exception failure) => new(CcrAction.Refuse, CcrMode.Off, "") { Failure = failure };
-
     /// <summary>Relay a thread <c>create</c>.</summary>
     public static CcrPlan Create { get; } = new(CcrAction.RelayWithTool, CcrMode.Thread, "");
 
     /// <summary>Relay a stateless request.</summary>
     public static CcrPlan Stateless { get; } = new(CcrAction.RelayWithTool, CcrMode.Stateless, "");
 
-    /// <summary>Relay a thread <c>continue</c> from the message the ledger names.</summary>
-    public static CcrPlan Continue(string continueFrom) => new(CcrAction.RelayContinue, CcrMode.Thread, continueFrom);
-
     /// <summary>Whether the proxy answers the client itself.</summary>
     public bool Relays => Action is CcrAction.RelayWithTool or CcrAction.RelayContinue;
+
+    /// <summary>Refuse the request because the ledger read failed.</summary>
+    public static CcrPlan Refuse(Exception failure)
+    {
+        return new CcrPlan(CcrAction.Refuse, CcrMode.Off, "") { Failure = failure };
+    }
+
+    /// <summary>Relay a thread <c>continue</c> from the message the ledger names.</summary>
+    public static CcrPlan Continue(string continueFrom)
+    {
+        return new CcrPlan(CcrAction.RelayContinue, CcrMode.Thread, continueFrom);
+    }
 
     /// <summary>Decides the plan of a request; a <c>continue</c> is looked up in the ledger whatever the settings, so a thread with hidden turns keeps working.</summary>
     public static async Task<CcrPlan> DecideAsync(
@@ -64,17 +69,14 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         ReadOnlyMemory<byte> body,
         CancellationToken cancellationToken)
     {
-        if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
-        {
-            return Forward;
-        }
+        if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request) return Forward;
 
         return request.Thread switch
         {
             CcrThread.Continue when request.PreviousMessageId is { } previous => await LookUpAsync(store, previous, cancellationToken).ConfigureAwait(false),
             CcrThread.Create when settings.Enabled && request.Tools == CcrTools.Defined => Create,
             CcrThread.None when settings.Enabled && request.Tools == CcrTools.Defined => Stateless,
-            _ => Forward,
+            _ => Forward
         };
     }
 

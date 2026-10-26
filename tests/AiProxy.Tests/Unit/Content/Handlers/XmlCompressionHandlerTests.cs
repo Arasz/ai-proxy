@@ -9,7 +9,10 @@ public sealed class XmlCompressionHandlerTests
 {
     private static readonly XmlCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text) => new("request", 1, ContentType.Xml, text);
+    private static ContentPart Part(string text)
+    {
+        return new ContentPart("request", 1, ContentType.Xml, text);
+    }
 
     [Fact]
     public async Task The_indentation_goes_away()

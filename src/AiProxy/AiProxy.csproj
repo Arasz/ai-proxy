@@ -27,27 +27,31 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../AiProxy.Cli/AiProxy.Cli.csproj" />
-        <ProjectReference Include="../AiProxy.Code/AiProxy.Code.csproj" />
-        <ProjectReference Include="../AiProxy.Mcp/AiProxy.Mcp.csproj" />
-        <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj" />
-        <ProjectReference Include="../AiProxy.Storage/AiProxy.Storage.csproj" />
+        <ProjectReference Include="../AiProxy.Code/AiProxy.Code.csproj"/>
+        <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
+        <ProjectReference Include="../AiProxy.Storage/AiProxy.Storage.csproj"/>
+        <ProjectReference Include="../AiProxy.Generators/AiProxy.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="RuntimeIdentifier"/>
     </ItemGroup>
 
     <ItemGroup>
         <!-- The package page is where someone lands after `dotnet tool install`; the
              README is what they read there. -->
-        <None Include="../../README.md" Pack="true" PackagePath="/" />
-        <None Include="../../content/icon.png" Pack="true" PackagePath="/" />
+        <None Include="../../README.md" Pack="true" PackagePath="/"/>
+        <None Include="../../content/icon.png" Pack="true" PackagePath="/"/>
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="AiProxy.Tests" />
+        <InternalsVisibleTo Include="AiProxy.Tests"/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="JsonSchema.Net" />
-      <PackageReference Include="Titanium.Web.Proxy" />
+        <PackageReference Include="FluentValidation"/>
+        <PackageReference Include="JetBrains.Annotations"/>
+        <PackageReference Include="JsonSchema.Net"/>
+        <PackageReference Include="ModelContextProtocol"/>
+        <PackageReference Include="Spectre.Console"/>
+        <PackageReference Include="Spectre.Console.Cli"/>
+        <PackageReference Include="Titanium.Web.Proxy"/>
     </ItemGroup>
 
 </Project>

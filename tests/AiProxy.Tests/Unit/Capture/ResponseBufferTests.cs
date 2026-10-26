@@ -52,7 +52,7 @@ public sealed class ResponseBufferTests
     public void A_short_plain_event_stream_is_kept_byte_for_byte()
     {
         var buffer = ResponseBuffer.For("text/event-stream; charset=utf-8", "identity");
-        var stream = Encoding.UTF8.GetBytes(Stream(events: 50));
+        var stream = Encoding.UTF8.GetBytes(Stream(50));
         Assert.True(stream.Length < ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes, "the stream must fit, or this proves nothing");
 
         Append(buffer, stream, 333);
@@ -64,7 +64,7 @@ public sealed class ResponseBufferTests
     public void A_plain_event_stream_far_over_the_cap_keeps_its_head_and_tail_and_still_reads_whole()
     {
         var buffer = ResponseBuffer.For(EventStream, null);
-        var stream = Encoding.UTF8.GetBytes(Stream(events: 60_000));
+        var stream = Encoding.UTF8.GetBytes(Stream(60_000));
         Assert.True(stream.Length > FourMiB + 1024, $"the stream is {stream.Length} bytes; it must be over the cap");
 
         // An odd chunk size cuts events in the middle at both ends of the window.
@@ -83,7 +83,7 @@ public sealed class ResponseBufferTests
     {
         // Answer text that looks like an event line, with the tail's first byte placed on one of those copies:
         // kept, the partial line would read as a broken event and lose the stream its final usage.
-        var lead = Stream(events: 30_000).Split("event: message_delta")[0];
+        var lead = Stream(30_000).Split("event: message_delta")[0];
         var filler = $"event: content_block_delta\ndata: {{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"{string.Concat(Enumerable.Repeat("data: {\\\"type\\\":\\\"x\\\"} ", 40))}\"}}}}\n\n";
         const string end = "event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":57,\"cache_read_input_tokens\":301}}\n\n";
         var fillers = ResponseBuffer.TailBytes / filler.Length + 2;
@@ -117,20 +117,14 @@ public sealed class ResponseBufferTests
 
     private static void Append(ResponseBuffer buffer, byte[] bytes, int chunk)
     {
-        for (var offset = 0; offset < bytes.Length; offset += chunk)
-        {
-            buffer.Append(bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)));
-        }
+        for (var offset = 0; offset < bytes.Length; offset += chunk) buffer.Append(bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)));
     }
 
     private static string Stream(int events)
     {
         var text = new StringBuilder();
         text.Append("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":100,\"output_tokens\":1,\"cache_creation_input_tokens\":200,\"cache_read_input_tokens\":300}}}\n\n");
-        for (var index = 0; index < events; index++)
-        {
-            text.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"word ").Append(index).Append("\"}}\n\n");
-        }
+        for (var index = 0; index < events; index++) text.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"word ").Append(index).Append("\"}}\n\n");
 
         text.Append("event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":57,\"cache_read_input_tokens\":301}}\n\n");
         text.Append("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");

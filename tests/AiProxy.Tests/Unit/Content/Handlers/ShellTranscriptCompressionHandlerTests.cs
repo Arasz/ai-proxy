@@ -8,22 +8,15 @@ public sealed class ShellTranscriptCompressionHandlerTests
 {
     private static readonly ShellTranscriptCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text) => new("request", 1, ContentType.ShellTranscript, text);
+    private static ContentPart Part(string text)
+    {
+        return new ContentPart("request", 1, ContentType.ShellTranscript, text);
+    }
 
     [Fact]
     public async Task The_line_that_carries_the_failure_survives()
     {
-        var text = string.Join("\n",
-        [
-            "$ ls -la",
-            "total 4",
-            "drwxr-xr-x 2 user group 4096 .",
-            "$ grep -r TODO .",
-            "src/a.cs:3: TODO: fix this",
-            "src/b.cs:9: TODO: and this",
-            "src/c.cs:11: TODO: and this",
-            "$ echo done",
-        ]);
+        var text = string.Join("\n", "$ ls -la", "total 4", "drwxr-xr-x 2 user group 4096 .", "$ grep -r TODO .", "src/a.cs:3: TODO: fix this", "src/b.cs:9: TODO: and this", "src/c.cs:11: TODO: and this", "$ echo done");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -33,17 +26,7 @@ public sealed class ShellTranscriptCompressionHandlerTests
     [Fact]
     public async Task A_line_without_a_signal_outside_the_anchors_is_dropped()
     {
-        var text = string.Join("\n",
-        [
-            "$ ls -la",
-            "total 4",
-            "nothing here",
-            "nothing here",
-            "nothing here",
-            "nothing here",
-            "drwxr-xr-x 2 user group 4096 .",
-            "$ echo done",
-        ]);
+        var text = string.Join("\n", "$ ls -la", "total 4", "nothing here", "nothing here", "nothing here", "nothing here", "drwxr-xr-x 2 user group 4096 .", "$ echo done");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -53,17 +36,7 @@ public sealed class ShellTranscriptCompressionHandlerTests
     [Fact]
     public async Task The_reduction_is_an_ordered_subsequence_of_the_input()
     {
-        var text = string.Join("\n",
-        [
-            "$ ls -la",
-            "total 4",
-            "nothing here",
-            "nothing here",
-            "nothing here",
-            "nothing here",
-            "drwxr-xr-x 2 user group 4096 .",
-            "$ echo done",
-        ]);
+        var text = string.Join("\n", "$ ls -la", "total 4", "nothing here", "nothing here", "nothing here", "nothing here", "drwxr-xr-x 2 user group 4096 .", "$ echo done");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 

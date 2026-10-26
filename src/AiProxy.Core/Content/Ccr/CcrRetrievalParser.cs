@@ -11,10 +11,7 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
     public CcrParseResult Parse(string arguments, CcrOptions options)
     {
         using var document = JsonDocument.TryParse(arguments);
-        if (document is null)
-        {
-            return CcrParseResult.Refused("The arguments are not JSON.");
-        }
+        if (document is null) return CcrParseResult.Refused("The arguments are not JSON.");
 
         var root = document.RootElement;
         var violation = HasMalformedUnicode(root) ? "The arguments contain malformed Unicode." : schema.Violation(root);
@@ -23,18 +20,11 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
 
     private static bool HasMalformedUnicode(JsonElement root)
     {
-        if (!root.IsObject)
-        {
-            return false;
-        }
+        if (!root.IsObject) return false;
 
         foreach (var property in root.EnumerateObject())
-        {
             if (!NameTranscodes(property) || (property.Value.IsString && property.Value.ReadString() is null))
-            {
                 return true;
-            }
-        }
 
         return false;
     }
@@ -61,25 +51,13 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         var start = Integer(root, RetrievalJson.Start);
         var end = Integer(root, RetrievalJson.End);
         var context = Integer(root, RetrievalJson.Context);
-        if (!start.Valid || !end.Valid || !context.Valid)
-        {
-            return CcrParseResult.Refused("'start', 'end' and 'context' must be whole numbers in range.");
-        }
+        if (!start.Valid || !end.Valid || !context.Valid) return CcrParseResult.Refused("'start', 'end' and 'context' must be whole numbers in range.");
 
-        if (context.Value > options.MaximumContext)
-        {
-            return CcrParseResult.Refused(CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
-        }
+        if (context.Value > options.MaximumContext) return CcrParseResult.Refused(CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
 
-        if (mode == RetrievalJson.LinesMode && (start.Value is null || end.Value is null))
-        {
-            return CcrParseResult.Refused("Mode lines needs 'start' and 'end'.");
-        }
+        if (mode == RetrievalJson.LinesMode && (start.Value is null || end.Value is null)) return CcrParseResult.Refused("Mode lines needs 'start' and 'end'.");
 
-        if (mode == RetrievalJson.PatternMode && pattern is null)
-        {
-            return CcrParseResult.Refused("Mode pattern needs 'pattern'.");
-        }
+        if (mode == RetrievalJson.PatternMode && pattern is null) return CcrParseResult.Refused("Mode pattern needs 'pattern'.");
 
         return CcrParseResult.Accepted(new CcrRetrievalRequest(id, mode, start.Value, end.Value, pattern, context.Value ?? 0));
     }
@@ -87,10 +65,7 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
     private static IntegerArgument Integer(JsonElement root, string name)
     {
         var value = root.PropertyOrDefault(name);
-        if (value.IsMissing)
-        {
-            return IntegerArgument.Missing;
-        }
+        if (value.IsMissing) return IntegerArgument.Missing;
 
         return value.TryGetInt32(out var number) ? IntegerArgument.Of(number) : IntegerArgument.Invalid;
     }
@@ -101,6 +76,9 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
 
         public static IntegerArgument Invalid { get; } = new(null, false);
 
-        public static IntegerArgument Of(int value) => new(value, true);
+        public static IntegerArgument Of(int value)
+        {
+            return new IntegerArgument(value, true);
+        }
     }
 }

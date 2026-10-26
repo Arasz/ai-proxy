@@ -5,11 +5,11 @@ namespace AiProxy.Core.Content;
 
 /// <summary>Finds the output of a tool in a request body, and nothing else.</summary>
 /// <remarks>
-/// The body is read twice. The first pass walks the parsed document and counts the string
-/// values in the order they appear, and notes which of them carry the output of a tool. The
-/// second pass walks the raw bytes and counts the string tokens in the same order, so a
-/// region is found by its position rather than by its content. That is what keeps a message
-/// the client wrote, which happens to repeat the tool's words, out of the regions.
+///     The body is read twice. The first pass walks the parsed document and counts the string
+///     values in the order they appear, and notes which of them carry the output of a tool. The
+///     second pass walks the raw bytes and counts the string tokens in the same order, so a
+///     region is found by its position rather than by its content. That is what keeps a message
+///     the client wrote, which happens to repeat the tool's words, out of the regions.
 /// </remarks>
 public sealed class ToolOutputRegionFinder
 {
@@ -17,16 +17,10 @@ public sealed class ToolOutputRegionFinder
     /// <param name="body">The request body.</param>
     public IReadOnlyList<ContentRegion> Find(ReadOnlyMemory<byte> body)
     {
-        if (body.Length == 0)
-        {
-            return [];
-        }
+        if (body.Length == 0) return [];
 
         var found = FindToolOutputIndexes(body.Span);
-        if (found.Indexes.Count == 0)
-        {
-            return [];
-        }
+        if (found.Indexes.Count == 0) return [];
 
         var scan = FindRegions(body.Span, found.Indexes);
 
@@ -42,10 +36,7 @@ public sealed class ToolOutputRegionFinder
         var indexes = new Dictionary<int, FileRead?>();
 
         using var document = JsonDocument.TryParse(body.ToArray());
-        if (document is null)
-        {
-            return new ToolOutputIndexes(indexes, 0);
-        }
+        if (document is null) return new ToolOutputIndexes(indexes, 0);
 
         var files = ToolCallFiles.Collect(document.RootElement);
         var count = Walk(document.RootElement, 0, indexes, files);
@@ -62,19 +53,14 @@ public sealed class ToolOutputRegionFinder
 
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
-                {
                     counter = IsToolOutputProperty(element, property)
                         ? WalkToolOutput(property.Value, counter, indexes, files, files.ReadFor(element))
                         : Walk(property.Value, counter, indexes, files);
-                }
 
                 return counter;
 
             case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray())
-                {
-                    counter = Walk(item, counter, indexes, files);
-                }
+                foreach (var item in element.EnumerateArray()) counter = Walk(item, counter, indexes, files);
 
                 return counter;
 
@@ -93,18 +79,11 @@ public sealed class ToolOutputRegionFinder
         // A path names one whole file, so an output that spans more than one string keeps none.
         var before = indexes.Count;
         var next = WalkToolOutputStrings(value, counter, indexes, files, path);
-        if (path is null || indexes.Count - before <= 1)
-        {
-            return next;
-        }
+        if (path is null || indexes.Count - before <= 1) return next;
 
         for (var index = counter; index < next; index++)
-        {
             if (indexes.ContainsKey(index))
-            {
                 indexes[index] = null;
-            }
-        }
 
         return next;
     }
@@ -122,18 +101,12 @@ public sealed class ToolOutputRegionFinder
                 return Record(counter, indexes, path);
 
             case JsonValueKind.Array:
-                foreach (var item in value.EnumerateArray())
-                {
-                    counter = WalkContentBlock(item, counter, indexes, files, path);
-                }
+                foreach (var item in value.EnumerateArray()) counter = WalkContentBlock(item, counter, indexes, files, path);
 
                 return counter;
 
             case JsonValueKind.Object:
-                foreach (var property in value.EnumerateObject())
-                {
-                    counter = WalkResultProperty(property, counter, indexes, files, path);
-                }
+                foreach (var property in value.EnumerateObject()) counter = WalkResultProperty(property, counter, indexes, files, path);
 
                 return counter;
 
@@ -150,17 +123,12 @@ public sealed class ToolOutputRegionFinder
         ToolCallFiles files,
         FileRead? path)
     {
-        if (!block.IsObject)
-        {
-            return Walk(block, counter, indexes, files);
-        }
+        if (!block.IsObject) return Walk(block, counter, indexes, files);
 
         foreach (var property in block.EnumerateObject())
-        {
             counter = property.IsString(ToolCallJson.Text)
                 ? Record(counter, indexes, path)
                 : Walk(property.Value, counter, indexes, files);
-        }
 
         return counter;
     }
@@ -173,10 +141,7 @@ public sealed class ToolOutputRegionFinder
         ToolCallFiles files,
         FileRead? path)
     {
-        if (property.IsString(ToolCallJson.Output) || property.IsString(ToolCallJson.Result))
-        {
-            return Record(counter, indexes, path);
-        }
+        if (property.IsString(ToolCallJson.Output) || property.IsString(ToolCallJson.Result)) return Record(counter, indexes, path);
 
         return property.Value.IsObject
             ? WalkToolOutputStrings(property.Value, counter, indexes, files, path)
@@ -210,10 +175,7 @@ public sealed class ToolOutputRegionFinder
 
         while (reader.Read())
         {
-            if (reader.TokenType != JsonTokenType.String)
-            {
-                continue;
-            }
+            if (reader.TokenType != JsonTokenType.String) continue;
 
             if (indexes.TryGetValue(counter, out var read))
             {

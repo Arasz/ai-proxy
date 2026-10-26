@@ -1,11 +1,15 @@
-using System.Threading.Channels;
-using Microsoft.Extensions.Time.Testing;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Channels;
+using AiProxy.Cli;
+using AiProxy.Client;
 using AiProxy.Core.Gain;
+using Microsoft.Extensions.Time.Testing;
 using Spectre.Console.Testing;
-namespace AiProxy.Cli.Tests;
+
+namespace AiProxy.Tests.Unit.Cli;
+
 public sealed class GainCommandTests
 {
     [Fact]
@@ -19,6 +23,7 @@ public sealed class GainCommandTests
         Assert.Contains("project=%2Fwork%2Fproject", fixture.Handler.Uris.Single().Query);
         Assert.Equal("", fixture.Error.ToString());
     }
+
     [Theory]
     [InlineData("", "estimated initial-request")]
     [InlineData("--history", "request-one")]
@@ -37,14 +42,14 @@ public sealed class GainCommandTests
     {
         using var fixture = new Fixture();
         var at = DateTimeOffset.Parse("2026-10-25T00:00:00Z");
-        var totals = new GainTotals(Requests: 1, EstimatedSavedTokens: 123);
+        var totals = new GainTotals(1, EstimatedSavedTokens: 123);
         fixture.Handler.Report = fixture.Handler.Report with
         {
-            History = [new("request-one", at, null, "anthropic", "POST", "code-rule", "tool-result", "content", totals)],
-            Daily = [new(at, totals)], Weekly = [new(at, totals)], Monthly = [new(at, totals)],
-            Attributions = [new("method", "POST", totals), new("rule", "code-rule", totals), new("layer", "tool-result", totals), new("pipeline", "content", totals)],
-            Failures = [new(at, "request-one", null, "failed-stage", "fallback")],
-            Recalls = [new(at, "preview-one", null, "caller", "whole", 10, 3, null)],
+            History = [new GainHistoryEntry("request-one", at, null, "anthropic", "POST", "code-rule", "tool-result", "content", totals)],
+            Daily = [new GainBucket(at, totals)], Weekly = [new GainBucket(at, totals)], Monthly = [new GainBucket(at, totals)],
+            Attributions = [new GainAttribution("method", "POST", totals), new GainAttribution("rule", "code-rule", totals), new GainAttribution("layer", "tool-result", totals), new GainAttribution("pipeline", "content", totals)],
+            Failures = [new GainFailure(at, "request-one", null, "failed-stage", "fallback")],
+            Recalls = [new GainRecall(at, "preview-one", null, "caller", "whole", 10, 3, null)]
         };
         var args = option.Length == 0 ? new[] { "gain" } : new[] { "gain", option };
         var exit = await new CliApplication(fixture.Runtime).RunAsync(args, TestContext.Current.CancellationToken);
@@ -52,6 +57,7 @@ public sealed class GainCommandTests
         Assert.Contains(expected, fixture.Console.Output);
         Assert.Single(fixture.Handler.Uris);
     }
+
     [Fact]
     public async Task Csv_escapes_history_values_and_all_filters_are_forwarded()
     {
@@ -59,20 +65,25 @@ public sealed class GainCommandTests
         var at = DateTimeOffset.Parse("2026-10-25T00:00:00Z");
         fixture.Handler.Report = fixture.Handler.Report with
         {
-            History = [new("request,\"one\"\nnext", at, "/project", "anthropic", "POST", "rule", "tool", "content", new(Requests: 1, EstimatedSavedTokens: -5))],
+            History = [new GainHistoryEntry("request,\"one\"\nnext", at, "/project", "anthropic", "POST", "rule", "tool", "content", new GainTotals(1, EstimatedSavedTokens: -5))]
         };
-        var exit = await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "csv", "--project-path", "/p a", "--from", "2026-10-01T02:00:00+02:00", "--to", "2026-11-01T00:00:00Z", "--provider", "anthropic", "--method", "POST", "--rule", "rule", "--layer", "tool", "--pipeline", "content", "--limit", "7"], TestContext.Current.CancellationToken);
+        var exit = await new CliApplication(fixture.Runtime).RunAsync(
+        [
+            "gain", "--history", "-f", "csv", "--project-path", "/p a", "--from", "2026-10-01T02:00:00+02:00", "--to", "2026-11-01T00:00:00Z", "--provider", "anthropic", "--method", "POST", "--rule", "rule", "--layer", "tool", "--pipeline",
+            "content", "--limit", "7"
+        ], TestContext.Current.CancellationToken);
         Assert.Equal(0, exit);
         var csv = fixture.Output.ToString();
         Assert.StartsWith("section,", csv);
         Assert.Contains("\"request,\"\"one\"\"\nnext\"", csv);
         Assert.Contains(",-5,", csv);
         var query = Uri.UnescapeDataString(fixture.Handler.Uris.Single().Query);
-        foreach (var part in new[] { "project=/p a", "from=2026-10-01T02:00:00.0000000+02:00", "to=2026-11-01T00:00:00.0000000+00:00", "provider=anthropic", "method=POST", "rule=rule", "layer=tool", "pipeline=content", "historyLimit=7" })
-        {
-            Assert.Contains(part, query);
-        }
+        foreach (var part in new[]
+                 {
+                     "project=/p a", "from=2026-10-01T02:00:00.0000000+02:00", "to=2026-11-01T00:00:00.0000000+00:00", "provider=anthropic", "method=POST", "rule=rule", "layer=tool", "pipeline=content", "historyLimit=7"
+                 }) Assert.Contains(part, query);
     }
+
     [Theory]
     [InlineData("--quota")]
     [InlineData("--tier", "pro")]
@@ -87,6 +98,7 @@ public sealed class GainCommandTests
         Assert.Empty(fixture.Handler.Uris);
         Assert.Equal("", fixture.Output.ToString());
     }
+
     [Theory]
     [InlineData(false, false, "", 1, 0)]
     [InlineData(false, true, "n", 0, 0)]
@@ -95,7 +107,7 @@ public sealed class GainCommandTests
     public async Task Reset_requires_yes_or_explicit_prompt_acceptance(bool yes, bool interactive, string input, int expectedExit, int expectedPosts)
     {
         using var fixture = new Fixture();
-        if (input.Length > 0) { fixture.Console.Input.PushTextWithEnter(input); }
+        if (input.Length > 0) fixture.Console.Input.PushTextWithEnter(input);
         var runtime = fixture.Runtime with { Interactive = interactive };
         var args = yes ? new[] { "gain", "--reset", "--yes", "--project-path", "/safe", "-f", "json" } : new[] { "gain", "--reset", "--project-path", "/safe", "-f", "json" };
         var exit = await new CliApplication(runtime).RunAsync(args, TestContext.Current.CancellationToken);
@@ -108,6 +120,7 @@ public sealed class GainCommandTests
             Assert.Contains("\"project\":\"/safe\"", fixture.Handler.PostBodies.Single());
         }
     }
+
     [Theory]
     [InlineData("-f|xml", "format")]
     [InlineData("--endpoint|file:///tmp/proxy", "endpoint")]
@@ -130,6 +143,7 @@ public sealed class GainCommandTests
         Assert.Empty(fixture.Handler.Uris);
         Assert.Equal("", fixture.Output.ToString());
     }
+
     [Fact]
     public async Task Watch_refreshes_on_injected_clock_and_cancellation_exits_without_extra_calls()
     {
@@ -167,28 +181,43 @@ public sealed class GainCommandTests
     {
         private readonly FakeTimeProvider _clock = new();
         public Channel<bool> Scheduled { get; } = Channel.CreateUnbounded<bool>();
+
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             var timer = _clock.CreateTimer(callback, state, dueTime, period);
             Scheduled.Writer.TryWrite(true);
             return timer;
         }
-        public void Advance(TimeSpan elapsed) => _clock.Advance(elapsed);
+
+        public void Advance(TimeSpan elapsed)
+        {
+            _clock.Advance(elapsed);
+        }
     }
+
     internal sealed class Fixture : IDisposable
     {
         public StringWriter Output { get; } = new();
         public StringWriter Error { get; } = new();
         public TestConsole Console { get; } = new();
         public RecordingHandler Handler { get; } = new();
-        public GainRuntime Runtime => new(Console, Output, Error, endpoint => new HttpClient(Handler, false) { BaseAddress = new Uri(endpoint) }, "/work/project", false, TimeProvider.System);
-        public void Dispose() { Output.Dispose(); Error.Dispose(); Console.Dispose(); Handler.Dispose(); }
+        public GainRuntime Runtime => new(Console, Output, Error, new ProxyClient(new HttpClient(Handler, false)), "/work/project", false, TimeProvider.System);
+
+        public void Dispose()
+        {
+            Output.Dispose();
+            Error.Dispose();
+            Console.Dispose();
+            Handler.Dispose();
+        }
     }
+
     internal sealed class RecordingHandler : HttpMessageHandler
     {
         public List<Uri> Uris { get; } = [];
         public List<string> PostBodies { get; } = [];
-        public GainReport Report { get; set; } = new(1, DateTimeOffset.Parse("2026-10-25T00:00:00Z"), new(), new(), new(Requests: 1, EstimatedSavedTokens: 123), [], [], [], [], [], [], [], []);
+        public GainReport Report { get; set; } = new(1, DateTimeOffset.Parse("2026-10-25T00:00:00Z"), new GainQuery(), new GainMeasurement(), new GainTotals(1, EstimatedSavedTokens: 123), [], [], [], [], [], [], [], []);
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Uris.Add(request.RequestUri!);
@@ -197,6 +226,7 @@ public sealed class GainCommandTests
                 PostBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new GainResetResult(7, DateTimeOffset.Parse("2026-10-25T00:00:00Z"))) };
             }
+
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Report) };
         }
     }

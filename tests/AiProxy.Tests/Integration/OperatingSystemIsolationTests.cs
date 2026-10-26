@@ -1,8 +1,9 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,10 +25,11 @@ public sealed class OperatingSystemIsolationTests
         portListener.Stop();
 
         await using (var service = new TitaniumProxyService(
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
-            new CanonicalProviderHosts(),
-            NullLoggerFactory.Instance))
+                         new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, directory.Path),
+                         new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System,
+                             new NoGainLedger()),
+                         new CanonicalProviderHosts(),
+                         NullLoggerFactory.Instance))
         {
             await service.StartAsync(TestContext.Current.CancellationToken);
             await service.StopAsync(CancellationToken.None);
@@ -36,8 +38,10 @@ public sealed class OperatingSystemIsolationTests
         Assert.Equal(before, CountRootCertificates());
     }
 
-    private static (int My, int Root) CountRootCertificates() =>
-        (Count(StoreName.My), Count(StoreName.Root));
+    private static (int My, int Root) CountRootCertificates()
+    {
+        return (Count(StoreName.My), Count(StoreName.Root));
+    }
 
     private static int Count(StoreName storeName)
     {
@@ -46,11 +50,11 @@ public sealed class OperatingSystemIsolationTests
         {
             store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
         }
-        catch (System.Security.Cryptography.CryptographicException)
+        catch (CryptographicException)
         {
             return 0;
         }
 
-        return store.Certificates.Find(X509FindType.FindBySubjectName, RootName, validOnly: false).Count;
+        return store.Certificates.Find(X509FindType.FindBySubjectName, RootName, false).Count;
     }
 }

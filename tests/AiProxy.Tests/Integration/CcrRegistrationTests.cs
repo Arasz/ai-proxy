@@ -1,3 +1,4 @@
+using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,6 @@ public sealed class CcrRegistrationTests
         }
 
         Assert.Same(CcrOptions.Default, app.Services.GetService<CcrOptions>());
-        Assert.IsType<Ccr.CcrRuntime>(app.Services.GetRequiredService<Ccr.ICcrRuntime>());
+        Assert.IsType<CcrRuntime>(app.Services.GetRequiredService<ICcrRuntime>());
     }
 }

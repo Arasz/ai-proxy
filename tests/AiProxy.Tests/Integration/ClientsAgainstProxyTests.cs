@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 using static AiProxy.Tests.Unit.Content.Ccr.RetrievalLoopTests;
 
 namespace AiProxy.Tests.Integration;
@@ -21,11 +22,8 @@ public sealed class ClientsAgainstProxyTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
-            File.Delete(file);
-        }
+        SqliteConnection.ClearAllPools();
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
     }
 
     [Fact]
@@ -41,12 +39,12 @@ public sealed class ClientsAgainstProxyTests : IDisposable
             new Dictionary<string, string>
             {
                 ["Proxy:Compression:Enabled"] = "true",
-                ["Proxy:Compression:Database"] = _databasePath,
+                ["Proxy:Compression:Database"] = _databasePath
             },
             providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
 
-        await SendAsync(proxy, upstream, Request(Thread, thread: true));
-        await SendAsync(proxy, upstream, Request(Stateless, thread: false));
+        await SendAsync(proxy, upstream, Request(Thread, true));
+        await SendAsync(proxy, upstream, Request(Stateless, false));
         var endpoint = proxy.BaseAddress.ToString().TrimEnd('/');
 
         var gain = await RunAsync(null, "gain", "--endpoint", endpoint, "--format", "json");
@@ -71,10 +69,12 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         Assert.Contains(CcrRetrieval.NotKept, notKept["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
-    private static JsonElement Property(JsonElement element, string camelCase) =>
-        element.TryGetProperty(camelCase, out var value)
+    private static JsonElement Property(JsonElement element, string camelCase)
+    {
+        return element.TryGetProperty(camelCase, out var value)
             ? value
             : element.EnumerateObject().First(property => string.Equals(property.Name.Replace("_", "", StringComparison.Ordinal), camelCase, StringComparison.OrdinalIgnoreCase)).Value;
+    }
 
     private static string Request(string toolResult, bool thread)
     {
@@ -87,13 +87,10 @@ public sealed class ClientsAgainstProxyTests : IDisposable
             ["messages"] = new JsonArray(new JsonObject
             {
                 ["role"] = "user",
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = toolResult }),
-            }),
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = toolResult })
+            })
         };
-        if (thread)
-        {
-            request["thread"] = new JsonObject { ["type"] = "create" };
-        }
+        if (thread) request["thread"] = new JsonObject { ["type"] = "create" };
 
         return request.ToJsonString();
     }
@@ -104,7 +101,7 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         using var client = new HttpClient(handler);
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages"))
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
         };
         message.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         using var response = await client.SendAsync(message, TestContext.Current.CancellationToken);
@@ -112,18 +109,21 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private static string Rpc(int id, string method, object parameters) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters })}\n";
+    private static string Rpc(int id, string method, object parameters)
+    {
+        return $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters })}\n";
+    }
 
-    private static string Notification(string method) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", method })}\n";
+    private static string Notification(string method)
+    {
+        return $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", method })}\n";
+    }
 
     private static async Task<ProcessResult> RunAsync(string? input, params string[] arguments)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

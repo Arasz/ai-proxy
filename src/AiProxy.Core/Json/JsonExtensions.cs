@@ -50,7 +50,10 @@ internal static class JsonExtensions
     {
         /// <summary>Whether the property has this name and holds a string.</summary>
         /// <param name="name">The property name.</param>
-        public bool IsString(string name) => property.NameEquals(name) && property.Value.IsString;
+        public bool IsString(string name)
+        {
+            return property.NameEquals(name) && property.Value.IsString;
+        }
     }
 
     /// <param name="element">The element to read from.</param>
@@ -75,32 +78,33 @@ internal static class JsonExtensions
         public IEnumerable<JsonElement> Children()
         {
             if (element.IsObject)
-            {
                 foreach (var property in element.EnumerateObject())
-                {
                     yield return property.Value;
-                }
-            }
             else if (element.IsArray)
-            {
                 foreach (var item in element.EnumerateArray())
-                {
                     yield return item;
-                }
-            }
         }
 
         /// <summary>The property of the object, or an undefined element when there is none.</summary>
         /// <param name="name">The property name.</param>
-        public JsonElement PropertyOrDefault(string name) => element.IsObject && element.TryGetProperty(name, out var value) ? value : default;
+        public JsonElement PropertyOrDefault(string name)
+        {
+            return element.IsObject && element.TryGetProperty(name, out var value) ? value : default;
+        }
 
         /// <summary>The string value of the property, or null when it is missing, not a string, or does not transcode.</summary>
         /// <param name="name">The property name.</param>
-        public string? StringProperty(string name) => element.PropertyOrDefault(name).ReadString();
+        public string? StringProperty(string name)
+        {
+            return element.PropertyOrDefault(name).ReadString();
+        }
 
         /// <summary>Whether the property is the JSON value true.</summary>
         /// <param name="name">The property name.</param>
-        public bool IsTrue(string name) => element.PropertyOrDefault(name).ValueKind == JsonValueKind.True;
+        public bool IsTrue(string name)
+        {
+            return element.PropertyOrDefault(name).ValueKind == JsonValueKind.True;
+        }
 
         /// <summary>The integer value of the property, or null when it is missing, not a number, or not an integer that fits.</summary>
         /// <param name="name">The property name.</param>
@@ -114,10 +118,7 @@ internal static class JsonExtensions
         /// <remarks>A string such as a lone surrogate does not transcode, so it reads as absent.</remarks>
         public string? ReadString()
         {
-            if (!element.IsString)
-            {
-                return null;
-            }
+            if (!element.IsString) return null;
 
             try
             {

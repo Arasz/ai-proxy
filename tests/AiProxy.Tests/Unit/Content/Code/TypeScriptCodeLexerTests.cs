@@ -67,11 +67,11 @@ public sealed class TypeScriptCodeLexerTests
     public void Reducer_removes_type_and_value_imports_but_keeps_import_require()
     {
         const string source = "1\t// a long removable comment so the compact view plus its hint is smaller than the source\n"
-            + "2\timport type { T } from 't';\n"
-            + "3\timport { u } from './u';\n"
-            + "4\timport x = require('y');\n"
-            + "5\timport './side';\n"
-            + "6\tlet v: T = u(x); // gone\n";
+                              + "2\timport type { T } from 't';\n"
+                              + "3\timport { u } from './u';\n"
+                              + "4\timport x = require('y');\n"
+                              + "5\timport './side';\n"
+                              + "6\tlet v: T = u(x); // gone\n";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.ts", null, Hint);
 
@@ -100,11 +100,11 @@ public sealed class TypeScriptCodeLexerTests
     public void Reducer_keeps_directive_comments_verbatim_on_their_original_lines()
     {
         const string source = "1\t/// <reference types=\"node\" />\n"
-            + "2\t// a long removable comment so the compact view plus its hint is smaller than the source\n"
-            + "3\t// @ts-ignore\n"
-            + "4\tlet a: number = f();\n"
-            + "5\t// @ts-expect-error\n"
-            + "6\tlet b: string = 1; // gone\n";
+                              + "2\t// a long removable comment so the compact view plus its hint is smaller than the source\n"
+                              + "3\t// @ts-ignore\n"
+                              + "4\tlet a: number = f();\n"
+                              + "5\t// @ts-expect-error\n"
+                              + "6\tlet b: string = 1; // gone\n";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.ts", null, Hint);
 
@@ -164,8 +164,10 @@ public sealed class TypeScriptCodeLexerTests
     [InlineData("a.d.ts", true)]
     [InlineData("a.js", false)]
     [InlineData(null, false)]
-    public void Supports_typescript_paths(string? path, bool expected) =>
+    public void Supports_typescript_paths(string? path, bool expected)
+    {
         Assert.Equal(expected, new TypeScriptCodeLexer().SupportsPath(path));
+    }
 
     [Theory]
     [InlineData("\n")]

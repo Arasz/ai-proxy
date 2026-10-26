@@ -9,7 +9,10 @@ public sealed class JsonCompressionHandlerTests
 {
     private static readonly JsonCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text) => new("request", 1, ContentType.Json, text);
+    private static ContentPart Part(string text)
+    {
+        return new ContentPart("request", 1, ContentType.Json, text);
+    }
 
     [Fact]
     public async Task The_whitespace_goes_away()

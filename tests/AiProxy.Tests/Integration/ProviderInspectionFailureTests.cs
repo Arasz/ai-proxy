@@ -1,9 +1,9 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
@@ -44,7 +44,7 @@ public sealed class ProviderInspectionFailureTests
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages"))
         {
-            Content = new StringContent(Body, Encoding.UTF8, "application/json"),
+            Content = new StringContent(Body, Encoding.UTF8, "application/json")
         };
         request.Headers.TransferEncodingChunked = true;
 
@@ -87,7 +87,7 @@ public sealed class ProviderInspectionFailureTests
     {
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         var service = new TitaniumProxyService(
-            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, dataDirectory),
+            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), false, false, dataDirectory),
             new ProviderRequestInspector(pipeline, hosts, new NoRequestCapture(), new CcrOff(), loggers.CreateLogger<ProviderRequestInspector>(), TimeProvider.System, new NoGainLedger()),
             hosts,
             loggers);
@@ -113,8 +113,10 @@ public sealed class ProviderInspectionFailureTests
 
     private sealed class ThrowingCompressionPipeline : ICompressionPipeline
     {
-        public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken) =>
+        public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
+        {
             throw new InvalidOperationException("pipeline broke");
+        }
     }
 
     private sealed record LogEntry(string Category, LogLevel Level, Exception? Exception);
@@ -125,7 +127,10 @@ public sealed class ProviderInspectionFailureTests
 
         public IReadOnlyCollection<LogEntry> Entries => _entries.ToArray();
 
-        public ILogger CreateLogger(string categoryName) => new RecordingLogger(categoryName, _entries);
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new RecordingLogger(categoryName, _entries);
+        }
 
         public void AddProvider(ILoggerProvider provider)
         {
@@ -139,11 +144,19 @@ public sealed class ProviderInspectionFailureTests
     private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
+            where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
             entries.Enqueue(new LogEntry(category, logLevel, exception));
+        }
     }
 }

@@ -1,7 +1,8 @@
-using AiProxy.Generators;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+
 namespace AiProxy.Generators.Tests;
+
 public sealed class McpToolInventoryGeneratorTests
 {
     [Fact]
@@ -11,6 +12,7 @@ public sealed class McpToolInventoryGeneratorTests
         Assert.Contains("retrieve_original", Assert.Single(result.GeneratedTrees).ToString());
         Assert.Empty(result.Diagnostics);
     }
+
     [Theory]
     [InlineData("Name", "APGEN001")]
     [InlineData("ReadOnly", "APGEN002")]
@@ -39,24 +41,21 @@ public sealed class McpToolInventoryGeneratorTests
     private static GeneratorDriverRunResult Generate(string arguments, bool extraTool = false)
     {
         var source = """
-            namespace ModelContextProtocol.Server {
-            [System.AttributeUsage(System.AttributeTargets.Method)]
-            public sealed class McpServerToolAttribute : System.Attribute {
-                public string Name { get; set; }
-                public bool ReadOnly { get; set; }
-                public bool Destructive { get; set; }
-                public bool Idempotent { get; set; }
-                public bool OpenWorld { get; set; }
-            }}
-            public sealed class Tools {
-                [ModelContextProtocol.Server.McpServerTool(ARGUMENTS)]
-                public void Retrieve() { }
-            }
-            """.Replace("ARGUMENTS", arguments);
-        if (extraTool)
-        {
-            source += "public sealed class MoreTools { [ModelContextProtocol.Server.McpServerTool(Name = \"second_tool\", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)] public void Second() {} }";
-        }
+                     namespace ModelContextProtocol.Server {
+                     [System.AttributeUsage(System.AttributeTargets.Method)]
+                     public sealed class McpServerToolAttribute : System.Attribute {
+                         public string Name { get; set; }
+                         public bool ReadOnly { get; set; }
+                         public bool Destructive { get; set; }
+                         public bool Idempotent { get; set; }
+                         public bool OpenWorld { get; set; }
+                     }}
+                     public sealed class Tools {
+                         [ModelContextProtocol.Server.McpServerTool(ARGUMENTS)]
+                         public void Retrieve() { }
+                     }
+                     """.Replace("ARGUMENTS", arguments);
+        if (extraTool) source += "public sealed class MoreTools { [ModelContextProtocol.Server.McpServerTool(Name = \"second_tool\", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)] public void Second() {} }";
         var compilation = CSharpCompilation.Create("Fixture", [CSharpSyntaxTree.ParseText(source)],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

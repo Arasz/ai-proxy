@@ -1,9 +1,9 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,7 +17,7 @@ public sealed class RootCertificateStorageTests
     {
         using var directory = new TemporaryDirectory();
 
-        await StartAndStopAsync(directory.Path, password: null);
+        await StartAndStopAsync(directory.Path, null);
 
         var pfx = Path.Combine(directory.Path, TitaniumProxyService.RootCertificateFileName);
         Assert.True(File.Exists(pfx));
@@ -34,7 +34,7 @@ public sealed class RootCertificateStorageTests
     {
         using var directory = new TemporaryDirectory();
 
-        await StartAndStopAsync(directory.Path, password: null);
+        await StartAndStopAsync(directory.Path, null);
 
         var pem = await File.ReadAllTextAsync(Path.Combine(directory.Path, TitaniumProxyService.RootCertificatePemFileName), TestContext.Current.CancellationToken);
         Assert.StartsWith("-----BEGIN CERTIFICATE-----", pem, StringComparison.Ordinal);
@@ -56,7 +56,7 @@ public sealed class RootCertificateStorageTests
         {
             File.SetUnixFileMode(directory.Path, (UnixFileMode)0b111_101_101);
 
-            await StartAndStopAsync(directory.Path, password: null);
+            await StartAndStopAsync(directory.Path, null);
 
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory.Path));
         }
@@ -67,7 +67,7 @@ public sealed class RootCertificateStorageTests
     {
         using var directory = new TemporaryDirectory();
 
-        await StartAndStopAsync(directory.Path, password: "correct horse");
+        await StartAndStopAsync(directory.Path, "correct horse");
 
         var bytes = await File.ReadAllBytesAsync(
             Path.Combine(directory.Path, TitaniumProxyService.RootCertificateFileName),
@@ -82,9 +82,9 @@ public sealed class RootCertificateStorageTests
     {
         byte[] bytes;
         await using (var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
-        {
-            ["Proxy:RootCertificatePassword"] = "from config",
-        }))
+                     {
+                         ["Proxy:RootCertificatePassword"] = "from config"
+                     }))
         {
             bytes = await File.ReadAllBytesAsync(
                 Path.Combine(proxy.DataDirectory, TitaniumProxyService.RootCertificateFileName),
@@ -104,9 +104,9 @@ public sealed class RootCertificateStorageTests
         portListener.Stop();
 
         await using var service = new TitaniumProxyService(
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, dataDirectory)
+            new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, dataDirectory)
             {
-                RootCertificatePassword = password,
+                RootCertificatePassword = password
             },
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),

@@ -32,47 +32,20 @@ public sealed record ContentJob(long JobId, ContentRecord Record);
 
 /// <summary>The queue that carries a record from the request path to the writer.</summary>
 /// <remarks>
-/// The queue is the pub/sub channel. The request path writes a row and returns, and the
-/// row is committed before the request is forwarded, so the promise that the original is
-/// kept survives the process dying. The writer drains the queue on its own connection,
-/// because the pragma that tells it whether anything changed does not move for a
-/// connection's own commits.
+///     The queue is the pub/sub channel. The request path writes a row and returns, and the
+///     row is committed before the request is forwarded, so the promise that the original is
+///     kept survives the process dying. The writer drains the queue on its own connection,
+///     because the pragma that tells it whether anything changed does not move for a
+///     connection's own commits.
 /// </remarks>
 public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        Converters = { new JsonStringEnumConverter() },
+        Converters = { new JsonStringEnumConverter() }
     };
 
     private readonly string _databasePath = options.ResolvedDatabasePath;
-
-    /// <summary>Publishes a record and returns once the row is committed.</summary>
-    /// <param name="record">The record to publish.</param>
-    /// <param name="cancellationToken">The token that stops the writer.</param>
-    public async ValueTask PublishAsync(ContentRecord record, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(record);
-
-        await using var connection = ContentSchema.Open(_databasePath);
-        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
-
-        const string insert = """
-            INSERT INTO content_queue (request_id, created_at, payload)
-            VALUES (@RequestId, @CreatedAt, @Payload);
-            """;
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            insert,
-            new
-            {
-                record.RequestId,
-                CreatedAt = record.CreatedAt.ToString("O"),
-                Payload = JsonSerializer.Serialize(record, SerializerOptions),
-            },
-            commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
 
     /// <summary>Reads the records waiting to be written.</summary>
     /// <param name="limit">How many to read at a time.</param>
@@ -83,11 +56,11 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
-            SELECT job_id AS JobId, payload AS Payload
-            FROM content_queue
-            ORDER BY job_id
-            LIMIT @Limit;
-            """;
+                              SELECT job_id AS JobId, payload AS Payload
+                              FROM content_queue
+                              ORDER BY job_id
+                              LIMIT @Limit;
+                              """;
 
         var getJobPayloadCommand = new CommandDefinition(select, new { Limit = limit }, cancellationToken: cancellationToken);
         var rows = (await connection.QueryAsync<JobPayload>(getJobPayloadCommand)).ToList();
@@ -96,10 +69,7 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
         foreach (var jobPayload in rows)
         {
             var record = JsonSerializer.Deserialize<ContentRecord>(jobPayload.Payload, SerializerOptions);
-            if (record is not null)
-            {
-                jobs.Add(new ContentJob(jobPayload.JobId, record));
-            }
+            if (record is not null) jobs.Add(new ContentJob(jobPayload.JobId, record));
         }
 
         return jobs;
@@ -129,6 +99,33 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
 
         return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             "PRAGMA data_version;",
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>Publishes a record and returns once the row is committed.</summary>
+    /// <param name="record">The record to publish.</param>
+    /// <param name="cancellationToken">The token that stops the writer.</param>
+    public async ValueTask PublishAsync(ContentRecord record, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+
+        await using var connection = ContentSchema.Open(_databasePath);
+        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
+
+        const string insert = """
+                              INSERT INTO content_queue (request_id, created_at, payload)
+                              VALUES (@RequestId, @CreatedAt, @Payload);
+                              """;
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            insert,
+            new
+            {
+                record.RequestId,
+                CreatedAt = record.CreatedAt.ToString("O"),
+                Payload = JsonSerializer.Serialize(record, SerializerOptions)
+            },
+            commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 

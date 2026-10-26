@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using AiProxy.Core.Content.Code;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using TreeSitter;
 
 namespace AiProxy.Code;
 
@@ -14,17 +13,17 @@ public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguag
     private const string PackageInit = "__init__.py";
 
     private static readonly TreeSitterGrammar Grammar = new(
-        Strings: new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
-        Comments: ["comment"],
-        Identifiers: ["identifier"],
-        IsFixedName: static _ => false,
-        IsUnsupported: static node => node.Type == "interpolation" && node.Children.Any(static child => child is { IsNamed: false, Type: "=" }),
-        IsImport: static node => node.Type is "import_statement" or "import_from_statement",
-        ImportNeedsTerminator: false,
-        ValueText: static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),
-        IsDirective: static (comment, line) => line == 1 && comment.StartsWith("#!", StringComparison.Ordinal)
-            || line <= 2 && EncodingCookie().IsMatch(comment)
-            || ToolDirective().IsMatch(comment));
+        new Dictionary<string, string?> { ["string"] = "interpolation", ["format_specifier"] = "format_expression" }.ToFrozenDictionary(),
+        ["comment"],
+        ["identifier"],
+        static _ => false,
+        static node => node.Type == "interpolation" && node.Children.Any(static child => child is { IsNamed: false, Type: "=" }),
+        static node => node.Type is "import_statement" or "import_from_statement",
+        false,
+        static text => text.IsNormalized(NormalizationForm.FormKC) ? null : text.Normalize(NormalizationForm.FormKC),
+        static (comment, line) => (line == 1 && comment.StartsWith("#!", StringComparison.Ordinal))
+                                  || (line <= 2 && EncodingCookie().IsMatch(comment))
+                                  || ToolDirective().IsMatch(comment));
 
     private static readonly FrozenSet<string> Keywords =
     [
@@ -50,7 +49,7 @@ public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguag
         "exit", "filter", "float", "format", "frozenset", "getattr", "globals", "hasattr", "hash", "help", "hex", "id",
         "input", "int", "isinstance", "issubclass", "iter", "len", "list", "locals", "map", "max", "memoryview", "min",
         "next", "object", "oct", "open", "ord", "pow", "print", "property", "quit", "range", "repr", "reversed", "round",
-        "set", "setattr", "slice", "sorted", "staticmethod", "str", "sum", "super", "tuple", "vars", "zip",
+        "set", "setattr", "slice", "sorted", "staticmethod", "str", "sum", "super", "tuple", "vars", "zip"
     ];
 
     /// <summary>Creates a lexer on the bundled Python grammar.</summary>
@@ -60,18 +59,28 @@ public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguag
     }
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath) => filePath is not null && filePath.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
+    public bool SupportsPath(string? filePath)
+    {
+        return filePath is not null && filePath.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Keywords, soft keywords, builtins, <c>self</c>/<c>cls</c> and dunder names.</summary>
-    public bool IsKeyword(string text) =>
-        Keywords.Contains(text) || text.Length > 4 && text.StartsWith("__", StringComparison.Ordinal) && text.EndsWith("__", StringComparison.Ordinal);
+    public bool IsKeyword(string text)
+    {
+        return Keywords.Contains(text) || (text.Length > 4 && text.StartsWith("__", StringComparison.Ordinal) && text.EndsWith("__", StringComparison.Ordinal));
+    }
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
+    public CodeLexResult Lex(string text)
+    {
+        return TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
+    }
 
     /// <summary>Scans a file; a package's <c>__init__.py</c> keeps its imports, since they are what the package exports.</summary>
-    public CodeLexResult Lex(string text, string? filePath) =>
-        Path.GetFileName(filePath) == PackageInit ? Lex(text) with { Imports = [] } : Lex(text);
+    public CodeLexResult Lex(string text, string? filePath)
+    {
+        return Path.GetFileName(filePath) == PackageInit ? Lex(text) with { Imports = [] } : Lex(text);
+    }
 
     /// <summary>A type-checker, linter, coverage or formatter directive anywhere in a comment.</summary>
     [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|pyright:|ruff:|isort:|nosec\b|pyre-|fmt:\s*(?:off|on|skip)\b)")]

@@ -6,14 +6,14 @@ namespace AiProxy.Tests.Unit.Content;
 public sealed class ContentCompositorTests
 {
     private const string Mixed = """
-        ProviderDetector.cs
-        UpstreamForwarder.cs
+                                 ProviderDetector.cs
+                                 UpstreamForwarder.cs
 
-        src/foo.cs:12: matched line
-        src/bar.cs:44: another line
+                                 src/foo.cs:12: matched line
+                                 src/bar.cs:44: another line
 
-        { "a": 1, "b": [1, 2] }
-        """;
+                                 { "a": 1, "b": [1, 2] }
+                                 """;
 
     private static readonly ContentDecompositor Decompositor = new();
     private static readonly ContentCompositor Compositor = new();
@@ -52,7 +52,7 @@ public sealed class ContentCompositorTests
         var decomposition = Decompositor.Decompose(Mixed, "request");
         var parts = new List<CompressedPart>
         {
-            new(1, ContentType.DirectoryListing, "only the first part", "the first part", "test", 0.5),
+            new(1, ContentType.DirectoryListing, "only the first part", "the first part", "test", 0.5)
         };
 
         var composed = Compositor.Compose(decomposition, parts);

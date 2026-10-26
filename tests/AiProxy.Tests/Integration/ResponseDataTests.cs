@@ -61,7 +61,7 @@ public sealed class ResponseDataTests
     private static byte[] Gzip(byte[] bytes)
     {
         using var output = new MemoryStream();
-        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, true))
         {
             gzip.Write(bytes);
         }

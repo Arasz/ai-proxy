@@ -5,7 +5,7 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>
-/// The log reducer over the scored log payloads: every pre-registered answer survives the reduction.
+///     The log reducer over the scored log payloads: every pre-registered answer survives the reduction.
 /// </summary>
 public sealed class ScoredLogPayloadTests
 {
@@ -18,15 +18,9 @@ public sealed class ScoredLogPayloadTests
 
         foreach (var payload in document.RootElement.GetProperty("payloads").EnumerateObject())
         {
-            if (payload.Value.GetProperty("kind").GetString() != "log")
-            {
-                continue;
-            }
+            if (payload.Value.GetProperty("kind").GetString() != "log") continue;
 
-            foreach (var question in payload.Value.GetProperty("questions").EnumerateArray())
-            {
-                data.Add(payload.Name, question.GetProperty("a").GetString()!);
-            }
+            foreach (var question in payload.Value.GetProperty("questions").EnumerateArray()) data.Add(payload.Name, question.GetProperty("a").GetString()!);
         }
 
         return data;

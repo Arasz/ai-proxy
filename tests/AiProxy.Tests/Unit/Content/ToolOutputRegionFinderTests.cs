@@ -4,14 +4,17 @@ using AiProxy.Core.Content;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The region finder, stated as behaviour: it finds the tool output in a request body and
-/// nothing else.
+///     The region finder, stated as behaviour: it finds the tool output in a request body and
+///     nothing else.
 /// </summary>
 public sealed class ToolOutputRegionFinderTests
 {
     private static readonly ToolOutputRegionFinder Finder = new();
 
-    private static ContentRegion[] Find(string body) => Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
+    private static ContentRegion[] Find(string body)
+    {
+        return Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
+    }
 
     [Fact]
     public void The_tool_result_of_an_anthropic_message_is_a_region()

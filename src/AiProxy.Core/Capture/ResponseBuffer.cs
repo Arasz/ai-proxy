@@ -21,15 +21,15 @@ public sealed class ResponseBuffer
     /// <summary>Every byte that passed, kept or not.</summary>
     public long Length { get; private set; }
 
-    /// <summary>Whether a body kept whole outgrew <see cref="MaxBytes"/>, so it was dropped.</summary>
+    /// <summary>Whether a body kept whole outgrew <see cref="MaxBytes" />, so it was dropped.</summary>
     public bool OverCap { get; private set; }
 
-    /// <summary>The bytes to read usage from; empty when <see cref="OverCap"/> or released.</summary>
+    /// <summary>The bytes to read usage from; empty when <see cref="OverCap" /> or released.</summary>
     public ReadOnlyMemory<byte> Body => _strategy?.Body ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
-    /// A plain (not content-encoded) event stream keeps only its head and tail, where Anthropic puts
-    /// <c>message_start</c> and the final <c>message_delta</c>; any other body is kept whole up to the cap.
+    ///     A plain (not content-encoded) event stream keeps only its head and tail, where Anthropic puts
+    ///     <c>message_start</c> and the final <c>message_delta</c>; any other body is kept whole up to the cap.
     /// </summary>
     public static ResponseBuffer For(string? contentType, string? contentEncoding)
     {
@@ -42,17 +42,17 @@ public sealed class ResponseBuffer
     public void Append(ReadOnlySpan<byte> bytes)
     {
         Length += bytes.Length;
-        if (_strategy is null || _strategy.Append(bytes))
-        {
-            return;
-        }
+        if (_strategy is null || _strategy.Append(bytes)) return;
 
         OverCap = true;
         _strategy = null;
     }
 
     /// <summary>Lets the kept bytes go once usage has been read.</summary>
-    public void Release() => _strategy = null;
+    public void Release()
+    {
+        _strategy = null;
+    }
 
     private interface IStrategy
     {
@@ -70,23 +70,20 @@ public sealed class ResponseBuffer
 
         public bool Append(ReadOnlySpan<byte> bytes)
         {
-            if (_bytes.Length + bytes.Length > MaxBytes)
-            {
-                return false;
-            }
+            if (_bytes.Length + bytes.Length > MaxBytes) return false;
 
             _bytes.Write(bytes);
             return true;
         }
     }
 
-    /// <summary>The first <see cref="HeadBytes"/> and a rolling last <see cref="TailBytes"/>.</summary>
+    /// <summary>The first <see cref="HeadBytes" /> and a rolling last <see cref="TailBytes" />.</summary>
     private sealed class Window : IStrategy
     {
         private readonly byte[] _head = new byte[HeadBytes];
         private readonly byte[] _tail = new byte[TailBytes];
-        private int _headCount;
         private long _afterHead;
+        private int _headCount;
 
         public ReadOnlyMemory<byte> Body
         {

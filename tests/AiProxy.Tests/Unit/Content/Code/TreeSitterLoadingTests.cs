@@ -1,7 +1,7 @@
 using AiProxy.Code;
 using AiProxy.Configuration;
-using AiProxy.Tests.Integration;
 using AiProxy.Core.Content.Code;
+using AiProxy.Tests.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,6 +11,14 @@ namespace AiProxy.Tests.Unit.Content.Code;
 
 public sealed class TreeSitterLoadingTests
 {
+    public static TheoryData<string, string> UnloadableLexers => new()
+    {
+        { "python", "a.py" },
+        { "javascript", "a.js" },
+        { "typescript", "a.ts" },
+        { "tsx", "a.tsx" }
+    };
+
     [Theory]
     [InlineData("Python", "x = 1\n", "module")]
     [InlineData("JavaScript", "let x = 1;\n", "program")]
@@ -26,14 +34,6 @@ public sealed class TreeSitterLoadingTests
         Assert.False(tree.RootNode.HasError);
     }
 
-    public static TheoryData<string, string> UnloadableLexers => new()
-    {
-        { "python", "a.py" },
-        { "javascript", "a.js" },
-        { "typescript", "a.ts" },
-        { "tsx", "a.tsx" },
-    };
-
     [Theory]
     [MemberData(nameof(UnloadableLexers))]
     public void A_grammar_that_fails_to_load_makes_the_lexer_unsupported_and_the_reducer_return_the_original(string lexer, string path)
@@ -43,7 +43,7 @@ public sealed class TreeSitterLoadingTests
         {
             "python" => new PythonCodeLexer(missing),
             "javascript" => new JavaScriptCodeLexer(missing),
-            _ => new TypeScriptCodeLexer(missing, missing),
+            _ => new TypeScriptCodeLexer(missing, missing)
         };
         const string source = "// a long removable comment so the compact view plus its hint is smaller than the source\nx = 1\n";
 

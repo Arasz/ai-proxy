@@ -3,33 +3,34 @@ using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
+using Titanium.Web.Proxy.Network;
 
 namespace AiProxy.Hosting;
 
 /// <summary>Runs the explicit HTTP(S) proxy and restores machine proxy settings on shutdown.</summary>
 public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposable
 {
-    /// <summary>File name of the root CA pfx inside <see cref="ProxyRuntimeOptions.DataDirectory"/>.</summary>
+    /// <summary>File name of the root CA pfx inside <see cref="ProxyRuntimeOptions.DataDirectory" />.</summary>
     public const string RootCertificateFileName = "root-ca.pfx";
 
     /// <summary>The public root certificate as PEM, for clients that trust a CA file (such as <c>NODE_EXTRA_CA_CERTS</c>).</summary>
     public const string RootCertificatePemFileName = "root-ca.pem";
 
-    private readonly ProxyServer _server;
-    private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly ISystemProxyGuardLauncher _guardLauncher;
+    private readonly ProviderRequestInspector _inspector;
+    private readonly ILogger<TitaniumProxyService> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly TimeSpan _markerWait;
     private readonly ProxyRuntimeOptions _options;
-    private readonly ProviderRequestInspector _inspector;
     private readonly IProviderHosts _providerHosts;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<TitaniumProxyService> _logger;
+
+    private readonly ISystemProxyRegistrar _systemProxyRegistrar;
+    private readonly Func<HttpWebClient, bool> _upstreamClosed;
     private ExplicitProxyEndPoint? _endPoint;
+    private ISystemProxyGuardSession? _guard;
+    private SystemProxyMarker? _marker;
     private bool _started;
     private bool _systemProxySet;
-    private SystemProxyMarker? _marker;
-    private ISystemProxyGuardSession? _guard;
-    private readonly Func<HttpWebClient, bool> _upstreamClosed;
     private volatile bool _upstreamStateUnreadable;
 
     /// <summary>Creates the proxy service without changing system settings until started.</summary>
@@ -57,8 +58,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ArgumentNullException.ThrowIfNull(inspector);
         ArgumentNullException.ThrowIfNull(providerHosts);
         ArgumentNullException.ThrowIfNull(loggerFactory);
-        _server = new ProxyServer(userTrustRootCertificate: false, machineTrustRootCertificate: false, trustRootCertificateAsAdmin: false);
-        _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(_server);
+        Server = new ProxyServer(false, false, false);
+        _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
         _guardLauncher = guardLauncher;
         _markerWait = markerWait;
         _options = options;
@@ -73,51 +74,60 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// <summary>The listener address used by system proxy settings and local clients.</summary>
     public Uri Address { get; }
 
-    internal IReadOnlyList<ProxyEndPoint> EndPoints => _server.ProxyEndPoints;
+    internal IReadOnlyList<ProxyEndPoint> EndPoints => Server.ProxyEndPoints;
 
-    internal ProxyServer Server => _server;
+    internal ProxyServer Server { get; }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync()
+    {
+        Server.BeforeRequest -= BeforeRequestAsync;
+        Server.BeforeResponse -= BeforeResponseAsync;
+        Server.AfterResponse -= AfterResponseAsync;
+        if (_endPoint is not null) _endPoint.BeforeTunnelConnectRequest -= BeforeTunnelConnectRequestAsync;
+        ReleaseSystemProxy();
+        if (_started)
+        {
+            Server.Stop();
+            _started = false;
+        }
+
+        Server.Dispose();
+        return ValueTask.CompletedTask;
+    }
 
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        Titanium.Web.Proxy.Network.CertificateManager.SuppressInteractiveRootStoreMutations = !_options.TrustRootCertificate;
-        _server.Logging.LoggerFactory = _loggerFactory;
-        _server.EnableHttpInterception = true;
-        _server.MaxBufferedBodyBytes = 8 * 1024 * 1024;
-        _server.ViaHeaderPseudonym = "";
-        _server.BeforeRequest += BeforeRequestAsync;
-        _server.BeforeResponse += BeforeResponseAsync;
-        _server.AfterResponse += AfterResponseAsync;
-        _server.EnableRequestTimingCapture = _inspector.CapturesResponses;
+        CertificateManager.SuppressInteractiveRootStoreMutations = !_options.TrustRootCertificate;
+        Server.Logging.LoggerFactory = _loggerFactory;
+        Server.EnableHttpInterception = true;
+        Server.MaxBufferedBodyBytes = 8 * 1024 * 1024;
+        Server.ViaHeaderPseudonym = "";
+        Server.BeforeRequest += BeforeRequestAsync;
+        Server.BeforeResponse += BeforeResponseAsync;
+        Server.AfterResponse += AfterResponseAsync;
+        Server.EnableRequestTimingCapture = _inspector.CapturesResponses;
 
         PrepareRootCertificate();
-        if (_options.ConfigureSystemProxy)
-        {
-            _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
-        }
+        if (_options.ConfigureSystemProxy) _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
 
-        _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, decryptSsl: true);
+        _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, true);
         _endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequestAsync;
-        _server.AddEndPoint(_endPoint);
-        if (_options.TrustRootCertificate)
-        {
-            new TitaniumRootCertificate(_server.CertificateManager).EnsureTrusted();
-        }
+        Server.AddEndPoint(_endPoint);
+        if (_options.TrustRootCertificate) new TitaniumRootCertificate(Server.CertificateManager).EnsureTrusted();
 
         try
         {
-            _server.Start(changeSystemProxySettings: false);
+            Server.Start(false);
             _started = true;
-            if (_options.ConfigureSystemProxy)
-            {
-                SetSystemProxy();
-            }
+            if (_options.ConfigureSystemProxy) SetSystemProxy();
         }
         catch
         {
             if (_started)
             {
-                _server.Stop();
+                Server.Stop();
                 _started = false;
             }
 
@@ -137,30 +147,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         if (_started)
         {
-            _server.Stop();
+            Server.Stop();
             _started = false;
         }
-        return Task.CompletedTask;
-    }
 
-    /// <inheritdoc />
-    public ValueTask DisposeAsync()
-    {
-        _server.BeforeRequest -= BeforeRequestAsync;
-        _server.BeforeResponse -= BeforeResponseAsync;
-        _server.AfterResponse -= AfterResponseAsync;
-        if (_endPoint is not null)
-        {
-            _endPoint.BeforeTunnelConnectRequest -= BeforeTunnelConnectRequestAsync;
-        }
-        ReleaseSystemProxy();
-        if (_started)
-        {
-            _server.Stop();
-            _started = false;
-        }
-        _server.Dispose();
-        return ValueTask.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private void SetSystemProxy()
@@ -222,23 +213,16 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         TryGuard(guard => guard.Dispose());
         _guard = null;
         if (restored)
-        {
             _marker?.Delete();
-        }
         else
-        {
             _marker?.Dispose();
-        }
 
         _marker = null;
     }
 
     private void TryGuard(Action<ISystemProxyGuardSession> action)
     {
-        if (_guard is null)
-        {
-            return;
-        }
+        if (_guard is null) return;
 
         try
         {
@@ -253,24 +237,15 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private void PrepareRootCertificate()
     {
         CreatePrivateDirectory(_options.DataDirectory);
-        var certificates = _server.CertificateManager;
+        var certificates = Server.CertificateManager;
         certificates.PfxFilePath = Path.GetFullPath(Path.Combine(_options.DataDirectory, RootCertificateFileName));
         certificates.PfxPassword = _options.RootCertificatePassword ?? "";
         certificates.SaveFakeCertificates = false;
-        if (!certificates.CreateRootCertificate())
-        {
-            throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
-        }
+        if (!certificates.CreateRootCertificate()) throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
 
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
-        if (certificates.RootCertificate is { } root)
-        {
-            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
-        }
+        if (certificates.RootCertificate is { } root) File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
     }
 
     private static void CreatePrivateDirectory(string path)
@@ -286,30 +261,30 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         File.SetUnixFileMode(path, userOnly);
     }
 
-    private Task BeforeRequestAsync(object sender, SessionEventArgs e) => _inspector.BeforeRequestAsync(sender, e);
+    private Task BeforeRequestAsync(object sender, SessionEventArgs e)
+    {
+        return _inspector.BeforeRequestAsync(sender, e);
+    }
 
-    private Task BeforeResponseAsync(object sender, SessionEventArgs e) => _inspector.BeforeResponseAsync(sender, e);
+    private Task BeforeResponseAsync(object sender, SessionEventArgs e)
+    {
+        return _inspector.BeforeResponseAsync(sender, e);
+    }
 
     private async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
-        if (_inspector.CapturesResponses)
-        {
-            await _inspector.AfterResponseAsync(sender, e);
-        }
+        if (_inspector.CapturesResponses) await _inspector.AfterResponseAsync(sender, e);
 
         CloseClientAfterUpstreamClosed(e);
     }
 
     /// <summary>
-    /// Ends the client connection once the upstream one has closed. Titanium reads a chunked body
-    /// that stops between chunks as complete and keeps the client waiting for the next chunk.
+    ///     Ends the client connection once the upstream one has closed. Titanium reads a chunked body
+    ///     that stops between chunks as complete and keeps the client waiting for the next chunk.
     /// </summary>
     private void CloseClientAfterUpstreamClosed(SessionEventArgs e)
     {
-        if (_upstreamStateUnreadable)
-        {
-            return;
-        }
+        if (_upstreamStateUnreadable) return;
 
         bool closed;
         try
@@ -323,15 +298,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             return;
         }
 
-        if (!closed)
-        {
-            return;
-        }
+        if (!closed) return;
 
-        if (e.HttpClient.Response.IsChunked)
-        {
-            Log.UpstreamClosedMidStream(_logger, e.HttpClient.Request.RequestUri.Host);
-        }
+        if (e.HttpClient.Response.IsChunked) Log.UpstreamClosedMidStream(_logger, e.HttpClient.Request.RequestUri.Host);
 
         e.TerminateSession();
     }

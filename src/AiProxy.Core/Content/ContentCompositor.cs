@@ -16,7 +16,7 @@ public sealed class ContentCompositor : ICompositor
             .Select(part => new
             {
                 Placeholder = part.Type.Placeholder(part.ChunkId),
-                Text = reduced.TryGetValue(part.ChunkId, out var text) ? text : part.Text,
+                Text = reduced.TryGetValue(part.ChunkId, out var text) ? text : part.Text
             })
             .ToList();
 
@@ -27,10 +27,7 @@ public sealed class ContentCompositor : ICompositor
         foreach (var part in placeholders)
         {
             var index = template.IndexOf(part.Placeholder, position, StringComparison.Ordinal);
-            if (index < 0)
-            {
-                continue;
-            }
+            if (index < 0) continue;
 
             composed.Append(template, position, index - position);
             composed.Append(part.Text);

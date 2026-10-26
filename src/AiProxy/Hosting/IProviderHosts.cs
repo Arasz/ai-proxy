@@ -9,9 +9,12 @@ public interface IProviderHosts
     Dialect? Find(string host);
 }
 
-/// <summary>The canonical provider API hosts from <see cref="ProviderHostCatalog"/>.</summary>
+/// <summary>The canonical provider API hosts from <see cref="ProviderHostCatalog" />.</summary>
 public sealed class CanonicalProviderHosts : IProviderHosts
 {
     /// <inheritdoc />
-    public Dialect? Find(string host) => ProviderHostCatalog.Find(host);
+    public Dialect? Find(string host)
+    {
+        return ProviderHostCatalog.Find(host);
+    }
 }

@@ -144,12 +144,15 @@ public sealed class RetrievalLoopTests
     [Fact]
     public void A_thread_follow_up_keeps_every_field_and_continues_from_the_retrieving_response()
     {
-        const string forwarded = """{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"tools":[{"name":"Read"}],"messages":[{"role":"user","content":"old"}],"thread":{"type":"create"},"diagnostics":{"previous_message_id":"msg_0"},"metadata":{"user_id":"u"}}""";
+        const string forwarded =
+            """{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"tools":[{"name":"Read"}],"messages":[{"role":"user","content":"old"}],"thread":{"type":"create"},"diagnostics":{"previous_message_id":"msg_0"},"metadata":{"user_id":"u"}}""";
         ToolResult[] results = [new("tu_r", "zażółć <x>", ToolOutcome.Succeeded), ToolResult.Deferred("tu_c")];
 
         var body = Encoding.UTF8.GetString(RetrievalFollowUp.Thread(Encoding.UTF8.GetBytes(forwarded), "msg_1", results));
 
-        Assert.Equal($$$"""{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"zażółć <x>"},{"type":"tool_result","tool_use_id":"tu_c","content":"{{{RetrievalLoop.DeferredCall}}}","is_error":true}]}],"thread":{"type":"continue","previous_message_id":"msg_1"},"diagnostics":{"previous_message_id":"msg_1"},"metadata":{"user_id":"u"}}""", body);
+        Assert.Equal(
+            $$$"""{"model":"claude-opus-5-5","max_tokens":10,"stream":true,"system":[{"type":"text","text":"s"}],"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"zażółć <x>"},{"type":"tool_result","tool_use_id":"tu_c","content":"{{{RetrievalLoop.DeferredCall}}}","is_error":true}]}],"thread":{"type":"continue","previous_message_id":"msg_1"},"diagnostics":{"previous_message_id":"msg_1"},"metadata":{"user_id":"u"}}""",
+            body);
     }
 
     [Fact]
@@ -159,64 +162,101 @@ public sealed class RetrievalLoopTests
 
         var body = Encoding.UTF8.GetString(RetrievalFollowUp.Stateless(Encoding.UTF8.GetBytes(forwarded), [new JsonObject { ["type"] = "text", ["text"] = "a" }], [new ToolResult("tu_r", "b", ToolOutcome.Succeeded)]));
 
-        Assert.Equal("""{"model":"m","messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"text","text":"a"}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"b"}]}],"tools":[{"name":"Read"}]}""", body);
+        Assert.Equal(
+            """{"model":"m","messages":[{"role":"user","content":"q"},{"role":"assistant","content":[{"type":"text","text":"a"}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu_r","content":"b"}]}],"tools":[{"name":"Read"}]}""",
+            body);
     }
 
     private static async Task<List<SseEvent>> RunRound(RetrievalLoop loop, string wire)
     {
         var written = new List<SseEvent>();
-        await foreach (var sse in new SseReader().ReadAsync(new MemoryStream(Encoding.UTF8.GetBytes(wire)), CancellationToken.None))
-        {
-            written.AddRange(loop.Round.Accept(sse));
-        }
+        await foreach (var sse in new SseReader().ReadAsync(new MemoryStream(Encoding.UTF8.GetBytes(wire)), CancellationToken.None)) written.AddRange(loop.Round.Accept(sse));
 
         return written;
     }
 
-    private static JsonElement Data(SseEvent sse) => JsonDocument.Parse(sse.Data).RootElement.Clone();
+    private static JsonElement Data(SseEvent sse)
+    {
+        return JsonDocument.Parse(sse.Data).RootElement.Clone();
+    }
 
-    private static string Wire(IEnumerable<SseEvent> events) => string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
+    private static string Wire(IEnumerable<SseEvent> events)
+    {
+        return string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
+    }
 
     /// <summary>Builds Messages streams the way the API sends them.</summary>
     internal static class Sse
     {
-        public static string Wire(params SseEvent[] events) => string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
+        public static string Wire(params SseEvent[] events)
+        {
+            return string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
+        }
 
-        public static Func<int, SseEvent[]> Text(string text) => index =>
-        [
-            Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "text", ["text"] = "" } }),
-            Delta(index, new JsonObject { ["type"] = "text_delta", ["text"] = text }),
-            Stop(index),
-        ];
+        public static Func<int, SseEvent[]> Text(string text)
+        {
+            return index =>
+            [
+                Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "text", ["text"] = "" } }),
+                Delta(index, new JsonObject { ["type"] = "text_delta", ["text"] = text }),
+                Stop(index)
+            ];
+        }
 
-        public static Func<int, SseEvent[]> Thinking(string thinking, string signature) => index =>
-        [
-            Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "thinking", ["thinking"] = "", ["signature"] = "" } }),
-            Delta(index, new JsonObject { ["type"] = "thinking_delta", ["thinking"] = thinking }),
-            Delta(index, new JsonObject { ["type"] = "signature_delta", ["signature"] = signature }),
-            Stop(index),
-        ];
+        public static Func<int, SseEvent[]> Thinking(string thinking, string signature)
+        {
+            return index =>
+            [
+                Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "thinking", ["thinking"] = "", ["signature"] = "" } }),
+                Delta(index, new JsonObject { ["type"] = "thinking_delta", ["thinking"] = thinking }),
+                Delta(index, new JsonObject { ["type"] = "signature_delta", ["signature"] = signature }),
+                Stop(index)
+            ];
+        }
 
-        public static Func<int, SseEvent[]> Tool(string id, string name, string input) => index =>
-        [
-            Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = new JsonObject() } }),
-            .. input.Length == 0 ? Array.Empty<SseEvent>() : [Delta(index, new JsonObject { ["type"] = "input_json_delta", ["partial_json"] = input })],
-            Stop(index),
-        ];
+        public static Func<int, SseEvent[]> Tool(string id, string name, string input)
+        {
+            return index =>
+            [
+                Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = new JsonObject() } }),
+                .. input.Length == 0 ? Array.Empty<SseEvent>() : [Delta(index, new JsonObject { ["type"] = "input_json_delta", ["partial_json"] = input })],
+                Stop(index)
+            ];
+        }
 
-        public static string Message(string id, string stopReason, int outputTokens, params Func<int, SseEvent[]>[] blocks) => Wire(
-        [
-            Event("message_start", new JsonObject { ["type"] = "message_start", ["message"] = new JsonObject { ["id"] = id, ["type"] = "message", ["role"] = "assistant", ["content"] = new JsonArray(), ["usage"] = new JsonObject { ["input_tokens"] = 3, ["output_tokens"] = 1 } } }),
-            .. blocks.SelectMany((block, index) => block(index)),
-            Event("message_delta", new JsonObject { ["type"] = "message_delta", ["delta"] = new JsonObject { ["stop_reason"] = stopReason, ["stop_sequence"] = null }, ["usage"] = new JsonObject { ["input_tokens"] = 3, ["output_tokens"] = outputTokens } }),
-            new("message_stop", """{"type":"message_stop"}"""),
-        ]);
+        public static string Message(string id, string stopReason, int outputTokens, params Func<int, SseEvent[]>[] blocks)
+        {
+            return Wire(
+            [
+                Event("message_start",
+                    new JsonObject
+                    {
+                        ["type"] = "message_start",
+                        ["message"] = new JsonObject { ["id"] = id, ["type"] = "message", ["role"] = "assistant", ["content"] = new JsonArray(), ["usage"] = new JsonObject { ["input_tokens"] = 3, ["output_tokens"] = 1 } }
+                    }),
+                .. blocks.SelectMany((block, index) => block(index)),
+                Event("message_delta",
+                    new JsonObject
+                    {
+                        ["type"] = "message_delta", ["delta"] = new JsonObject { ["stop_reason"] = stopReason, ["stop_sequence"] = null }, ["usage"] = new JsonObject { ["input_tokens"] = 3, ["output_tokens"] = outputTokens }
+                    }),
+                new SseEvent("message_stop", """{"type":"message_stop"}""")
+            ]);
+        }
 
-        private static SseEvent Event(string name, JsonObject data) => new(name, data.ToJsonString());
+        private static SseEvent Event(string name, JsonObject data)
+        {
+            return new SseEvent(name, data.ToJsonString());
+        }
 
-        private static SseEvent Delta(int index, JsonObject delta) =>
-            Event("content_block_delta", new JsonObject { ["type"] = "content_block_delta", ["index"] = index, ["delta"] = delta });
+        private static SseEvent Delta(int index, JsonObject delta)
+        {
+            return Event("content_block_delta", new JsonObject { ["type"] = "content_block_delta", ["index"] = index, ["delta"] = delta });
+        }
 
-        private static SseEvent Stop(int index) => Event("content_block_stop", new JsonObject { ["type"] = "content_block_stop", ["index"] = index });
+        private static SseEvent Stop(int index)
+        {
+            return Event("content_block_stop", new JsonObject { ["type"] = "content_block_stop", ["index"] = index });
+        }
     }
 }

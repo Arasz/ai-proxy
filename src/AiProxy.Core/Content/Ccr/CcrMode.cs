@@ -10,5 +10,5 @@ public enum CcrMode
     Thread,
 
     /// <summary>Previews whose originals are in every request the client sends.</summary>
-    Stateless,
+    Stateless
 }

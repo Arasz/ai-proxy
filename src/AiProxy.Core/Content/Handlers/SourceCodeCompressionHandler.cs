@@ -16,7 +16,10 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
     private readonly ICodeLexer[] _lexers = lexers.ToArray();
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.SourceCode;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.SourceCode;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
@@ -26,10 +29,7 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
 
     private HandledContent? View(ContentPart part)
     {
-        if (part.Ccr == CcrMode.Off || _lexers.FirstOrDefault(lexer => lexer.SupportsPath(part.FilePath)) is not { } lexer)
-        {
-            return null;
-        }
+        if (part.Ccr == CcrMode.Off || _lexers.FirstOrDefault(lexer => lexer.SupportsPath(part.FilePath)) is not { } lexer) return null;
 
         var id = CcrView.IdOf(part.Text);
         var view = new CodeReducer(lexer).Reduce(part.Text, part.FilePath, new CodeReductionOptions(), CcrView.Hint(id));
@@ -43,10 +43,7 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
         {
             var line = segment.Text.TrimEnd('\n');
 
-            if (!segment.IsLiteral && line.Trim().Length == 0)
-            {
-                continue;
-            }
+            if (!segment.IsLiteral && line.Trim().Length == 0) continue;
 
             kept.Add(line);
         }

@@ -8,8 +8,8 @@ using AiProxy.Core.Content.Ccr;
 namespace AiProxy.Tests.Unit.Content.Ccr;
 
 /// <summary>
-/// The tool result preview, stated as behaviour: a deterministic, budget-bound subset of the
-/// original's lines that names every line it hides.
+///     The tool result preview, stated as behaviour: a deterministic, budget-bound subset of the
+///     original's lines that names every line it hides.
 /// </summary>
 public sealed partial class CcrPreviewTests
 {
@@ -24,11 +24,15 @@ public sealed partial class CcrPreviewTests
         return string.Join("\n", Enumerable.Range(1, lines).Select(line));
     }
 
-    private static string IdOf(string original) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
+    private static string IdOf(string original)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
+    }
 
-    private static CcrPreview Build(string original) =>
-        new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options) ?? throw new InvalidOperationException("expected a preview");
+    private static CcrPreview Build(string original)
+    {
+        return new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options) ?? throw new InvalidOperationException("expected a preview");
+    }
 
     [Theory]
     [InlineData("plain", "c5ff72de3e0f8dff", "be371a8c77ae6bbe06630d1c6d98a44b0864917cced3574edb7241329524dbc5")]
@@ -40,7 +44,7 @@ public sealed partial class CcrPreviewTests
     public void Preview_bytes_match_the_captured_core_baseline(string shape, string id, string digest)
     {
         var preview = new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(Shape(shape), BaselineOptions)
-            ?? throw new InvalidOperationException("expected a preview");
+                      ?? throw new InvalidOperationException("expected a preview");
 
         Assert.Equal(id, preview.Id);
         Assert.Equal(digest, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(preview.Text))));
@@ -311,18 +315,21 @@ public sealed partial class CcrPreviewTests
         Assert.True(new UTF8Encoding(false, true).GetByteCount(preview.Text) > 0);
     }
 
-    private static string Shape(string shape) => shape switch
+    private static string Shape(string shape)
     {
-        "plain" => Log(400),
-        "signals" => Log(800, index => index % 3 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
-        "sparse-signals" => Log(2000, index => index % 20 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
-        "wide" => Log(300, index => $"{index}: {new string((char)('a' + (index % 26)), 40 + (index * 7 % 500))}"),
-        "identifiers" => Log(800, index => $"call SomeServiceName{index}.HandleRequest{index} /usr/lib/x{index}.so 0x{index:x4}"),
-        "crlf" => Log(400, index => $"step {index}: compiling module m{index}   \r"),
-        "one-line" => new string('q', 20_000),
-        "unicode-cut" => $"a{string.Concat(Enumerable.Repeat("😀", 10_000))}",
-        _ => throw new ArgumentOutOfRangeException(nameof(shape))
-    };
+        return shape switch
+        {
+            "plain" => Log(400),
+            "signals" => Log(800, index => index % 3 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
+            "sparse-signals" => Log(2000, index => index % 20 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
+            "wide" => Log(300, index => $"{index}: {new string((char)('a' + (index % 26)), 40 + (index * 7 % 500))}"),
+            "identifiers" => Log(800, index => $"call SomeServiceName{index}.HandleRequest{index} /usr/lib/x{index}.so 0x{index:x4}"),
+            "crlf" => Log(400, index => $"step {index}: compiling module m{index}   \r"),
+            "one-line" => new string('q', 20_000),
+            "unicode-cut" => $"a{string.Concat(Enumerable.Repeat("😀", 10_000))}",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+    }
 
     private static IEnumerable<string> Body(string preview)
     {
@@ -343,10 +350,7 @@ public sealed partial class CcrPreviewTests
                 continue;
             }
 
-            if (shown == line)
-            {
-                return next;
-            }
+            if (shown == line) return next;
 
             next++;
         }

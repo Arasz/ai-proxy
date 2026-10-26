@@ -1,3 +1,4 @@
+using System.Globalization;
 using AiProxy.Core.Content;
 using Dapper;
 
@@ -5,15 +6,15 @@ namespace AiProxy.Storage;
 
 /// <summary>Keeps what the proxy compressed, in a SQLite file.</summary>
 /// <remarks>
-/// The write is a hand-off, not a write: the record is published to the queue and the
-/// background writer puts it in the content tables. The read looks in the content tables
-/// first and in the queue second, so a record that has not been written yet is still
-/// served.
+///     The write is a hand-off, not a write: the record is published to the queue and the
+///     background writer puts it in the content tables. The read looks in the content tables
+///     first and in the queue second, so a record that has not been written yet is still
+///     served.
 /// </remarks>
 public sealed class SqliteContentStore : IContentStore, IContentWriter
 {
-    private readonly ContentQueue _queue;
     private readonly string _databasePath;
+    private readonly ContentQueue _queue;
 
     /// <summary>Holds the queue the record is published to, and the file it lives in.</summary>
     /// <param name="options">Where the store keeps what the proxy compressed.</param>
@@ -28,8 +29,10 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
     }
 
     /// <inheritdoc />
-    public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) =>
-        _queue.PublishAsync(record, cancellationToken);
+    public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
+    {
+        return _queue.PublishAsync(record, cancellationToken);
+    }
 
     /// <inheritdoc />
     public async ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
@@ -40,16 +43,16 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
-            SELECT request_id      AS RequestId,
-                   created_at      AS CreatedAt,
-                   original        AS Original,
-                   compressed      AS Compressed,
-                   ratio           AS Ratio,
-                   path            AS Path,
-                   chunk_count     AS ChunkCount
-            FROM content_request
-            WHERE request_id = @RequestId;
-            """;
+                              SELECT request_id      AS RequestId,
+                                     created_at      AS CreatedAt,
+                                     original        AS Original,
+                                     compressed      AS Compressed,
+                                     ratio           AS Ratio,
+                                     path            AS Path,
+                                     chunk_count     AS ChunkCount
+                              FROM content_request
+                              WHERE request_id = @RequestId;
+                              """;
 
         var row = await connection.QuerySingleOrDefaultAsync<ContentRequestRow>(new CommandDefinition(
             select,
@@ -65,16 +68,16 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         }
 
         const string selectChunks = """
-            SELECT chunk_id        AS ChunkId,
-                   content_type    AS ContentType,
-                   original_text   AS OriginalText,
-                   compressed_text AS CompressedText,
-                   path            AS Path,
-                   ratio           AS Ratio
-            FROM content_chunk
-            WHERE request_id = @RequestId
-            ORDER BY chunk_id;
-            """;
+                                    SELECT chunk_id        AS ChunkId,
+                                           content_type    AS ContentType,
+                                           original_text   AS OriginalText,
+                                           compressed_text AS CompressedText,
+                                           path            AS Path,
+                                           ratio           AS Ratio
+                                    FROM content_chunk
+                                    WHERE request_id = @RequestId
+                                    ORDER BY chunk_id;
+                                    """;
 
         var chunks = await connection.QueryAsync<ContentChunkRow>(new CommandDefinition(
             selectChunks,
@@ -84,7 +87,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         var parts = chunks
             .Select(chunk => new CompressedPart(
                 (int)chunk.ChunkId,
-                Enum.Parse<ContentType>(chunk.ContentType, ignoreCase: true),
+                Enum.Parse<ContentType>(chunk.ContentType, true),
                 chunk.CompressedText,
                 chunk.OriginalText,
                 chunk.Path,
@@ -93,7 +96,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
 
         return new ContentRecord(
             row.RequestId,
-            DateTimeOffset.Parse(row.CreatedAt, System.Globalization.CultureInfo.InvariantCulture),
+            DateTimeOffset.Parse(row.CreatedAt, CultureInfo.InvariantCulture),
             row.Original,
             row.Compressed,
             row.Ratio,
@@ -111,18 +114,18 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
         connection.Ensure();
 
         const string insertRequest = """
-            INSERT OR REPLACE INTO content_request
-                (request_id, created_at, original, compressed, ratio, path, chunk_count)
-            VALUES
-                (@RequestId, @CreatedAt, @Original, @Compressed, @Ratio, @Path, @ChunkCount);
-            """;
+                                     INSERT OR REPLACE INTO content_request
+                                         (request_id, created_at, original, compressed, ratio, path, chunk_count)
+                                     VALUES
+                                         (@RequestId, @CreatedAt, @Original, @Compressed, @Ratio, @Path, @ChunkCount);
+                                     """;
 
         const string insertChunk = """
-            INSERT OR REPLACE INTO content_chunk
-                (request_id, chunk_id, content_type, original_text, compressed_text, path, ratio)
-            VALUES
-                (@RequestId, @ChunkId, @ContentType, @OriginalText, @CompressedText, @Path, @Ratio);
-            """;
+                                   INSERT OR REPLACE INTO content_chunk
+                                       (request_id, chunk_id, content_type, original_text, compressed_text, path, ratio)
+                                   VALUES
+                                       (@RequestId, @ChunkId, @ContentType, @OriginalText, @CompressedText, @Path, @Ratio);
+                                   """;
 
         // The request row and its chunks are one fact, so they are written together or
         // not at all. A reader that found a request row without its chunks would serve
@@ -139,13 +142,12 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                 record.Compressed,
                 record.Ratio,
                 record.Path,
-                record.ChunkCount,
+                record.ChunkCount
             },
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         foreach (var part in record.Parts)
-        {
             await connection.ExecuteAsync(new CommandDefinition(
                 insertChunk,
                 new
@@ -156,11 +158,10 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                     part.OriginalText,
                     CompressedText = part.Text,
                     part.Path,
-                    part.Ratio,
+                    part.Ratio
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
-        }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

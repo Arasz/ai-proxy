@@ -1,6 +1,7 @@
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
 namespace AiProxy.Tests.Unit.Storage;
@@ -9,21 +10,18 @@ namespace AiProxy.Tests.Unit.Storage;
 public sealed class OriginalStoreTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"ai-proxy-originals-{Guid.CreateVersion7():N}.db");
-    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
     private readonly SqliteOriginalStore _store;
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
 
     public OriginalStoreTests()
     {
-        _store = new SqliteOriginalStore(new ContentStoreOptions(_path), _time, Microsoft.Extensions.Logging.Abstractions.NullLogger<SqliteOriginalStore>.Instance);
+        _store = new SqliteOriginalStore(new ContentStoreOptions(_path), _time, NullLogger<SqliteOriginalStore>.Instance);
     }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _path, $"{_path}-wal", $"{_path}-shm" })
-        {
-            File.Delete(file);
-        }
+        foreach (var file in new[] { _path, $"{_path}-wal", $"{_path}-shm" }) File.Delete(file);
     }
 
     [Fact]
@@ -94,7 +92,8 @@ public sealed class OriginalStoreTests : IDisposable
     {
         await using (var connection = ContentSchema.Open(_path))
         {
-            connection.Execute("CREATE TABLE content_request (request_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, original TEXT NOT NULL, compressed TEXT NOT NULL, ratio REAL NOT NULL, path TEXT NOT NULL, chunk_count INTEGER NOT NULL); INSERT INTO content_request VALUES ('r1','t','o','c',1,'p',0); PRAGMA user_version = 1;");
+            connection.Execute(
+                "CREATE TABLE content_request (request_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, original TEXT NOT NULL, compressed TEXT NOT NULL, ratio REAL NOT NULL, path TEXT NOT NULL, chunk_count INTEGER NOT NULL); INSERT INTO content_request VALUES ('r1','t','o','c',1,'p',0); PRAGMA user_version = 1;");
         }
 
         await _store.KeepAsync(new KeptOriginal("0123456789abcdef", "text", 1), CancellationToken.None);

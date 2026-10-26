@@ -23,7 +23,7 @@ public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLan
         "Object", "Array", "Function", "String", "Number", "Boolean", "Symbol", "BigInt", "Math", "JSON", "Date",
         "RegExp", "Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "Promise", "Map", "Set",
         "WeakMap", "WeakSet", "Proxy", "Reflect", "parseInt", "parseFloat", "isNaN", "isFinite", "setTimeout",
-        "clearTimeout", "setInterval", "clearInterval", "queueMicrotask", "structuredClone", "fetch",
+        "clearTimeout", "setInterval", "clearInterval", "queueMicrotask", "structuredClone", "fetch"
     ];
 
     private static readonly TreeSitterGrammar Grammar = Script(
@@ -37,18 +37,26 @@ public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLan
     }
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath) =>
-        filePath is not null
-        && (filePath.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
-            || filePath.EndsWith(".mjs", StringComparison.OrdinalIgnoreCase)
-            || filePath.EndsWith(".cjs", StringComparison.OrdinalIgnoreCase)
-            || filePath.EndsWith(".jsx", StringComparison.OrdinalIgnoreCase));
+    public bool SupportsPath(string? filePath)
+    {
+        return filePath is not null
+               && (filePath.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                   || filePath.EndsWith(".mjs", StringComparison.OrdinalIgnoreCase)
+                   || filePath.EndsWith(".cjs", StringComparison.OrdinalIgnoreCase)
+                   || filePath.EndsWith(".jsx", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <inheritdoc />
-    public bool IsKeyword(string text) => Keywords.Contains(text);
+    public bool IsKeyword(string text)
+    {
+        return Keywords.Contains(text);
+    }
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
+    public CodeLexResult Lex(string text)
+    {
+        return TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
+    }
 
     /// <summary>The JavaScript-family mapping, extended with a dialect's identifier and literal node types.</summary>
     internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, IReadOnlyDictionary<string, string?> strings)
@@ -59,28 +67,25 @@ public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLan
             ["template_string"] = "template_substitution",
             ["regex"] = null,
             ["jsx_text"] = null,
-            ["html_character_reference"] = null,
+            ["html_character_reference"] = null
         };
         var identifierTypes = identifiers.ToFrozenSet();
         return new TreeSitterGrammar(
-            Strings: literals.ToFrozenDictionary(),
-            Comments: ["comment", "html_comment"],
-            Identifiers: identifierTypes,
-            IsFixedName: IsJsxName,
-            IsUnsupported: node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
-            IsImport: static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
-            ImportNeedsTerminator: true,
-            ValueText: static _ => null,
-            IsDirective: static (comment, _) => ToolDirective().IsMatch(comment));
+            literals.ToFrozenDictionary(),
+            ["comment", "html_comment"],
+            identifierTypes,
+            IsJsxName,
+            node => identifierTypes.Contains(node.Type) && node.Children.Count == 0 && node.Text.Contains('\\'),
+            static node => node.Type == "import_statement" && node.Children.Any(static child => child.Type == "import_clause"),
+            true,
+            static _ => null,
+            static (comment, _) => ToolDirective().IsMatch(comment));
     }
 
     private static bool IsJsxName(Node node)
     {
         var parent = node.Parent;
-        while (parent is { Type: "member_expression" or "nested_identifier" or "jsx_namespace_name" })
-        {
-            parent = parent.Parent;
-        }
+        while (parent is { Type: "member_expression" or "nested_identifier" or "jsx_namespace_name" }) parent = parent.Parent;
         return parent is { Type: "jsx_opening_element" or "jsx_closing_element" or "jsx_self_closing_element" or "jsx_attribute" };
     }
 

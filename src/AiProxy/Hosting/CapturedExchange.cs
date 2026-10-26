@@ -1,9 +1,8 @@
 using AiProxy.Core.Capture;
+using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Titanium.Web.Proxy.StreamExtended.Network;
-
-using AiProxy.Core.Gain;
 
 namespace AiProxy.Hosting;
 

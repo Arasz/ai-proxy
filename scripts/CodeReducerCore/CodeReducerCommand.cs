@@ -32,38 +32,26 @@ public static class CodeReducerCommand
             return 1;
         }
     }
+
     private static void Validate(JsonElement root)
     {
-        if (root.ValueKind != JsonValueKind.Object)
-        {
-            throw new JsonException();
-        }
+        if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
 
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in root.EnumerateObject())
         {
-            if (!names.Add(property.Name))
-            {
-                throw new JsonException();
-            }
+            if (!names.Add(property.Name)) throw new JsonException();
 
             var valid = property.Name switch
             {
                 "text" => property.Value.ValueKind == JsonValueKind.String,
                 "filePath" or "retrievalHint" => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Null,
                 "removeComments" or "removeImports" or "renameIdentifiers" => property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
-                _ => false,
+                _ => false
             };
-            if (!valid)
-            {
-                throw new JsonException();
-            }
+            if (!valid) throw new JsonException();
         }
 
-        if (!names.Contains("text"))
-        {
-            throw new JsonException();
-        }
+        if (!names.Contains("text")) throw new JsonException();
     }
-
 }

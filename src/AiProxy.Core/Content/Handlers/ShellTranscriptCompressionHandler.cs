@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace AiProxy.Core.Content.Handlers;
 
 /// <summary>Keeps the lines of a shell transcript that carry a signal, plus two anchors at each end.</summary>
@@ -6,12 +8,15 @@ public sealed class ShellTranscriptCompressionHandler : ICompressionHandler
     /// <summary>The path this handler reports.</summary>
     public const string HandlerPath = "shell.log-rules";
 
-    private static readonly System.Text.RegularExpressions.Regex SignalPattern = new(
+    private static readonly Regex SignalPattern = new(
         LogRules.SignalPattern,
-        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.ShellTranscript;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.ShellTranscript;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

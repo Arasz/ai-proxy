@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AiProxy.Core.Gain;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Core.Gain;
 
 namespace AiProxy.Hosting;
 
@@ -11,17 +11,14 @@ public static partial class GainEndpoints
 {
     private static readonly JsonSerializerOptions RetrievalJson = new(JsonSerializerDefaults.Web)
     {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     public static void MapGainEndpoints(this WebApplication app)
     {
         app.MapGet("/gain", async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
         {
-            if (!TryQuery(request.Query, out var query, out var error))
-            {
-                return Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400);
-            }
+            if (!TryQuery(request.Query, out var query, out var error)) return Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400);
             return Results.Json(await store.QueryAsync(query, cancellationToken));
         });
         app.MapPost("/gain/reset", async (GainQuery query, IGainStore store, CancellationToken cancellationToken) =>
@@ -35,10 +32,7 @@ public static partial class GainEndpoints
         {
             var store = context.RequestServices.GetService<IOriginalStore>();
             var retriever = context.RequestServices.GetService<CcrRetriever>();
-            if (store is null || retriever is null)
-            {
-                return Results.Problem(title: "retrieval_disabled", detail: "Enable proxy compression to retain and retrieve originals.", statusCode: 503);
-            }
+            if (store is null || retriever is null) return Results.Problem(title: "retrieval_disabled", detail: "Enable proxy compression to retain and retrieve originals.", statusCode: 503);
             var arguments = JsonSerializer.Serialize(request, RetrievalJson);
             var parser = context.RequestServices.GetRequiredService<CcrRetrievalParser>();
             var options = context.RequestServices.GetRequiredService<CcrOptions>();
@@ -49,7 +43,7 @@ public static partial class GainEndpoints
             try
             {
                 await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? GainLabels.Unknown : GainLabels.Attributions.Caller,
-                    request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
+                        request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
                     null, GainLabels.RetrieveOriginal, GainLabels.Unknown, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, cancellationToken);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
@@ -65,7 +59,12 @@ public static partial class GainEndpoints
     {
         query = new GainQuery();
         error = null;
-        string? Value(string key) => values.TryGetValue(key, out var value) ? value.ToString() : null;
+
+        string? Value(string key)
+        {
+            return values.TryGetValue(key, out var value) ? value.ToString() : null;
+        }
+
         DateTimeOffset? from = null;
         DateTimeOffset? to = null;
         if (Value("from") is { } fromValue)
@@ -75,8 +74,10 @@ public static partial class GainEndpoints
                 error = "from must be an ISO date or timestamp.";
                 return false;
             }
+
             from = parsed;
         }
+
         if (Value("to") is { } toValue)
         {
             if (!DateTimeOffset.TryParse(toValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
@@ -84,14 +85,17 @@ public static partial class GainEndpoints
                 error = "to must be an ISO date or timestamp.";
                 return false;
             }
+
             to = parsed;
         }
+
         var limit = 50;
         if (Value("historyLimit") is { } limitValue && !int.TryParse(limitValue, NumberStyles.None, CultureInfo.InvariantCulture, out limit))
         {
             error = "historyLimit must be an integer from 0 to 1000.";
             return false;
         }
+
         query = new GainQuery(Value("project"), from, to, Value("provider"), Value("method"), Value("rule"), Value("layer"), Value("pipeline"), limit);
         error = Validate(query);
         return error is null;
@@ -99,15 +103,12 @@ public static partial class GainEndpoints
 
     private static string? Validate(GainQuery query)
     {
-        if (query.HistoryLimit is < 0 or > 1000) { return "historyLimit must be from 0 to 1000."; }
-        if (query is { From: { } from, To: { } to } && from >= to) { return "from must be earlier than to."; }
+        if (query.HistoryLimit is < 0 or > 1000) return "historyLimit must be from 0 to 1000.";
+        if (query is { From: { } from, To: { } to } && from >= to) return "from must be earlier than to.";
         foreach (var value in new[] { query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline })
-        {
             if (value is not null && (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl)))
-            {
                 return "Filters must be nonblank text without control characters, at most 4096 characters.";
-            }
-        }
+
         return null;
     }
 

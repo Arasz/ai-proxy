@@ -1,5 +1,5 @@
-using System.Text;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
@@ -7,8 +7,8 @@ using AiProxy.Core.Content.Ccr;
 namespace AiProxy.Tests.Unit.Content.Ccr;
 
 /// <summary>
-/// The proxy_retrieve answer, stated as behaviour: it returns only the slice asked for, from the
-/// original it was given, and every failure is a named error rather than a throw.
+///     The proxy_retrieve answer, stated as behaviour: it returns only the slice asked for, from the
+///     original it was given, and every failure is a named error rather than a throw.
 /// </summary>
 public sealed class CcrRetrievalTests
 {
@@ -18,25 +18,41 @@ public sealed class CcrRetrievalTests
 
     private static readonly string Id = IdOf(Original);
 
-    private static string IdOf(string original) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
+    private static string IdOf(string original)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
+    }
 
-    private static CcrRetrieval Answer(string arguments, string? original = null) =>
-        Retriever().Answer(arguments, original ?? Original, Options);
+    private static CcrRetrieval Answer(string arguments, string? original = null)
+    {
+        return Retriever().Answer(arguments, original ?? Original, Options);
+    }
 
-    private static CcrRetriever Retriever() => new(new CcrRetrievalParser(new RetrievalArgumentSchema()));
+    private static CcrRetriever Retriever()
+    {
+        return new CcrRetriever(new CcrRetrievalParser(new RetrievalArgumentSchema()));
+    }
 
-    private static string Lines(int start, int end) => $$"""{"id":"{{Id}}","mode":"lines","start":{{start}},"end":{{end}}}""";
+    private static string Lines(int start, int end)
+    {
+        return $$"""{"id":"{{Id}}","mode":"lines","start":{{start}},"end":{{end}}}""";
+    }
 
-    private static string Pattern(string pattern, int context = 0, string? id = null) =>
-        $$"""{"id":"{{id ?? Id}}","mode":"pattern","pattern":{{JsonSerializer.Serialize(pattern)}},"context":{{context}}}""";
+    private static string Pattern(string pattern, int context = 0, string? id = null)
+    {
+        return $$"""{"id":"{{id ?? Id}}","mode":"pattern","pattern":{{JsonSerializer.Serialize(pattern)}},"context":{{context}}}""";
+    }
 
-    private static string[] Body(CcrRetrieval result) => result.Text.Split('\n')[1..];
+    private static string[] Body(CcrRetrieval result)
+    {
+        return result.Text.Split('\n')[1..];
+    }
 
     [Fact]
     public void The_definition_is_the_exact_tool_the_adr_declares()
     {
-        const string expected = """{"name":"proxy_retrieve","description":"Reads part of a tool result the proxy shortened. Use the id from a [proxy preview ...] line. Ask for lines or a pattern; ask for the whole text only when you need all of it.","input_schema":{"type":"object","properties":{"id":{"type":"string","pattern":"^[0-9a-f]{16}$"},"mode":{"type":"string","enum":["lines","pattern","whole"]},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"pattern":{"type":"string","description":".NET regular expression, case-sensitive"},"context":{"type":"integer","minimum":0,"maximum":10}},"required":["id","mode"],"additionalProperties":false}}""";
+        const string expected =
+            """{"name":"proxy_retrieve","description":"Reads part of a tool result the proxy shortened. Use the id from a [proxy preview ...] line. Ask for lines or a pattern; ask for the whole text only when you need all of it.","input_schema":{"type":"object","properties":{"id":{"type":"string","pattern":"^[0-9a-f]{16}$"},"mode":{"type":"string","enum":["lines","pattern","whole"]},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"pattern":{"type":"string","description":".NET regular expression, case-sensitive"},"context":{"type":"integer","minimum":0,"maximum":10}},"required":["id","mode"],"additionalProperties":false}}""";
 
         Assert.Equal(expected, CcrRetrieval.Definition);
         Assert.Equal(CcrRetrieval.Name, JsonDocument.Parse(CcrRetrieval.Definition).RootElement.GetProperty("name").GetString());
@@ -131,12 +147,14 @@ public sealed class CcrRetrievalTests
     [Fact]
     public void Pattern_returns_each_matching_line_with_its_context()
     {
-        var result = Answer(Pattern(@"v(10|12|30)$", context: 1));
+        var result = Answer(Pattern(@"v(10|12|30)$", 1));
 
         Assert.Null(result.Error);
         Assert.Equal(
-            ["9\tline 9: value v9", "10\tline 10: value v10", "11\tline 11: value v11", "12\tline 12: value v12", "13\tline 13: value v13",
-             "--", "29\tline 29: value v29", "30\tline 30: value v30", "31\tline 31: value v31"],
+            [
+                "9\tline 9: value v9", "10\tline 10: value v10", "11\tline 11: value v11", "12\tline 12: value v12", "13\tline 13: value v13",
+                "--", "29\tline 29: value v29", "30\tline 30: value v30", "31\tline 31: value v31"
+            ],
             Body(result));
     }
 
@@ -324,6 +342,9 @@ public sealed class CcrRetrievalTests
 
     private sealed class RejectingSchema(string violation) : IToolArgumentSchema
     {
-        public string? Violation(JsonElement arguments) => violation;
+        public string? Violation(JsonElement arguments)
+        {
+            return violation;
+        }
     }
 }

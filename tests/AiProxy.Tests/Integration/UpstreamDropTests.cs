@@ -1,9 +1,10 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
@@ -71,7 +72,7 @@ public sealed class UpstreamDropTests
             await context.Response.Body.WriteAsync(FirstEvent);
             await context.Response.Body.FlushAsync();
         };
-        await using var proxy = await StartProxyAsync(provider, capture: false);
+        await using var proxy = await StartProxyAsync(provider, false);
         var connections = 0;
         using var client = new HttpClient(new SocketsHttpHandler
         {
@@ -82,8 +83,8 @@ public sealed class UpstreamDropTests
                 Interlocked.Increment(ref connections);
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-                return new NetworkStream(socket, ownsSocket: true);
-            },
+                return new NetworkStream(socket, true);
+            }
         }) { Timeout = ClientTimeout };
 
         Assert.Equal(FirstEvent, await SendAsync(client, upstream.BaseAddress));
@@ -100,7 +101,7 @@ public sealed class UpstreamDropTests
         const string body = "a body delimited by the close";
         await using var upstream = await CloseDelimitedUpstream.StartAsync(body);
         var logs = new RecordingLoggerProvider();
-        await using var proxy = await StartProxyAsync(provider, capture: false, logs);
+        await using var proxy = await StartProxyAsync(provider, false, logs);
         using var client = new HttpClient(new SocketsHttpHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true }) { Timeout = ClientTimeout };
 
         Assert.Equal(body, Encoding.UTF8.GetString(await SendAsync(client, upstream.BaseAddress)));
@@ -120,7 +121,7 @@ public sealed class UpstreamDropTests
         listener.Stop();
         await using var service = new TitaniumProxyService(
             null,
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
+            new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             new ProcessSystemProxyGuardLauncher(),
@@ -139,13 +140,18 @@ public sealed class UpstreamDropTests
         Assert.IsType<MissingMethodException>(error.Exception);
     }
 
-    private static Task<ProxyHost> StartProxyAsync(bool provider, bool capture, ILoggerProvider? logs = null) =>
-        ProxyHost.StartAsync(
+    private static Task<ProxyHost> StartProxyAsync(bool provider, bool capture, ILoggerProvider? logs = null)
+    {
+        return ProxyHost.StartAsync(
             capture ? new Dictionary<string, string> { ["Proxy:Capture"] = "true" } : new Dictionary<string, string>(),
             providerHosts: provider ? new LoopbackProviderHosts(Dialect.Anthropic) : new NoProviderHosts(),
             logging: logs);
+    }
 
-    private static StringContent Json() => new("""{"model":"m","stream":true}""", Encoding.UTF8, "application/json");
+    private static StringContent Json()
+    {
+        return new StringContent("""{"model":"m","stream":true}""", Encoding.UTF8, "application/json");
+    }
 
     private static async Task<byte[]> SendAsync(HttpClient client, Uri upstream)
     {
@@ -156,7 +162,10 @@ public sealed class UpstreamDropTests
 
     private sealed class NoProviderHosts : IProviderHosts
     {
-        public Dialect? Find(string host) => null;
+        public Dialect? Find(string host)
+        {
+            return null;
+        }
     }
 
     /// <summary>An upstream that answers with neither a length nor chunking, so its close ends the body.</summary>
@@ -173,17 +182,17 @@ public sealed class UpstreamDropTests
 
         public Uri BaseAddress => new($"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}");
 
+        public async ValueTask DisposeAsync()
+        {
+            _listener.Stop();
+            await Record.ExceptionAsync(() => _serving);
+        }
+
         public static Task<CloseDelimitedUpstream> StartAsync(string body)
         {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             return Task.FromResult(new CloseDelimitedUpstream(listener, body));
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _listener.Stop();
-            await Record.ExceptionAsync(() => _serving);
         }
 
         private async Task ServeAsync(string body)
@@ -203,27 +212,18 @@ public sealed class UpstreamDropTests
             while (true)
             {
                 var read = await stream.ReadAsync(buffer);
-                if (read == 0)
-                {
-                    return;
-                }
+                if (read == 0) return;
 
                 received.AddRange(buffer.AsSpan(0, read));
                 var text = Encoding.ASCII.GetString(received.ToArray());
                 var end = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-                if (end < 0)
-                {
-                    continue;
-                }
+                if (end < 0) continue;
 
                 var length = text[..end].Split("\r\n")
                     .Where(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-                    .Select(line => int.Parse(line["Content-Length:".Length..].Trim(), System.Globalization.CultureInfo.InvariantCulture))
+                    .Select(line => int.Parse(line["Content-Length:".Length..].Trim(), CultureInfo.InvariantCulture))
                     .FirstOrDefault();
-                if (received.Count >= end + 4 + length)
-                {
-                    return;
-                }
+                if (received.Count >= end + 4 + length) return;
             }
         }
     }

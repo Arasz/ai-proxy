@@ -5,17 +5,14 @@ namespace AiProxy.Tests.Unit.Content.Handlers;
 /// <summary>Checks that a reduction only removed characters: what it kept is the input, in order.</summary>
 internal static class OrderedSubsequence
 {
-    /// <summary>Whether every character of <paramref name="candidate"/> appears in <paramref name="source"/>, in the same order.</summary>
+    /// <summary>Whether every character of <paramref name="candidate" /> appears in <paramref name="source" />, in the same order.</summary>
     public static bool Holds(string candidate, string source)
     {
         var position = 0;
         foreach (var character in candidate)
         {
             position = source.IndexOf(character, position);
-            if (position < 0)
-            {
-                return false;
-            }
+            if (position < 0) return false;
 
             position++;
         }

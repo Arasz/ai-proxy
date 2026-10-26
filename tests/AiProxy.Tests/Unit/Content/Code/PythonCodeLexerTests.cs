@@ -87,7 +87,7 @@ public sealed class PythonCodeLexerTests
         const string source =
             $"{Padding}from __future__ import annotations\nimport os, sys\nfrom a.b import (\n    c,\n    d,\n)\nfrom . import e  # why\nimport g; h = 1\ntry:\n    import json\nexcept ImportError:\n    json = None\nx = os\n";
 
-        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RemoveComments: true), Hint);
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(true), Hint);
 
         Assert.True(result.Changed);
         Assert.Equal(
@@ -117,11 +117,11 @@ public sealed class PythonCodeLexerTests
     public void Reducer_keeps_directive_comments_verbatim_on_their_original_lines()
     {
         const string source = "1\t#!/usr/bin/env python\n"
-            + "2\t# -*- coding: utf-8 -*-\n"
-            + "3\t# a long removable comment so the compact view plus its hint is smaller than the source\n"
-            + "4\timport os\n"
-            + "5\tx = os.path  # type: ignore\n"
-            + "6\ty = 1  # gone\n";
+                              + "2\t# -*- coding: utf-8 -*-\n"
+                              + "3\t# a long removable comment so the compact view plus its hint is smaller than the source\n"
+                              + "4\timport os\n"
+                              + "5\tx = os.path  # type: ignore\n"
+                              + "6\ty = 1  # gone\n";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", null, Hint);
 
@@ -180,8 +180,10 @@ public sealed class PythonCodeLexerTests
     [InlineData("EXAMPLE.PY", true)]
     [InlineData("example.pyi", false)]
     [InlineData(null, false)]
-    public void Supports_python_paths(string? path, bool expected) =>
+    public void Supports_python_paths(string? path, bool expected)
+    {
         Assert.Equal(expected, new PythonCodeLexer().SupportsPath(path));
+    }
 
     [Theory]
     [InlineData("\n")]

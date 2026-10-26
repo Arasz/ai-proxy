@@ -1,13 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
-using AiProxy.Core.Gain;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
+using AiProxy.Storage;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+using Xunit.Sdk;
 using static AiProxy.Tests.Unit.Content.Ccr.RetrievalLoopTests;
 
 namespace AiProxy.Tests.Integration;
@@ -15,17 +19,17 @@ namespace AiProxy.Tests.Integration;
 /// <summary>CCR through the real proxy against a streaming upstream: previews go up, retrievals are answered inside the request, and the client gets one message.</summary>
 public sealed class CcrRelayTests : IDisposable
 {
-    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
-
-    private static readonly string Id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Large)))[..16];
-
-    private static readonly string Retrieve = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3 });
-
     private const string CodeFile =
         "using System;\nusing System.Collections.Generic;\n\n/// <summary>A type whose doc comment is long enough that the code view, hint included, is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 1; // the value the model reads back exactly\n\n    /// <summary>A second member, so the file is over the compression minimum for source code.</summary>\n    public int Other => 2; // another comment the view drops\n\n    /// <summary>A third member with its own doc comment, also dropped from the view.</summary>\n    public int Third => 3;\n}\n";
 
     private const string PythonFile =
         "import os\nimport sys\nfrom typing import Any\n\n# A module comment long enough that the code view, hint included, is smaller than the file.\n\n\ndef value(item: Any) -> str:\n    \"\"\"Returns the item's text; the docstring stays in the view.\"\"\"\n    return os.fspath(item)  # the value the model reads back exactly\n\n\n# A second comment, so the file is over the compression minimum for source code.\ndef main() -> int:\n    # a third comment the view drops\n    print(value(sys.argv[0]))\n    return 0\n\n\n# Entry point; this comment goes too.\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
+
+    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+
+    private static readonly string Id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Large)))[..16];
+
+    private static readonly string Retrieve = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3 });
 
     private static readonly string ViewId = CcrView.IdOf(CodeFile);
 
@@ -35,11 +39,8 @@ public sealed class CcrRelayTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
-            File.Delete(file);
-        }
+        SqliteConnection.ClearAllPools();
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class CcrRelayTests : IDisposable
 
         Assert.Equal(2, upstream.Requests.Count);
         var summary = Assert.Single(logs.Entries, entry => entry.EventId == 1407);
-        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Information, summary.Level);
+        Assert.Equal(LogLevel.Information, summary.Level);
         Assert.Contains($"{Encoding.UTF8.GetByteCount(StatelessRequest())} bytes to", summary.Message, StringComparison.Ordinal);
         var first = Json(upstream.Requests[0].Body);
         Assert.Equal(CcrRetrieval.Name, first.GetProperty("tools").EnumerateArray().Last().GetProperty("name").GetString());
@@ -90,6 +91,7 @@ public sealed class CcrRelayTests : IDisposable
             Assert.Equal("context-1", sent.Headers["anthropic-beta"]);
             Assert.DoesNotContain(sent.Headers.Keys, key => key.Equals("X-Ai-Proxy-Project", StringComparison.OrdinalIgnoreCase));
         }
+
         using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         Assert.Equal(1, gain!.Summary.Requests);
@@ -160,7 +162,7 @@ public sealed class CcrRelayTests : IDisposable
         {
         }
 
-        var row = await ReadResponseRowAsync(Path.Combine(proxy.DataDirectory, Storage.SqliteCaptureStore.FileName));
+        var row = await ReadResponseRowAsync(Path.Combine(proxy.DataDirectory, SqliteCaptureStore.FileName));
         Assert.Equal(200, row.Status);
         Assert.Equal(10, row.OutputTokens);
         Assert.Contains("ccr.round-1", row.Stages, StringComparison.Ordinal);
@@ -299,48 +301,68 @@ public sealed class CcrRelayTests : IDisposable
         Assert.DoesNotContain(CcrView.Marker, ToolResultOf(Assert.Single(upstream.Requests).Body), StringComparison.Ordinal);
     }
 
-    private static string ToolResultOf(string body) =>
-        Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? string.Empty;
-
-    private static JsonObject CodeRequest() => CodeRequest("src/Example.cs", CodeFile);
-
-    private static JsonObject CodeRequest(string path, string text) => new()
+    private static string ToolResultOf(string body)
     {
-        ["model"] = "m",
-        ["max_tokens"] = 5,
-        ["stream"] = true,
-        ["tools"] = new JsonArray(new JsonObject { ["name"] = "Read", ["input_schema"] = new JsonObject { ["type"] = "object" } }),
-        ["messages"] = new JsonArray(
-            new JsonObject
-            {
-                ["role"] = "assistant",
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["id"] = "t0", ["name"] = "Read", ["input"] = new JsonObject { ["file_path"] = path } }),
-            },
-            new JsonObject
+        return Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? "";
+    }
+
+    private static JsonObject CodeRequest()
+    {
+        return CodeRequest("src/Example.cs", CodeFile);
+    }
+
+    private static JsonObject CodeRequest(string path, string text)
+    {
+        return new JsonObject
+        {
+            ["model"] = "m",
+            ["max_tokens"] = 5,
+            ["stream"] = true,
+            ["tools"] = new JsonArray(new JsonObject { ["name"] = "Read", ["input_schema"] = new JsonObject { ["type"] = "object" } }),
+            ["messages"] = new JsonArray(
+                new JsonObject
+                {
+                    ["role"] = "assistant",
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_use", ["id"] = "t0", ["name"] = "Read", ["input"] = new JsonObject { ["file_path"] = path } })
+                },
+                new JsonObject
+                {
+                    ["role"] = "user",
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = text })
+                })
+        };
+    }
+
+    private static string StatelessRequest()
+    {
+        return Request().ToJsonString();
+    }
+
+    private static string CreateRequest()
+    {
+        return Request().Also(request => request["thread"] = new JsonObject { ["type"] = "create" }).ToJsonString();
+    }
+
+    private static JsonObject Request()
+    {
+        return new JsonObject
+        {
+            ["model"] = "m",
+            ["max_tokens"] = 5,
+            ["stream"] = true,
+            ["tools"] = new JsonArray(new JsonObject { ["name"] = "Read", ["input_schema"] = new JsonObject { ["type"] = "object" } }),
+            ["messages"] = new JsonArray(new JsonObject
             {
                 ["role"] = "user",
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = text }),
-            }),
-    };
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = Large })
+            })
+        };
+    }
 
-    private static string StatelessRequest() => Request().ToJsonString();
-
-    private static string CreateRequest() => Request().Also(request => request["thread"] = new JsonObject { ["type"] = "create" }).ToJsonString();
-
-    private static JsonObject Request() => new()
+    private static JsonElement Json(string body)
     {
-        ["model"] = "m",
-        ["max_tokens"] = 5,
-        ["stream"] = true,
-        ["tools"] = new JsonArray(new JsonObject { ["name"] = "Read", ["input_schema"] = new JsonObject { ["type"] = "object" } }),
-        ["messages"] = new JsonArray(new JsonObject
-        {
-            ["role"] = "user",
-            ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = Large }),
-        }),
-    };
-
-    private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement.Clone();
+        return JsonDocument.Parse(body).RootElement.Clone();
+    }
 
     private static Func<FakeUpstream, HttpContext, Task> Script(params string[] streams)
     {
@@ -352,35 +374,33 @@ public sealed class CcrRelayTests : IDisposable
         };
     }
 
-    private Task<ProxyHost> StartProxyAsync(params KeyValuePair<string, string>[] extra) => ProxyHost.StartAsync(
-        new Dictionary<string, string>(extra)
-        {
-            ["Proxy:Compression:Enabled"] = "true",
-            ["Proxy:Compression:Database"] = _databasePath,
-        },
-        providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+    private Task<ProxyHost> StartProxyAsync(params KeyValuePair<string, string>[] extra)
+    {
+        return ProxyHost.StartAsync(
+            new Dictionary<string, string>(extra)
+            {
+                ["Proxy:Compression:Enabled"] = "true",
+                ["Proxy:Compression:Database"] = _databasePath
+            },
+            providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+    }
 
     private static async Task<ResponseRow> ReadResponseRowAsync(string path)
     {
         for (var attempt = 0; attempt < 50; attempt++)
         {
-            await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}");
+            await using var connection = new SqliteConnection($"Data Source={path}");
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT status, output_tokens, stages FROM capture_response;";
             await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
-            if (await reader.ReadAsync(TestContext.Current.CancellationToken))
-            {
-                return new ResponseRow(reader.GetInt32(0), reader.IsDBNull(1) ? -1 : reader.GetInt64(1), reader.GetString(2));
-            }
+            if (await reader.ReadAsync(TestContext.Current.CancellationToken)) return new ResponseRow(reader.GetInt32(0), reader.IsDBNull(1) ? -1 : reader.GetInt64(1), reader.GetString(2));
 
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }
 
-        throw new Xunit.Sdk.XunitException("No capture_response row was written for the relayed exchange.");
+        throw new XunitException("No capture_response row was written for the relayed exchange.");
     }
-
-    private sealed record ResponseRow(int Status, long OutputTokens, string Stages);
 
     private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
@@ -388,7 +408,7 @@ public sealed class CcrRelayTests : IDisposable
         using var client = new HttpClient(handler);
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages?beta=true"))
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
         };
         message.Headers.TryAddWithoutValidation("Authorization", "Bearer secret");
         message.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
@@ -398,6 +418,8 @@ public sealed class CcrRelayTests : IDisposable
         await response.Content.LoadIntoBufferAsync(TestContext.Current.CancellationToken);
         return response;
     }
+
+    private sealed record ResponseRow(int Status, long OutputTokens, string Stages);
 }
 
 internal static class JsonObjectExtensions

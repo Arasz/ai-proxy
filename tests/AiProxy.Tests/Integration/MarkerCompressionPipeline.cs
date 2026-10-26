@@ -13,6 +13,6 @@ internal sealed class MarkerCompressionPipeline : ICompressionPipeline
     public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
     {
         var body = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(request.Body.Span) + Marker);
-        return ValueTask.FromResult(new CompressionResult(body, Changed: true));
+        return ValueTask.FromResult(new CompressionResult(body, true));
     }
 }

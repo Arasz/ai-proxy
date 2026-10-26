@@ -19,31 +19,33 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     private readonly SemaphoreSlim _writer = new(1, 1);
     private bool _initialized;
 
-    public async ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken) =>
+    public async ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken)
+    {
         await WriteAsync(async connection =>
         {
             await using var transaction = connection.BeginTransaction();
             await InsertAsync(connection, new GainEventInput(Kinds.Request, entry.Id, entry.At, entry.Project, entry.Provider,
                 entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(entry)), transaction, cancellationToken);
             foreach (var failure in failures)
-            {
                 await InsertAsync(connection, new GainEventInput(Kinds.Failure, Guid.CreateVersion7().ToString("N"), failure.At, failure.Project,
                     entry.Provider, entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(failure)), transaction, cancellationToken);
-            }
 
             await transaction.CommitAsync(cancellationToken);
         }, WritePath.Request, cancellationToken);
+    }
 
-    public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) =>
-        WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.Recall, Guid.CreateVersion7().ToString("N"), recall.At,
+    public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
+    {
+        return WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.Recall, Guid.CreateVersion7().ToString("N"), recall.At,
             recall.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(recall)), null, cancellationToken), WritePath.Request, cancellationToken);
+    }
 
     public async ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
     {
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
         connection.CreateCollation("ordinal", string.CompareOrdinal);
-        await using var transaction = connection.BeginTransaction(deferred: true);
+        await using var transaction = connection.BeginTransaction(true);
         var parameters = query.ToSqlParameters();
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
             Sql.Aggregate, parameters, transaction, cancellationToken: cancellationToken))).ToArray();
@@ -56,9 +58,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await transaction.CommitAsync(cancellationToken);
 
         var attributions = Attributions.SelectMany(dimension =>
-            rows.Where(row => row.View == dimension)
-                .OrderBy(static row => row.Name, StringComparer.Ordinal)
-                .Select(row => new GainAttribution(dimension, row.Name, row.ConvertToTotals())))
+                rows.Where(row => row.View == dimension)
+                    .OrderBy(static row => row.Name, StringComparer.Ordinal)
+                    .Select(row => new GainAttribution(dimension, row.Name, row.ConvertToTotals())))
             .ToArray();
         return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
         {
@@ -94,11 +96,14 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         return new GainResetResult(removed, cutoff);
     }
 
-    private static GainBucket[] Buckets(IEnumerable<AggregateRow> rows, string view) =>
-    [
-        .. rows.Where(row => row.View == view).OrderBy(static row => row.Start)
-            .Select(static row => new GainBucket(new DateTimeOffset(row.Start, TimeSpan.Zero), row.ConvertToTotals()))
-    ];
+    private static GainBucket[] Buckets(IEnumerable<AggregateRow> rows, string view)
+    {
+        return
+        [
+            .. rows.Where(row => row.View == view).OrderBy(static row => row.Start)
+                .Select(static row => new GainBucket(new DateTimeOffset(row.Start, TimeSpan.Zero), row.ConvertToTotals()))
+        ];
+    }
 
     private static async Task<T[]> DetailsAsync<T>(SqliteConnection connection, SqliteTransaction transaction,
         object filters, string kind, string sql, CancellationToken cancellationToken) where T : class
@@ -112,28 +117,22 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     }
 
     private static async Task InsertAsync(SqliteConnection connection, GainEventInput gainEvent,
-        SqliteTransaction? transaction, CancellationToken cancellationToken) =>
+        SqliteTransaction? transaction, CancellationToken cancellationToken)
+    {
         await connection.ExecuteAsync(new CommandDefinition(Sql.Insert, gainEvent.ToSqlParameters(),
             transaction, ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken));
+    }
 
     private async ValueTask WriteAsync(Func<SqliteConnection, Task> write, WritePath path, CancellationToken cancellationToken)
     {
         if (path == WritePath.Reset)
-        {
             await _writer.WaitAsync(cancellationToken);
-        }
-        else if (!await _writer.WaitAsync(RequestWait, cancellationToken))
-        {
-            throw new TimeoutException("The gain ledger is busy; this request is not recorded.");
-        }
+        else if (!await _writer.WaitAsync(RequestWait, cancellationToken)) throw new TimeoutException("The gain ledger is busy; this request is not recorded.");
 
         try
         {
             await using var connection = Open();
-            if (path == WritePath.Request)
-            {
-                connection.DefaultTimeout = ContentSchema.RequestCommandTimeoutSeconds;
-            }
+            if (path == WritePath.Request) connection.DefaultTimeout = ContentSchema.RequestCommandTimeoutSeconds;
 
             await InitializeAsync(connection, cancellationToken);
             await write(connection);
@@ -146,30 +145,21 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private async Task EnsureAsync(CancellationToken cancellationToken)
     {
-        if (_initialized)
-        {
-            return;
-        }
+        if (_initialized) return;
 
         await WriteAsync(static _ => Task.CompletedTask, WritePath.Reset, cancellationToken);
     }
 
     private SqliteConnection Open()
     {
-        if (Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath)) is { } directory)
-        {
-            Directory.CreateDirectory(directory);
-        }
+        if (Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath)) is { } directory) Directory.CreateDirectory(directory);
 
         return ContentSchema.Open(options.DatabasePath);
     }
 
     private async Task InitializeAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        if (_initialized)
-        {
-            return;
-        }
+        if (_initialized) return;
 
         await connection.ExecuteAsync(new CommandDefinition(Sql.Schema, cancellationToken: cancellationToken));
         _initialized = true;
@@ -177,7 +167,10 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private sealed record AggregateRow(string View, long Start, string Name, string Totals)
     {
-        public GainTotals ConvertToTotals() => JsonSerializer.Deserialize<GainTotals>(Totals) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
+        public GainTotals ConvertToTotals()
+        {
+            return JsonSerializer.Deserialize<GainTotals>(Totals) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
+        }
     }
 
     internal sealed record GainEventInput(
@@ -281,21 +274,25 @@ file static class GainStoreExtensions
 {
     extension(GainQuery query)
     {
-        public object ToSqlParameters() =>
-            new
+        public object ToSqlParameters()
+        {
+            return new
             {
                 query.Project, From = query.From?.UtcTicks, To = query.To?.UtcTicks,
                 query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline, HistoryLimit = Math.Max(0, query.HistoryLimit)
             };
+        }
     }
 
     extension(SqliteGainStore.GainEventInput gainEvent)
     {
-        public object ToSqlParameters() =>
-            new
+        public object ToSqlParameters()
+        {
+            return new
             {
                 gainEvent.Kind, gainEvent.Id, at = gainEvent.At.UtcTicks, gainEvent.Project, gainEvent.Provider,
                 gainEvent.Method, gainEvent.Rule, gainEvent.Layer, gainEvent.Pipeline, gainEvent.Payload
             };
+        }
     }
 }

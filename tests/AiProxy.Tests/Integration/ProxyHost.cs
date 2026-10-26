@@ -1,14 +1,14 @@
+using System.Net;
+using System.Net.Sockets;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
+using AiProxy.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using System.Net;
-using System.Net.Sockets;
-using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
@@ -36,6 +36,14 @@ internal sealed class ProxyHost : IAsyncDisposable
     /// <summary>The host services used by the integration fixture.</summary>
     public IServiceProvider Services => _app.Services;
 
+    /// <summary>Stops the proxy.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        await _app.StopAsync();
+        await _app.DisposeAsync();
+        _directory.Dispose();
+    }
+
     /// <summary>Starts the proxy with the given configuration.</summary>
     public static async Task<ProxyHost> StartAsync(
         IReadOnlyDictionary<string, string> configuration,
@@ -48,10 +56,7 @@ internal sealed class ProxyHost : IAsyncDisposable
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
-        if (logging is not null)
-        {
-            builder.Logging.AddProvider(logging);
-        }
+        if (logging is not null) builder.Logging.AddProvider(logging);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         var portListener = new TcpListener(IPAddress.Loopback, 0);
@@ -61,52 +66,29 @@ internal sealed class ProxyHost : IAsyncDisposable
 
         // Compression is on by default for a person; a test turns it on and names its own database.
         builder.Configuration["Proxy:Compression:Enabled"] = "false";
-        foreach (var (key, value) in configuration)
-        {
-            builder.Configuration[key] = value;
-        }
+        foreach (var (key, value) in configuration) builder.Configuration[key] = value;
 
         var directory = new TemporaryDirectory();
         var app = ProxyApplication.Create(
             builder,
             services =>
             {
-                if (compression is not null)
-                {
-                    services.AddSingleton(compression);
-                }
+                if (compression is not null) services.AddSingleton(compression);
 
-                if (providerHosts is not null)
-                {
-                    services.AddSingleton(providerHosts);
-                }
+                if (providerHosts is not null) services.AddSingleton(providerHosts);
 
-                if (capture is not null)
-                {
-                    services.AddSingleton(capture);
-                }
+                if (capture is not null) services.AddSingleton(capture);
 
-                if (time is not null)
-                {
-                    services.AddSingleton(time);
-                }
+                if (time is not null) services.AddSingleton(time);
 
                 configure?.Invoke(services);
             },
-            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path));
+            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, false, false, directory.Path));
 
         await app.StartAsync();
 
         var addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
 
         return new ProxyHost(app, directory) { BaseAddress = new Uri(addresses!.Addresses.First()) };
-    }
-
-    /// <summary>Stops the proxy.</summary>
-    public async ValueTask DisposeAsync()
-    {
-        await _app.StopAsync();
-        await _app.DisposeAsync();
-        _directory.Dispose();
     }
 }

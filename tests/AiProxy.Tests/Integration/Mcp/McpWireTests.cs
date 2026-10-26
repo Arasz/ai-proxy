@@ -1,17 +1,16 @@
 using System.Diagnostics;
 using System.Text.Json;
-using System.Net;
-using System.Net.Http.Json;
 using AiProxy.Core.Gain;
+using AiProxy.Mcp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AiProxy.Mcp.Tests;
+namespace AiProxy.Tests.Integration.Mcp;
 
 public sealed class McpWireTests
 {
@@ -31,6 +30,7 @@ public sealed class McpWireTests
         Assert.Equal(JsonValueKind.False, annotations.GetProperty("openWorldHint").ValueKind);
         Assert.Contains("mode", tool.GetProperty("inputSchema").GetProperty("required").EnumerateArray().Select(static item => item.GetString()));
     }
+
     [Theory]
     [InlineData("whole")]
     [InlineData("lines")]
@@ -45,7 +45,7 @@ public sealed class McpWireTests
         {
             "lines" => new { id = "0123456789abcdef", mode, start = 1, end = 2, context = 0 },
             "pattern" => new { id = "0123456789abcdef", mode, pattern = "second", context = 1 },
-            _ => new { id = "0123456789abcdef", mode, context = 0 },
+            _ => new { id = "0123456789abcdef", mode, context = 0 }
         };
         var response = await server.CallAsync("tools/call", new { name = "retrieve_original", arguments });
         var result = response.GetProperty("result");
@@ -71,6 +71,7 @@ public sealed class McpWireTests
             Assert.False(request.TryGetProperty("end", out _));
         }
     }
+
     [Theory]
     [InlineData("not_kept")]
     [InlineData("bad_pattern")]
@@ -101,13 +102,18 @@ public sealed class McpWireTests
         Assert.Contains("proxy", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("503", text);
     }
-
 }
 
 internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDisposable
 {
     public string Endpoint { get; } = endpoint;
     public List<JsonElement> Requests { get; } = [];
+
+    public async ValueTask DisposeAsync()
+    {
+        await app.StopAsync();
+        await app.DisposeAsync();
+    }
 
     public static async Task<ProxyStub> StartAsync(RetrievalResponse response, int status = 200)
     {
@@ -116,7 +122,7 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var app = builder.Build();
         ProxyStub? stub = null;
-        app.MapPost("/retrieval", async (Microsoft.AspNetCore.Http.HttpContext context) =>
+        app.MapPost("/retrieval", async context =>
         {
             using var body = await JsonDocument.ParseAsync(context.Request.Body);
             stub!.Requests.Add(body.RootElement.Clone());
@@ -127,11 +133,6 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
         var endpoint = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
         stub = new ProxyStub(app, endpoint);
         return stub;
-    }
-    public async ValueTask DisposeAsync()
-    {
-        await app.StopAsync();
-        await app.DisposeAsync();
     }
 }
 
@@ -144,6 +145,14 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
 
     private Task<string> Errors => _launched.Errors;
 
+    public async ValueTask DisposeAsync()
+    {
+        Server.StandardInput.Close();
+        if (!Server.HasExited) Server.Kill(true);
+        await Server.WaitForExitAsync();
+        Server.Dispose();
+    }
+
     private static Launched Start(string endpoint)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
@@ -154,9 +163,6 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
         var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start the MCP server.");
         return new Launched(process, process.StandardError.ReadToEndAsync());
     }
-
-    /// <summary>The server process and its stderr, read from the start so the pipe never fills.</summary>
-    private sealed record Launched(Process Process, Task<string> Errors);
 
     public async Task InitializeAsync()
     {
@@ -176,21 +182,10 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
             var line = await Server.StandardOutput.ReadLineAsync(timeout.Token);
             Assert.True(line is not null, $"MCP process closed stdout: {(Errors.IsCompleted ? await Errors : "stderr still open")}");
             using var document = JsonDocument.Parse(line!);
-            if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id)
-            {
-                return document.RootElement.Clone();
-            }
+            if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id) return document.RootElement.Clone();
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        Server.StandardInput.Close();
-        if (!Server.HasExited)
-        {
-            Server.Kill(entireProcessTree: true);
-        }
-        await Server.WaitForExitAsync();
-        Server.Dispose();
-    }
+    /// <summary>The server process and its stderr, read from the start so the pipe never fills.</summary>
+    private sealed record Launched(Process Process, Task<string> Errors);
 }

@@ -6,11 +6,12 @@ public sealed class GuardCommand
     /// <summary>The first argument that selects guard mode; the second is the data directory.</summary>
     public const string Argument = "--guard-system-proxy";
 
-    private readonly string _dataDirectory;
     private readonly Action _clear;
+
+    private readonly string _dataDirectory;
     private readonly TimeSpan _lockWait;
 
-    /// <summary>Creates the guard for the marker in <paramref name="dataDirectory"/>; <paramref name="lockWait"/> bounds the wait for that marker.</summary>
+    /// <summary>Creates the guard for the marker in <paramref name="dataDirectory" />; <paramref name="lockWait" /> bounds the wait for that marker.</summary>
     public GuardCommand(string dataDirectory, Action clear, TimeSpan lockWait)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
@@ -20,10 +21,13 @@ public sealed class GuardCommand
         _lockWait = lockWait;
     }
 
-    /// <summary>True when <paramref name="args"/> ask for guard mode.</summary>
-    public static bool IsRequested(string[] args) => args is [Argument, _];
+    /// <summary>True when <paramref name="args" /> ask for guard mode.</summary>
+    public static bool IsRequested(string[] args)
+    {
+        return args is [Argument, _];
+    }
 
-    /// <summary>Reads <paramref name="input"/> until it ends and returns the process exit code.</summary>
+    /// <summary>Reads <paramref name="input" /> until it ends and returns the process exit code.</summary>
     public int Run(TextReader input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -54,10 +58,7 @@ public sealed class GuardCommand
 
         using (marker)
         {
-            if (marker.PreviousRunDied)
-            {
-                _clear();
-            }
+            if (marker.PreviousRunDied) _clear();
 
             marker.Delete();
         }

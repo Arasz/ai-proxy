@@ -3,15 +3,14 @@ using AiProxy.Ccr;
 using AiProxy.Code;
 using AiProxy.Configuration;
 using AiProxy.Core.Capture;
-using AiProxy.Core.Gain;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
+using AiProxy.Core.Gain;
 using AiProxy.Hosting;
 using AiProxy.Storage;
-using Microsoft.Extensions.Logging;
 
 namespace AiProxy;
 
@@ -26,19 +25,13 @@ public static partial class ProxyServiceExtensions
         public IServiceCollection AddProxy(IConfiguration configuration, ProxyRuntimeOptions? runtimeOptions = null)
         {
             var settings = configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
-            Validator.ValidateObject(settings, new ValidationContext(settings), validateAllProperties: true);
+            Validator.ValidateObject(settings, new ValidationContext(settings), true);
 
             var compression = settings.Compression;
             var options = runtimeOptions ?? ProxyRuntimeOptions.Default;
-            if (settings.RootCertificatePassword is { Length: > 0 } rootPassword)
-            {
-                options = options with { RootCertificatePassword = rootPassword };
-            }
+            if (settings.RootCertificatePassword is { Length: > 0 } rootPassword) options = options with { RootCertificatePassword = rootPassword };
 
-            if (settings.Port is { } port)
-            {
-                options = options with { Port = port };
-            }
+            if (settings.Port is { } port) options = options with { Port = port };
 
             var capturePath = settings.Capture ? CapturePath(options) : null;
 
@@ -167,17 +160,16 @@ public static partial class ProxyServiceExtensions
             app.MapGet("/health", () => Results.Json(new { status = "ok" }));
             app.MapGainEndpoints();
 
-            if (settings.Compression.Enabled)
-            {
-                app.MapContentEndpoints();
-            }
+            if (settings.Compression.Enabled) app.MapContentEndpoints();
 
             return app;
         }
     }
 
-    private static string CapturePath(ProxyRuntimeOptions options) =>
-        Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
+    private static string CapturePath(ProxyRuntimeOptions options)
+    {
+        return Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
+    }
 
     private static partial class Log
     {

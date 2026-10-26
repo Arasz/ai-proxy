@@ -1,3 +1,4 @@
+using System.Text;
 using AiProxy.Core.Content;
 using AiProxy.Storage;
 using Dapper;
@@ -6,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace AiProxy.Tests.Unit.Storage;
 
 /// <summary>
-/// The store, tested against a real database file: a fake would pass where the SQL is wrong.
+///     The store, tested against a real database file: a fake would pass where the SQL is wrong.
 /// </summary>
 public sealed class ContentStoreTests : IDisposable
 {
@@ -29,23 +30,22 @@ public sealed class ContentStoreTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
             if (File.Exists(file))
-            {
                 File.Delete(file);
-            }
-        }
     }
 
-    private static ContentRecord Record() => new(
-        "request-1",
-        new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
-        "the original bödy",
-        "shört",
-        6.0 / 18.0,
-        "log.signal-filter",
-        1,
-        [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
+    private static ContentRecord Record()
+    {
+        return new ContentRecord(
+            "request-1",
+            new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
+            "the original bödy",
+            "shört",
+            6.0 / 18.0,
+            "log.signal-filter",
+            1,
+            [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
+    }
 
     [Fact]
     public async Task A_published_record_is_in_the_queue_when_the_producer_returns()
@@ -102,7 +102,7 @@ public sealed class ContentStoreTests : IDisposable
         await using var connection = ContentSchema.Open(_databasePath);
         var mode = await connection.ExecuteScalarAsync<string>("PRAGMA journal_mode;");
 
-        Assert.Equal("wal", mode, ignoreCase: true);
+        Assert.Equal("wal", mode, true);
     }
 
     [Fact]
@@ -126,8 +126,8 @@ public sealed class ContentStoreTests : IDisposable
         {
             Parts =
             [
-                new CompressedPart(1, ContentType.Log, "the compressed part", null!, "log.signal-filter", 0.5),
-            ],
+                new CompressedPart(1, ContentType.Log, "the compressed part", null!, "log.signal-filter", 0.5)
+            ]
         };
 
         await Assert.ThrowsAnyAsync<Exception>(async () =>
@@ -146,7 +146,7 @@ public sealed class ContentStoreTests : IDisposable
         await _store.PersistAsync(record, TestContext.Current.CancellationToken);
 
         await using var writer = ContentSchema.Open(_databasePath);
-        ContentSchema.Execute(writer, "BEGIN IMMEDIATE;");
+        writer.Execute("BEGIN IMMEDIATE;");
         try
         {
             await writer.ExecuteAsync(
@@ -161,7 +161,7 @@ public sealed class ContentStoreTests : IDisposable
         }
         finally
         {
-            ContentSchema.Execute(writer, "ROLLBACK;");
+            writer.Execute("ROLLBACK;");
         }
 
         var afterWriting = await _store.GetAsync(record.RequestId, TestContext.Current.CancellationToken);
@@ -183,15 +183,14 @@ public sealed class ContentStoreTests : IDisposable
             var requestId = $"request-{index}";
 
             work.Add(Task.Run(async () => await _store.PersistAsync(
-                Record() with { RequestId = requestId },
-                TestContext.Current.CancellationToken),
+                    Record() with { RequestId = requestId },
+                    TestContext.Current.CancellationToken),
                 TestContext.Current.CancellationToken));
         }
 
         var failures = new List<Exception>();
 
         foreach (var write in work)
-        {
             try
             {
                 await write;
@@ -200,7 +199,6 @@ public sealed class ContentStoreTests : IDisposable
             {
                 failures.Add(exception);
             }
-        }
 
         Assert.All(failures, failure =>
         {
@@ -221,11 +219,11 @@ public sealed class ContentStoreTests : IDisposable
         // lock is a different thing from writing a row under one.
         using (var setup = ContentSchema.Open(_databasePath))
         {
-            ContentSchema.Ensure(setup);
+            setup.Ensure();
         }
 
         await using var holder = ContentSchema.Open(_databasePath);
-        ContentSchema.Execute(holder, "BEGIN IMMEDIATE;");
+        holder.Execute("BEGIN IMMEDIATE;");
 
         var started = DateTimeOffset.UtcNow;
 
@@ -237,7 +235,7 @@ public sealed class ContentStoreTests : IDisposable
             waited < TimeSpan.FromSeconds(10),
             $"the producer waited {waited.TotalSeconds:F1} seconds for the lock");
 
-        ContentSchema.Execute(holder, "COMMIT;");
+        holder.Execute("COMMIT;");
     }
 
     [Fact]
@@ -253,8 +251,8 @@ public sealed class ContentStoreTests : IDisposable
             new { record.RequestId });
 
         Assert.Equal(
-            (double)System.Text.Encoding.UTF8.GetByteCount(row.Compressed) /
-            System.Text.Encoding.UTF8.GetByteCount(row.Original),
+            (double)Encoding.UTF8.GetByteCount(row.Compressed) /
+            Encoding.UTF8.GetByteCount(row.Original),
             row.Ratio,
             6);
     }

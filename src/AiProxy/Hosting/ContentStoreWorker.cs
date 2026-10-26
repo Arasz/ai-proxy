@@ -48,10 +48,7 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
         var connection = _connection ??= ContentSchema.Open(options.ResolvedDatabasePath);
         var version = await queue.ReadDataVersionAsync(connection, cancellationToken).ConfigureAwait(false);
 
-        if (version == _lastDataVersion)
-        {
-            return 0;
-        }
+        if (version == _lastDataVersion) return 0;
 
         _lastDataVersion = version;
 
@@ -59,7 +56,6 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
         var written = 0;
 
         foreach (var job in jobs)
-        {
             try
             {
                 await writer.PersistAsync(job.Record, cancellationToken).ConfigureAwait(false);
@@ -71,12 +67,8 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
                 _lastDataVersion = -1;
                 Log.JobFailed(logger, job.JobId, exception);
             }
-        }
 
-        if (written > 0)
-        {
-            Log.Drained(logger, written);
-        }
+        if (written > 0) Log.Drained(logger, written);
 
         return written;
     }

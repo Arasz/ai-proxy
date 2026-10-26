@@ -19,7 +19,7 @@ public enum RetrievalState
     Done,
 
     /// <summary>The client got an error event.</summary>
-    Failed,
+    Failed
 }
 
 /// <summary>One move of the retrieval loop and what triggered it.</summary>
@@ -31,19 +31,19 @@ public sealed record RetrievalMove(RetrievalState From, RetrievalState To, strin
 /// <summary>What the host does after an upstream response ended.</summary>
 public enum RetrievalStep
 {
-    /// <summary>Write <see cref="RetrievalLoop.Finish"/> and stop.</summary>
+    /// <summary>Write <see cref="RetrievalLoop.Finish" /> and stop.</summary>
     Release,
 
-    /// <summary>Answer the round's calls with <see cref="RetrievalLoop.ToolResults"/> and send a follow-up.</summary>
+    /// <summary>Answer the round's calls with <see cref="RetrievalLoop.ToolResults" /> and send a follow-up.</summary>
     Retrieve,
 
-    /// <summary>Write <see cref="RetrievalLoop.Failure"/> and stop.</summary>
-    Fail,
+    /// <summary>Write <see cref="RetrievalLoop.Failure" /> and stop.</summary>
+    Fail
 }
 
 /// <summary>
-/// The retrieval loop of one client response: the declared state transitions, the rounds, and the
-/// merge of every upstream response into the one message the client sees.
+///     The retrieval loop of one client response: the declared state transitions, the rounds, and the
+///     merge of every upstream response into the one message the client sees.
 /// </summary>
 public sealed class RetrievalLoop
 {
@@ -59,11 +59,10 @@ public sealed class RetrievalLoop
         [RetrievalState.HoldingTools] = [RetrievalState.Retrieving, RetrievalState.Done, RetrievalState.Failed],
         [RetrievalState.Retrieving] = [RetrievalState.Forwarding, RetrievalState.Failed],
         [RetrievalState.Done] = [RetrievalState.Failed],
-        [RetrievalState.Failed] = [],
+        [RetrievalState.Failed] = []
     };
 
     private readonly List<RetrievalMove> _history = [];
-    private RetrievalRound _round = RetrievalRound.First();
     private long _outputTokens;
 
     /// <summary>The current state.</summary>
@@ -73,7 +72,7 @@ public sealed class RetrievalLoop
     public IReadOnlyList<RetrievalMove> History => _history;
 
     /// <summary>The upstream response streaming now.</summary>
-    public RetrievalRound Round => _round;
+    public RetrievalRound Round { get; private set; } = RetrievalRound.First();
 
     /// <summary>How many rounds of calls were answered.</summary>
     public int Answered { get; private set; }
@@ -87,20 +86,17 @@ public sealed class RetrievalLoop
     /// <summary>Decides what follows the current round, once its upstream response ended or failed.</summary>
     public RetrievalStep Decide()
     {
-        if (FirstMessageId.Length == 0)
-        {
-            FirstMessageId = _round.MessageId;
-        }
+        if (FirstMessageId.Length == 0) FirstMessageId = Round.MessageId;
 
-        if (_round.Failed || !_round.Ended)
+        if (Round.Failed || !Round.Ended)
         {
-            Move(RetrievalState.Failed, _round.Failed ? Triggers.UpstreamError : Triggers.CutOff);
+            Move(RetrievalState.Failed, Round.Failed ? Triggers.UpstreamError : Triggers.CutOff);
             return RetrievalStep.Fail;
         }
 
         Move(RetrievalState.HoldingTools, Triggers.MessageStop);
-        _outputTokens += _round.OutputTokens;
-        var retrieves = _round.StopReason == StopReasons.ToolUse && _round.ToolCalls.Any(static call => call.IsRetrieval);
+        _outputTokens += Round.OutputTokens;
+        var retrieves = Round.StopReason == StopReasons.ToolUse && Round.ToolCalls.Any(static call => call.IsRetrieval);
         if (!retrieves)
         {
             Move(RetrievalState.Done, Triggers.NoRetrieval);
@@ -118,37 +114,36 @@ public sealed class RetrievalLoop
         return RetrievalStep.Retrieve;
     }
 
-    /// <summary>The tool results of the round being answered: retrievals from <paramref name="answers"/>, every other call deferred.</summary>
-    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers) =>
-        _round.ToolCalls
+    /// <summary>The tool results of the round being answered: retrievals from <paramref name="answers" />, every other call deferred.</summary>
+    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers)
+    {
+        return Round.ToolCalls
             .Select(call => call.IsRetrieval ? ToolResult.Of(call.Id, answers[call.Id]) : ToolResult.Deferred(call.Id))
             .ToArray();
+    }
 
     /// <summary>Starts the round of the follow-up response; its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
     public RetrievalRound NextRound()
     {
         Move(RetrievalState.Forwarding, Triggers.FollowUp);
-        _round = _round.Next();
-        return _round;
+        Round = Round.Next();
+        return Round;
     }
 
     /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
     public IReadOnlyList<SseEvent> Finish()
     {
-        var events = new List<SseEvent>(_round.Release());
-        events.Add(Answered == 0 && _round.DeltaEvent is { } received ? received : MergedDelta());
-        events.Add(_round.StopEvent ?? SseEvent.Of(Events.MessageStop, new JsonObject { [Fields.Type] = Events.MessageStop }));
+        var events = new List<SseEvent>(Round.Release());
+        events.Add(Answered == 0 && Round.DeltaEvent is { } received ? received : MergedDelta());
+        events.Add(Round.StopEvent ?? SseEvent.Of(Events.MessageStop, new JsonObject { [Fields.Type] = Events.MessageStop }));
         return events;
     }
 
     /// <summary>The last response's <c>message_delta</c> with the output tokens of every response.</summary>
     private SseEvent MergedDelta()
     {
-        var delta = _round.Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
-        if (delta[Fields.Usage] is not JsonObject usage)
-        {
-            delta[Fields.Usage] = usage = [];
-        }
+        var delta = Round.Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
+        if (delta[Fields.Usage] is not JsonObject usage) delta[Fields.Usage] = usage = [];
 
         usage[Fields.OutputTokens] = _outputTokens;
         return SseEvent.Of(Events.MessageDelta, delta);
@@ -157,12 +152,17 @@ public sealed class RetrievalLoop
     /// <summary>The error event of a failed loop.</summary>
     public SseEvent Failure(string message)
     {
-        if (State != RetrievalState.Failed)
-        {
-            Move(RetrievalState.Failed, message);
-        }
+        if (State != RetrievalState.Failed) Move(RetrievalState.Failed, message);
 
         return SseEvent.Error(Errors.Api, message);
+    }
+
+    private void Move(RetrievalState to, string trigger)
+    {
+        if (!Transitions[State].Contains(to)) throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
+
+        _history.Add(new RetrievalMove(State, to, trigger));
+        State = to;
     }
 
     /// <summary>What a move of the loop records as its trigger.</summary>
@@ -176,16 +176,5 @@ public sealed class RetrievalLoop
         public const string OverLimit = "proxy_retrieve over the limit";
         public const string Retrieval = "proxy_retrieve call";
         public const string FollowUp = "follow-up sent";
-    }
-
-    private void Move(RetrievalState to, string trigger)
-    {
-        if (!Transitions[State].Contains(to))
-        {
-            throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
-        }
-
-        _history.Add(new RetrievalMove(State, to, trigger));
-        State = to;
     }
 }

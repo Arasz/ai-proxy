@@ -6,6 +6,9 @@ public static class GainLabels
     /// <summary>Recorded when a value is not known; never inferred.</summary>
     public const string Unknown = "unknown";
 
+    /// <summary>The method a recall made through the API is recorded under.</summary>
+    public const string RetrieveOriginal = "retrieve_original";
+
     /// <summary>The rule of a request the proxy did not change.</summary>
     public static class Rules
     {
@@ -33,7 +36,4 @@ public static class GainLabels
     {
         public const string Caller = "caller";
     }
-
-    /// <summary>The method a recall made through the API is recorded under.</summary>
-    public const string RetrieveOriginal = "retrieve_original";
 }

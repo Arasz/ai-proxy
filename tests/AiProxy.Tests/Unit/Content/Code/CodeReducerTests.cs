@@ -1,5 +1,5 @@
-using AiProxy.Core.Content.Code;
 using AiProxy.Code;
+using AiProxy.Core.Content.Code;
 
 namespace AiProxy.Tests.Unit.Content.Code;
 
@@ -19,6 +19,7 @@ public sealed class CodeReducerTests
         Assert.Equal($"    int value = 1;\n{Hint}", result.Text);
         Assert.Empty(result.RenameMap);
     }
+
     [Theory]
     [InlineData(null, "Example.cs")]
     [InlineData("", "Example.cs")]
@@ -59,7 +60,8 @@ public sealed class CodeReducerTests
     [Fact]
     public void Contextual_and_native_integer_names_are_not_renamed_partially()
     {
-        var source = "// a very long comment makes room for the hint while preserving all names\nclass @record { }\nclass C { record first; record second; public int @record { get; set; } void P() { record = 1; record++; } void U() { int \\u0072ecord = 0; \\u0072ecord++; } }\nclass D { void record() {} void M() { record(); record(); } }\nclass E { int @nint; void M() { @nint++; nint++; } }\nclass V { public int P { set { int @value = 0; @value++; this.P = value; value = @value; } } }\n";
+        var source =
+            "// a very long comment makes room for the hint while preserving all names\nclass @record { }\nclass C { record first; record second; public int @record { get; set; } void P() { record = 1; record++; } void U() { int \\u0072ecord = 0; \\u0072ecord++; } }\nclass D { void record() {} void M() { record(); record(); } }\nclass E { int @nint; void M() { @nint++; nint++; } }\nclass V { public int P { set { int @value = 0; @value++; this.P = value; value = @value; } } }\n";
         var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
         Assert.True(result.Changed);
@@ -121,6 +123,7 @@ public sealed class CodeReducerTests
         Assert.False(result.Changed);
         Assert.Equal(source, result.Text);
     }
+
     [Fact]
     public void Every_number_prefix_survives_removable_gaps_and_CRLF()
     {
@@ -130,10 +133,12 @@ public sealed class CodeReducerTests
         Assert.True(result.Changed);
         Assert.Equal($"  62\t    int value = 1;\r\n{Hint}", result.Text);
     }
+
     [Fact]
     public void Only_complete_using_directives_are_removed()
     {
-        const string source = "global using System.Text;\nusing static System.Math;\nusing Alias = System.Collections.Generic;\nusing\n    System.Threading;\nusing System;\nclass Keep { void M() { using var resource = Open(); await using var other = Open(); using (var scope = Open()) { Work(); } } }\n";
+        const string source =
+            "global using System.Text;\nusing static System.Math;\nusing Alias = System.Collections.Generic;\nusing\n    System.Threading;\nusing System;\nclass Keep { void M() { using var resource = Open(); await using var other = Open(); using (var scope = Open()) { Work(); } } }\n";
         var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", null, Hint);
 
         Assert.True(result.Changed);
@@ -143,6 +148,7 @@ public sealed class CodeReducerTests
         Assert.Contains("await using var other = Open();", result.Text, StringComparison.Ordinal);
         Assert.Contains("using (var scope = Open()) { Work(); }", result.Text, StringComparison.Ordinal);
     }
+
     [Fact]
     public void Globally_and_alias_qualified_imports_are_removed()
     {
@@ -156,7 +162,8 @@ public sealed class CodeReducerTests
     [Fact]
     public void Renaming_is_lexical_deterministic_and_avoids_existing_short_names()
     {
-        const string source = "// a very long removable comment provides enough savings for the complete hint and map too\nint a = 1;\nint VeryLongVariable = 2;\nVeryLongVariable += VeryLongVariable;\nPrint(VeryLongVariable, \"VeryLongVariable\");\n";
+        const string source =
+            "// a very long removable comment provides enough savings for the complete hint and map too\nint a = 1;\nint VeryLongVariable = 2;\nVeryLongVariable += VeryLongVariable;\nPrint(VeryLongVariable, \"VeryLongVariable\");\n";
         var options = new CodeReductionOptions(RenameIdentifiers: true);
         var result = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", options, Hint);
         var again = new CodeReducer(new CSharpCodeLexer()).Reduce(source, "Example.cs", options, Hint);
@@ -170,6 +177,7 @@ public sealed class CodeReducerTests
         Assert.Contains($"b:VeryLongVariable\n{Hint}", result.Text, StringComparison.Ordinal);
         Assert.Equal(result.Text, again.Text);
     }
+
     [Theory]
     [InlineData("1UL", "2UL")]
     [InlineData("1e10", "2e10")]
@@ -184,14 +192,15 @@ public sealed class CodeReducerTests
         Assert.Contains(first, result.Text, StringComparison.Ordinal);
         Assert.Contains(second, result.Text, StringComparison.Ordinal);
     }
+
     [Fact]
     public void Options_independently_preserve_comments_imports_and_original_names()
     {
         var source = $"using System.Text;\n// LongVariable stays readable in this comment\nint LongVariable = 1;\nLongVariable++;\n{new string('\n', 100)}";
         var reducer = new CodeReducer(new CSharpCodeLexer());
-        var keepComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveComments: false), Hint);
+        var keepComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false), Hint);
         var keepImports = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(RemoveImports: false), Hint);
-        var keepAll = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, false, false), Hint);
+        var keepAll = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, false), Hint);
         var renameWithComments = reducer.Reduce(source, "Example.cs", new CodeReductionOptions(false, true, true), Hint);
 
         Assert.True(keepComments.Changed);

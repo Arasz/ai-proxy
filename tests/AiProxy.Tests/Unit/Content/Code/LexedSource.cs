@@ -23,16 +23,22 @@ internal static class LexedSource
     }
 
     /// <summary>The single token of a kind whose text matches exactly.</summary>
-    public static CodeToken Single(CodeLexResult result, CodeTokenKind kind, string text) =>
-        Assert.Single(result.Tokens, token => token.Kind == kind && token.Text == text);
+    public static CodeToken Single(CodeLexResult result, CodeTokenKind kind, string text)
+    {
+        return Assert.Single(result.Tokens, token => token.Kind == kind && token.Text == text);
+    }
 
     /// <summary>Every token text of a kind, in source order.</summary>
-    public static string[] Texts(CodeLexResult result, CodeTokenKind kind) =>
-        result.Tokens.Where(token => token.Kind == kind).Select(static token => token.Text).ToArray();
+    public static string[] Texts(CodeLexResult result, CodeTokenKind kind)
+    {
+        return result.Tokens.Where(token => token.Kind == kind).Select(static token => token.Text).ToArray();
+    }
 
     /// <summary>Distinct identifiers each used twice, enough for two-letter short names.</summary>
-    public static IEnumerable<string> ManyNames(int count) =>
-        Enumerable.Range(0, count).Select(static index => $"name_{index:000}");
+    public static IEnumerable<string> ManyNames(int count)
+    {
+        return Enumerable.Range(0, count).Select(static index => $"name_{index:000}");
+    }
 
     private static int Lines(string text, char previous)
     {
@@ -40,11 +46,9 @@ internal static class LexedSource
         for (var index = 0; index < text.Length; index++)
         {
             var before = index == 0 ? previous : text[index - 1];
-            if (text[index] == '\r' || text[index] == '\n' && before != '\r')
-            {
-                lines++;
-            }
+            if (text[index] == '\r' || (text[index] == '\n' && before != '\r')) lines++;
         }
+
         return lines;
     }
 }

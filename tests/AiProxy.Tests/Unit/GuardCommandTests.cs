@@ -93,7 +93,10 @@ public sealed class GuardCommandTests
         Assert.Equal(expected, GuardCommand.IsRequested(args));
     }
 
-    private static string MarkerPath(TemporaryDirectory directory) => Path.Combine(directory.Path, SystemProxyMarker.FileName);
+    private static string MarkerPath(TemporaryDirectory directory)
+    {
+        return Path.Combine(directory.Path, SystemProxyMarker.FileName);
+    }
 
     private static void LeaveMarker(TemporaryDirectory directory)
     {

@@ -18,41 +18,49 @@ public sealed class ContentCompressionPipelineCodeViewTests
     private const string Second =
         "using System.Linq;\nusing System.Collections.Generic;\n\n/// <summary>The second file's type; this doc comment is also long enough that the view is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 2;\n}\n";
 
-    private static byte[] Body(params ReadFile[] files) => Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] Body(params ReadFile[] files)
     {
-        messages = new object[]
+        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
-            new
+            messages = new object[]
             {
-                role = "assistant",
-                content = files.Select((file, index) => new { type = "tool_use", id = $"call-{index}", name = "Read", input = new { file_path = file.Path } }).ToArray(),
-            },
-            new
-            {
-                role = "user",
-                content = files.Select((file, index) => new { type = "tool_result", tool_use_id = $"call-{index}", content = file.Text }).ToArray(),
-            },
-        },
-    }));
+                new
+                {
+                    role = "assistant",
+                    content = files.Select((file, index) => new { type = "tool_use", id = $"call-{index}", name = "Read", input = new { file_path = file.Path } }).ToArray()
+                },
+                new
+                {
+                    role = "user",
+                    content = files.Select((file, index) => new { type = "tool_result", tool_use_id = $"call-{index}", content = file.Text }).ToArray()
+                }
+            }
+        }));
+    }
 
-    private static ContentCompressionPipeline Build(MemoryOriginalStore store) => new(
-        new ToolOutputRegionFinder(),
-        new ContentDecompositor(),
-        new CompressionExecutor(new ContentRouter([new SourceCodeCompressionHandler([new CSharpCodeLexer(), new JavaScriptCodeLexer()])], new PassThroughCompressionHandler())),
-        new ContentCompositor(),
-        new NullContentStore(),
-        CompressionOptions.WithMinimum(1),
-        TimeProvider.System,
-        new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+    private static ContentCompressionPipeline Build(MemoryOriginalStore store)
+    {
+        return new ContentCompressionPipeline(
+            new ToolOutputRegionFinder(),
+            new ContentDecompositor(),
+            new CompressionExecutor(new ContentRouter([new SourceCodeCompressionHandler([new CSharpCodeLexer(), new JavaScriptCodeLexer()])], new PassThroughCompressionHandler())),
+            new ContentCompositor(),
+            new NullContentStore(),
+            CompressionOptions.WithMinimum(1),
+            TimeProvider.System,
+            new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+    }
 
-    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrMode mode, params ReadFile[] files) =>
-        Build(store).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
+    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrMode mode, params ReadFile[] files)
+    {
+        return Build(store).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
+    }
 
     private static string[] ToolResults(CompressionResult result)
     {
         using var document = JsonDocument.Parse(result.Body);
         return document.RootElement.GetProperty("messages")[1].GetProperty("content").EnumerateArray()
-            .Select(block => block.GetProperty("content").GetString() ?? string.Empty)
+            .Select(block => block.GetProperty("content").GetString() ?? "")
             .ToArray();
     }
 
@@ -150,8 +158,14 @@ public sealed class ContentCompressionPipelineCodeViewTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult<ContentRecord?>(null);
+        }
     }
 }

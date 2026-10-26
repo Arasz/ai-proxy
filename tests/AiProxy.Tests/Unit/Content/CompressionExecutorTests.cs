@@ -9,7 +9,7 @@ public sealed class CompressionExecutorTests
     private static readonly CompressionExecutor Executor = new(
         new ContentRouter(
             [
-                new LogCompressionHandler(),
+                new LogCompressionHandler()
             ],
             new PassThroughCompressionHandler()));
 

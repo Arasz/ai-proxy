@@ -13,7 +13,10 @@ public sealed partial record CcrPreview(string Id, string Text, int ShownLines, 
     public const string Marker = "[proxy preview ";
 
     /// <summary>True when the text holds a preview header, so it is never previewed again.</summary>
-    public static bool IsIn(string text) => Header().IsMatch(text);
+    public static bool IsIn(string text)
+    {
+        return Header().IsMatch(text);
+    }
 
     [GeneratedRegex(@"\[proxy preview [0-9a-f]{16}: [0-9]+ of [0-9]+ lines shown\.", RegexOptions.CultureInvariant)]
     private static partial Regex Header();

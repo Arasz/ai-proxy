@@ -1,21 +1,16 @@
 <Solution>
     <Folder Name="/src/">
-        <Project Path="src/AiProxy.Core/AiProxy.Core.csproj" />
-        <Project Path="src/AiProxy.Cli/AiProxy.Cli.csproj" />
-        <Project Path="src/AiProxy.Client/AiProxy.Client.csproj" />
-        <Project Path="src/AiProxy.Code/AiProxy.Code.csproj" />
-        <Project Path="src/AiProxy/AiProxy.csproj" />
-        <Project Path="src/AiProxy.Generators/AiProxy.Generators.csproj" />
-        <Project Path="src/AiProxy.Mcp/AiProxy.Mcp.csproj" />
-        <Project Path="src/AiProxy.Storage/AiProxy.Storage.csproj" />
+        <Project Path="src/AiProxy.Core/AiProxy.Core.csproj"/>
+        <Project Path="src/AiProxy.Code/AiProxy.Code.csproj"/>
+        <Project Path="src/AiProxy/AiProxy.csproj"/>
+        <Project Path="src/AiProxy.Generators/AiProxy.Generators.csproj"/>
+        <Project Path="src/AiProxy.Storage/AiProxy.Storage.csproj"/>
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests/AiProxy.Cli.Tests/AiProxy.Cli.Tests.csproj" />
-        <Project Path="tests/AiProxy.Generators.Tests/AiProxy.Generators.Tests.csproj" />
-        <Project Path="tests/AiProxy.Mcp.Tests/AiProxy.Mcp.Tests.csproj" />
-        <Project Path="tests/AiProxy.Tests/AiProxy.Tests.csproj" />
+        <Project Path="tests/AiProxy.Generators.Tests/AiProxy.Generators.Tests.csproj"/>
+        <Project Path="tests/AiProxy.Tests/AiProxy.Tests.csproj"/>
     </Folder>
     <Folder Name="/scripts/">
-        <Project Path="scripts/CodeReducerCore/CodeReducerCore.csproj" />
+        <Project Path="scripts/CodeReducerCore/CodeReducerCore.csproj"/>
     </Folder>
 </Solution>

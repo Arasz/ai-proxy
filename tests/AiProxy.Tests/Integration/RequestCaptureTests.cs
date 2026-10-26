@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Capture;
@@ -13,6 +16,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using Titanium.Web.Proxy.EventArguments;
 
 namespace AiProxy.Tests.Integration;
 
@@ -20,16 +24,40 @@ namespace AiProxy.Tests.Integration;
 public sealed class RequestCaptureTests : IDisposable
 {
     private const string ToolOutput = """
-        2026-03-12 10:00:00 INFO worker=api-1 request started
-        2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
-        2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:05 INFO worker=api-1 the second to last line
-        2026-03-12 10:00:06 INFO worker=api-1 the last line
-        """;
+                                      2026-03-12 10:00:00 INFO worker=api-1 request started
+                                      2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
+                                      2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:05 INFO worker=api-1 the second to last line
+                                      2026-03-12 10:00:06 INFO worker=api-1 the last line
+                                      """;
 
     private const int CaptureFailedEventId = 1403;
+
+    private const string UsageMessage = """
+                                        {"id":"msg_1","type":"message","content":[{"type":"text","text":"answer-marker"}],
+                                         "usage":{"input_tokens":11,"output_tokens":22,"cache_creation_input_tokens":33,"cache_read_input_tokens":44}}
+                                        """;
+
+    private const string StreamStart = """
+                                       event: message_start
+                                       data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":1,"cache_creation_input_tokens":200,"cache_read_input_tokens":300}}}
+
+
+                                       """;
+
+    private const string StreamEnd = """
+                                     event: message_delta
+                                     data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":57,"cache_read_input_tokens":301}}
+
+                                     event: message_stop
+                                     data: {"type":"message_stop"}
+
+
+                                     """;
+
+    private const int ResponseCaptureFailedEventId = 1404;
 
     private readonly string _contentDatabasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
@@ -37,12 +65,8 @@ public sealed class RequestCaptureTests : IDisposable
     {
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _contentDatabasePath, $"{_contentDatabasePath}-wal", $"{_contentDatabasePath}-shm" })
-        {
             if (File.Exists(file))
-            {
                 File.Delete(file);
-            }
-        }
     }
 
     [Fact]
@@ -50,7 +74,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         var now = new DateTimeOffset(2026, 10, 23, 12, 30, 15, 250, TimeSpan.Zero);
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, time: new FakeTimeProvider(now));
+        await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
         // Multi-byte characters and odd spacing: a re-serialized or re-encoded body would differ.
         var body = Encoding.UTF8.GetBytes("{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  ");
 
@@ -64,7 +88,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal(upstream.BaseAddress.Host, row.Host);
         Assert.Equal("/v1/messages", row.Path);
         Assert.False(string.IsNullOrWhiteSpace(row.RequestId));
-        var capturedAt = DateTimeOffset.Parse(row.CapturedAt, System.Globalization.CultureInfo.InvariantCulture);
+        var capturedAt = DateTimeOffset.Parse(row.CapturedAt, CultureInfo.InvariantCulture);
         Assert.Equal(now, capturedAt);
     }
 
@@ -72,7 +96,7 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task With_compression_on_the_capture_holds_the_body_before_compression()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, compression: true);
+        await using var proxy = await StartProxyAsync(true, true);
         var body = ToolResultBody();
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -85,14 +109,14 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task No_header_or_query_value_reaches_the_capture_file()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
         var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"capture-body-marker"}]}""");
         string[] secrets = ["secret-authorization-7f3a", "secret-api-key-91bc", "secret-cookie-4d2e", "secret-query-key-c0de"];
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true, UseCookies = false };
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, $"/v1/messages?key={secrets[3]}"))
         {
-            Content = Json(body),
+            Content = Json(body)
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secrets[0]);
         request.Headers.Add("x-api-key", secrets[1]);
@@ -105,17 +129,14 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Single(await ReadCapturesAsync(proxy));
         var stored = ReadCaptureFiles(proxy);
         Assert.True(Contains(stored, [.. "capture-body-marker"u8]), "the scan must see the body, or it proves nothing");
-        foreach (var secret in secrets)
-        {
-            Assert.False(Contains(stored, Encoding.UTF8.GetBytes(secret)), $"{secret} was found in the capture files");
-        }
+        foreach (var secret in secrets) Assert.False(Contains(stored, Encoding.UTF8.GetBytes(secret)), $"{secret} was found in the capture files");
     }
 
     [Fact]
     public async Task Capture_off_stores_nothing_and_forwards_the_body_unchanged()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: false);
+        await using var proxy = await StartProxyAsync(false);
         var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -131,7 +152,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, store: new ThrowingCaptureStore(), logs: logs);
+        await using var proxy = await StartProxyAsync(true, store: new ThrowingCaptureStore(), logs: logs);
         var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -150,7 +171,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, compression: true, store: new ThrowingCaptureStore(), logs: logs);
+        await using var proxy = await StartProxyAsync(true, true, new ThrowingCaptureStore(), logs);
         var body = ToolResultBody();
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -172,7 +193,7 @@ public sealed class RequestCaptureTests : IDisposable
         writer.Open();
         writer.Execute("PRAGMA journal_mode=WAL; CREATE TABLE capture_request (body TEXT); INSERT INTO capture_request VALUES (@Body)",
             new { Body = "capture-inspection-marker" });
-        Assert.True(File.Exists(path + "-wal"));
+        Assert.True(File.Exists($"{path}-wal"));
 
         var bytes = ReadCaptureFiles(directory.Path, writer.Close);
 
@@ -204,7 +225,7 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task Startup_says_once_that_capture_is_on_and_where_it_writes()
     {
         var logs = new RecordingLoggerProvider();
-        await using var proxy = await StartProxyAsync(capture: true, logs: logs);
+        await using var proxy = await StartProxyAsync(true, logs: logs);
 
         var entry = Assert.Single(logs.Entries, entry => entry.EventId == 1501);
         Assert.Equal(LogLevel.Information, entry.Level);
@@ -215,7 +236,7 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task Startup_says_nothing_about_capture_when_it_is_off()
     {
         var logs = new RecordingLoggerProvider();
-        await using var proxy = await StartProxyAsync(capture: false, logs: logs);
+        await using var proxy = await StartProxyAsync(false, logs: logs);
 
         Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1501);
     }
@@ -233,7 +254,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.Headers.ContentEncoding = "gzip";
             return context.Response.Body.WriteAsync(encoded).AsTask();
         };
-        await using var proxy = await StartProxyAsync(capture: true, time: new FakeTimeProvider(now));
+        await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
         var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -241,7 +262,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var row = Assert.Single(await ReadResponsesAsync(proxy));
         Assert.Equal(Assert.Single(await ReadCapturesAsync(proxy)).RequestId, row.RequestId);
-        Assert.Equal(now, DateTimeOffset.Parse(row.CompletedAt, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(now, DateTimeOffset.Parse(row.CompletedAt, CultureInfo.InvariantCulture));
         Assert.Equal(201, row.Status);
         Assert.Equal(body.Length, row.RequestBytes);
         Assert.Equal(body.Length, row.ForwardedBytes);
@@ -249,10 +270,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal((11L, 22L, 33L, 44L), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
         Assert.Null(row.UsageError);
         var stages = Stages(row);
-        foreach (var stage in new[] { "body-read", "capture-write", "inspector", "usage-read", "titanium.ttfb", "titanium.total" })
-        {
-            Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
-        }
+        foreach (var stage in new[] { "body-read", "capture-write", "inspector", "usage-read", "titanium.ttfb", "titanium.total" }) Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
 
         Assert.DoesNotContain("compression", stages.Keys);
     }
@@ -271,7 +289,7 @@ public sealed class RequestCaptureTests : IDisposable
             await release.Task.WaitAsync(TimeSpan.FromSeconds(10));
             await context.Response.Body.WriteAsync(rest);
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages")) { Content = Json([.. """{"model":"m","stream":true}"""u8]) };
@@ -301,7 +319,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.ContentType = "application/json";
             return context.Response.WriteAsync(UsageMessage);
         };
-        await using var proxy = await StartProxyAsync(capture: true, compression: true);
+        await using var proxy = await StartProxyAsync(true, true);
         var body = ToolResultBody();
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -311,10 +329,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal(Assert.Single(upstream.Requests).BodyBytes.Length, row.ForwardedBytes);
         Assert.True(row.ForwardedBytes < row.RequestBytes, "the body was not compressed");
         var stages = Stages(row);
-        foreach (var stage in new[] { "compression", "compression.find", "compression.reduce.Log", "compression.store", "set-body" })
-        {
-            Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
-        }
+        foreach (var stage in new[] { "compression", "compression.find", "compression.reduce.Log", "compression.store", "set-body" }) Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
 
         Assert.True(response.Headers.Contains("x-ai-proxy-content-id"), "the content-id header was lost");
         Assert.Contains("answer-marker", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
@@ -332,7 +347,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.ContentType = "application/json";
             return context.Response.Body.WriteAsync(big).AsTask();
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
 
@@ -353,7 +368,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.Headers.ContentEncoding = "zstd";
             return context.Response.WriteAsync("opaque");
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
 
@@ -367,7 +382,7 @@ public sealed class RequestCaptureTests : IDisposable
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
         var store = new ResponseThrowingCaptureStore();
-        await using var proxy = await StartProxyAsync(capture: true, store: store, logs: logs);
+        await using var proxy = await StartProxyAsync(true, store: store, logs: logs);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
 
@@ -384,7 +399,7 @@ public sealed class RequestCaptureTests : IDisposable
         // The absence test below relies on this ordering: Titanium awaits AfterResponse handlers one after another.
         var store = new RecordingCaptureStore { ResponseDelay = TimeSpan.FromMilliseconds(300) };
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, store: store);
+        await using var proxy = await StartProxyAsync(true, store: store);
         var seen = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         proxy.Services.GetRequiredService<TitaniumProxyService>().Server.AfterResponse += (_, _) =>
         {
@@ -402,7 +417,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         var store = new ThrowingCaptureStore();
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: true, store: store);
+        await using var proxy = await StartProxyAsync(true, store: store);
         var finished = 0;
         proxy.Services.GetRequiredService<TitaniumProxyService>().Server.AfterResponse += (_, _) =>
         {
@@ -457,7 +472,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.ContentType = "application/json";
             return context.Response.WriteAsync(error);
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
 
@@ -473,10 +488,7 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task A_plain_event_stream_far_over_the_cap_still_gives_its_whole_usage()
     {
         var events = new StringBuilder(StreamStart);
-        while (events.Length < 5 * 1024 * 1024)
-        {
-            events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
-        }
+        while (events.Length < 5 * 1024 * 1024) events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
 
         var stream = Encoding.UTF8.GetBytes(events.Append(StreamEnd).ToString());
         await using var upstream = await FakeUpstream.StartAsync();
@@ -489,7 +501,7 @@ public sealed class RequestCaptureTests : IDisposable
                 await context.Response.Body.FlushAsync();
             }
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m","stream":true}"""u8]);
 
@@ -511,7 +523,7 @@ public sealed class RequestCaptureTests : IDisposable
             context.Response.ContentType = "application/json";
             return context.Response.WriteAsync(UsageMessage);
         };
-        await using var proxy = await StartProxyAsync(capture: true, store: store, time: time);
+        await using var proxy = await StartProxyAsync(true, store: store, time: time);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
 
@@ -535,7 +547,7 @@ public sealed class RequestCaptureTests : IDisposable
             await Task.Delay(300);
             await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(StreamEnd));
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var response = await SendAsync(proxy, upstream, [.. """{"model":"m","stream":true}"""u8]);
 
@@ -552,8 +564,8 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task Only_capture_attaches_a_reader_to_the_response_stream(bool capture)
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(capture: capture, compression: true);
-        var field = typeof(Titanium.Web.Proxy.EventArguments.SessionEventArgsBase).GetField("DataReceived", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        await using var proxy = await StartProxyAsync(capture, true);
+        var field = typeof(SessionEventArgsBase).GetField("DataReceived", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var attached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         proxy.Services.GetRequiredService<TitaniumProxyService>().Server.BeforeResponse += (_, e) =>
         {
@@ -579,7 +591,7 @@ public sealed class RequestCaptureTests : IDisposable
             await Task.Delay(100);
             context.Abort();
         };
-        await using var proxy = await StartProxyAsync(capture: true);
+        await using var proxy = await StartProxyAsync(true);
 
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
         using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
@@ -599,37 +611,15 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal("truncated", row.UsageError);
     }
 
-    private const string UsageMessage = """
-        {"id":"msg_1","type":"message","content":[{"type":"text","text":"answer-marker"}],
-         "usage":{"input_tokens":11,"output_tokens":22,"cache_creation_input_tokens":33,"cache_read_input_tokens":44}}
-        """;
-
-    private const string StreamStart = """
-        event: message_start
-        data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":1,"cache_creation_input_tokens":200,"cache_read_input_tokens":300}}}
-
-
-        """;
-
-    private const string StreamEnd = """
-        event: message_delta
-        data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":57,"cache_read_input_tokens":301}}
-
-        event: message_stop
-        data: {"type":"message_stop"}
-
-
-        """;
-
-    private const int ResponseCaptureFailedEventId = 1404;
-
-    private static Dictionary<string, long> Stages(ResponseRow row) =>
-        JsonSerializer.Deserialize<Dictionary<string, long>>(row.Stages)!;
+    private static Dictionary<string, long> Stages(ResponseRow row)
+    {
+        return JsonSerializer.Deserialize<Dictionary<string, long>>(row.Stages)!;
+    }
 
     private static byte[] Gzip(byte[] bytes)
     {
         using var output = new MemoryStream();
-        using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, true))
         {
             gzip.Write(bytes);
         }
@@ -646,20 +636,22 @@ public sealed class RequestCaptureTests : IDisposable
             await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             var rows = (await connection.QueryAsync<ResponseRow>("""
-                SELECT request_id AS RequestId, completed_at AS CompletedAt, status AS Status,
-                       request_bytes AS RequestBytes, forwarded_bytes AS ForwardedBytes, response_bytes AS ResponseBytes,
-                       input_tokens AS InputTokens, output_tokens AS OutputTokens,
-                       cache_creation_input_tokens AS CacheCreationInputTokens, cache_read_input_tokens AS CacheReadInputTokens,
-                       usage_error AS UsageError, stages AS Stages
-                FROM capture_response;
-                """)).ToList();
+                                                                 SELECT request_id AS RequestId, completed_at AS CompletedAt, status AS Status,
+                                                                        request_bytes AS RequestBytes, forwarded_bytes AS ForwardedBytes, response_bytes AS ResponseBytes,
+                                                                        input_tokens AS InputTokens, output_tokens AS OutputTokens,
+                                                                        cache_creation_input_tokens AS CacheCreationInputTokens, cache_read_input_tokens AS CacheReadInputTokens,
+                                                                        usage_error AS UsageError, stages AS Stages
+                                                                 FROM capture_response;
+                                                                 """)).ToList();
             return rows.Count == 0 ? null : rows;
         });
     }
 
     private static Task<T> WaitForAsync<T>(Func<T?> probe)
-        where T : class =>
-        WaitForAsync(() => Task.FromResult(probe()));
+        where T : class
+    {
+        return WaitForAsync(() => Task.FromResult(probe()));
+    }
 
     private static async Task<T> WaitForAsync<T>(Func<Task<T?>> probe)
         where T : class
@@ -677,10 +669,7 @@ public sealed class RequestCaptureTests : IDisposable
             {
             }
 
-            if (value is not null)
-            {
-                return value;
-            }
+            if (value is not null) return value;
 
             Assert.False(deadline.IsCancellationRequested, "timed out waiting for the capture");
             try
@@ -691,6 +680,94 @@ public sealed class RequestCaptureTests : IDisposable
             {
             }
         }
+    }
+
+    private Task<ProxyHost> StartProxyAsync(bool capture, bool compression = false, IRequestCaptureStore? store = null, ILoggerProvider? logs = null, TimeProvider? time = null)
+    {
+        var configuration = new Dictionary<string, string>();
+        if (capture) configuration["Proxy:Capture"] = "true";
+
+        if (compression)
+        {
+            configuration["Proxy:Compression:Enabled"] = "true";
+            configuration["Proxy:Compression:Database"] = _contentDatabasePath;
+        }
+
+        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs, time: time);
+    }
+
+    private static byte[] ToolResultBody()
+    {
+        return Encoding.UTF8.GetBytes(
+            $$"""{"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(ToolOutput)}}}]}]}""");
+    }
+
+    private static ByteArrayContent Json(byte[] body)
+    {
+        var content = new ByteArrayContent(body);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        return content;
+    }
+
+    private static Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body)
+    {
+        return SendAsync(proxy, upstream.BaseAddress, body);
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, Uri upstream, byte[] body)
+    {
+        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
+        using var client = new HttpClient(handler);
+        return await client.PostAsync(new Uri(upstream, "/v1/messages"), Json(body), TestContext.Current.CancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<CaptureRow>> ReadCapturesAsync(ProxyHost proxy)
+    {
+        var path = Path.Combine(proxy.DataDirectory, SqliteCaptureStore.FileName);
+        Assert.True(File.Exists(path), $"no capture file at {path}");
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        var rows = await connection.QueryAsync<CaptureRow>("""
+                                                           SELECT request_id AS RequestId, captured_at AS CapturedAt, provider AS Provider,
+                                                                  host AS Host, path AS Path, body AS Body
+                                                           FROM capture_request;
+                                                           """);
+        return [.. rows];
+    }
+
+    /// <summary>Every byte of the capture database and its journal files, wherever SQLite put a page.</summary>
+    private static byte[] ReadCaptureFiles(ProxyHost proxy)
+    {
+        return ReadCaptureFiles(proxy.DataDirectory);
+    }
+
+    private static byte[] ReadCaptureFiles(string directory, Action? beforeRead = null)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.Combine(directory, SqliteCaptureStore.FileName),
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false
+        }.ToString());
+        connection.Open();
+        using var snapshot = connection.BeginTransaction(true);
+        // Keep a reader active so closing the writer cannot delete the journal files mid-copy.
+        connection.ExecuteScalar<long>("SELECT COUNT(*) FROM capture_request", transaction: snapshot);
+        var files = Directory.GetFiles(directory, $"{SqliteCaptureStore.FileName}*");
+        beforeRead?.Invoke();
+        using var all = new MemoryStream();
+        foreach (var file in files)
+        {
+            using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            stream.CopyTo(all);
+        }
+
+        return all.ToArray();
+    }
+
+    private static bool Contains(byte[] haystack, byte[] needle)
+    {
+        return haystack.AsSpan().IndexOf(needle) >= 0;
     }
 
     /// <summary>Keeps what the proxy hands it in memory; can move a fake clock or stall, to time a step.</summary>
@@ -743,97 +820,21 @@ public sealed class RequestCaptureTests : IDisposable
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken) =>
+        public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
+        {
             throw new IOException("disk full");
-    }
-
-    private Task<ProxyHost> StartProxyAsync(bool capture, bool compression = false, IRequestCaptureStore? store = null, ILoggerProvider? logs = null, TimeProvider? time = null)
-    {
-        var configuration = new Dictionary<string, string>();
-        if (capture)
-        {
-            configuration["Proxy:Capture"] = "true";
         }
-
-        if (compression)
-        {
-            configuration["Proxy:Compression:Enabled"] = "true";
-            configuration["Proxy:Compression:Database"] = _contentDatabasePath;
-        }
-
-        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs, time: time);
     }
-
-    private static byte[] ToolResultBody() =>
-        Encoding.UTF8.GetBytes(
-            $$"""{"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(ToolOutput)}}}]}]}""");
-
-    private static ByteArrayContent Json(byte[] body)
-    {
-        var content = new ByteArrayContent(body);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        return content;
-    }
-
-    private static Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body) =>
-        SendAsync(proxy, upstream.BaseAddress, body);
-
-    private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, Uri upstream, byte[] body)
-    {
-        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
-        using var client = new HttpClient(handler);
-        return await client.PostAsync(new Uri(upstream, "/v1/messages"), Json(body), TestContext.Current.CancellationToken);
-    }
-
-    private static async Task<IReadOnlyList<CaptureRow>> ReadCapturesAsync(ProxyHost proxy)
-    {
-        var path = Path.Combine(proxy.DataDirectory, SqliteCaptureStore.FileName);
-        Assert.True(File.Exists(path), $"no capture file at {path}");
-        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
-        var rows = await connection.QueryAsync<CaptureRow>("""
-            SELECT request_id AS RequestId, captured_at AS CapturedAt, provider AS Provider,
-                   host AS Host, path AS Path, body AS Body
-            FROM capture_request;
-            """);
-        return [.. rows];
-    }
-
-    /// <summary>Every byte of the capture database and its journal files, wherever SQLite put a page.</summary>
-    private static byte[] ReadCaptureFiles(ProxyHost proxy) => ReadCaptureFiles(proxy.DataDirectory);
-
-    private static byte[] ReadCaptureFiles(string directory, Action? beforeRead = null)
-    {
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = Path.Combine(directory, SqliteCaptureStore.FileName),
-            Mode = SqliteOpenMode.ReadOnly,
-            Pooling = false,
-        }.ToString());
-        connection.Open();
-        using var snapshot = connection.BeginTransaction(deferred: true);
-        // Keep a reader active so closing the writer cannot delete the journal files mid-copy.
-        connection.ExecuteScalar<long>("SELECT COUNT(*) FROM capture_request", transaction: snapshot);
-        var files = Directory.GetFiles(directory, $"{SqliteCaptureStore.FileName}*");
-        beforeRead?.Invoke();
-        using var all = new MemoryStream();
-        foreach (var file in files)
-        {
-            using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            stream.CopyTo(all);
-        }
-
-        return all.ToArray();
-    }
-
-    private static bool Contains(byte[] haystack, byte[] needle) => haystack.AsSpan().IndexOf(needle) >= 0;
 
     private sealed record CaptureRow(string RequestId, string CapturedAt, string Provider, string Host, string Path, byte[] Body);
 
     /// <summary>Treats one host as a provider and every other host as pass-through traffic.</summary>
     private sealed class SingleProviderHost(string host, Dialect dialect) : IProviderHosts
     {
-        public Dialect? Find(string candidate) => string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? dialect : null;
+        public Dialect? Find(string candidate)
+        {
+            return string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? dialect : null;
+        }
     }
 
     private sealed class ThrowingCaptureStore : IRequestCaptureStore
@@ -842,8 +843,10 @@ public sealed class RequestCaptureTests : IDisposable
 
         public int Responses => _responses;
 
-        public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken) =>
+        public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken)
+        {
             throw new IOException("disk full");
+        }
 
         public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
         {
@@ -860,7 +863,10 @@ public sealed class RequestCaptureTests : IDisposable
 
         public IReadOnlyCollection<LogEntry> Entries => [.. _entries];
 
-        public ILogger CreateLogger(string categoryName) => new RecordingLogger(categoryName, _entries);
+        public ILogger CreateLogger(string categoryName)
+        {
+            return new RecordingLogger(categoryName, _entries);
+        }
 
         public void Dispose()
         {
@@ -870,11 +876,19 @@ public sealed class RequestCaptureTests : IDisposable
     private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
+            where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
             entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, formatter(state, exception), exception));
+        }
     }
 }

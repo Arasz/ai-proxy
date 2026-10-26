@@ -7,7 +7,10 @@ public sealed class TomlCompressionHandler : ICompressionHandler
     public const string HandlerPath = "toml.strip-comments";
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.Toml;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.Toml;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
@@ -26,10 +29,7 @@ public sealed class TomlCompressionHandler : ICompressionHandler
             }
 
             var trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
-            {
-                continue;
-            }
+            if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
 
             kept.Add(line);
         }

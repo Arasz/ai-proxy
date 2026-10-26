@@ -3,16 +3,16 @@ using AiProxy.Core.Content;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The decomposer with a file path, stated as behaviour: a source file read whole is one
-/// source-code part, and an unknown or missing path changes nothing.
+///     The decomposer with a file path, stated as behaviour: a source file read whole is one
+///     source-code part, and an unknown or missing path changes nothing.
 /// </summary>
 public sealed class ContentDecompositorFilePathTests
 {
     private const string Text = """
-        This file explains the build.
+                                This file explains the build.
 
-        It has two paragraphs of plain words.
-        """;
+                                It has two paragraphs of plain words.
+                                """;
 
     private static readonly ContentDecompositor Decompositor = new();
 
@@ -81,14 +81,14 @@ public sealed class ContentDecompositorFilePathTests
     public void A_fenced_csharp_block_outside_a_source_file_is_source_code_with_no_language(string? path)
     {
         const string notes = """
-            Some notes.
+                             Some notes.
 
-            ```csharp
-            public sealed class A
-            {
-            }
-            ```
-            """;
+                             ```csharp
+                             public sealed class A
+                             {
+                             }
+                             ```
+                             """;
 
         var decomposition = Decompositor.Decompose(notes, "request", path);
 

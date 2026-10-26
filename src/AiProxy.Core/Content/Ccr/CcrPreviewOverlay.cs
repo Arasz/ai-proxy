@@ -5,8 +5,8 @@ namespace AiProxy.Core.Content.Ccr;
 /// <summary>Builds the identifier overlay. Use each transient instance for one operation at a time.</summary>
 public sealed class CcrPreviewOverlay
 {
-    private readonly HashSet<string> _known = new(StringComparer.OrdinalIgnoreCase);
     private readonly StringBuilder _block = new();
+    private readonly HashSet<string> _known = new(StringComparer.OrdinalIgnoreCase);
     private int _count;
 
     /// <summary>Lists identifiers absent from the shown text, within the supplied character budget.</summary>
@@ -29,16 +29,10 @@ public sealed class CcrPreviewOverlay
     {
         foreach (var token in MustKeepOverlay.Identifiers(hiddenText))
         {
-            if (_known.Contains(token))
-            {
-                continue;
-            }
+            if (_known.Contains(token)) continue;
 
             var added = token.Length + (_count > 0 ? 1 : 0);
-            if (_block.Length + added > room)
-            {
-                break;
-            }
+            if (_block.Length + added > room) break;
 
             _block.Append(_count > 0 ? " " : "").Append(token);
             _count++;
