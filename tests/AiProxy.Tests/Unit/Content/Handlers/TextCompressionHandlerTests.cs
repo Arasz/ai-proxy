@@ -13,6 +13,16 @@ public sealed class TextCompressionHandlerTests
     private static readonly DirectoryListingCompressionHandler Listing = new();
     private static readonly PassThroughCompressionHandler PassThrough = new();
 
+    public static TheoryData<ContentType, string> TextReducerInputs => new()
+    {
+        { ContentType.Toml, "# a comment\nkey = \"value\"\n\n# another\nother = 1" },
+        { ContentType.Markdown, "<!-- hidden -->\n# Title\n\n\n\nbody" },
+        { ContentType.SourceCode, "var a = 1;\n\nvar b = 2;\n\n\nreturn a;" },
+        { ContentType.Prose, "the same line\nthe same line\nanother line" },
+        { ContentType.DirectoryListing, "Dialect.cs\nUpstreamForwarder.cs" },
+        { ContentType.Unknown, "anything at all" }
+    };
+
     [Fact]
     public async Task A_comment_line_in_a_configuration_file_goes_away()
     {
@@ -145,7 +155,7 @@ public sealed class TextCompressionHandlerTests
             (ContentType.Prose, new ProseCompressionHandler(), "a line", "prose.dedupe"),
             (ContentType.Log, new LogCompressionHandler(), "2026-03-12 10:00:00 INFO a", "log.signal-filter"),
             (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler(), "$ echo hi", "shell.log-rules"),
-            (ContentType.DirectoryListing, new DirectoryListingCompressionHandler(), "a.cs", "listing.pass-through"),
+            (ContentType.DirectoryListing, new DirectoryListingCompressionHandler(), "a.cs", "listing.pass-through")
         };
 
         foreach (var (kind, handler, text, path) in cases)
@@ -155,16 +165,6 @@ public sealed class TextCompressionHandlerTests
             Assert.Equal(path, result.Path);
         }
     }
-
-    public static TheoryData<ContentType, string> TextReducerInputs => new()
-    {
-        { ContentType.Toml, "# a comment\nkey = \"value\"\n\n# another\nother = 1" },
-        { ContentType.Markdown, "<!-- hidden -->\n# Title\n\n\n\nbody" },
-        { ContentType.SourceCode, "var a = 1;\n\nvar b = 2;\n\n\nreturn a;" },
-        { ContentType.Prose, "the same line\nthe same line\nanother line" },
-        { ContentType.DirectoryListing, "Dialect.cs\nUpstreamForwarder.cs" },
-        { ContentType.Unknown, "anything at all" },
-    };
 
     [Theory]
     [MemberData(nameof(TextReducerInputs))]
@@ -178,7 +178,7 @@ public sealed class TextCompressionHandlerTests
             ContentType.Prose => new ProseCompressionHandler(),
             ContentType.DirectoryListing => new DirectoryListingCompressionHandler(),
             ContentType.Unknown => new PassThroughCompressionHandler(),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no text reducer for this kind"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "no text reducer for this kind")
         };
 
         var result = await handler.HandleAsync(Part(kind, text), CancellationToken.None);
@@ -198,5 +198,8 @@ public sealed class TextCompressionHandlerTests
         Assert.False(new TomlCompressionHandler().CanHandle(ContentType.Prose));
     }
 
-    private static ContentPart Part(ContentType type, string text) => new("request", 1, type, text);
+    private static ContentPart Part(ContentType type, string text)
+    {
+        return new ContentPart("request", 1, type, text);
+    }
 }

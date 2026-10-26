@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 
 namespace AiProxy.Core.Content.Code;
@@ -17,63 +18,43 @@ public sealed class CodeReducer(ICodeLexer lexer)
     /// <summary>Returns the original when safety or complete-view savings cannot be established.</summary>
     public CodeReductionResult Reduce(string text, string? filePath, CodeReductionOptions? options, string? retrievalHint)
     {
-        if (string.IsNullOrWhiteSpace(retrievalHint) || !lexer.SupportsPath(filePath))
-        {
-            return Original(text, false);
-        }
+        if (string.IsNullOrWhiteSpace(retrievalHint) || !lexer.SupportsPath(filePath)) return Original(text, false);
         var numbered = Unnumber(text);
         var source = numbered.Source;
         var prefixes = numbered.Prefixes;
         var lexed = lexer.Lex(source, filePath);
-        if (!lexed.Supported)
-        {
-            return Original(text, false);
-        }
+        if (!lexed.Supported) return Original(text, false);
         options ??= new CodeReductionOptions();
         var view = source.ToCharArray();
         var literals = new bool[source.Length];
         foreach (var token in lexed.Tokens)
         {
-            if (token.Kind == CodeTokenKind.String)
-            {
-                Array.Fill(literals, true, token.Offset, token.Text.Length);
-            }
-            if (options.RemoveComments && token.Kind == CodeTokenKind.Comment)
-            {
-                Blank(view, token.Offset, token.Text.Length);
-            }
+            if (token.Kind == CodeTokenKind.String) Array.Fill(literals, true, token.Offset, token.Text.Length);
+            if (options.RemoveComments && token.Kind == CodeTokenKind.Comment) Blank(view, token.Offset, token.Text.Length);
         }
+
         if (options.RemoveImports && lexed.Imports is { } imports)
-        {
             foreach (var span in imports)
             {
                 Blank(view, span.Offset, span.Length);
                 Array.Fill(literals, false, span.Offset, span.Length);
             }
-        }
-        else if (options.RemoveImports)
-        {
-            RemoveImports(view, lexed.Tokens);
-        }
+        else if (options.RemoveImports) RemoveImports(view, lexed.Tokens);
+
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         var replacements = options.RenameIdentifiers
             ? Rename(view, lexed.Tokens, map)
             : new Dictionary<int, IdentifierRename>();
         var rendered = Render(view, literals, prefixes, replacements);
         var newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-        if (rendered.Length > 0 && rendered[^1] is not ('\r' or '\n'))
-        {
-            rendered += newline;
-        }
-        foreach (var entry in map)
-        {
-            rendered += $"{entry.Key}:{entry.Value}{newline}";
-        }
+        if (rendered.Length > 0 && rendered[^1] is not ('\r' or '\n')) rendered += newline;
+        foreach (var entry in map) rendered += $"{entry.Key}:{entry.Value}{newline}";
         rendered += retrievalHint;
         return rendered.Length < text.Length
-            ? new CodeReductionResult(rendered, true, true, new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(map))
+            ? new CodeReductionResult(rendered, true, true, new ReadOnlyDictionary<string, string>(map))
             : Original(text, true);
     }
+
     private Dictionary<int, IdentifierRename> Rename(
         char[] view, IReadOnlyList<CodeToken> tokens, Dictionary<string, string> map)
     {
@@ -89,24 +70,19 @@ public sealed class CodeReducer(ICodeLexer lexer)
         var next = 0;
         foreach (var group in used.GroupBy(static token => token.ValueText ?? token.Text, StringComparer.Ordinal))
         {
-            if (group.Count() < 2 || lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key))
-            {
-                continue;
-            }
+            if (group.Count() < 2 || lexer.IsKeyword(group.Key) || fixedNames.Contains(group.Key)) continue;
             string candidate;
             do
             {
                 candidate = ShortName(next++);
-            }
-            while (reserved.Contains(candidate) || lexer.IsKeyword(candidate));
-            if (candidate.Length >= group.Key.Length)
-            {
-                continue;
-            }
+            } while (reserved.Contains(candidate) || lexer.IsKeyword(candidate));
+
+            if (candidate.Length >= group.Key.Length) continue;
             reserved.Add(candidate);
             names.Add(group.Key, candidate);
             map.Add(candidate, group.Key);
         }
+
         return used.Where(token => names.ContainsKey(token.ValueText ?? token.Text))
             .ToDictionary(token => token.Offset, token => new IdentifierRename(token.Text.Length, names[token.ValueText ?? token.Text]));
     }
@@ -124,8 +100,8 @@ public sealed class CodeReducer(ICodeLexer lexer)
         {
             name = (char)('a' + value % 26) + name;
             value = value / 26 - 1;
-        }
-        while (value >= 0);
+        } while (value >= 0);
+
         return name;
     }
 
@@ -135,23 +111,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
         for (var index = 0; index < code.Length; index++)
         {
             var start = index;
-            if (code[index].Text == "global" && index + 1 < code.Length && code[index + 1].Text == "using")
-            {
-                index++;
-            }
-            if (code[index].Text != "using" || (start > 0 && code[start - 1].Text is not (";" or "{" or "}")))
-            {
-                continue;
-            }
+            if (code[index].Text == "global" && index + 1 < code.Length && code[index + 1].Text == "using") index++;
+            if (code[index].Text != "using" || (start > 0 && code[start - 1].Text is not (";" or "{" or "}"))) continue;
             var end = index + 1;
-            while (end < code.Length && code[end].Text != ";")
-            {
-                end++;
-            }
-            if (end == code.Length || !IsImport(code.AsSpan(index + 1, end - index - 1)))
-            {
-                continue;
-            }
+            while (end < code.Length && code[end].Text != ";") end++;
+            if (end == code.Length || !IsImport(code.AsSpan(index + 1, end - index - 1))) continue;
             Blank(view, code[start].Offset, code[end].Offset + code[end].Text.Length - code[start].Offset);
             index = end;
         }
@@ -159,33 +123,16 @@ public sealed class CodeReducer(ICodeLexer lexer)
 
     private static bool IsImport(ReadOnlySpan<CodeToken> tokens)
     {
-        if (tokens.Length == 0)
-        {
-            return false;
-        }
+        if (tokens.Length == 0) return false;
         if (tokens[0].Text == "static")
-        {
             tokens = tokens[1..];
-        }
-        else if (tokens.Length > 2 && tokens[0].Kind == CodeTokenKind.Identifier && tokens[1].Text == "=")
-        {
-            tokens = tokens[2..];
-        }
-        if (tokens.Length >= 2 && tokens[0].Text == "global" && tokens[1].Text == "::")
-        {
-            tokens = tokens[2..];
-        }
-        if (tokens.Length == 0 || tokens.Length % 2 == 0)
-        {
-            return false;
-        }
+        else if (tokens.Length > 2 && tokens[0].Kind == CodeTokenKind.Identifier && tokens[1].Text == "=") tokens = tokens[2..];
+        if (tokens.Length >= 2 && tokens[0].Text == "global" && tokens[1].Text == "::") tokens = tokens[2..];
+        if (tokens.Length == 0 || tokens.Length % 2 == 0) return false;
         for (var index = 0; index < tokens.Length; index++)
-        {
             if (index % 2 == 0 ? tokens[index].Kind != CodeTokenKind.Identifier : tokens[index].Text is not ("." or "::"))
-            {
                 return false;
-            }
-        }
+
         return true;
     }
 
@@ -197,47 +144,31 @@ public sealed class CodeReducer(ICodeLexer lexer)
         while (start < text.Length)
         {
             var index = start;
-            while (index < text.Length && text[index] == ' ')
-            {
-                index++;
-            }
+            while (index < text.Length && text[index] == ' ') index++;
             var digits = index;
-            while (index < text.Length && char.IsAsciiDigit(text[index]))
-            {
-                index++;
-            }
-            if (index == digits || index == text.Length || text[index] != '\t')
-            {
-                return new NumberedText(text, []);
-            }
+            while (index < text.Length && char.IsAsciiDigit(text[index])) index++;
+            if (index == digits || index == text.Length || text[index] != '\t') return new NumberedText(text, []);
             prefixes.Add(text[start..++index]);
             var end = index;
-            while (end < text.Length && text[end] is not ('\r' or '\n'))
-            {
-                end++;
-            }
-            if (end < text.Length)
-            {
-                end += text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1;
-            }
+            while (end < text.Length && text[end] is not ('\r' or '\n')) end++;
+            if (end < text.Length) end += text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1;
             source.Append(text, index, end - index);
             start = end;
         }
+
         return new NumberedText(source.ToString(), prefixes);
     }
 
-    private static CodeReductionResult Original(string text, bool supported) =>
-        new(text, false, supported, new Dictionary<string, string>());
+    private static CodeReductionResult Original(string text, bool supported)
+    {
+        return new CodeReductionResult(text, false, supported, new Dictionary<string, string>());
+    }
 
     private static void Blank(char[] text, int start, int length)
     {
         for (var index = start; index < start + length; index++)
-        {
             if (text[index] is not ('\r' or '\n'))
-            {
                 text[index] = ' ';
-            }
-        }
     }
 
     private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, IdentifierRename> replacements)
@@ -248,28 +179,15 @@ public sealed class CodeReducer(ICodeLexer lexer)
         while (start < text.Length)
         {
             var end = start;
-            while (end < text.Length && text[end] is not ('\r' or '\n'))
-            {
-                end++;
-            }
+            while (end < text.Length && text[end] is not ('\r' or '\n')) end++;
             var next = end;
-            if (next < text.Length)
-            {
-                next += text[next] == '\r' && next + 1 < text.Length && text[next + 1] == '\n' ? 2 : 1;
-            }
+            if (next < text.Length) next += text[next] == '\r' && next + 1 < text.Length && text[next + 1] == '\n' ? 2 : 1;
             var trimmed = end;
-            while (trimmed > start && text[trimmed - 1] is ' ' or '\t' && !literals[trimmed - 1])
-            {
-                trimmed--;
-            }
+            while (trimmed > start && text[trimmed - 1] is ' ' or '\t' && !literals[trimmed - 1]) trimmed--;
             if (trimmed > start || literals.AsSpan(start, next - start).Contains(true))
             {
-                if (prefixes.Count > 0)
-                {
-                    output.Append(prefixes[line]);
-                }
+                if (prefixes.Count > 0) output.Append(prefixes[line]);
                 for (var index = start; index < trimmed; index++)
-                {
                     if (replacements.TryGetValue(index, out var replacement))
                     {
                         output.Append(replacement.Text);
@@ -279,12 +197,14 @@ public sealed class CodeReducer(ICodeLexer lexer)
                     {
                         output.Append(text[index]);
                     }
-                }
+
                 output.Append(text, end, next - end);
             }
+
             start = next;
             line++;
         }
+
         return output.ToString();
     }
 

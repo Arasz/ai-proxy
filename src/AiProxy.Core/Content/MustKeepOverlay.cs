@@ -44,10 +44,7 @@ public static partial class MustKeepOverlay
     public static OverlayResult Apply(string reducedText, string originalText)
     {
         var tokens = Tokens(originalText);
-        if (tokens.Decisions.Count == 0 && tokens.Others.Count == 0)
-        {
-            return new OverlayResult(reducedText, 0, false);
-        }
+        if (tokens.Decisions.Count == 0 && tokens.Others.Count == 0) return new OverlayResult(reducedText, 0, false);
 
         var kept = TokenSet(reducedText);
         var block = new List<string>(tokens.Decisions.Where(token => !kept.Contains(token)));
@@ -70,17 +67,16 @@ public static partial class MustKeepOverlay
             length += added;
         }
 
-        if (block.Count == 0)
-        {
-            return new OverlayResult(reducedText, 0, ceilingReached);
-        }
+        if (block.Count == 0) return new OverlayResult(reducedText, 0, ceilingReached);
 
         return new OverlayResult(reducedText + BlockLabel + string.Join(" ", block), block.Count, ceilingReached);
     }
 
     /// <summary>Whether a line carries a failure verdict, an exit status or a state transition.</summary>
-    public static bool CarriesSignal(string line) =>
-        DecisionPatterns[0].IsMatch(line) || DecisionPatterns[1].IsMatch(line) || DecisionPatterns[2].IsMatch(line);
+    public static bool CarriesSignal(string line)
+    {
+        return DecisionPatterns[0].IsMatch(line) || DecisionPatterns[1].IsMatch(line) || DecisionPatterns[2].IsMatch(line);
+    }
 
     /// <summary>The tokens a reduction may never lose, decision tokens first, each once, in text order.</summary>
     public static IReadOnlyList<string> Identifiers(string text)
@@ -96,23 +92,13 @@ public static partial class MustKeepOverlay
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var pattern in DecisionPatterns)
-        {
-            foreach (Match match in pattern.Matches(text))
-            {
-                if (seen.Add(match.Value))
-                {
-                    decisions.Add(match.Value);
-                }
-            }
-        }
+        foreach (Match match in pattern.Matches(text))
+            if (seen.Add(match.Value))
+                decisions.Add(match.Value);
 
         foreach (Match match in IdentifierPattern.Matches(text))
-        {
             if (seen.Add(match.Value))
-            {
                 others.Add(match.Value);
-            }
-        }
 
         return new OverlayTokens(decisions, others);
     }
@@ -122,10 +108,7 @@ public static partial class MustKeepOverlay
         var tokens = Tokens(text);
         var set = new HashSet<string>(tokens.Decisions, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var token in tokens.Others)
-        {
-            set.Add(token);
-        }
+        foreach (var token in tokens.Others) set.Add(token);
 
         return set;
     }

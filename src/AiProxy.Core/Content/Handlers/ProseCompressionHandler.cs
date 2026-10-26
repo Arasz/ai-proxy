@@ -7,7 +7,10 @@ public sealed class ProseCompressionHandler : ICompressionHandler
     public const string HandlerPath = "prose.dedupe";
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.Prose;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.Prose;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

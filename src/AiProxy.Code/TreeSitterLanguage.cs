@@ -1,5 +1,5 @@
-using TreeSitter;
 using Microsoft.Extensions.Logging;
+using TreeSitter;
 
 namespace AiProxy.Code;
 

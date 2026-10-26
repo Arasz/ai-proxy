@@ -6,15 +6,15 @@ namespace AiProxy.Hosting;
 /// <summary>An exclusively held file that records an endpoint while the system proxy points at it.</summary>
 public sealed class SystemProxyMarker : IDisposable
 {
-    /// <summary>File name inside <see cref="ProxyRuntimeOptions.DataDirectory"/>.</summary>
+    /// <summary>File name inside <see cref="ProxyRuntimeOptions.DataDirectory" />.</summary>
     public const string FileName = "system-proxy.lock";
 
     // Unix takes flock only for FileShare.None. Windows needs FileShare.Delete so the owner can delete the file it holds;
     // other openers still conflict because their own share mode excludes our read/write access.
     private static readonly FileShare LockShare = OperatingSystem.IsWindows() ? FileShare.Delete : FileShare.None;
+    private readonly string _path;
 
     private readonly FileStream _stream;
-    private readonly string _path;
 
     private SystemProxyMarker(FileStream stream, string path, string? previousEndpoint)
     {
@@ -29,9 +29,15 @@ public sealed class SystemProxyMarker : IDisposable
     /// <summary>True when the file still named an endpoint, so an earlier run ended with the system proxy set.</summary>
     public bool PreviousRunDied => PreviousEndpoint is not null;
 
+    /// <summary>Releases the hold and leaves the file as it is.</summary>
+    public void Dispose()
+    {
+        _stream.Dispose();
+    }
+
     /// <summary>
-    /// Takes the marker in <paramref name="dataDirectory"/>, retrying for <paramref name="wait"/> while another process holds it;
-    /// throws <see cref="InvalidOperationException"/> when it is still held.
+    ///     Takes the marker in <paramref name="dataDirectory" />, retrying for <paramref name="wait" /> while another process holds it;
+    ///     throws <see cref="InvalidOperationException" /> when it is still held.
     /// </summary>
     public static SystemProxyMarker Acquire(string dataDirectory, TimeSpan wait)
     {
@@ -39,7 +45,6 @@ public sealed class SystemProxyMarker : IDisposable
         var path = Path.Combine(dataDirectory, FileName);
         var deadline = DateTime.UtcNow + wait;
         while (true)
-        {
             try
             {
                 var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
@@ -48,18 +53,15 @@ public sealed class SystemProxyMarker : IDisposable
             catch (IOException exception)
             {
                 if (DateTime.UtcNow >= deadline)
-                {
                     throw new InvalidOperationException(
                         $"Another ai-proxy instance already owns the system proxy ({path} is in use). Stop it, then start ai-proxy again.",
                         exception);
-                }
 
                 Thread.Sleep(50);
             }
-        }
     }
 
-    /// <summary>Replaces the file content with <paramref name="endPoint"/> as <c>host:port</c>.</summary>
+    /// <summary>Replaces the file content with <paramref name="endPoint" /> as <c>host:port</c>.</summary>
     public void Write(IPEndPoint endPoint)
     {
         ArgumentNullException.ThrowIfNull(endPoint);
@@ -84,17 +86,11 @@ public sealed class SystemProxyMarker : IDisposable
         _stream.Dispose();
     }
 
-    /// <summary>Releases the hold and leaves the file as it is.</summary>
-    public void Dispose() => _stream.Dispose();
-
     private static string? ReadEndpoint(FileStream stream)
     {
-        if (stream.Length == 0)
-        {
-            return null;
-        }
+        if (stream.Length == 0) return null;
 
-        var text = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true).ReadToEnd().Trim();
+        var text = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true).ReadToEnd().Trim();
         return text.Length == 0 ? "unknown" : text;
     }
 }

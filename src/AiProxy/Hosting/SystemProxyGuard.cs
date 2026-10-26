@@ -10,15 +10,9 @@ public sealed class SystemProxyGuard(Action clear)
     public bool Run(TextReader input)
     {
         var restored = false;
-        while (input.ReadLine() is { } line)
-        {
-            restored |= line == RestoredLine;
-        }
+        while (input.ReadLine() is { } line) restored |= line == RestoredLine;
 
-        if (restored)
-        {
-            return false;
-        }
+        if (restored) return false;
 
         clear();
         return true;

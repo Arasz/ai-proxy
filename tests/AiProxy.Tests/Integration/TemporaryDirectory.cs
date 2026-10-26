@@ -15,9 +15,6 @@ internal sealed class TemporaryDirectory : IDisposable
     /// <summary>Deletes the directory and everything in it.</summary>
     public void Dispose()
     {
-        if (Directory.Exists(Path))
-        {
-            Directory.Delete(Path, recursive: true);
-        }
+        if (Directory.Exists(Path)) Directory.Delete(Path, true);
     }
 }

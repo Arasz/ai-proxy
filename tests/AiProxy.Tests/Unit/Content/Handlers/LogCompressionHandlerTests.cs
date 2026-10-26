@@ -4,25 +4,30 @@ using AiProxy.Core.Content.Handlers;
 namespace AiProxy.Tests.Unit.Content.Handlers;
 
 /// <summary>
-/// The log reducer, stated as behaviour: which lines survive, and which facts come back.
+///     The log reducer, stated as behaviour: which lines survive, and which facts come back.
 /// </summary>
 public sealed class LogCompressionHandlerTests
 {
     private const string Log = """
-        2026-03-12 10:00:00 INFO worker=api-1 request started
-        2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
-        2026-03-12 10:00:02 INFO worker=api-1 nothing to see
-        2026-03-12 10:00:03 INFO worker=api-1 nothing to see
-        2026-03-12 10:00:04 ERROR worker=api-2 boom
-        2026-03-12 10:00:05 INFO worker=api-2 the last line
-        """;
+                               2026-03-12 10:00:00 INFO worker=api-1 request started
+                               2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
+                               2026-03-12 10:00:02 INFO worker=api-1 nothing to see
+                               2026-03-12 10:00:03 INFO worker=api-1 nothing to see
+                               2026-03-12 10:00:04 ERROR worker=api-2 boom
+                               2026-03-12 10:00:05 INFO worker=api-2 the last line
+                               """;
 
     private static readonly LogCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text) => new("request", 1, ContentType.Log, text);
+    private static ContentPart Part(string text)
+    {
+        return new ContentPart("request", 1, ContentType.Log, text);
+    }
 
-    private static string[] Lines(string reduced) =>
-        reduced.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal)).ToArray();
+    private static string[] Lines(string reduced)
+    {
+        return reduced.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal)).ToArray();
+    }
 
     [Fact]
     public async Task The_line_that_carries_the_failure_survives_even_at_info_level()
@@ -54,12 +59,9 @@ public sealed class LogCompressionHandlerTests
     {
         // The scored question asks for one field of the row picked by another field, so the
         // two values must survive on the same line, each next to its key.
-        var text = string.Join("\n",
-        [
-            "2026-10-23T18:25:25.508537Z  INFO ccr: compressed session=cdb66ea2 tokens_compressed=819 tokens_in_context=283 blocks_compressed=1",
+        var text = string.Join("\n", "2026-10-23T18:25:25.508537Z  INFO ccr: compressed session=cdb66ea2 tokens_compressed=819 tokens_in_context=283 blocks_compressed=1",
             "2026-10-23T18:25:25.521939Z  INFO ccr: compressed session=246079e5 tokens_compressed=1419 tokens_in_context=1031 blocks_compressed=1",
-            "2026-10-23T18:25:25.555186Z  INFO ccr: compressed session=ebd546fe tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2",
-        ]);
+            "2026-10-23T18:25:25.555186Z  INFO ccr: compressed session=ebd546fe tokens_compressed=2443 tokens_in_context=2033 blocks_compressed=2");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -70,12 +72,8 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task A_line_with_another_shape_is_kept_whole()
     {
-        var text = string.Join("\n",
-        [
-            "2026-10-23T18:25:09Z INFO rtk_proxy: pipeline stages=[\"normalize\", \"ccr\"]",
-            "2026-10-23T18:25:09Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18080\"",
-            "2026-10-23T18:25:10Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18081\" again",
-        ]);
+        var text = string.Join("\n", "2026-10-23T18:25:09Z INFO rtk_proxy: pipeline stages=[\"normalize\", \"ccr\"]", "2026-10-23T18:25:09Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18080\"",
+            "2026-10-23T18:25:10Z INFO rtk_proxy: rtk-proxy listening bind=\"127.0.0.1:18081\" again");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -85,11 +83,7 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task A_line_with_other_keys_is_not_shortened_against_an_unrelated_line()
     {
-        var text = string.Join("\n",
-        [
-            "10:00:00 INFO worker=api-1 status=200",
-            "10:00:01 INFO worker=api-1 retries=200",
-        ]);
+        var text = string.Join("\n", "10:00:00 INFO worker=api-1 status=200", "10:00:01 INFO worker=api-1 retries=200");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -99,7 +93,7 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task Shortened_lines_of_different_shapes_are_not_merged_as_repeats()
     {
-        var text = string.Join("\n", ["took 41 ms", "took 12 ms", "waited 41 ms", "waited 12 ms"]);
+        var text = string.Join("\n", "took 41 ms", "took 12 ms", "waited 41 ms", "waited 12 ms");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -109,13 +103,7 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task A_shortened_line_keeps_every_key_and_value_pair()
     {
-        var text = string.Join("\n",
-        [
-            "t1 job=a state=ok",
-            "t2 job=b state=ok",
-            "t3 ERROR job=b crashed",
-            "t4 job=c state=ok",
-        ]);
+        var text = string.Join("\n", "t1 job=a state=ok", "t2 job=b state=ok", "t3 ERROR job=b crashed", "t4 job=c state=ok");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -136,11 +124,7 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task A_value_without_a_key_is_compared_too()
     {
-        var text = string.Join("\n",
-        [
-            "10:00:00 worker api-1 took 41 ms",
-            "10:00:01 worker api-1 took 12 ms",
-        ]);
+        var text = string.Join("\n", "10:00:00 worker api-1 took 41 ms", "10:00:01 worker api-1 took 12 ms");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -160,16 +144,8 @@ public sealed class LogCompressionHandlerTests
     {
         // The measured rule keeps a line on its level as well as on its message, and the
         // level is the only reason this line survives: "boom" says nothing.
-        var text = string.Join("\n",
-        [
-            "2026-03-12 10:00:00 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:01 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:03 ERROR worker=api-2 boom",
-            "2026-03-12 10:00:04 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:05 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:06 INFO worker=api-1 nothing to see",
-        ]);
+        var text = string.Join("\n", "2026-03-12 10:00:00 INFO worker=api-1 nothing to see", "2026-03-12 10:00:01 INFO worker=api-1 nothing to see", "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:03 ERROR worker=api-2 boom", "2026-03-12 10:00:04 INFO worker=api-1 nothing to see", "2026-03-12 10:00:05 INFO worker=api-1 nothing to see", "2026-03-12 10:00:06 INFO worker=api-1 nothing to see");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -179,15 +155,8 @@ public sealed class LogCompressionHandlerTests
     [Fact]
     public async Task The_last_two_lines_are_anchors_and_survive()
     {
-        var text = string.Join("\n",
-        [
-            "2026-03-12 10:00:00 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:01 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:03 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:04 INFO worker=api-1 the second to last line",
-            "2026-03-12 10:00:05 INFO worker=api-1 the last line",
-        ]);
+        var text = string.Join("\n", "2026-03-12 10:00:00 INFO worker=api-1 nothing to see", "2026-03-12 10:00:01 INFO worker=api-1 nothing to see", "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:03 INFO worker=api-1 nothing to see", "2026-03-12 10:00:04 INFO worker=api-1 the second to last line", "2026-03-12 10:00:05 INFO worker=api-1 the last line");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
 
@@ -219,10 +188,7 @@ public sealed class LogCompressionHandlerTests
     {
         var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
 
-        foreach (var line in Lines(result.Text))
-        {
-            Assert.Contains(Log.Split('\n'), input => OrderedSubsequence.Holds(line, input) && line.Split(' ').All(input.Split(' ').Contains));
-        }
+        foreach (var line in Lines(result.Text)) Assert.Contains(Log.Split('\n'), input => OrderedSubsequence.Holds(line, input) && line.Split(' ').All(input.Split(' ').Contains));
     }
 
     [Fact]

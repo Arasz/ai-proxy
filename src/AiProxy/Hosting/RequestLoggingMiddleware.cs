@@ -3,8 +3,8 @@ namespace AiProxy.Hosting;
 /// <summary>Logs the request that came in and the status that went out.</summary>
 public sealed partial class RequestLoggingMiddleware
 {
-    private readonly RequestDelegate _next;
     private readonly ILogger<RequestLoggingMiddleware> _logger;
+    private readonly RequestDelegate _next;
 
     /// <summary>Holds the next middleware and the logger.</summary>
     public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)

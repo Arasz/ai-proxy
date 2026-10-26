@@ -1,26 +1,36 @@
 using System.Text;
+using System.Text.Json;
 using AiProxy.Core.Content;
 
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The file path of a region, stated as behaviour: a tool result carries the path of the
-/// whole file its call read, matched by call id, and no path when the match is in doubt.
+///     The file path of a region, stated as behaviour: a tool result carries the path of the
+///     whole file its call read, matched by call id, and no path when the match is in doubt.
 /// </summary>
 public sealed class ToolOutputFilePathTests
 {
     private static readonly ToolOutputRegionFinder Finder = new();
 
-    private static ContentRegion[] Find(string body) => Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
+    private static ContentRegion[] Find(string body)
+    {
+        return Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
+    }
 
-    private static string AnthropicCall(string id, string input) =>
-        $$"""{"type":"tool_use","id":"{{id}}","name":"Read","input":{{input}}}""";
+    private static string AnthropicCall(string id, string input)
+    {
+        return $$"""{"type":"tool_use","id":"{{id}}","name":"Read","input":{{input}}}""";
+    }
 
-    private static string AnthropicResult(string id, string text) =>
-        $$"""{"type":"tool_result","tool_use_id":"{{id}}","content":"{{text}}"}""";
+    private static string AnthropicResult(string id, string text)
+    {
+        return $$"""{"type":"tool_result","tool_use_id":"{{id}}","content":"{{text}}"}""";
+    }
 
-    private static string AnthropicBody(string calls, string results) =>
-        $$"""{"messages":[{"role":"assistant","content":[{{calls}}]},{"role":"user","content":[{{results}}]}]}""";
+    private static string AnthropicBody(string calls, string results)
+    {
+        return $$"""{"messages":[{"role":"assistant","content":[{{calls}}]},{"role":"user","content":[{{results}}]}]}""";
+    }
 
     [Fact]
     public void Two_anthropic_results_in_reversed_order_each_carry_the_path_of_their_own_call()
@@ -40,13 +50,13 @@ public sealed class ToolOutputFilePathTests
     public void Two_openai_chat_results_in_reversed_order_each_carry_the_path_of_their_own_call()
     {
         var body = """
-            {"messages":[
-              {"role":"assistant","tool_calls":[
-                {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}},
-                {"id":"call-b","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/b.ts\"}"}}]},
-              {"role":"tool","tool_call_id":"call-b","content":"content of b"},
-              {"role":"tool","tool_call_id":"call-a","content":"content of a"}]}
-            """;
+                   {"messages":[
+                     {"role":"assistant","tool_calls":[
+                       {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}},
+                       {"id":"call-b","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/b.ts\"}"}}]},
+                     {"role":"tool","tool_call_id":"call-b","content":"content of b"},
+                     {"role":"tool","tool_call_id":"call-a","content":"content of a"}]}
+                   """;
 
         var regions = Find(body);
 
@@ -59,12 +69,12 @@ public sealed class ToolOutputFilePathTests
     public void Two_openai_responses_outputs_in_reversed_order_each_carry_the_path_of_their_own_call()
     {
         var body = """
-            {"input":[
-              {"type":"function_call","call_id":"call-a","name":"read_file","arguments":"{\"filePath\":\"src/A.cs\"}"},
-              {"type":"function_call","call_id":"call-b","name":"read_file","arguments":"{\"filePath\":\"src/b.js\"}"},
-              {"type":"function_call_output","call_id":"call-b","output":"content of b"},
-              {"type":"function_call_output","call_id":"call-a","output":"content of a"}]}
-            """;
+                   {"input":[
+                     {"type":"function_call","call_id":"call-a","name":"read_file","arguments":"{\"filePath\":\"src/A.cs\"}"},
+                     {"type":"function_call","call_id":"call-b","name":"read_file","arguments":"{\"filePath\":\"src/b.js\"}"},
+                     {"type":"function_call_output","call_id":"call-b","output":"content of b"},
+                     {"type":"function_call_output","call_id":"call-a","output":"content of a"}]}
+                   """;
 
         var regions = Find(body);
 
@@ -139,22 +149,26 @@ public sealed class ToolOutputFilePathTests
     public void Arguments_that_do_not_parse_carry_no_path()
     {
         var body = """
-            {"messages":[
-              {"role":"assistant","tool_calls":[
-                {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\""}}]},
-              {"role":"tool","tool_call_id":"call-a","content":"content"}]}
-            """;
+                   {"messages":[
+                     {"role":"assistant","tool_calls":[
+                       {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\""}}]},
+                     {"role":"tool","tool_call_id":"call-a","content":"content"}]}
+                   """;
 
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
 
-    private static string Numbered(int from, int count) =>
-        string.Join("\n", Enumerable.Range(from, count).Select(number => $"{number}\tline {number}"));
+    private static string Numbered(int from, int count)
+    {
+        return string.Join("\n", Enumerable.Range(from, count).Select(number => $"{number}\tline {number}"));
+    }
 
-    private static string NumberedBody(string input, string content) =>
-        AnthropicBody(
+    private static string NumberedBody(string input, string content)
+    {
+        return AnthropicBody(
             AnthropicCall("call-a", input),
-            $$"""{"type":"tool_result","tool_use_id":"call-a","content":{{System.Text.Json.JsonSerializer.Serialize(content)}}}""");
+            $$"""{"type":"tool_result","tool_use_id":"call-a","content":{{JsonSerializer.Serialize(content)}}}""");
+    }
 
     [Theory]
     [InlineData(3)]
@@ -287,10 +301,10 @@ public sealed class ToolOutputFilePathTests
     public void A_gemini_function_response_carries_no_path_because_it_has_no_call_id()
     {
         var body = """
-            {"contents":[
-              {"role":"model","parts":[{"functionCall":{"name":"read_file","args":{"path":"src/A.cs"}}}]},
-              {"role":"user","parts":[{"functionResponse":{"name":"read_file","response":{"output":"content"}}}]}]}
-            """;
+                   {"contents":[
+                     {"role":"model","parts":[{"functionCall":{"name":"read_file","args":{"path":"src/A.cs"}}}]},
+                     {"role":"user","parts":[{"functionResponse":{"name":"read_file","response":{"output":"content"}}}]}]}
+                   """;
 
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
@@ -299,13 +313,13 @@ public sealed class ToolOutputFilePathTests
     public void A_lone_surrogate_in_another_call_leaves_the_other_paths_resolved()
     {
         var body = """
-            {"messages":[
-              {"role":"assistant","tool_calls":[
-                {"id":"call-x","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"x\ud800y\"}"}},
-                {"id":"call-\ud800","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/B.cs\"}"}},
-                {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}}]},
-              {"role":"tool","tool_call_id":"call-a","content":"content of a"}]}
-            """;
+                   {"messages":[
+                     {"role":"assistant","tool_calls":[
+                       {"id":"call-x","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"x\ud800y\"}"}},
+                       {"id":"call-\ud800","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/B.cs\"}"}},
+                       {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}}]},
+                     {"role":"tool","tool_call_id":"call-a","content":"content of a"}]}
+                   """;
 
         Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
     }
@@ -357,11 +371,11 @@ public sealed class ToolOutputFilePathTests
     public void An_openai_chat_call_that_is_not_a_read_carries_no_path(string name)
     {
         var body = $$$"""
-            {"messages":[
-              {"role":"assistant","tool_calls":[
-                {"id":"call-a","type":"function","function":{"name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"}}]},
-              {"role":"tool","tool_call_id":"call-a","content":"content"}]}
-            """;
+                      {"messages":[
+                        {"role":"assistant","tool_calls":[
+                          {"id":"call-a","type":"function","function":{"name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"}}]},
+                        {"role":"tool","tool_call_id":"call-a","content":"content"}]}
+                      """;
 
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
@@ -372,10 +386,10 @@ public sealed class ToolOutputFilePathTests
     public void An_openai_responses_call_that_is_not_a_read_carries_no_path(string name)
     {
         var body = $$$"""
-            {"input":[
-              {"type":"function_call","call_id":"call-a","name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"},
-              {"type":"function_call_output","call_id":"call-a","output":"content"}]}
-            """;
+                      {"input":[
+                        {"type":"function_call","call_id":"call-a","name":"{{{name}}}","arguments":"{\"path\":\"src/A.cs\"}"},
+                        {"type":"function_call_output","call_id":"call-a","output":"content"}]}
+                      """;
 
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }

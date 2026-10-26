@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text;
 using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
-using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
@@ -18,7 +17,7 @@ public sealed class GainTrafficTests
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages"))
         {
-            Content = new StringContent("{\"messages\":[]}", Encoding.UTF8, "application/json"),
+            Content = new StringContent("{\"messages\":[]}", Encoding.UTF8, "application/json")
         };
         request.Headers.Add("X-Ai-Proxy-Project", "/project/a");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);

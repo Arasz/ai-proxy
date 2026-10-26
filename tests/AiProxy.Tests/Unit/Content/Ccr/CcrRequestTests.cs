@@ -7,7 +7,10 @@ namespace AiProxy.Tests.Unit.Content.Ccr;
 /// <summary>What the proxy reads from a Messages request before it decides on CCR, and the tool it appends.</summary>
 public sealed class CcrRequestTests
 {
-    private static byte[] Bytes(string json) => Encoding.UTF8.GetBytes(json);
+    private static byte[] Bytes(string json)
+    {
+        return Encoding.UTF8.GetBytes(json);
+    }
 
     [Fact]
     public void A_thread_continue_names_its_previous_message()

@@ -18,6 +18,7 @@ public sealed class CodeAdapterTests
         Assert.Equal("", output.ToString());
         Assert.NotEmpty(error.ToString());
     }
+
     [Fact]
     public async Task Defaults_invoke_the_actual_reducer_and_publish_only_the_contract_fields()
     {
@@ -38,6 +39,7 @@ public sealed class CodeAdapterTests
         Assert.True(document.RootElement.GetProperty("changed").GetBoolean());
         Assert.True(document.RootElement.GetProperty("supported").GetBoolean());
     }
+
     [Theory]
     [InlineData("{}")]
     [InlineData("[]")]
@@ -130,5 +132,4 @@ public sealed class CodeAdapterTests
         Assert.False(document.RootElement.GetProperty("changed").GetBoolean());
         Assert.Equal("", error.ToString());
     }
-
 }

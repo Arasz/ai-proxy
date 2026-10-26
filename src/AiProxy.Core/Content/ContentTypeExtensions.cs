@@ -24,6 +24,9 @@ public static class ContentTypeExtensions
 
         /// <summary>The placeholder that holds a part's place in the template.</summary>
         /// <param name="chunkId">The part's number within the request.</param>
-        public string Placeholder(int chunkId) => $"{{{type.ShortName}_{chunkId}}}";
+        public string Placeholder(int chunkId)
+        {
+            return $"{{{type.ShortName}_{chunkId}}}";
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using AiProxy.Core.Content.Ccr;
 using Dapper;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 namespace AiProxy.Storage;
@@ -42,10 +43,7 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
             "SELECT continue_from FROM ccr_thread WHERE message_id = @MessageId;",
             new { MessageId = messageId },
             cancellationToken)).ConfigureAwait(false);
-        if (continueFrom is not null)
-        {
-            await RefreshAsync(connection, messageId, cancellationToken).ConfigureAwait(false);
-        }
+        if (continueFrom is not null) await RefreshAsync(connection, messageId, cancellationToken).ConfigureAwait(false);
 
         return continueFrom;
     }
@@ -63,7 +61,7 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
             cancellationToken)).ConfigureAwait(false);
     }
 
-    /// <summary>Deletes the originals and ledger rows older than <see cref="Retention"/>, and says how many went.</summary>
+    /// <summary>Deletes the originals and ledger rows older than <see cref="Retention" />, and says how many went.</summary>
     public async Task<int> EvictAsync(CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(options.ResolvedDatabasePath);
@@ -76,7 +74,7 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
     }
 
     /// <summary>Keeps a ledger row that was just read past its retention; a busy database only costs the refresh.</summary>
-    private async Task RefreshAsync(Microsoft.Data.Sqlite.SqliteConnection connection, string messageId, CancellationToken cancellationToken)
+    private async Task RefreshAsync(SqliteConnection connection, string messageId, CancellationToken cancellationToken)
     {
         try
         {
@@ -85,23 +83,28 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
                 new { MessageId = messageId, Now = Now() },
                 cancellationToken)).ConfigureAwait(false);
         }
-        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        catch (SqliteException exception)
         {
             Log.RefreshFailed(logger, messageId, exception);
         }
     }
 
-    private Microsoft.Data.Sqlite.SqliteConnection Open()
+    private SqliteConnection Open()
     {
         var connection = ContentSchema.Open(options.ResolvedDatabasePath);
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
         return connection;
     }
 
-    private string Now() => time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
+    private string Now()
+    {
+        return time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
+    }
 
-    private static CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken) =>
-        new(sql, parameters, commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken);
+    private static CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken)
+    {
+        return new CommandDefinition(sql, parameters, commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken);
+    }
 
     private static partial class Log
     {

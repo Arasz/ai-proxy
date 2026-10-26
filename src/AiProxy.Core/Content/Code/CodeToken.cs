@@ -9,7 +9,7 @@ public enum CodeTokenKind
     Identifier,
     Keyword,
     Whitespace,
-    NewLine,
+    NewLine
 }
 
 /// <summary>A source token with its zero-based offset and one-based original line.</summary>

@@ -1,8 +1,11 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 
 namespace AiProxy.Tests.Integration;
 
@@ -10,34 +13,31 @@ namespace AiProxy.Tests.Integration;
 public sealed class ProviderCompressionTests : IDisposable
 {
     private const string ToolOutput = """
-        2026-03-12 10:00:00 INFO worker=api-1 request started
-        2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
-        2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
-        2026-03-12 10:00:05 INFO worker=api-1 the second to last line
-        2026-03-12 10:00:06 INFO worker=api-1 the last line
-        """;
+                                      2026-03-12 10:00:00 INFO worker=api-1 request started
+                                      2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
+                                      2026-03-12 10:00:02 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:03 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:04 INFO worker=api-1 nothing to see here
+                                      2026-03-12 10:00:05 INFO worker=api-1 the second to last line
+                                      2026-03-12 10:00:06 INFO worker=api-1 the last line
+                                      """;
 
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
             if (File.Exists(file))
-            {
                 File.Delete(file);
-            }
-        }
     }
 
     [Fact]
     public async Task The_provider_upstream_receives_the_tool_output_reduced()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(compression: true);
+        var logs = new RecordingLoggerProvider();
+        await using var proxy = await StartProxyAsync(true, logs);
         var body = Body(ToolOutput);
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -47,13 +47,20 @@ public sealed class ProviderCompressionTests : IDisposable
         Assert.Contains("status=503", received.Body, StringComparison.Ordinal);
         Assert.Single(received.Body.Split("nothing to see here").Skip(1));
         Assert.Contains("10:00:04", received.Body, StringComparison.Ordinal);
+        var summary = Assert.Single(logs.Entries, entry => entry.EventId == 1407);
+        Assert.Equal(LogLevel.Information, summary.Level);
+        Assert.Contains($"{Encoding.UTF8.GetByteCount(body)} bytes to {Encoding.UTF8.GetByteCount(received.Body)}", summary.Message, StringComparison.Ordinal);
+        Assert.Contains("compressed the body with log.signal-filter over 1 parts", summary.Message, StringComparison.Ordinal);
+        var ratio = ((double)Encoding.UTF8.GetByteCount(received.Body) / Encoding.UTF8.GetByteCount(body)).ToString("F3", CultureInfo.InvariantCulture);
+        Assert.Contains($"ratio {ratio}", summary.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("status=503", summary.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task The_bytes_outside_the_tool_output_are_the_clients_bytes()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(compression: true);
+        await using var proxy = await StartProxyAsync(true);
         var body = Body(ToolOutput);
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -72,7 +79,7 @@ public sealed class ProviderCompressionTests : IDisposable
     public async Task The_client_gets_the_id_the_original_is_kept_under()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(compression: true);
+        await using var proxy = await StartProxyAsync(true);
         var body = Body(ToolOutput);
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -88,7 +95,8 @@ public sealed class ProviderCompressionTests : IDisposable
     public async Task A_provider_request_is_forwarded_unchanged_when_compression_is_off()
     {
         await using var upstream = await FakeUpstream.StartAsync();
-        await using var proxy = await StartProxyAsync(compression: false);
+        var logs = new RecordingLoggerProvider();
+        await using var proxy = await StartProxyAsync(false, logs);
         var body = Body(ToolOutput);
 
         using var response = await SendAsync(proxy, upstream, body);
@@ -96,14 +104,17 @@ public sealed class ProviderCompressionTests : IDisposable
         var received = Assert.Single(upstream.Requests);
         Assert.Equal(body, received.Body);
         Assert.False(response.Headers.Contains("x-ai-proxy-content-id"));
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1407);
     }
 
-    private static string Body(string toolOutput) =>
-        $$"""
-        {"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(toolOutput)}}}]}]}
-        """;
+    private static string Body(string toolOutput)
+    {
+        return $$"""
+                 {"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(toolOutput)}}}]}]}
+                 """;
+    }
 
-    private Task<ProxyHost> StartProxyAsync(bool compression)
+    private Task<ProxyHost> StartProxyAsync(bool compression, RecordingLoggerProvider? logs = null)
     {
         var configuration = new Dictionary<string, string>();
         if (compression)
@@ -112,7 +123,7 @@ public sealed class ProviderCompressionTests : IDisposable
             configuration["Proxy:Compression:Database"] = _databasePath;
         }
 
-        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+        return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), logging: logs);
     }
 
     private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
@@ -129,6 +140,8 @@ public sealed class ProviderCompressionTests : IDisposable
 /// <summary>Treats loopback hosts as a provider, so a local upstream stands in for a provider API.</summary>
 internal sealed class LoopbackProviderHosts(Dialect dialect) : IProviderHosts
 {
-    public Dialect? Find(string host) =>
-        host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? dialect : null;
+    public Dialect? Find(string host)
+    {
+        return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? dialect : null;
+    }
 }

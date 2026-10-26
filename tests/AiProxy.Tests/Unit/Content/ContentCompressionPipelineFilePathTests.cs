@@ -1,16 +1,16 @@
-using AiProxy.Core.Content.Ccr;
-using AiProxy.Tests.Unit.Content.Ccr;
 using System.Text;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
+using AiProxy.Tests.Unit.Content.Ccr;
 
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The pipeline with file reads, stated as behaviour: the path of the call that read a file
-/// reaches the reducer that runs on its result.
+///     The pipeline with file reads, stated as behaviour: the path of the call that read a file
+///     reaches the reducer that runs on its result.
 /// </summary>
 public sealed class ContentCompressionPipelineFilePathTests
 {
@@ -29,14 +29,14 @@ public sealed class ContentCompressionPipelineFilePathTests
             new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
 
         var body = """
-            {"messages":[
-              {"role":"assistant","content":[
-                {"type":"tool_use","id":"call-a","name":"Read","input":{"file_path":"src/A.cs"}},
-                {"type":"tool_use","id":"call-b","name":"Read","input":{"file_path":"src/b.py"}}]},
-              {"role":"user","content":[
-                {"type":"tool_result","tool_use_id":"call-b","content":"text of b"},
-                {"type":"tool_result","tool_use_id":"call-a","content":"text of a"}]}]}
-            """;
+                   {"messages":[
+                     {"role":"assistant","content":[
+                       {"type":"tool_use","id":"call-a","name":"Read","input":{"file_path":"src/A.cs"}},
+                       {"type":"tool_use","id":"call-b","name":"Read","input":{"file_path":"src/b.py"}}]},
+                     {"role":"user","content":[
+                       {"type":"tool_result","tool_use_id":"call-b","content":"text of b"},
+                       {"type":"tool_result","tool_use_id":"call-a","content":"text of a"}]}]}
+                   """;
 
         await pipeline.CompressAsync(
             new CompressionRequest(Encoding.UTF8.GetBytes(body), "application/json", Dialect.Anthropic),
@@ -60,12 +60,12 @@ public sealed class ContentCompressionPipelineFilePathTests
             new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
 
         var body = """
-            {"messages":[
-              {"role":"assistant","tool_calls":[
-                {"id":"call-x","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"x\ud800y\"}"}},
-                {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}}]},
-              {"role":"tool","tool_call_id":"call-a","content":"text of a"}]}
-            """;
+                   {"messages":[
+                     {"role":"assistant","tool_calls":[
+                       {"id":"call-x","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"x\ud800y\"}"}},
+                       {"id":"call-a","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"src/A.cs\"}"}}]},
+                     {"role":"tool","tool_call_id":"call-a","content":"text of a"}]}
+                   """;
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(Encoding.UTF8.GetBytes(body), "application/json", Dialect.OpenAi),
@@ -79,7 +79,10 @@ public sealed class ContentCompressionPipelineFilePathTests
     {
         public List<(string Text, string? FilePath)> Seen { get; } = [];
 
-        public bool CanHandle(ContentType type) => type == ContentType.SourceCode;
+        public bool CanHandle(ContentType type)
+        {
+            return type == ContentType.SourceCode;
+        }
 
         public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
         {
@@ -90,9 +93,14 @@ public sealed class ContentCompressionPipelineFilePathTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult<ContentRecord?>(null);
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult<ContentRecord?>(null);
+        }
     }
 }

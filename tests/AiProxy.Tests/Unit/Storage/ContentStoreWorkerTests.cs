@@ -13,6 +13,7 @@ public sealed class ContentStoreWorkerTests : IDisposable
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
         $"ai-proxy-worker-{Guid.CreateVersion7():N}.db");
+
     private readonly ContentStoreOptions _options;
     private readonly ContentQueue _queue;
     private readonly SqliteContentStore _store;
@@ -30,33 +31,34 @@ public sealed class ContentStoreWorkerTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
             if (File.Exists(file))
-            {
                 File.Delete(file);
-            }
-        }
     }
 
-    private static ContentRecord Record() => new(
-        "request-1",
-        new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
-        "the original bödy",
-        "shört",
-        6.0 / 18.0,
-        "log.signal-filter",
-        1,
-        [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
+    private static ContentRecord Record()
+    {
+        return new ContentRecord(
+            "request-1",
+            new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
+            "the original bödy",
+            "shört",
+            6.0 / 18.0,
+            "log.signal-filter",
+            1,
+            [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
+    }
 
     /// <summary>Makes the tables, as the host does when the store starts.</summary>
     private void EnsureSchema()
     {
         using var connection = ContentSchema.Open(_databasePath);
-        ContentSchema.Ensure(connection);
+        connection.Ensure();
     }
 
-    private ContentStoreWorker Worker(IContentWriter writer) =>
-        new(writer, _queue, _options, NullLogger<ContentStoreWorker>.Instance, _time);
+    private ContentStoreWorker Worker(IContentWriter writer)
+    {
+        return new ContentStoreWorker(writer, _queue, _options, NullLogger<ContentStoreWorker>.Instance, _time);
+    }
 
     [Fact]
     public async Task A_pass_writes_the_record_and_takes_it_out_of_the_queue()
@@ -140,11 +142,15 @@ public sealed class ContentStoreWorkerTests : IDisposable
             return inner.ReadAsync(limit, cancellationToken);
         }
 
-        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken) =>
-            inner.RemoveAsync(jobId, cancellationToken);
+        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
+        {
+            return inner.RemoveAsync(jobId, cancellationToken);
+        }
 
-        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
-            inner.ReadDataVersionAsync(connection, cancellationToken);
+        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
+        {
+            return inner.ReadDataVersionAsync(connection, cancellationToken);
+        }
     }
 
     private sealed class RecordingWriter : IContentWriter
@@ -157,10 +163,7 @@ public sealed class ContentStoreWorkerTests : IDisposable
         {
             Calls++;
 
-            if (Calls <= Failures)
-            {
-                throw new InvalidOperationException("the disk is full");
-            }
+            if (Calls <= Failures) throw new InvalidOperationException("the disk is full");
 
             return ValueTask.CompletedTask;
         }

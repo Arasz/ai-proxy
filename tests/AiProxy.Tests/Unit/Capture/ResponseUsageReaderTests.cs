@@ -14,28 +14,28 @@ public sealed class ResponseUsageReaderTests
     private const int SixteenMiB = 16 * 1024 * 1024;
 
     private const string MessageBody = """
-        {"id":"msg_1","type":"message","content":[{"type":"text","text":"hi"}],
-         "usage":{"input_tokens":11,"output_tokens":22,"cache_creation_input_tokens":33,"cache_read_input_tokens":44,
-                  "cache_creation":{"ephemeral_5m_input_tokens":33},"server_tool_use":{"web_search_requests":1},"service_tier":"standard"}}
-        """;
+                                       {"id":"msg_1","type":"message","content":[{"type":"text","text":"hi"}],
+                                        "usage":{"input_tokens":11,"output_tokens":22,"cache_creation_input_tokens":33,"cache_read_input_tokens":44,
+                                                 "cache_creation":{"ephemeral_5m_input_tokens":33},"server_tool_use":{"web_search_requests":1},"service_tier":"standard"}}
+                                       """;
 
     private const string Stream = """
-        event: message_start
-        data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":1,"cache_creation_input_tokens":200,"cache_read_input_tokens":300,"cache_creation":{"ephemeral_1h_input_tokens":0}}}}
+                                  event: message_start
+                                  data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":1,"cache_creation_input_tokens":200,"cache_read_input_tokens":300,"cache_creation":{"ephemeral_1h_input_tokens":0}}}}
 
-        event: content_block_delta
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"usage"}}
+                                  event: content_block_delta
+                                  data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"usage"}}
 
-        event: ping
-        data: {"type": "ping"}
+                                  event: ping
+                                  data: {"type": "ping"}
 
-        event: message_delta
-        data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":57,"cache_read_input_tokens":301,"server_tool_use":{"web_search_requests":0}}}
+                                  event: message_delta
+                                  data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":57,"cache_read_input_tokens":301,"server_tool_use":{"web_search_requests":0}}}
 
-        event: message_stop
-        data: {"type":"message_stop"}
+                                  event: message_stop
+                                  data: {"type":"message_stop"}
 
-        """;
+                                  """;
 
     [Fact]
     public void A_message_body_gives_its_four_token_counts_and_ignores_the_rest()
@@ -52,7 +52,7 @@ public sealed class ResponseUsageReaderTests
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream), EventStream, null);
 
         Assert.Null(reading.Error);
-        Assert.Equal(new ResponseUsage(InputTokens: 100, OutputTokens: 57, CacheCreationInputTokens: 200, CacheReadInputTokens: 301), reading.Usage);
+        Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
     }
 
     [Fact]
@@ -87,11 +87,11 @@ public sealed class ResponseUsageReaderTests
     public void A_delta_null_does_not_erase_a_count_the_start_gave()
     {
         const string stream = """
-            data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}
+                              data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}
 
-            data: {"type":"message_delta","usage":{"input_tokens":null,"output_tokens":9}}
+                              data: {"type":"message_delta","usage":{"input_tokens":null,"output_tokens":9}}
 
-            """;
+                              """;
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null);
 
@@ -212,10 +212,10 @@ public sealed class ResponseUsageReaderTests
     public void A_stream_cut_mid_event_keeps_the_usage_read_so_far_and_says_it_was_truncated()
     {
         const string cut = """
-            data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}
+                           data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}
 
-            data: {"type":"message_delta","usage":{"output_to
-            """;
+                           data: {"type":"message_delta","usage":{"output_to
+                           """;
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(cut), EventStream, null);
 
@@ -223,8 +223,10 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal(ResponseUsageReader.Truncated, reading.Error);
     }
 
-    private static string LongMessageBody() =>
-        $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
+    private static string LongMessageBody()
+    {
+        return $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
+    }
 
     [Theory]
     [InlineData(Json, "{\"usage\":{\"input_tokens\":1,")]
@@ -262,13 +264,13 @@ public sealed class ResponseUsageReaderTests
     {
         using var output = new MemoryStream();
         using (Stream encoder = encoding switch
-        {
-            "gzip" => new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true),
-            "deflate" => new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true),
-            "br" => new BrotliStream(output, CompressionLevel.Optimal, leaveOpen: true),
-            "raw-deflate" => new DeflateStream(output, CompressionLevel.Optimal, leaveOpen: true),
-            _ => throw new ArgumentOutOfRangeException(nameof(encoding)),
-        })
+               {
+                   "gzip" => new GZipStream(output, CompressionLevel.Optimal, true),
+                   "deflate" => new ZLibStream(output, CompressionLevel.Optimal, true),
+                   "br" => new BrotliStream(output, CompressionLevel.Optimal, true),
+                   "raw-deflate" => new DeflateStream(output, CompressionLevel.Optimal, true),
+                   _ => throw new ArgumentOutOfRangeException(nameof(encoding))
+               })
         {
             encoder.Write(bytes);
         }

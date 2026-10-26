@@ -7,9 +7,14 @@ public static class CcrView
     public const string Marker = "[proxy view ";
 
     /// <summary>The id an original is kept under; the same id a preview of the same text gets.</summary>
-    public static string IdOf(string original) => CcrText.IdOf(original);
+    public static string IdOf(string original)
+    {
+        return CcrText.IdOf(original);
+    }
 
-    /// <summary>The hint line for a view whose original is kept under <paramref name="id"/>.</summary>
-    public static string Hint(string id) =>
-        CcrText.Invariant($"{Marker}{id}: comments and imports removed. Call proxy_retrieve with this id for the exact text.]");
+    /// <summary>The hint line for a view whose original is kept under <paramref name="id" />.</summary>
+    public static string Hint(string id)
+    {
+        return CcrText.Invariant($"{Marker}{id}: comments and imports removed. Call proxy_retrieve with this id for the exact text.]");
+    }
 }

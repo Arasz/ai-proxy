@@ -11,14 +11,10 @@ public sealed partial class OriginalEvictionWorker(SqliteOriginalStore store, IL
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
-        {
             try
             {
                 var evicted = await store.EvictAsync(stoppingToken).ConfigureAwait(false);
-                if (evicted > 0)
-                {
-                    Log.Evicted(logger, evicted);
-                }
+                if (evicted > 0) Log.Evicted(logger, evicted);
 
                 await Task.Delay(Interval, time, stoppingToken).ConfigureAwait(false);
             }
@@ -31,7 +27,6 @@ public sealed partial class OriginalEvictionWorker(SqliteOriginalStore store, IL
                 Log.EvictionFailed(logger, exception);
                 await Task.Delay(Interval, time, stoppingToken).ConfigureAwait(false);
             }
-        }
     }
 
     private static partial class Log

@@ -17,7 +17,10 @@ public sealed class JsonCompressionHandler : ICompressionHandler
     private static readonly JsonWriterOptions WriterOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.Json;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.Json;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

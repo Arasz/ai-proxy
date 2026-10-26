@@ -6,8 +6,14 @@ namespace AiProxy.Core.Content.Ccr;
 public sealed record CcrParseResult(CcrRetrievalRequest? Request, string Reason)
 {
     /// <summary>A valid call.</summary>
-    public static CcrParseResult Accepted(CcrRetrievalRequest request) => new(request, "");
+    public static CcrParseResult Accepted(CcrRetrievalRequest request)
+    {
+        return new CcrParseResult(request, "");
+    }
 
     /// <summary>Malformed arguments, with the reason the model reads.</summary>
-    public static CcrParseResult Refused(string reason) => new(null, reason);
+    public static CcrParseResult Refused(string reason)
+    {
+        return new CcrParseResult(null, reason);
+    }
 }

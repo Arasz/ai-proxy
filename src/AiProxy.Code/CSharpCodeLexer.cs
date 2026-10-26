@@ -13,7 +13,7 @@ public sealed class CSharpCodeLexer : ICodeLexer
     [
         SyntaxKind.StringLiteralExpression,
         SyntaxKind.Utf8StringLiteralExpression,
-        SyntaxKind.CharacterLiteralExpression,
+        SyntaxKind.CharacterLiteralExpression
     ];
 
     private static readonly FrozenSet<SyntaxKind> InterpolatedStringTokenKinds =
@@ -25,39 +25,35 @@ public sealed class CSharpCodeLexer : ICodeLexer
         SyntaxKind.InterpolatedStringTextToken,
         SyntaxKind.InterpolatedSingleLineRawStringStartToken,
         SyntaxKind.InterpolatedMultiLineRawStringStartToken,
-        SyntaxKind.InterpolatedRawStringEndToken,
+        SyntaxKind.InterpolatedRawStringEndToken
     ];
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath) => filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+    public bool SupportsPath(string? filePath)
+    {
+        return filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+    }
 
-    public bool IsKeyword(string text) =>
-        SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
-        || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
-        || text is "nint" or "nuint" or "value";
+    public bool IsKeyword(string text)
+    {
+        return SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
+               || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
+               || text is "nint" or "nuint" or "value";
+    }
 
 
     /// <inheritdoc />
     public CodeLexResult Lex(string text)
     {
         var tree = CSharpSyntaxTree.ParseText(text);
-        if (tree.GetDiagnostics().Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
-        {
-            return Unsupported();
-        }
+        if (tree.GetDiagnostics().Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)) return Unsupported();
 
         var root = tree.GetRoot();
         var triviaLexingResult = ProcessTriviaTokens(root);
-        if (!triviaLexingResult.Supported)
-        {
-            return triviaLexingResult;
-        }
+        if (!triviaLexingResult.Supported) return triviaLexingResult;
 
         var tokenLexingResult = ProcessTokens(root);
-        if (!tokenLexingResult.Supported)
-        {
-            return tokenLexingResult;
-        }
+        if (!tokenLexingResult.Supported) return tokenLexingResult;
 
         var spans = new List<CodeToken>(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count);
         spans.AddRange(triviaLexingResult.Tokens);
@@ -72,10 +68,7 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var spans = new List<CodeToken>();
         foreach (var token in root.DescendantTokens(descendIntoTrivia: false))
         {
-            if (token.IsKind(SyntaxKind.EndOfFileToken) || token.Span.Length == 0)
-            {
-                continue;
-            }
+            if (token.IsKind(SyntaxKind.EndOfFileToken) || token.Span.Length == 0) continue;
 
             var kind = TokenKind(token);
             var valueText = kind == CodeTokenKind.Identifier ? token.ValueText : null;
@@ -91,16 +84,11 @@ public sealed class CSharpCodeLexer : ICodeLexer
         foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: false))
         {
             if (trivia.Kind() is SyntaxKind.DisabledTextTrivia or SyntaxKind.SkippedTokensTrivia
-                || trivia.HasStructure && trivia.GetStructure() is DirectiveTriviaSyntax)
-            {
+                || (trivia.HasStructure && trivia.GetStructure() is DirectiveTriviaSyntax))
                 return Unsupported();
-            }
 
             var kind = TriviaKind(trivia.Kind());
-            if (kind is null || trivia.Span.Length == 0)
-            {
-                continue;
-            }
+            if (kind is null || trivia.Span.Length == 0) continue;
 
             var triviaSpan = kind == CodeTokenKind.Comment && trivia.HasStructure ? trivia.FullSpan : trivia.Span;
             spans.Add(new CodeToken(kind.Value, trivia.ToFullString(), triviaSpan.Start, 1));
@@ -109,8 +97,9 @@ public sealed class CSharpCodeLexer : ICodeLexer
         return new CodeLexResult(true, spans);
     }
 
-    private static CodeTokenKind? TriviaKind(SyntaxKind kind) =>
-        kind switch
+    private static CodeTokenKind? TriviaKind(SyntaxKind kind)
+    {
+        return kind switch
         {
             SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia
                 or SyntaxKind.SingleLineDocumentationCommentTrivia or SyntaxKind.MultiLineDocumentationCommentTrivia
@@ -119,23 +108,19 @@ public sealed class CSharpCodeLexer : ICodeLexer
             SyntaxKind.EndOfLineTrivia => CodeTokenKind.NewLine,
             _ => null
         };
+    }
 
     private static CodeTokenKind TokenKind(SyntaxToken token)
     {
         var kind = token.Kind();
 
-        if (token.Parent is LiteralExpressionSyntax literal && StringLiteralKinds.Contains(literal.Kind())
+        if ((token.Parent is LiteralExpressionSyntax literal && StringLiteralKinds.Contains(literal.Kind()))
             || token.IsKind(SyntaxKind.InterpolatedStringTextToken)
             || token.Parent is InterpolatedStringTextSyntax
-            || token.Parent is InterpolatedStringExpressionSyntax && InterpolatedStringTokenKinds.Contains(kind))
-        {
+            || (token.Parent is InterpolatedStringExpressionSyntax && InterpolatedStringTokenKinds.Contains(kind)))
             return CodeTokenKind.String;
-        }
 
-        if (kind == SyntaxKind.IdentifierToken)
-        {
-            return CodeTokenKind.Identifier;
-        }
+        if (kind == SyntaxKind.IdentifierToken) return CodeTokenKind.Identifier;
 
         return SyntaxFacts.IsKeywordKind(kind) || SyntaxFacts.IsContextualKeyword(kind)
             ? CodeTokenKind.Keyword
@@ -150,10 +135,7 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var line = 1;
         foreach (var codeToken in spans)
         {
-            if (codeToken.Offset < position)
-            {
-                return null;
-            }
+            if (codeToken.Offset < position) return null;
 
             if (codeToken.Offset > position)
             {
@@ -182,10 +164,8 @@ public sealed class CSharpCodeLexer : ICodeLexer
         {
             var current = text[scanPosition];
             if (current is '\r' or '\u0085' or '\u2028' or '\u2029'
-                || current == '\n' && (scanPosition == 0 || text[scanPosition - 1] != '\r'))
-            {
+                || (current == '\n' && (scanPosition == 0 || text[scanPosition - 1] != '\r')))
                 line++;
-            }
 
             scanPosition++;
         }
@@ -193,5 +173,8 @@ public sealed class CSharpCodeLexer : ICodeLexer
         return line;
     }
 
-    private static CodeLexResult Unsupported() => new(false, []);
+    private static CodeLexResult Unsupported()
+    {
+        return new CodeLexResult(false, []);
+    }
 }

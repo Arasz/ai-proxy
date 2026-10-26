@@ -17,7 +17,7 @@ public sealed class ContentRoutingTableTests
         new ProseCompressionHandler(),
         new DirectoryListingCompressionHandler(),
         new ShellTranscriptCompressionHandler(),
-        new PassThroughCompressionHandler(),
+        new PassThroughCompressionHandler()
     ];
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class ContentRoutingTableTests
             [ContentType.Prose] = typeof(ProseCompressionHandler),
             [ContentType.DirectoryListing] = typeof(DirectoryListingCompressionHandler),
             [ContentType.ShellTranscript] = typeof(ShellTranscriptCompressionHandler),
-            [ContentType.Unknown] = typeof(PassThroughCompressionHandler),
+            [ContentType.Unknown] = typeof(PassThroughCompressionHandler)
         };
 
         var router = new ContentRouter(Handlers, new PassThroughCompressionHandler());
@@ -64,22 +64,8 @@ public sealed class ContentRoutingTableTests
         // The promise the whole design rests on: a reducer never invents a word. The
         // document-shaped reducers are checked by their values instead, because the
         // whitespace they remove is not a line of the input.
-        var text = string.Join("\n",
-        [
-            "2026-03-12 10:00:00 INFO worker=api-1 request started",
-            "2026-03-12 10:00:01 INFO worker=api-1 request failed status=503",
-            "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
-            "2026-03-12 10:00:03 INFO worker=api-1 nothing to see",
-            "",
-            "key = \"value\"",
-            "# a comment",
-            "",
-            "# Heading",
-            "",
-            "    return null;",
-            "",
-            "$ echo done",
-        ]);
+        var text = string.Join("\n", "2026-03-12 10:00:00 INFO worker=api-1 request started", "2026-03-12 10:00:01 INFO worker=api-1 request failed status=503", "2026-03-12 10:00:02 INFO worker=api-1 nothing to see",
+            "2026-03-12 10:00:03 INFO worker=api-1 nothing to see", "", "key = \"value\"", "# a comment", "", "# Heading", "", "    return null;", "", "$ echo done");
 
         var kinds = new (ContentType Kind, ICompressionHandler Handler)[]
         {
@@ -88,7 +74,7 @@ public sealed class ContentRoutingTableTests
             (ContentType.Markdown, new MarkdownCompressionHandler()),
             (ContentType.SourceCode, new SourceCodeCompressionHandler([])),
             (ContentType.Prose, new ProseCompressionHandler()),
-            (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler()),
+            (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler())
         };
 
         foreach (var (kind, handler) in kinds)
@@ -123,10 +109,7 @@ public sealed class ContentRoutingTableTests
         foreach (var word in kept.Split(' '))
         {
             position = Array.IndexOf(words, word, position);
-            if (position < 0)
-            {
-                return false;
-            }
+            if (position < 0) return false;
 
             position++;
         }

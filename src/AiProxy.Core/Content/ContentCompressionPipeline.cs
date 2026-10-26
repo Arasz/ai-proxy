@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.Json;
-using AiProxy.Core.Timing;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Core.Timing;
 
 namespace AiProxy.Core.Content;
 
@@ -40,19 +40,13 @@ public sealed class ContentCompressionPipeline(
     /// <inheritdoc />
     public async ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
     {
-        if (request.Body.Length == 0)
-        {
-            return new CompressionResult(request.Body, false);
-        }
+        if (request.Body.Length == 0) return new CompressionResult(request.Body, false);
 
         var stages = new StageTimings();
         var started = time.GetTimestamp();
         var regions = finder.Find(request.Body);
         stages.Add("find", time.GetElapsedTime(started));
-        if (regions.Count == 0)
-        {
-            return new CompressionResult(request.Body, false) { Stages = stages.ToArray() };
-        }
+        if (regions.Count == 0) return new CompressionResult(request.Body, false) { Stages = stages.ToArray() };
 
         var requestId = Guid.CreateVersion7().ToString();
         var original = Encoding.UTF8.GetString(request.Body.Span);
@@ -73,24 +67,15 @@ public sealed class ContentCompressionPipeline(
             }
 
             var preview = await PreviewAsync(region, reduced ?? region.Text, request.Ccr, failures, stages, cancellationToken);
-            if (preview is not null)
-            {
-                originals[preview.Id] = region.Text;
-            }
+            if (preview is not null) originals[preview.Id] = region.Text;
 
             var sent = preview?.Text ?? reduced;
-            if (sent is null)
-            {
-                continue;
-            }
+            if (sent is null) continue;
 
             replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sent))));
         }
 
-        if (replacements.Count == 0)
-        {
-            return new CompressionResult(request.Body, false) { PartFailures = failures, Stages = stages.ToArray() };
-        }
+        if (replacements.Count == 0) return new CompressionResult(request.Body, false) { PartFailures = failures, Stages = stages.ToArray() };
 
         started = time.GetTimestamp();
         var compressed = Rebuild(body, replacements);
@@ -129,10 +114,10 @@ public sealed class ContentCompressionPipeline(
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>
     /// <remarks>
-    /// The finder returns the string tokens of a body, and the tokens of a body do not
-    /// overlap, so the regions never do either. A region that started inside the one
-    /// before it would make the rebuild write a negative number of bytes, so a region
-    /// that does is left alone rather than trusted.
+    ///     The finder returns the string tokens of a body, and the tokens of a body do not
+    ///     overlap, so the regions never do either. A region that started inside the one
+    ///     before it would make the rebuild write a negative number of bytes, so a region
+    ///     that does is left alone rather than trusted.
     /// </remarks>
     /// <param name="regions">The regions the finder found.</param>
     public static IReadOnlyList<ContentRegion> WithoutOverlaps(IReadOnlyList<ContentRegion> regions)
@@ -142,10 +127,7 @@ public sealed class ContentCompressionPipeline(
 
         foreach (var region in regions.OrderBy(static region => region.Start))
         {
-            if (region.Start < end)
-            {
-                continue;
-            }
+            if (region.Start < end) continue;
 
             kept.Add(region);
             end = region.Start + region.Length;
@@ -179,10 +161,7 @@ public sealed class ContentCompressionPipeline(
         StageTimings stages,
         CancellationToken cancellationToken)
     {
-        if (mode == CcrMode.Off)
-        {
-            return null;
-        }
+        if (mode == CcrMode.Off) return null;
 
         var started = time.GetTimestamp();
         try
@@ -210,10 +189,7 @@ public sealed class ContentCompressionPipeline(
     {
         foreach (var part in reduced)
         {
-            if (part.RetrievalId is not { } id)
-            {
-                continue;
-            }
+            if (part.RetrievalId is not { } id) continue;
 
             try
             {
@@ -242,10 +218,7 @@ public sealed class ContentCompressionPipeline(
         var started = time.GetTimestamp();
         var decomposition = decomposer.Decompose(region.Text, requestId, region.FilePath);
         stages.Add("decompose", time.GetElapsedTime(started));
-        if (decomposition.Parts.Count == 0)
-        {
-            return null;
-        }
+        if (decomposition.Parts.Count == 0) return null;
 
         var reduced = new List<CompressedPart>(decomposition.Parts.Count);
         var changed = false;
@@ -276,10 +249,7 @@ public sealed class ContentCompressionPipeline(
         }
 
         parts.AddRange(reduced);
-        if (!changed)
-        {
-            return null;
-        }
+        if (!changed) return null;
 
         started = time.GetTimestamp();
         var composed = compositor.Compose(decomposition, reduced);

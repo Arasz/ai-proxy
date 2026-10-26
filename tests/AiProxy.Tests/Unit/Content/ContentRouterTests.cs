@@ -9,7 +9,7 @@ public sealed class ContentRouterTests
     private static readonly ContentRouter Router = new(
         [
             new LogCompressionHandler(),
-            new JsonCompressionHandler(),
+            new JsonCompressionHandler()
         ],
         new PassThroughCompressionHandler());
 

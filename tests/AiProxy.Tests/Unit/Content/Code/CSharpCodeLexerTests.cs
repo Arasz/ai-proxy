@@ -1,5 +1,5 @@
-using AiProxy.Core.Content.Code;
 using AiProxy.Code;
+using AiProxy.Core.Content.Code;
 
 namespace AiProxy.Tests.Unit.Content.Code;
 
@@ -14,6 +14,7 @@ public sealed class CSharpCodeLexerTests
         Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.String, Text: "\"// literal\"" });
         Assert.Single(result.Tokens, static token => token.Kind == CodeTokenKind.Comment);
     }
+
     [Theory]
     [InlineData("var text = @\"/* literal */\"; // actual")]
     [InlineData("var text = \"\"\"\n// literal\n\"\"\"; // actual")]
@@ -28,6 +29,7 @@ public sealed class CSharpCodeLexerTests
         Assert.Single(result.Tokens, static token => token.Kind == CodeTokenKind.Comment);
         Assert.Equal(source, string.Concat(result.Tokens.Select(static token => token.Text)));
     }
+
     [Theory]
     [InlineData("/* never closed")]
     [InlineData("var x = \"never closed")]
@@ -60,7 +62,7 @@ public sealed class CSharpCodeLexerTests
         var result = new CSharpCodeLexer().Lex($"var bytes = {source};");
 
         Assert.True(result.Supported);
-        Assert.Contains(result.Tokens,  token => token.Kind == CodeTokenKind.String && token.Text == source);
+        Assert.Contains(result.Tokens, token => token.Kind == CodeTokenKind.String && token.Text == source);
         Assert.DoesNotContain(result.Tokens, static token => token is { Kind: CodeTokenKind.Identifier, Text: "u8" });
     }
 
@@ -108,10 +110,7 @@ public sealed class CSharpCodeLexerTests
         Assert.Equal(3, identifiers["third"].Line);
         Assert.Equal(4, identifiers["fourth"].Line);
         Assert.Equal(5, identifiers["fifth"].Line);
-        foreach (var token in identifiers.Values)
-        {
-            Assert.Equal(token.Text, source.Substring(token.Offset, token.Text.Length));
-        }
+        foreach (var token in identifiers.Values) Assert.Equal(token.Text, source.Substring(token.Offset, token.Text.Length));
     }
 
     [Fact]

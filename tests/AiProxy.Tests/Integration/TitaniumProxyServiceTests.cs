@@ -1,7 +1,7 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Net;
 using System.Net.Sockets;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -145,7 +145,7 @@ public sealed class TitaniumProxyServiceTests
         var events = new List<string>();
         await using var service = new TitaniumProxyService(
             new RecordingSystemProxyRegistrar(events),
-            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
+            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), false, false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             new RecordingGuardLauncher(events),
@@ -254,22 +254,27 @@ public sealed class TitaniumProxyServiceTests
         }
     }
 
-    private static string MarkerPath(TemporaryDirectory directory) => Path.Combine(directory.Path, "system-proxy.lock");
+    private static string MarkerPath(TemporaryDirectory directory)
+    {
+        return Path.Combine(directory.Path, "system-proxy.lock");
+    }
 
     private static TitaniumProxyService CreateService(
         ISystemProxyRegistrar registrar,
         int port,
         string dataDirectory,
         ISystemProxyGuardLauncher? launcher = null,
-        TimeSpan? markerWait = null) =>
-        new(
+        TimeSpan? markerWait = null)
+    {
+        return new TitaniumProxyService(
             registrar,
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: true, TrustRootCertificate: false, dataDirectory),
+            new ProxyRuntimeOptions(IPAddress.Loopback, port, true, false, dataDirectory),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             launcher ?? new RecordingGuardLauncher([]),
             NullLoggerFactory.Instance,
             markerWait ?? TimeSpan.FromSeconds(1));
+    }
 
     private static int FreePort()
     {
@@ -293,10 +298,7 @@ public sealed class TitaniumProxyServiceTests
 
         public void Set(ExplicitProxyEndPoint endPoint)
         {
-            if (FailSet)
-            {
-                throw new InvalidOperationException("networksetup failed");
-            }
+            if (FailSet) throw new InvalidOperationException("networksetup failed");
 
             _events?.Add("set");
             EndPoint = endPoint;
@@ -306,13 +308,13 @@ public sealed class TitaniumProxyServiceTests
         {
             _events?.Add("restore");
             RestoreCount++;
-            if (FailRestore)
-            {
-                throw new InvalidOperationException("networksetup failed");
-            }
+            if (FailRestore) throw new InvalidOperationException("networksetup failed");
         }
 
-        public void Clear() => _events?.Add("clear");
+        public void Clear()
+        {
+            _events?.Add("clear");
+        }
     }
 
     private sealed class RecordingGuardLauncher(List<string> events) : ISystemProxyGuardLauncher
@@ -331,10 +333,7 @@ public sealed class TitaniumProxyServiceTests
         public ISystemProxyGuardSession Launch(string dataDirectory, Action guardExited)
         {
             _events.Add("launch");
-            if (Fail)
-            {
-                throw new InvalidOperationException("cannot start the guard");
-            }
+            if (Fail) throw new InvalidOperationException("cannot start the guard");
 
             _markerPath = Path.Combine(dataDirectory, SystemProxyMarker.FileName);
             return new Session(this);
@@ -346,13 +345,13 @@ public sealed class TitaniumProxyServiceTests
             {
                 owner._events.Add("restored");
                 owner.MarkerLengthWhenRestoredWasReported = new FileInfo(owner._markerPath).Length;
-                if (owner.ReportThrows)
-                {
-                    throw new IOException("Broken pipe");
-                }
+                if (owner.ReportThrows) throw new IOException("Broken pipe");
             }
 
-            public void Dispose() => owner.DisposeCount++;
+            public void Dispose()
+            {
+                owner.DisposeCount++;
+            }
         }
     }
 }

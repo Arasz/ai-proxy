@@ -24,10 +24,7 @@ public static class LogRules
         {
             var anchored = index < Anchors || index >= lines.Length - Anchors;
 
-            if (anchored || carriesSignal(lines[index]))
-            {
-                kept.Add(lines[index]);
-            }
+            if (anchored || carriesSignal(lines[index])) kept.Add(lines[index]);
         }
 
         return kept;

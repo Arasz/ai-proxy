@@ -8,9 +8,9 @@ namespace AiProxy.Storage;
 
 /// <summary>Keeps captured provider requests in their own SQLite file, readable by the user only.</summary>
 /// <remarks>
-/// The request table holds the body and where it was sent, and the response table holds only
-/// numbers; neither has a column for headers, the query string or the response body, so a
-/// credential or a model's answer has nowhere to land.
+///     The request table holds the body and where it was sent, and the response table holds only
+///     numbers; neither has a column for headers, the query string or the response body, so a
+///     credential or a model's answer has nowhere to land.
 /// </remarks>
 public sealed class SqliteCaptureStore : IRequestCaptureStore
 {
@@ -36,10 +36,7 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!_prepared)
-        {
-            Prepare();
-        }
+        if (!_prepared) Prepare();
 
         await using var connection = ContentSchema.Open(_databasePath);
         await connection.ExecuteAsync(new CommandDefinition(
@@ -51,7 +48,7 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
                 Provider = request.Provider.ToString(),
                 request.Host,
                 request.Path,
-                Body = request.Body.ToArray(),
+                Body = request.Body.ToArray()
             },
             commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -62,10 +59,7 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
     {
         ArgumentNullException.ThrowIfNull(response);
 
-        if (!_prepared)
-        {
-            Prepare();
-        }
+        if (!_prepared) Prepare();
 
         await using var connection = ContentSchema.Open(_databasePath);
         await connection.ExecuteAsync(new CommandDefinition(
@@ -83,7 +77,7 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
                 response.Usage?.CacheCreationInputTokens,
                 response.Usage?.CacheReadInputTokens,
                 response.UsageError,
-                Stages = StagesJson(response.Stages),
+                Stages = StagesJson(response.Stages)
             },
             commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -96,10 +90,7 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            foreach (var stage in stages)
-            {
-                writer.WriteNumber(stage.Name, (long)stage.Elapsed.TotalMicroseconds);
-            }
+            foreach (var stage in stages) writer.WriteNumber(stage.Name, (long)stage.Elapsed.TotalMicroseconds);
 
             writer.WriteEndObject();
         }
@@ -121,11 +112,11 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
             Directory.CreateDirectory(directory, UserOnlyDirectory);
             File.SetUnixFileMode(directory, UserOnlyDirectory);
             using (new FileStream(_databasePath, new FileStreamOptions
-            {
-                Mode = FileMode.OpenOrCreate,
-                Access = FileAccess.ReadWrite,
-                UnixCreateMode = UserOnlyFile,
-            }))
+                   {
+                       Mode = FileMode.OpenOrCreate,
+                       Access = FileAccess.ReadWrite,
+                       UnixCreateMode = UserOnlyFile
+                   }))
             {
             }
 
@@ -164,18 +155,18 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
                                      );
                                      """;
 
-    public const string Insert = """
-                                  INSERT INTO capture_request (request_id, captured_at, provider, host, path, body)
-                                  VALUES (@RequestId, @CapturedAt, @Provider, @Host, @Path, @Body);
-                                  """;
+        public const string Insert = """
+                                     INSERT INTO capture_request (request_id, captured_at, provider, host, path, body)
+                                     VALUES (@RequestId, @CapturedAt, @Provider, @Host, @Path, @Body);
+                                     """;
 
-    public const string InsertResponse = """
-                                          INSERT INTO capture_response (
-                                              request_id, completed_at, status, request_bytes, forwarded_bytes, response_bytes,
-                                              input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usage_error, stages)
-                                          VALUES (
-                                              @RequestId, @CompletedAt, @StatusCode, @RequestBytes, @ForwardedBytes, @ResponseBytes,
-                                              @InputTokens, @OutputTokens, @CacheCreationInputTokens, @CacheReadInputTokens, @UsageError, @Stages);
-                                          """;
+        public const string InsertResponse = """
+                                             INSERT INTO capture_response (
+                                                 request_id, completed_at, status, request_bytes, forwarded_bytes, response_bytes,
+                                                 input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usage_error, stages)
+                                             VALUES (
+                                                 @RequestId, @CompletedAt, @StatusCode, @RequestBytes, @ForwardedBytes, @ResponseBytes,
+                                                 @InputTokens, @OutputTokens, @CacheCreationInputTokens, @CacheReadInputTokens, @UsageError, @Stages);
+                                             """;
     }
 }

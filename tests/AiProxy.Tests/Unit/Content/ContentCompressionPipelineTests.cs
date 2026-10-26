@@ -1,31 +1,34 @@
-using AiProxy.Core.Content.Ccr;
-using AiProxy.Tests.Unit.Content.Ccr;
 using System.Text;
+using System.Text.Json;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
+using AiProxy.Tests.Unit.Content.Ccr;
 using Microsoft.Extensions.Time.Testing;
 
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The pipeline, stated as behaviour: the tool output is smaller, the rest of the body is
-/// exactly what the client sent, and the record says what happened.
+///     The pipeline, stated as behaviour: the tool output is smaller, the rest of the body is
+///     exactly what the client sent, and the record says what happened.
 /// </summary>
 public sealed class ContentCompressionPipelineTests
 {
     private const string ToolOutput = """
-        2026-03-12 10:00:00 INFO worker=api-1 request started
-        2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
-        2026-03-12 10:00:02 INFO worker=api-1 nothing to see
-        2026-03-12 10:00:03 INFO worker=api-1 nothing to see
-        2026-03-12 10:00:04 INFO worker=api-1 nothing to see
-        2026-03-12 10:00:05 INFO worker=api-1 nothing to see
-        """;
+                                      2026-03-12 10:00:00 INFO worker=api-1 request started
+                                      2026-03-12 10:00:01 INFO worker=api-1 request failed status=503 dur_ms=3110
+                                      2026-03-12 10:00:02 INFO worker=api-1 nothing to see
+                                      2026-03-12 10:00:03 INFO worker=api-1 nothing to see
+                                      2026-03-12 10:00:04 INFO worker=api-1 nothing to see
+                                      2026-03-12 10:00:05 INFO worker=api-1 nothing to see
+                                      """;
 
-    private static string Body(string toolOutput) =>
-        $$"""{"messages":[{"role":"tool","content":{{System.Text.Json.JsonSerializer.Serialize(toolOutput)}}}]}""";
+    private static string Body(string toolOutput)
+    {
+        return $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
+    }
 
     private static (ContentCompressionPipeline Pipeline, RecordingContentStore Store) Build(
         IContentStore? store = null,
@@ -38,7 +41,7 @@ public sealed class ContentCompressionPipelineTests
             [
                 logHandler ?? new LogCompressionHandler(),
                 new JsonCompressionHandler(),
-                new ProseCompressionHandler(),
+                new ProseCompressionHandler()
             ],
             new PassThroughCompressionHandler());
 
@@ -145,7 +148,7 @@ public sealed class ContentCompressionPipelineTests
     [Fact]
     public async Task A_part_under_the_minimum_is_left_alone()
     {
-        var options = new CompressionOptions(MinimumLengths: new Dictionary<ContentType, int> { [ContentType.Log] = 10_000 });
+        var options = new CompressionOptions(new Dictionary<ContentType, int> { [ContentType.Log] = 10_000 });
         var (pipeline, _) = Build(options: options);
         var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
 
@@ -166,7 +169,7 @@ public sealed class ContentCompressionPipelineTests
         {
             new(0, 100, "first"),
             new(50, 100, "overlapping"),
-            new(200, 100, "last"),
+            new(200, 100, "last")
         };
 
         var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
@@ -178,7 +181,7 @@ public sealed class ContentCompressionPipelineTests
     public void The_regions_the_finder_found_do_not_overlap()
     {
         // The promise the guard rests on, checked against the finder itself.
-        var regions = new ToolOutputRegionFinder().Find(System.Text.Encoding.UTF8.GetBytes(
+        var regions = new ToolOutputRegionFinder().Find(Encoding.UTF8.GetBytes(
             """{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""));
 
         var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
@@ -206,7 +209,7 @@ public sealed class ContentCompressionPipelineTests
         var (pipeline, store) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler());
         var json = "{\n  \"a\": 1,\n  \"b\": [1, 2, 3]\n}";
         var body = Encoding.UTF8.GetBytes(
-            $$"""{"messages":[{"role":"tool","content":{{System.Text.Json.JsonSerializer.Serialize(ToolOutput)}}},{"role":"tool","content":{{System.Text.Json.JsonSerializer.Serialize(json)}}}]}""");
+            $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(ToolOutput)}}},{"role":"tool","content":{{JsonSerializer.Serialize(json)}}}]}""");
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),
@@ -242,7 +245,7 @@ public sealed class ContentCompressionPipelineTests
     [Fact]
     public async Task A_cancelled_request_still_propagates_out_of_a_handler()
     {
-        var (pipeline, _) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler(cancelled: true));
+        var (pipeline, _) = Build(options: CompressionOptions.WithMinimum(1), logHandler: new ThrowingLogHandler(true));
         var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
         using var source = new CancellationTokenSource();
         await source.CancelAsync();
@@ -256,7 +259,7 @@ public sealed class ContentCompressionPipelineTests
     {
         var time = new FakeTimeProvider();
         var store = new RecordingContentStore { OnStore = () => time.Advance(TimeSpan.FromMilliseconds(3)) };
-        var (pipeline, _) = Build(store: store, time: time, logHandler: new SlowHandler(new LogCompressionHandler(), time, TimeSpan.FromMilliseconds(7)));
+        var (pipeline, _) = Build(store, time: time, logHandler: new SlowHandler(new LogCompressionHandler(), time, TimeSpan.FromMilliseconds(7)));
         var body = Encoding.UTF8.GetBytes(Body(ToolOutput));
 
         var result = await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.OpenAi), CancellationToken.None);
@@ -284,7 +287,10 @@ public sealed class ContentCompressionPipelineTests
     /// <summary>Runs another handler and moves the clock on, so a stage has a known duration.</summary>
     private sealed class SlowHandler(ICompressionHandler inner, FakeTimeProvider time, TimeSpan cost) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type) => inner.CanHandle(type);
+        public bool CanHandle(ContentType type)
+        {
+            return inner.CanHandle(type);
+        }
 
         public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
         {
@@ -295,10 +301,15 @@ public sealed class ContentCompressionPipelineTests
 
     private sealed class ThrowingLogHandler(bool cancelled = false) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type) => type == ContentType.Log;
+        public bool CanHandle(ContentType type)
+        {
+            return type == ContentType.Log;
+        }
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) =>
-            cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
+        {
+            return cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
+        }
     }
 
     private sealed class RecordingContentStore : IContentStore
@@ -313,16 +324,15 @@ public sealed class ContentCompressionPipelineTests
         {
             OnStore?.Invoke();
 
-            if (Failure is not null)
-            {
-                throw Failure;
-            }
+            if (Failure is not null) throw Failure;
 
             Records.Add(record);
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
+        }
     }
 }

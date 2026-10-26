@@ -11,12 +11,12 @@ ai-proxy installs itself as the current user's system HTTP and HTTPS proxy while
 routes the standard API hosts for OpenAI, Anthropic, Google Gemini, and OpenRouter, and passes
 every other destination through. There are no upstream or pass-through rules to configure.
 
-| Provider | API host |
-|---|---|
-| OpenAI | `api.openai.com`, plus the regional `us.`, `eu.`, `gb.`, `ca.`, `au.`, `jp.`, `kr.`, `sg.`, `in.` and `ae.api.openai.com` |
-| Anthropic | `api.anthropic.com` |
-| Google Gemini | `generativelanguage.googleapis.com` |
-| OpenRouter | `openrouter.ai`, `eu.openrouter.ai` |
+| Provider      | API host                                                                                                                  |
+|---------------|---------------------------------------------------------------------------------------------------------------------------|
+| OpenAI        | `api.openai.com`, plus the regional `us.`, `eu.`, `gb.`, `ca.`, `au.`, `jp.`, `kr.`, `sg.`, `in.` and `ae.api.openai.com` |
+| Anthropic     | `api.anthropic.com`                                                                                                       |
+| Google Gemini | `generativelanguage.googleapis.com`                                                                                       |
+| OpenRouter    | `openrouter.ai`, `eu.openrouter.ai`                                                                                       |
 
 HTTPS requests to those hosts are decrypted so ai-proxy can inspect and optionally compress
 request bodies. The first run creates and asks the operating system to trust a per-user root
@@ -77,19 +77,33 @@ is configured. Start ai-proxy once before launching them: it writes its public i
 certificate to `~/.ai-proxy/root-ca.pem`. The private certificate and key remain in
 `root-ca.pfx`; use the public PEM file for client trust.
 
-For Claude Code, launch it from the project directory with:
+Keep the proxy running in one terminal. In another, use `harness` to start a command-line
+agent from the project directory. For Claude Code:
 
 ```bash
-HTTP_PROXY=http://127.0.0.1:8080 \
-HTTPS_PROXY=http://127.0.0.1:8080 \
-NO_PROXY=localhost,127.0.0.1,::1 \
-NODE_EXTRA_CA_CERTS="$HOME/.ai-proxy/root-ca.pem" \
-ANTHROPIC_CUSTOM_HEADERS="X-Ai-Proxy-Project: $PWD" \
-claude
+ai-proxy harness claude
+ai-proxy harness claude -- --model sonnet
 ```
 
+The launcher checks that the proxy is reachable, sets `HTTP_PROXY`, `HTTPS_PROXY`,
+`NO_PROXY` and `NODE_EXTRA_CA_CERTS` for the child, and adds `X-Ai-Proxy-Project` with the
+current directory to `ANTHROPIC_CUSTOM_HEADERS`. It preserves other custom headers and
+existing proxy bypass entries. Claude keeps its terminal input and output, arguments, and
+exit status. The parent shell's environment stays unchanged.
+
+The defaults are `http://127.0.0.1:8080` (or the port in `PROXY__PORT`) and
+`~/.ai-proxy/root-ca.pem`. To use a different running proxy or CA file:
+
+```bash
+ai-proxy harness --proxy http://127.0.0.1:9080 --ca-file /path/to/root-ca.pem claude -- --model sonnet
+```
+
+The selected CA file replaces `NODE_EXTRA_CA_CERTS` for Claude. If you need additional
+private CAs, pass a PEM bundle containing those certificates and the proxy's public CA.
+Use `ai-proxy harness --help` for launcher options; use `ai-proxy harness claude -- --help` for Claude's help.
+
 The proxy settings route traffic through ai-proxy, and `NODE_EXTRA_CA_CERTS` lets the Node
-client trust its inspection certificate. The optional project header attributes gain to this
+client trust its inspection certificate. The project header attributes gain to this
 directory; ai-proxy removes that header before forwarding. See the
 [gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project)
 for the verified Codex project-header configuration. Keep each provider's upstream base URL;

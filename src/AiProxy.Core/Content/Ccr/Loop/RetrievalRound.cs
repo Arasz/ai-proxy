@@ -12,13 +12,13 @@ public enum MessageStart
     Pass,
 
     /// <summary>Drop it: a follow-up round continues the client's message.</summary>
-    Drop,
+    Drop
 }
 
 /// <summary>
-/// One upstream response inside a client response. Text, thinking and server blocks pass on as they
-/// arrive under the client's block numbering; <c>tool_use</c> blocks, <c>message_delta</c> and
-/// <c>message_stop</c> are held until the loop decides. The assistant content is rebuilt as received.
+///     One upstream response inside a client response. Text, thinking and server blocks pass on as they
+///     arrive under the client's block numbering; <c>tool_use</c> blocks, <c>message_delta</c> and
+///     <c>message_stop</c> are held until the loop decides. The assistant content is rebuilt as received.
 /// </summary>
 /// <param name="start">Whether the client sees this round's <c>message_start</c>: only the first round's.</param>
 /// <param name="nextIndex">The client block index the first block passed on gets.</param>
@@ -26,13 +26,6 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 {
     private readonly Dictionary<int, Block> _blocks = [];
     private readonly List<Block> _order = [];
-    private int _nextIndex = nextIndex;
-
-    /// <summary>The round of the first upstream response.</summary>
-    public static RetrievalRound First() => new(MessageStart.Pass, 0);
-
-    /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
-    public RetrievalRound Next() => new(MessageStart.Drop, _nextIndex);
 
     /// <summary>The response's message id, from <c>message_start</c>; empty until it arrives.</summary>
     public string MessageId { get; private set; } = "";
@@ -62,7 +55,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     public bool Lossy { get; private set; }
 
     /// <summary>The next client index after the blocks passed on so far.</summary>
-    public int NextIndex => _nextIndex;
+    public int NextIndex { get; private set; } = nextIndex;
 
     /// <summary>The tool calls of this response, in order.</summary>
     public IReadOnlyList<ToolCall> ToolCalls => _order
@@ -73,16 +66,28 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
             block.Content[Fields.Input]?.ToJsonString() ?? "{}"))
         .ToArray();
 
+    /// <summary>The round of the first upstream response.</summary>
+    public static RetrievalRound First()
+    {
+        return new RetrievalRound(MessageStart.Pass, 0);
+    }
+
+    /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
+    public RetrievalRound Next()
+    {
+        return new RetrievalRound(MessageStart.Drop, NextIndex);
+    }
+
     /// <summary>The assistant content as received, for a stateless follow-up.</summary>
-    public JsonArray Content() => new(_order.Select(static block => (JsonNode)block.Content.DeepClone()).ToArray());
+    public JsonArray Content()
+    {
+        return new JsonArray(_order.Select(static block => (JsonNode)block.Content.DeepClone()).ToArray());
+    }
 
     /// <summary>Takes one upstream event and returns what the client gets now; an event it cannot read passes on as it came.</summary>
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
     {
-        if (JsonNode.Parse(sse.Data) is not JsonObject data)
-        {
-            return [sse];
-        }
+        if (JsonNode.Parse(sse.Data) is not JsonObject data) return [sse];
 
         switch (sse.Name)
         {
@@ -113,7 +118,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     public IReadOnlyList<SseEvent> Release()
     {
         var released = new List<SseEvent>();
-        var index = _nextIndex;
+        var index = NextIndex;
         foreach (var block in _order.Where(static block => block.Held && block.Content.TextOf(Fields.Name) != CcrRetrieval.Name))
         {
             var clientIndex = index++;
@@ -133,10 +138,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 
     private IReadOnlyList<SseEvent> Start(SseEvent sse, JsonObject data)
     {
-        if (data.NumberOf(Fields.Index) is not { } index || data[Fields.ContentBlock] is not JsonObject received)
-        {
-            return [sse];
-        }
+        if (data.NumberOf(Fields.Index) is not { } index || data[Fields.ContentBlock] is not JsonObject received) return [sse];
 
         var block = new Block(index, received.DeepClone().AsObject());
         _blocks[index] = block;
@@ -147,29 +149,20 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
             return [];
         }
 
-        block.ClientIndex = _nextIndex++;
+        block.ClientIndex = NextIndex++;
         return [sse.Renumbered(index, block.ClientIndex)];
     }
 
     private IReadOnlyList<SseEvent> Continue(SseEvent sse, JsonObject data)
     {
-        if (data.NumberOf(Fields.Index) is not { } index || !_blocks.TryGetValue(index, out var block))
-        {
-            return [sse];
-        }
+        if (data.NumberOf(Fields.Index) is not { } index || !_blocks.TryGetValue(index, out var block)) return [sse];
 
         if (sse.Name == Events.ContentBlockStop)
-        {
             Close(block);
-        }
         else if (data[Fields.Delta] is JsonObject delta)
-        {
             Fold(block, delta);
-        }
         else
-        {
             Lossy = true;
-        }
 
         if (block.Held)
         {
@@ -198,10 +191,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
                 block.PartialJson.Append(delta.TextOf(Fields.PartialJson));
                 break;
             case Deltas.Citations:
-                if (content[Fields.Citations] is not JsonArray citations)
-                {
-                    content[Fields.Citations] = citations = [];
-                }
+                if (content[Fields.Citations] is not JsonArray citations) content[Fields.Citations] = citations = [];
 
                 citations.Add(delta[Fields.Citation]?.DeepClone());
                 break;
@@ -213,10 +203,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 
     private void Close(Block block)
     {
-        if (block.PartialJson.Length == 0)
-        {
-            return;
-        }
+        if (block.PartialJson.Length == 0) return;
 
         try
         {

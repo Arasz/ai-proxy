@@ -18,17 +18,23 @@ public sealed record CompressionOptions(IReadOnlyDictionary<ContentType, int> Mi
         [ContentType.SourceCode] = 500,
         [ContentType.Prose] = DefaultMinimum,
         [ContentType.DirectoryListing] = int.MaxValue,
-        [ContentType.ShellTranscript] = 200,
+        [ContentType.ShellTranscript] = 200
     });
 
     /// <summary>The options that use one minimum for every kind.</summary>
     /// <param name="minimum">The smallest part that is worth compressing.</param>
-    public static CompressionOptions WithMinimum(int minimum) => new(
-        Default.MinimumLengths.ToDictionary(
-            pair => pair.Key,
-            pair => pair.Key == ContentType.DirectoryListing ? int.MaxValue : minimum));
+    public static CompressionOptions WithMinimum(int minimum)
+    {
+        return new CompressionOptions(
+            Default.MinimumLengths.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Key == ContentType.DirectoryListing ? int.MaxValue : minimum));
+    }
 
     /// <summary>The shortest part of the kind that is worth compressing.</summary>
     /// <param name="type">The kind of part.</param>
-    public int MinimumFor(ContentType type) => MinimumLengths.GetValueOrDefault(type, DefaultMinimum);
+    public int MinimumFor(ContentType type)
+    {
+        return MinimumLengths.GetValueOrDefault(type, DefaultMinimum);
+    }
 }

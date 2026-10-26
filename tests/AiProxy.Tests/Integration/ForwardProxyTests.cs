@@ -1,6 +1,7 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Net;
+using System.Net.Sockets;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,7 +20,7 @@ public sealed class ForwardProxyTests
         const string jsonRpc = "{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\"}";
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/mcp?mode=tools"))
         {
-            Content = new StringContent(jsonRpc),
+            Content = new StringContent(jsonRpc)
         };
         request.Headers.TryAddWithoutValidation("x-mcp-client", "agent");
 
@@ -38,8 +39,8 @@ public sealed class ForwardProxyTests
 
     private sealed class TestProxy : IAsyncDisposable
     {
-        private readonly TitaniumProxyService _service;
         private readonly TemporaryDirectory _directory;
+        private readonly TitaniumProxyService _service;
 
         private TestProxy(TitaniumProxyService service, TemporaryDirectory directory)
         {
@@ -49,27 +50,27 @@ public sealed class ForwardProxyTests
 
         public Uri Address => _service.Address;
 
-        public static async Task<TestProxy> StartAsync()
-        {
-            var portListener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-            portListener.Start();
-            var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
-            portListener.Stop();
-            var directory = new TemporaryDirectory();
-            var service = new TitaniumProxyService(
-                new ProxyRuntimeOptions(IPAddress.Loopback, port, ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
-                new CanonicalProviderHosts(),
-                NullLoggerFactory.Instance);
-            await service.StartAsync(TestContext.Current.CancellationToken);
-            return new TestProxy(service, directory);
-        }
-
         public async ValueTask DisposeAsync()
         {
             await _service.StopAsync(CancellationToken.None);
             await _service.DisposeAsync();
             _directory.Dispose();
+        }
+
+        public static async Task<TestProxy> StartAsync()
+        {
+            var portListener = new TcpListener(IPAddress.Loopback, 0);
+            portListener.Start();
+            var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
+            portListener.Stop();
+            var directory = new TemporaryDirectory();
+            var service = new TitaniumProxyService(
+                new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, directory.Path),
+                new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
+                new CanonicalProviderHosts(),
+                NullLoggerFactory.Instance);
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            return new TestProxy(service, directory);
         }
     }
 }

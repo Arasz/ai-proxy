@@ -1,3 +1,5 @@
+using AiProxy.Core.Gain;
+
 namespace AiProxy.Core.Content.Ccr;
 
 /// <summary>The numbers recoverable compression runs with; every default is an owner-approved ADR 0005 value.</summary>
@@ -27,21 +29,27 @@ public sealed record CcrOptions(
 {
     /// <summary>The owner-approved ADR 0005 values.</summary>
     public static CcrOptions Default { get; } = new(
-        CharactersPerToken: Gain.GainReportBuilder.CharactersPerToken,
-        MinimumTokens: 3_000,
-        BudgetTokens: 1_500,
-        SignalShare: 0.40m,
-        HeadShare: 2m / 3m,
-        OverlayShare: 0.05m,
-        RetrievalTokens: 3_000,
-        MaximumMatches: 50,
-        MatchWindow: 240,
-        MaximumContext: 10,
-        PatternTimeout: TimeSpan.FromMilliseconds(250));
+        GainReportBuilder.CharactersPerToken,
+        3_000,
+        1_500,
+        0.40m,
+        2m / 3m,
+        0.05m,
+        3_000,
+        50,
+        240,
+        10,
+        TimeSpan.FromMilliseconds(250));
 
     /// <summary>The estimated tokens of a text of this many characters, rounded down.</summary>
-    public int TokensOf(int characters) => (int)(characters / CharactersPerToken);
+    public int TokensOf(int characters)
+    {
+        return (int)(characters / CharactersPerToken);
+    }
 
     /// <summary>The most characters that still fit in this many estimated tokens.</summary>
-    public int CharactersOf(int tokens) => (int)(tokens * CharactersPerToken);
+    public int CharactersOf(int tokens)
+    {
+        return (int)(tokens * CharactersPerToken);
+    }
 }

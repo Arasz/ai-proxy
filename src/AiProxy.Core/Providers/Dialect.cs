@@ -7,5 +7,5 @@ public enum Dialect
     Unknown,
     Anthropic,
     OpenAi,
-    Gemini,
+    Gemini
 }

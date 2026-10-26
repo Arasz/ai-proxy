@@ -29,7 +29,7 @@ public static class ResponseUsageReader
     /// <summary>The prefix of the error naming a content encoding the reader does not decode.</summary>
     public const string EncodingPrefix = "encoding:";
 
-    /// <summary>The most bytes a body is decoded to; a body that decodes to more is <see cref="OverCap"/>.</summary>
+    /// <summary>The most bytes a body is decoded to; a body that decodes to more is <see cref="OverCap" />.</summary>
     public const int MaxDecodedBytes = 16 * 1024 * 1024;
 
     private static readonly byte[] DataField = "data:"u8.ToArray();
@@ -82,15 +82,14 @@ public static class ResponseUsageReader
         }
     }
 
-    private static bool IsEventStream(string? contentType) =>
-        contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
+    private static bool IsEventStream(string? contentType)
+    {
+        return contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static UsageReading ReadMessage(ReadOnlyMemory<byte> body)
     {
-        if (body.Span.Trim(" \t\r\n"u8).IsEmpty)
-        {
-            return new UsageReading(null, NoUsage);
-        }
+        if (body.Span.Trim(" \t\r\n"u8).IsEmpty) return new UsageReading(null, NoUsage);
 
         using var document = JsonDocument.Parse(body);
         var usage = Merge(null, document.RootElement.PropertyOrDefault(UsageJson.Usage));
@@ -104,16 +103,10 @@ public static class ResponseUsageReader
         var broken = false;
         foreach (var line in Lines(body))
         {
-            if (!line.Span.StartsWith(DataField))
-            {
-                continue;
-            }
+            if (!line.Span.StartsWith(DataField)) continue;
 
             var data = line[DataField.Length..];
-            if (data.Span.Trim(" "u8).SequenceEqual("[DONE]"u8))
-            {
-                continue;
-            }
+            if (data.Span.Trim(" "u8).SequenceEqual("[DONE]"u8)) continue;
 
             try
             {
@@ -130,7 +123,7 @@ public static class ResponseUsageReader
             (null, true) => new UsageReading(null, Malformed),
             (null, false) => new UsageReading(null, NoUsage),
             (_, true) => new UsageReading(usage, Truncated),
-            _ => new UsageReading(usage, null),
+            _ => new UsageReading(usage, null)
         };
     }
 
@@ -139,20 +132,11 @@ public static class ResponseUsageReader
         using var document = JsonDocument.Parse(data);
         var root = document.RootElement;
         var type = root.PropertyOrDefault(UsageJson.Type);
-        if (type.IsMissing)
-        {
-            return usage;
-        }
+        if (type.IsMissing) return usage;
 
-        if (!type.IsString)
-        {
-            throw new JsonException("An event type must be a string.");
-        }
+        if (!type.IsString) throw new JsonException("An event type must be a string.");
 
-        if (type.ValueEquals(UsageJson.MessageStart))
-        {
-            return Merge(usage, root.PropertyOrDefault(UsageJson.Message).PropertyOrDefault(UsageJson.Usage));
-        }
+        if (type.ValueEquals(UsageJson.MessageStart)) return Merge(usage, root.PropertyOrDefault(UsageJson.Message).PropertyOrDefault(UsageJson.Usage));
 
         return type.ValueEquals(UsageJson.MessageDelta)
             ? Merge(usage, root.PropertyOrDefault(UsageJson.Usage))
@@ -167,32 +151,23 @@ public static class ResponseUsageReader
             var end = body.Span[start..].IndexOf((byte)'\n');
             end = end < 0 ? body.Length : start + end;
             var length = end - start;
-            if (length > 0 && body.Span[end - 1] == (byte)'\r')
-            {
-                length--;
-            }
+            if (length > 0 && body.Span[end - 1] == (byte)'\r') length--;
 
             yield return body.Slice(start, length);
             start = end + 1;
         }
     }
 
-    /// <summary>Takes the Anthropic counts of a usage object; one with none of them leaves <paramref name="current"/> as it was.</summary>
+    /// <summary>Takes the Anthropic counts of a usage object; one with none of them leaves <paramref name="current" /> as it was.</summary>
     private static ResponseUsage? Merge(ResponseUsage? current, JsonElement usage)
     {
-        if (!usage.IsObject)
-        {
-            return current;
-        }
+        if (!usage.IsObject) return current;
 
         var input = usage.Int64Property(UsageJson.InputTokens);
         var output = usage.Int64Property(UsageJson.OutputTokens);
         var cacheCreation = usage.Int64Property(UsageJson.CacheCreationInputTokens);
         var cacheRead = usage.Int64Property(UsageJson.CacheReadInputTokens);
-        if (input is null && output is null && cacheCreation is null && cacheRead is null)
-        {
-            return current;
-        }
+        if (input is null && output is null && cacheCreation is null && cacheRead is null) return current;
 
         return new ResponseUsage(
             input ?? current?.InputTokens,
@@ -205,17 +180,14 @@ public static class ResponseUsageReader
     private static ReadOnlyMemory<byte> DecodeGzip(ReadOnlyMemory<byte> body)
     {
         var decoded = Decode(body, static stream => new GZipStream(stream, CompressionMode.Decompress));
-        if (body.Length < 18 || BinaryPrimitives.ReadUInt32LittleEndian(body.Span[^4..]) != (uint)decoded.Length)
-        {
-            throw new InvalidDataException("The gzip trailer does not match the decoded body.");
-        }
+        if (body.Length < 18 || BinaryPrimitives.ReadUInt32LittleEndian(body.Span[^4..]) != (uint)decoded.Length) throw new InvalidDataException("The gzip trailer does not match the decoded body.");
 
         return decoded;
     }
 
     /// <summary>
-    /// HTTP deflate is meant to be zlib-wrapped, and its Adler-32 trailer shows a body cut short;
-    /// some servers send raw deflate, which carries no trailer, so a raw body cut short is read as far as it goes.
+    ///     HTTP deflate is meant to be zlib-wrapped, and its Adler-32 trailer shows a body cut short;
+    ///     some servers send raw deflate, which carries no trailer, so a raw body cut short is read as far as it goes.
     /// </summary>
     private static ReadOnlyMemory<byte> DecodeDeflate(ReadOnlyMemory<byte> body)
     {
@@ -229,10 +201,7 @@ public static class ResponseUsageReader
             return Decode(body, static stream => new DeflateStream(stream, CompressionMode.Decompress));
         }
 
-        if (body.Length < 6 || BinaryPrimitives.ReadUInt32BigEndian(body.Span[^4..]) != Adler32(decoded.Span))
-        {
-            throw new InvalidDataException("The zlib trailer does not match the decoded body.");
-        }
+        if (body.Length < 6 || BinaryPrimitives.ReadUInt32BigEndian(body.Span[^4..]) != Adler32(decoded.Span)) throw new InvalidDataException("The zlib trailer does not match the decoded body.");
 
         return decoded;
     }
@@ -247,10 +216,7 @@ public static class ResponseUsageReader
             var status = decoder.Decompress(body, output.GetSpan(64 * 1024), out var consumed, out var written);
             output.Advance(written);
             body = body[consumed..];
-            if (output.WrittenCount > MaxDecodedBytes)
-            {
-                throw new OverCapException();
-            }
+            if (output.WrittenCount > MaxDecodedBytes) throw new OverCapException();
 
             switch (status)
             {
@@ -267,18 +233,15 @@ public static class ResponseUsageReader
     private static ReadOnlyMemory<byte> Decode(ReadOnlyMemory<byte> body, Func<Stream, Stream> decoder)
     {
         using var input = MemoryMarshal.TryGetArray(body, out var segment)
-            ? new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false)
-            : new MemoryStream(body.ToArray(), writable: false);
+            ? new MemoryStream(segment.Array!, segment.Offset, segment.Count, false)
+            : new MemoryStream(body.ToArray(), false);
         using var stream = decoder(input);
         var output = new MemoryStream();
         var buffer = new byte[64 * 1024];
         int read;
         while ((read = stream.Read(buffer)) > 0)
         {
-            if (output.Length + read > MaxDecodedBytes)
-            {
-                throw new OverCapException();
-            }
+            if (output.Length + read > MaxDecodedBytes) throw new OverCapException();
 
             output.Write(buffer, 0, read);
         }
@@ -296,7 +259,7 @@ public static class ResponseUsageReader
             b = (b + a) % modulus;
         }
 
-        return b << 16 | a;
+        return (b << 16) | a;
     }
 
     private sealed class OverCapException : Exception;

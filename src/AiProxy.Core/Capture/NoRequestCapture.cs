@@ -7,8 +7,14 @@ public sealed class NoRequestCapture : IRequestCaptureStore
     public bool Keeps => false;
 
     /// <inheritdoc />
-    public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken)
+    {
+        return ValueTask.CompletedTask;
+    }
 
     /// <inheritdoc />
-    public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
+    {
+        return ValueTask.CompletedTask;
+    }
 }

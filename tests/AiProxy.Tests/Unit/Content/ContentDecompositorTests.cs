@@ -3,20 +3,20 @@ using AiProxy.Core.Content;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The decomposer, stated as behaviour: a mixed payload is split by structure, and the
-/// template keeps everything that is not a part.
+///     The decomposer, stated as behaviour: a mixed payload is split by structure, and the
+///     template keeps everything that is not a part.
 /// </summary>
 public sealed class ContentDecompositorTests
 {
     private const string Mixed = """
-        ProviderDetector.cs
-        UpstreamForwarder.cs
+                                 ProviderDetector.cs
+                                 UpstreamForwarder.cs
 
-        src/foo.cs:12: matched line
-        src/bar.cs:44: another line
+                                 src/foo.cs:12: matched line
+                                 src/bar.cs:44: another line
 
-        { "a": 1, "b": [1, 2] }
-        """;
+                                 { "a": 1, "b": [1, 2] }
+                                 """;
 
     private static readonly ContentDecompositor Decompositor = new();
 

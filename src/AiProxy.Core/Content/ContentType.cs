@@ -31,5 +31,5 @@ public enum ContentType
     DirectoryListing,
 
     /// <summary>The output of a shell command.</summary>
-    ShellTranscript,
+    ShellTranscript
 }

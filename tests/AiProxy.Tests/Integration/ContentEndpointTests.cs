@@ -1,6 +1,7 @@
 using System.Net;
 using AiProxy.Core.Content;
 using AiProxy.Storage;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Tests.Integration;
@@ -9,18 +10,26 @@ public sealed class ContentEndpointTests : IAsyncDisposable
 {
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
+    public ValueTask DisposeAsync()
+    {
+        SqliteConnection.ClearAllPools();
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
+
+        return ValueTask.CompletedTask;
+    }
+
     [Fact]
     public async Task A_stored_original_is_served_and_an_unknown_id_returns_not_found()
     {
         using (var connection = ContentSchema.Open(_databasePath))
         {
-            ContentSchema.Ensure(connection);
+            connection.Ensure();
         }
 
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["Proxy:Compression:Enabled"] = "true",
-            ["Proxy:Compression:Database"] = _databasePath,
+            ["Proxy:Compression:Database"] = _databasePath
         });
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
         var store = proxy.Services.GetRequiredService<IContentStore>();
@@ -35,16 +44,5 @@ public sealed class ContentEndpointTests : IAsyncDisposable
         Assert.Equal("original body", original);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.Equal("application/problem+json", missing.Content.Headers.ContentType?.MediaType);
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
-        {
-            File.Delete(file);
-        }
-
-        return ValueTask.CompletedTask;
     }
 }

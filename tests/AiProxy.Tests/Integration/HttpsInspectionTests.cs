@@ -1,11 +1,11 @@
-using AiProxy.Core.Capture;
-using AiProxy.Ccr;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using AiProxy.Ccr;
+using AiProxy.Core.Capture;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,7 +25,7 @@ public sealed class HttpsInspectionTests
         await using var upstream = await FakeUpstream.StartAsync(upstreamCertificate);
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         await using var proxy = new TitaniumProxyService(
-            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
+            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), false, false, directory.Path),
             new ProviderRequestInspector(new MarkerCompressionPipeline(), hosts, new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             hosts,
             NullLoggerFactory.Instance);
@@ -41,7 +41,7 @@ public sealed class HttpsInspectionTests
         {
             Proxy = new WebProxy(proxy.Address),
             UseProxy = true,
-            ServerCertificateCustomValidationCallback = (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate, errors),
+            ServerCertificateCustomValidationCallback = (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate, errors)
         };
         using var client = new HttpClient(handler);
 
@@ -58,10 +58,7 @@ public sealed class HttpsInspectionTests
 
     private static bool ChainsTo(X509Certificate2 root, X509Certificate2? certificate, SslPolicyErrors errors)
     {
-        if (certificate is null || (errors & ~SslPolicyErrors.RemoteCertificateChainErrors) != SslPolicyErrors.None)
-        {
-            return false;
-        }
+        if (certificate is null || (errors & ~SslPolicyErrors.RemoteCertificateChainErrors) != SslPolicyErrors.None) return false;
 
         using var chain = new X509Chain();
         chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
@@ -74,7 +71,7 @@ public sealed class HttpsInspectionTests
     {
         using var withKey = X509CertificateLoader.LoadPkcs12FromFile(
             Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName),
-            password: null);
+            null);
         return X509CertificateLoader.LoadCertificate(withKey.RawData);
     }
 
@@ -86,7 +83,7 @@ public sealed class HttpsInspectionTests
         names.AddIpAddress(IPAddress.Loopback);
         request.CertificateExtensions.Add(names.Build());
         using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
-        return X509CertificateLoader.LoadPkcs12(created.Export(X509ContentType.Pfx), password: null);
+        return X509CertificateLoader.LoadPkcs12(created.Export(X509ContentType.Pfx), null);
     }
 
     private static int FreePort()

@@ -7,7 +7,10 @@ public sealed class PassThroughCompressionHandler : ICompressionHandler
     public const string HandlerPath = "unknown.pass-through";
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.Unknown;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.Unknown;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

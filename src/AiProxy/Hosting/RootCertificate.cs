@@ -15,18 +15,27 @@ internal interface IRootCertificate
     void Trust();
 }
 
-/// <summary>Titanium's certificate manager, trusted only through <see cref="Trust"/>, so its own later checks never trust again.</summary>
+/// <summary>Titanium's certificate manager, trusted only through <see cref="Trust" />, so its own later checks never trust again.</summary>
 /// <param name="certificates">The proxy server's certificate manager.</param>
 internal sealed class TitaniumRootCertificate(CertificateManager certificates) : IRootCertificate
 {
     /// <inheritdoc />
-    public void Load() => certificates.EnsureRootCertificate();
+    public void Load()
+    {
+        certificates.EnsureRootCertificate();
+    }
 
     /// <inheritdoc />
-    public bool IsTrusted() => certificates.IsRootCertificateUserTrusted();
+    public bool IsTrusted()
+    {
+        return certificates.IsRootCertificateUserTrusted();
+    }
 
     /// <inheritdoc />
-    public void Trust() => certificates.TrustRootCertificate();
+    public void Trust()
+    {
+        certificates.TrustRootCertificate();
+    }
 }
 
 /// <summary>Trusting the root certificate once per start.</summary>
@@ -38,17 +47,12 @@ internal static class RootCertificateExtensions
         public void EnsureTrusted()
         {
             root.Load();
-            if (root.IsTrusted())
-            {
-                return;
-            }
+            if (root.IsTrusted()) return;
 
             root.Trust();
             if (!root.IsTrusted())
-            {
                 throw new InvalidOperationException(
                     "The ai-proxy HTTPS inspection certificate is not trusted. Trust the ai-proxy root certificate for this user, then start ai-proxy again.");
-            }
         }
     }
 }

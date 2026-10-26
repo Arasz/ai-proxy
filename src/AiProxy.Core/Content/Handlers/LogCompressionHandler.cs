@@ -17,7 +17,10 @@ public sealed class LogCompressionHandler : ICompressionHandler
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type) => type == ContentType.Log;
+    public bool CanHandle(ContentType type)
+    {
+        return type == ContentType.Log;
+    }
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
@@ -33,16 +36,10 @@ public sealed class LogCompressionHandler : ICompressionHandler
 
     private static bool CarriesSignal(string line)
     {
-        if (SignalPattern.IsMatch(line))
-        {
-            return true;
-        }
+        if (SignalPattern.IsMatch(line)) return true;
 
         var match = LevelPattern.Match(line);
-        if (!match.Success)
-        {
-            return false;
-        }
+        if (!match.Success) return false;
 
         return match.Groups[2].Value is "ERROR" or "FATAL" or "WARN";
     }

@@ -12,7 +12,7 @@ public interface IOriginalStore
     /// <summary>Returns the message a <c>continue</c> naming this message must follow, or null when the thread was not created with the tool.</summary>
     ValueTask<string?> FindThreadAsync(string messageId, CancellationToken cancellationToken);
 
-    /// <summary>Records that a client which saw <paramref name="messageId"/> continues from <paramref name="continueFrom"/>.</summary>
+    /// <summary>Records that a client which saw <paramref name="messageId" /> continues from <paramref name="continueFrom" />.</summary>
     ValueTask LinkThreadAsync(string messageId, string continueFrom, CancellationToken cancellationToken);
 }
 

@@ -3,8 +3,8 @@ using AiProxy.Core.Content;
 namespace AiProxy.Tests.Unit.Content;
 
 /// <summary>
-/// The overlay that re-attaches what a reduction dropped, stated as behaviour: which facts
-/// must survive, and how much the overlay is allowed to cost.
+///     The overlay that re-attaches what a reduction dropped, stated as behaviour: which facts
+///     must survive, and how much the overlay is allowed to cost.
 /// </summary>
 public sealed class MustKeepOverlayTests
 {
