@@ -98,11 +98,13 @@ public static partial class MustKeepOverlay
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var pattern in DecisionPatterns)
-        foreach (Match match in pattern.Matches(text))
         {
-            if (seen.Add(match.Value))
+            foreach (Match match in pattern.Matches(text))
             {
-                decisions.Add(match.Value);
+                if (seen.Add(match.Value))
+                {
+                    decisions.Add(match.Value);
+                }
             }
         }
 
