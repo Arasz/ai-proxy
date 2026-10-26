@@ -26,8 +26,6 @@ public sealed class ClientCommandTests
     private static async Task<ProcessResult> RunAsync(params string[] arguments)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
-        start.Environment["NO_COLOR"] = "1";
-        start.Environment["TERM"] = "dumb";
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
         foreach (var argument in arguments)
         {
@@ -40,8 +38,11 @@ public sealed class ClientCommandTests
         var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
         var error = process.StandardError.ReadToEndAsync(timeout.Token);
         await process.WaitForExitAsync(timeout.Token);
-        return new ProcessResult(process.ExitCode, await output, await error);
+        return new ProcessResult(process.ExitCode, Plain(await output), Plain(await error));
     }
+
+    /// <summary>The text without ANSI styling, which a terminal or CI log detection may add.</summary>
+    private static string Plain(string text) => System.Text.RegularExpressions.Regex.Replace(text, "\u001b\\[[0-9;]*m", string.Empty);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }
