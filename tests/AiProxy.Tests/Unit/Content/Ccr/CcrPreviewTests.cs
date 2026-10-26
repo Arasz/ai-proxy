@@ -322,7 +322,7 @@ public sealed partial class CcrPreviewTests
             "plain" => Log(400),
             "signals" => Log(800, index => index % 3 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
             "sparse-signals" => Log(2000, index => index % 20 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
-            "wide" => Log(300, index => $"{index}: {new string((char)('a' + (index % 26)), 40 + (index * 7 % 500))}"),
+            "wide" => Log(300, index => $"{index}: {new string((char)('a' + index % 26), 40 + index * 7 % 500)}"),
             "identifiers" => Log(800, index => $"call SomeServiceName{index}.HandleRequest{index} /usr/lib/x{index}.so 0x{index:x4}"),
             "crlf" => Log(400, index => $"step {index}: compiling module m{index}   \r"),
             "one-line" => new string('q', 20_000),

@@ -70,7 +70,10 @@ internal sealed class ProxyHost : IAsyncDisposable
 
         // Compression is on by default for a person; a test turns it on and names its own database.
         builder.Configuration["Proxy:Compression:Enabled"] = "false";
-        foreach (var (key, value) in configuration) builder.Configuration[key] = value;
+        foreach (var (key, value) in configuration)
+        {
+            builder.Configuration[key] = value;
+        }
 
         var directory = new TemporaryDirectory();
         var app = ProxyApplication.Create(

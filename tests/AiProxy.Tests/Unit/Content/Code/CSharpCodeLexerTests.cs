@@ -110,7 +110,10 @@ public sealed class CSharpCodeLexerTests
         Assert.Equal(3, identifiers["third"].Line);
         Assert.Equal(4, identifiers["fourth"].Line);
         Assert.Equal(5, identifiers["fifth"].Line);
-        foreach (var token in identifiers.Values) Assert.Equal(token.Text, source.Substring(token.Offset, token.Text.Length));
+        foreach (var token in identifiers.Values)
+        {
+            Assert.Equal(token.Text, source.Substring(token.Offset, token.Text.Length));
+        }
     }
 
     [Fact]

@@ -112,7 +112,11 @@ public sealed class GainView
     private static Table Table(string[] columns, IEnumerable<string[]> rows)
     {
         var table = new Table().Border(TableBorder.Rounded);
-        foreach (var column in columns) table.AddColumn(new TableColumn(new Text(column)));
+        foreach (var column in columns)
+        {
+            table.AddColumn(new TableColumn(new Text(column)));
+        }
+
         var any = false;
         foreach (var row in rows)
         {

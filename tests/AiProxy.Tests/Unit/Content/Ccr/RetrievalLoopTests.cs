@@ -170,7 +170,10 @@ public sealed class RetrievalLoopTests
     private static async Task<List<SseEvent>> RunRound(RetrievalLoop loop, string wire)
     {
         var written = new List<SseEvent>();
-        await foreach (var sse in new SseReader().ReadAsync(new MemoryStream(Encoding.UTF8.GetBytes(wire)), CancellationToken.None)) written.AddRange(loop.Round.Accept(sse));
+        await foreach (var sse in new SseReader().ReadAsync(new MemoryStream(Encoding.UTF8.GetBytes(wire)), CancellationToken.None))
+        {
+            written.AddRange(loop.Round.Accept(sse));
+        }
 
         return written;
     }

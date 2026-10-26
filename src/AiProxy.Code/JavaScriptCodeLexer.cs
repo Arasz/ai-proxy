@@ -85,7 +85,11 @@ public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLan
     private static bool IsJsxName(Node node)
     {
         var parent = node.Parent;
-        while (parent is { Type: "member_expression" or "nested_identifier" or "jsx_namespace_name" }) parent = parent.Parent;
+        while (parent is { Type: "member_expression" or "nested_identifier" or "jsx_namespace_name" })
+        {
+            parent = parent.Parent;
+        }
+
         return parent is { Type: "jsx_opening_element" or "jsx_closing_element" or "jsx_self_closing_element" or "jsx_attribute" };
     }
 

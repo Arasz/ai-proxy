@@ -65,10 +65,12 @@ public sealed class RequestCaptureTests : IDisposable
     {
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _contentDatabasePath, $"{_contentDatabasePath}-wal", $"{_contentDatabasePath}-shm" })
+        {
             if (File.Exists(file))
             {
                 File.Delete(file);
             }
+        }
     }
 
     [Fact]
@@ -131,7 +133,10 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Single(await ReadCapturesAsync(proxy));
         var stored = ReadCaptureFiles(proxy);
         Assert.True(Contains(stored, [.. "capture-body-marker"u8]), "the scan must see the body, or it proves nothing");
-        foreach (var secret in secrets) Assert.False(Contains(stored, Encoding.UTF8.GetBytes(secret)), $"{secret} was found in the capture files");
+        foreach (var secret in secrets)
+        {
+            Assert.False(Contains(stored, Encoding.UTF8.GetBytes(secret)), $"{secret} was found in the capture files");
+        }
     }
 
     [Fact]
@@ -272,7 +277,10 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal((11L, 22L, 33L, 44L), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
         Assert.Null(row.UsageError);
         var stages = Stages(row);
-        foreach (var stage in new[] { "body-read", "capture-write", "inspector", "usage-read", "titanium.ttfb", "titanium.total" }) Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
+        foreach (var stage in new[] { "body-read", "capture-write", "inspector", "usage-read", "titanium.ttfb", "titanium.total" })
+        {
+            Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
+        }
 
         Assert.DoesNotContain("compression", stages.Keys);
     }
@@ -331,7 +339,10 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal(Assert.Single(upstream.Requests).BodyBytes.Length, row.ForwardedBytes);
         Assert.True(row.ForwardedBytes < row.RequestBytes, "the body was not compressed");
         var stages = Stages(row);
-        foreach (var stage in new[] { "compression", "compression.find", "compression.reduce.Log", "compression.store", "set-body" }) Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
+        foreach (var stage in new[] { "compression", "compression.find", "compression.reduce.Log", "compression.store", "set-body" })
+        {
+            Assert.True(stages.ContainsKey(stage), $"no {stage} stage in {row.Stages}");
+        }
 
         Assert.True(response.Headers.Contains("x-ai-proxy-content-id"), "the content-id header was lost");
         Assert.Contains("answer-marker", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
@@ -490,7 +501,10 @@ public sealed class RequestCaptureTests : IDisposable
     public async Task A_plain_event_stream_far_over_the_cap_still_gives_its_whole_usage()
     {
         var events = new StringBuilder(StreamStart);
-        while (events.Length < 5 * 1024 * 1024) events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
+        while (events.Length < 5 * 1024 * 1024)
+        {
+            events.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"filler text\"}}\n\n");
+        }
 
         var stream = Encoding.UTF8.GetBytes(events.Append(StreamEnd).ToString());
         await using var upstream = await FakeUpstream.StartAsync();

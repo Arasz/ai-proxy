@@ -29,10 +29,12 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         }
 
         foreach (var property in root.EnumerateObject())
+        {
             if (!NameTranscodes(property) || (property.Value.IsString && property.Value.ReadString() is null))
             {
                 return true;
             }
+        }
 
         return false;
     }

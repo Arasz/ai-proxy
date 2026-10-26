@@ -13,7 +13,10 @@ public sealed class ContentEndpointTests : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
+        {
+            File.Delete(file);
+        }
 
         return ValueTask.CompletedTask;
     }

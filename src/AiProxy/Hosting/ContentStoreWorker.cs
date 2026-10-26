@@ -59,6 +59,7 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
         var written = 0;
 
         foreach (var job in jobs)
+        {
             try
             {
                 await writer.PersistAsync(job.Record, cancellationToken).ConfigureAwait(false);
@@ -70,6 +71,7 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
                 _lastDataVersion = -1;
                 Log.JobFailed(logger, job.JobId, exception);
             }
+        }
 
         if (written > 0)
         {

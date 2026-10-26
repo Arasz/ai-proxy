@@ -23,7 +23,10 @@ public sealed class ClientsAgainstProxyTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
+        {
+            File.Delete(file);
+        }
     }
 
     [Fact]
@@ -126,7 +129,10 @@ public sealed class ClientsAgainstProxyTests : IDisposable
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

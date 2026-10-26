@@ -27,8 +27,10 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             await InsertAsync(connection, new GainEventInput(Kinds.Request, entry.Id, entry.At, entry.Project, entry.Provider,
                 entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(entry)), transaction, cancellationToken);
             foreach (var failure in failures)
+            {
                 await InsertAsync(connection, new GainEventInput(Kinds.Failure, Guid.CreateVersion7().ToString("N"), failure.At, failure.Project,
                     entry.Provider, entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(failure)), transaction, cancellationToken);
+            }
 
             await transaction.CommitAsync(cancellationToken);
         }, WritePath.Request, cancellationToken);

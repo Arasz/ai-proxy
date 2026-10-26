@@ -30,10 +30,12 @@ public sealed class ContentStoreTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
+        {
             if (File.Exists(file))
             {
                 File.Delete(file);
             }
+        }
     }
 
     private static ContentRecord Record()
@@ -193,6 +195,7 @@ public sealed class ContentStoreTests : IDisposable
         var failures = new List<Exception>();
 
         foreach (var write in work)
+        {
             try
             {
                 await write;
@@ -201,6 +204,7 @@ public sealed class ContentStoreTests : IDisposable
             {
                 failures.Add(exception);
             }
+        }
 
         Assert.All(failures, failure =>
         {

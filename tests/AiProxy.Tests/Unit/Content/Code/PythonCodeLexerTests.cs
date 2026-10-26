@@ -87,7 +87,7 @@ public sealed class PythonCodeLexerTests
         const string source =
             $"{Padding}from __future__ import annotations\nimport os, sys\nfrom a.b import (\n    c,\n    d,\n)\nfrom . import e  # why\nimport g; h = 1\ntry:\n    import json\nexcept ImportError:\n    json = None\nx = os\n";
 
-        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(true), Hint);
+        var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(), Hint);
 
         Assert.True(result.Changed);
         Assert.Equal(

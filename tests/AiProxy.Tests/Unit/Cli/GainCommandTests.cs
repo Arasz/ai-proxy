@@ -81,7 +81,10 @@ public sealed class GainCommandTests
         foreach (var part in new[]
                  {
                      "project=/p a", "from=2026-10-01T02:00:00.0000000+02:00", "to=2026-11-01T00:00:00.0000000+00:00", "provider=anthropic", "method=POST", "rule=rule", "layer=tool", "pipeline=content", "historyLimit=7"
-                 }) Assert.Contains(part, query);
+                 })
+        {
+            Assert.Contains(part, query);
+        }
     }
 
     [Theory]

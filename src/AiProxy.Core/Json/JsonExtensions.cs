@@ -80,12 +80,16 @@ internal static class JsonExtensions
             if (element.IsObject)
             {
                 foreach (var property in element.EnumerateObject())
+                {
                     yield return property.Value;
+                }
             }
             else if (element.IsArray)
             {
                 foreach (var item in element.EnumerateArray())
+                {
                     yield return item;
+                }
             }
         }
 

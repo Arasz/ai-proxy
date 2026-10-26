@@ -44,7 +44,10 @@ internal sealed class ToolCallFiles
             Note(element);
         }
 
-        foreach (var child in element.Children()) Visit(child);
+        foreach (var child in element.Children())
+        {
+            Visit(child);
+        }
     }
 
     private void Note(JsonElement element)
@@ -134,6 +137,7 @@ internal sealed class ToolCallFiles
         var paths = 0;
         var allowLarge = false;
         foreach (var property in input.EnumerateObject())
+        {
             if (PathKeys.Contains(property.Name) && property.Value.IsString)
             {
                 paths++;
@@ -147,6 +151,7 @@ internal sealed class ToolCallFiles
             {
                 return null;
             }
+        }
 
         return paths == 1 && !string.IsNullOrWhiteSpace(path) ? new FileRead(path, allowLarge) : null;
     }

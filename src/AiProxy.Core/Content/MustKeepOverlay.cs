@@ -99,16 +99,20 @@ public static partial class MustKeepOverlay
 
         foreach (var pattern in DecisionPatterns)
         foreach (Match match in pattern.Matches(text))
+        {
             if (seen.Add(match.Value))
             {
                 decisions.Add(match.Value);
             }
+        }
 
         foreach (Match match in IdentifierPattern.Matches(text))
+        {
             if (seen.Add(match.Value))
             {
                 others.Add(match.Value);
             }
+        }
 
         return new OverlayTokens(decisions, others);
     }
@@ -118,7 +122,10 @@ public static partial class MustKeepOverlay
         var tokens = Tokens(text);
         var set = new HashSet<string>(tokens.Decisions, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var token in tokens.Others) set.Add(token);
+        foreach (var token in tokens.Others)
+        {
+            set.Add(token);
+        }
 
         return set;
     }

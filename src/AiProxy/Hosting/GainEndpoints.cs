@@ -122,10 +122,12 @@ public static partial class GainEndpoints
         }
 
         foreach (var value in new[] { query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline })
+        {
             if (value is not null && (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl)))
             {
                 return "Filters must be nonblank text without control characters, at most 4096 characters.";
             }
+        }
 
         return null;
     }

@@ -96,7 +96,10 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            foreach (var stage in stages) writer.WriteNumber(stage.Name, (long)stage.Elapsed.TotalMicroseconds);
+            foreach (var stage in stages)
+            {
+                writer.WriteNumber(stage.Name, (long)stage.Elapsed.TotalMicroseconds);
+            }
 
             writer.WriteEndObject();
         }

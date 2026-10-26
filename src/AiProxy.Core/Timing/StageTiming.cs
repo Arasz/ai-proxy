@@ -25,7 +25,10 @@ public sealed class StageTimings
     /// <summary>Adds every stage of <paramref name="stages" />, each name prefixed with <paramref name="prefix" />.</summary>
     public void Add(string prefix, IEnumerable<StageTiming> stages)
     {
-        foreach (var stage in stages) Add($"{prefix}{stage.Name}", stage.Elapsed);
+        foreach (var stage in stages)
+        {
+            Add($"{prefix}{stage.Name}", stage.Elapsed);
+        }
     }
 
     /// <summary>The stages so far, in the order they first ran.</summary>

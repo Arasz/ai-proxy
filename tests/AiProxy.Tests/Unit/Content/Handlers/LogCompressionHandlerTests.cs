@@ -188,7 +188,10 @@ public sealed class LogCompressionHandlerTests
     {
         var result = await Handler.HandleAsync(Part(Log), CancellationToken.None);
 
-        foreach (var line in Lines(result.Text)) Assert.Contains(Log.Split('\n'), input => OrderedSubsequence.Holds(line, input) && line.Split(' ').All(input.Split(' ').Contains));
+        foreach (var line in Lines(result.Text))
+        {
+            Assert.Contains(Log.Split('\n'), input => OrderedSubsequence.Holds(line, input) && line.Split(' ').All(input.Split(' ').Contains));
+        }
     }
 
     [Fact]

@@ -72,7 +72,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
             rendered += newline;
         }
 
-        foreach (var entry in map) rendered += $"{entry.Key}:{entry.Value}{newline}";
+        foreach (var entry in map)
+        {
+            rendered += $"{entry.Key}:{entry.Value}{newline}";
+        }
+
         rendered += retrievalHint;
         return rendered.Length < text.Length
             ? new CodeReductionResult(rendered, true, true, new ReadOnlyDictionary<string, string>(map))
@@ -154,7 +158,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
             }
 
             var end = index + 1;
-            while (end < code.Length && code[end].Text != ";") end++;
+            while (end < code.Length && code[end].Text != ";")
+            {
+                end++;
+            }
+
             if (end == code.Length || !IsImport(code.AsSpan(index + 1, end - index - 1)))
             {
                 continue;
@@ -192,10 +200,12 @@ public sealed class CodeReducer(ICodeLexer lexer)
         }
 
         for (var index = 0; index < tokens.Length; index++)
+        {
             if (index % 2 == 0 ? tokens[index].Kind != CodeTokenKind.Identifier : tokens[index].Text is not ("." or "::"))
             {
                 return false;
             }
+        }
 
         return true;
     }
@@ -208,9 +218,17 @@ public sealed class CodeReducer(ICodeLexer lexer)
         while (start < text.Length)
         {
             var index = start;
-            while (index < text.Length && text[index] == ' ') index++;
+            while (index < text.Length && text[index] == ' ')
+            {
+                index++;
+            }
+
             var digits = index;
-            while (index < text.Length && char.IsAsciiDigit(text[index])) index++;
+            while (index < text.Length && char.IsAsciiDigit(text[index]))
+            {
+                index++;
+            }
+
             if (index == digits || index == text.Length || text[index] != '\t')
             {
                 return new NumberedText(text, []);
@@ -218,7 +236,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
 
             prefixes.Add(text[start..++index]);
             var end = index;
-            while (end < text.Length && text[end] is not ('\r' or '\n')) end++;
+            while (end < text.Length && text[end] is not ('\r' or '\n'))
+            {
+                end++;
+            }
+
             if (end < text.Length)
             {
                 end += text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1;
@@ -239,10 +261,12 @@ public sealed class CodeReducer(ICodeLexer lexer)
     private static void Blank(char[] text, int start, int length)
     {
         for (var index = start; index < start + length; index++)
+        {
             if (text[index] is not ('\r' or '\n'))
             {
                 text[index] = ' ';
             }
+        }
     }
 
     private static string Render(char[] text, bool[] literals, IReadOnlyList<string> prefixes, IReadOnlyDictionary<int, IdentifierRename> replacements)
@@ -253,7 +277,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
         while (start < text.Length)
         {
             var end = start;
-            while (end < text.Length && text[end] is not ('\r' or '\n')) end++;
+            while (end < text.Length && text[end] is not ('\r' or '\n'))
+            {
+                end++;
+            }
+
             var next = end;
             if (next < text.Length)
             {
@@ -261,7 +289,11 @@ public sealed class CodeReducer(ICodeLexer lexer)
             }
 
             var trimmed = end;
-            while (trimmed > start && text[trimmed - 1] is ' ' or '\t' && !literals[trimmed - 1]) trimmed--;
+            while (trimmed > start && text[trimmed - 1] is ' ' or '\t' && !literals[trimmed - 1])
+            {
+                trimmed--;
+            }
+
             if (trimmed > start || literals.AsSpan(start, next - start).Contains(true))
             {
                 if (prefixes.Count > 0)
@@ -270,6 +302,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
                 }
 
                 for (var index = start; index < trimmed; index++)
+                {
                     if (replacements.TryGetValue(index, out var replacement))
                     {
                         output.Append(replacement.Text);
@@ -279,6 +312,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
                     {
                         output.Append(text[index]);
                     }
+                }
 
                 output.Append(text, end, next - end);
             }

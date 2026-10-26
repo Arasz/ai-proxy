@@ -133,7 +133,10 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
             _hidden.Append(_lines[0], _cut.Length, _lines[0].Length - _cut.Length).Append('\n');
         }
 
-        for (var index = 0; index < _lines.Length;) index = _shown[index] ? AddShownLine(index) : AddHiddenRun(index);
+        for (var index = 0; index < _lines.Length;)
+        {
+            index = _shown[index] ? AddShownLine(index) : AddHiddenRun(index);
+        }
     }
 
     private int AddShownLine(int index)

@@ -183,7 +183,11 @@ public sealed class GainStoreTests
         Assert.Equal(DateTimeOffset.Parse("2026-10-26T00:00:00Z"), Assert.Single(report.Weekly).Start);
         Assert.Equal(DateTimeOffset.Parse("2026-10-01T00:00:00Z"), Assert.Single(report.Monthly).Start);
         Assert.Equal("a", Assert.Single(report.History).Id);
-        foreach (var dimension in report.Attributions.GroupBy(static row => row.Dimension)) Assert.Equal(report.Summary.EstimatedSavedTokens, dimension.Sum(static row => row.Totals.EstimatedSavedTokens));
+        foreach (var dimension in report.Attributions.GroupBy(static row => row.Dimension))
+        {
+            Assert.Equal(report.Summary.EstimatedSavedTokens, dimension.Sum(static row => row.Totals.EstimatedSavedTokens));
+        }
+
         Assert.Equal("json,log", Assert.Single(report.Attributions, static row => row.Dimension == "rule").Name);
         var injected = await store.QueryAsync(new GainQuery("' OR 1=1 --"), TestContext.Current.CancellationToken);
         Assert.Equal(0, injected.Summary.Requests);

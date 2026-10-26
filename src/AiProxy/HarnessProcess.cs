@@ -57,9 +57,16 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
             }
 
             var start = new ProcessStartInfo(settings.Executable) { UseShellExecute = false };
-            foreach (var argument in context.Remaining.Raw) start.ArgumentList.Add(argument);
+            foreach (var argument in context.Remaining.Raw)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
             foreach (var key in new[] { Strings.EnvironmentVariables.HttpProxy, Strings.EnvironmentVariables.HttpsProxy, Strings.EnvironmentVariables.LowerHttpProxy, Strings.EnvironmentVariables.LowerHttpsProxy })
+            {
                 start.Environment[key] = endpoint.GetLeftPart(UriPartial.Authority);
+            }
+
             start.Environment.TryGetValue(Strings.EnvironmentVariables.NoProxy, out var upperBypass);
             start.Environment.TryGetValue(Strings.EnvironmentVariables.LowerNoProxy, out var lowerBypass);
             start.Environment.TryGetValue(Strings.EnvironmentVariables.AnthropicCustomHeaders, out var customHeaders);

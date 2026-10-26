@@ -33,7 +33,10 @@ public sealed class MarkdownCompressionHandler : ICompressionHandler
         // in a fence is left alone rather than half removed.
         var builder = new StringBuilder(part.Text.Length);
 
-        foreach (var segment in LiteralBlocks.MarkdownFences(part.Text)) builder.Append(segment.IsLiteral ? segment.Text : CommentPattern.Replace(segment.Text, ""));
+        foreach (var segment in LiteralBlocks.MarkdownFences(part.Text))
+        {
+            builder.Append(segment.IsLiteral ? segment.Text : CommentPattern.Replace(segment.Text, ""));
+        }
 
         var reduced = BlankRunPattern.Replace(builder.ToString(), "\n\n").Trim();
 

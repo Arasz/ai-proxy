@@ -117,14 +117,20 @@ public sealed class ResponseBufferTests
 
     private static void Append(ResponseBuffer buffer, byte[] bytes, int chunk)
     {
-        for (var offset = 0; offset < bytes.Length; offset += chunk) buffer.Append(bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)));
+        for (var offset = 0; offset < bytes.Length; offset += chunk)
+        {
+            buffer.Append(bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)));
+        }
     }
 
     private static string Stream(int events)
     {
         var text = new StringBuilder();
         text.Append("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":100,\"output_tokens\":1,\"cache_creation_input_tokens\":200,\"cache_read_input_tokens\":300}}}\n\n");
-        for (var index = 0; index < events; index++) text.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"word ").Append(index).Append("\"}}\n\n");
+        for (var index = 0; index < events; index++)
+        {
+            text.Append("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"word ").Append(index).Append("\"}}\n\n");
+        }
 
         text.Append("event: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":57,\"cache_read_input_tokens\":301}}\n\n");
         text.Append("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");

@@ -45,6 +45,7 @@ public sealed class SystemProxyMarker : IDisposable
         var path = Path.Combine(dataDirectory, FileName);
         var deadline = DateTime.UtcNow + wait;
         while (true)
+        {
             try
             {
                 var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
@@ -61,6 +62,7 @@ public sealed class SystemProxyMarker : IDisposable
 
                 Thread.Sleep(50);
             }
+        }
     }
 
     /// <summary>Replaces the file content with <paramref name="endPoint" /> as <c>host:port</c>.</summary>

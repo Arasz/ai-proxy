@@ -62,14 +62,19 @@ public sealed class ToolOutputRegionFinder
 
             case JsonValueKind.Object:
                 foreach (var property in element.EnumerateObject())
+                {
                     counter = IsToolOutputProperty(element, property)
                         ? WalkToolOutput(property.Value, counter, indexes, files, files.ReadFor(element))
                         : Walk(property.Value, counter, indexes, files);
+                }
 
                 return counter;
 
             case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray()) counter = Walk(item, counter, indexes, files);
+                foreach (var item in element.EnumerateArray())
+                {
+                    counter = Walk(item, counter, indexes, files);
+                }
 
                 return counter;
 
@@ -94,10 +99,12 @@ public sealed class ToolOutputRegionFinder
         }
 
         for (var index = counter; index < next; index++)
+        {
             if (indexes.ContainsKey(index))
             {
                 indexes[index] = null;
             }
+        }
 
         return next;
     }
@@ -115,12 +122,18 @@ public sealed class ToolOutputRegionFinder
                 return Record(counter, indexes, path);
 
             case JsonValueKind.Array:
-                foreach (var item in value.EnumerateArray()) counter = WalkContentBlock(item, counter, indexes, files, path);
+                foreach (var item in value.EnumerateArray())
+                {
+                    counter = WalkContentBlock(item, counter, indexes, files, path);
+                }
 
                 return counter;
 
             case JsonValueKind.Object:
-                foreach (var property in value.EnumerateObject()) counter = WalkResultProperty(property, counter, indexes, files, path);
+                foreach (var property in value.EnumerateObject())
+                {
+                    counter = WalkResultProperty(property, counter, indexes, files, path);
+                }
 
                 return counter;
 
@@ -143,9 +156,11 @@ public sealed class ToolOutputRegionFinder
         }
 
         foreach (var property in block.EnumerateObject())
+        {
             counter = property.IsString(ToolCallJson.Text)
                 ? Record(counter, indexes, path)
                 : Walk(property.Value, counter, indexes, files);
+        }
 
         return counter;
     }

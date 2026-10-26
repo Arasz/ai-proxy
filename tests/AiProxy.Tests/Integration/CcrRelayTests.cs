@@ -40,7 +40,10 @@ public sealed class CcrRelayTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" }) File.Delete(file);
+        foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
+        {
+            File.Delete(file);
+        }
     }
 
     [Fact]

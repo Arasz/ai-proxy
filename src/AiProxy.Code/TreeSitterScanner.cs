@@ -92,7 +92,10 @@ internal static class TreeSitterScanner
                 continue;
             }
 
-            for (var index = children.Count - 1; index >= 0; index--) stack.Push(ScanItem.Visit(children[index]));
+            for (var index = children.Count - 1; index >= 0; index--)
+            {
+                stack.Push(ScanItem.Visit(children[index]));
+            }
         }
 
         return spans;
@@ -103,15 +106,20 @@ internal static class TreeSitterScanner
         var items = new List<ScanItem>();
         var cursor = node.StartIndex;
         foreach (var child in children)
+        {
             if (child.Type == embedded)
             {
                 items.Add(ScanItem.Literal(cursor, child.StartIndex));
                 items.Add(ScanItem.Visit(child));
                 cursor = child.EndIndex;
             }
+        }
 
         items.Add(ScanItem.Literal(cursor, node.EndIndex));
-        for (var index = items.Count - 1; index >= 0; index--) stack.Push(items[index]);
+        for (var index = items.Count - 1; index >= 0; index--)
+        {
+            stack.Push(items[index]);
+        }
     }
 
     private static CodeToken Leaf(string text, Node node, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
@@ -173,7 +181,9 @@ internal static class TreeSitterScanner
             else
             {
                 while (stop < end && GapKind(text[stop]) == kind)
+                {
                     stop++;
+                }
             }
 
             tokens.Add(new CodeToken(kind, text[start..stop], start, 0));
@@ -195,10 +205,12 @@ internal static class TreeSitterScanner
     {
         var breaks = 0;
         for (var index = start; index < start + length; index++)
+        {
             if (text[index] == '\r' || (text[index] == '\n' && (index == 0 || text[index - 1] != '\r')))
             {
                 breaks++;
             }
+        }
 
         return breaks;
     }
@@ -206,7 +218,11 @@ internal static class TreeSitterScanner
     private static List<CodeSpan> Imports(string text, Node root, List<CodeToken> tokens, TreeSitterGrammar grammar)
     {
         var indexes = new Dictionary<int, int>(tokens.Count);
-        for (var index = 0; index < tokens.Count; index++) indexes[tokens[index].Offset] = index;
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            indexes[tokens[index].Offset] = index;
+        }
+
         var imports = new List<CodeSpan>();
         var removedEnd = -1;
         foreach (var statement in root.Children)
@@ -231,10 +247,12 @@ internal static class TreeSitterScanner
     private static bool StartsLine(List<CodeToken> tokens, int index)
     {
         for (index--; index >= 0 && tokens[index].Kind != CodeTokenKind.NewLine; index--)
+        {
             if (tokens[index].Kind != CodeTokenKind.Whitespace)
             {
                 return false;
             }
+        }
 
         return true;
     }
@@ -242,10 +260,12 @@ internal static class TreeSitterScanner
     private static bool EndsLine(List<CodeToken> tokens, int index)
     {
         for (; index < tokens.Count && tokens[index].Kind != CodeTokenKind.NewLine; index++)
+        {
             if (tokens[index].Kind is not (CodeTokenKind.Whitespace or CodeTokenKind.Comment))
             {
                 return false;
             }
+        }
 
         return true;
     }

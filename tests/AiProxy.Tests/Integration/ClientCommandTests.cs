@@ -82,7 +82,11 @@ public sealed class ClientCommandTests
         Assert.Equal(17, result.ExitCode);
         Assert.Contains("stdin:fixture input", result.Output, StringComparison.Ordinal);
         Assert.Contains("child stderr", result.Error, StringComparison.Ordinal);
-        foreach (var variable in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" }) Assert.Contains($"{variable}=http://127.0.0.1:{port}\n", result.Output, StringComparison.Ordinal);
+        foreach (var variable in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
+        {
+            Assert.Contains($"{variable}=http://127.0.0.1:{port}\n", result.Output, StringComparison.Ordinal);
+        }
+
         Assert.Contains(ca, result.Output, StringComparison.Ordinal);
         Assert.Contains("Other: preserved", result.Output, StringComparison.Ordinal);
         Assert.Contains($"X-Ai-Proxy-Project: {Environment.CurrentDirectory}", result.Output, StringComparison.Ordinal);
@@ -121,9 +125,16 @@ public sealed class ClientCommandTests
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
         start.Environment["Proxy__Port"] = "0";
-        foreach (var (key, value) in environment) start.Environment[key] = value;
+        foreach (var (key, value) in environment)
+        {
+            start.Environment[key] = value;
+        }
+
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

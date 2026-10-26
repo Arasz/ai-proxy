@@ -29,7 +29,10 @@ public sealed class XmlCompressionHandler : ICompressionHandler
         {
             var document = XDocument.Parse(part.Text, LoadOptions.PreserveWhitespace);
 
-            foreach (var node in document.DescendantNodes().OfType<XText>().Where(IsIndentation).ToList()) node.Remove();
+            foreach (var node in document.DescendantNodes().OfType<XText>().Where(IsIndentation).ToList())
+            {
+                node.Remove();
+            }
 
             return ValueTask.FromResult(new HandledContent(document.ToString(SaveOptions.DisableFormatting), CompactPath));
         }
@@ -64,10 +67,12 @@ public sealed class XmlCompressionHandler : ICompressionHandler
         }
 
         for (var ancestor = parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
             if (ancestor.Attribute(XmlNamespace + "space")?.Value == "preserve")
             {
                 return false;
             }
+        }
 
         var mixed = parent.Nodes().OfType<XText>().Any(node => !string.IsNullOrWhiteSpace(node.Value));
 

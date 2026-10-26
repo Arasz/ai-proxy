@@ -97,10 +97,12 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     {
         var message = new HttpRequestMessage(HttpMethod.Post, uri) { Content = new ByteArrayContent(body) };
         foreach (var header in headers)
+        {
             if (!message.Headers.TryAddWithoutValidation(header.Name, header.Value))
             {
                 message.Content.Headers.TryAddWithoutValidation(header.Name, header.Value);
             }
+        }
 
         return message;
     }
@@ -119,7 +121,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 continue;
             }
 
-            foreach (var value in values) response.Headers.AddHeader(name, value);
+            foreach (var value in values)
+            {
+                response.Headers.AddHeader(name, value);
+            }
         }
 
         response.Headers.AddHeader(HeaderNames.TransferEncoding, Chunked);
@@ -199,7 +204,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     await using var upstream = await response.Content.ReadAsStreamAsync(_cancellation).ConfigureAwait(false);
                     await foreach (var sse in new SseReader().ReadAsync(upstream, _cancellation).ConfigureAwait(false))
                     foreach (var passed in loop.Round.Accept(sse))
+                    {
                         await WriteAsync(passed).ConfigureAwait(false);
+                    }
                 }
 
                 exchange.Stages.Add($"ccr.round-{loop.Answered + 1}", Stopwatch.GetElapsedTime(started));
@@ -222,7 +229,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                             return;
                         }
 
-                        foreach (var released in loop.Finish()) await WriteAsync(released).ConfigureAwait(false);
+                        foreach (var released in loop.Finish())
+                        {
+                            await WriteAsync(released).ConfigureAwait(false);
+                        }
 
                         return;
                 }
@@ -376,7 +386,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private async Task<HttpResponseMessage> SendWithPingsAsync(byte[] followUp)
         {
             var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, _cancellation);
-            while (await Task.WhenAny(sending, Task.Delay(PingInterval, _cancellation)).ConfigureAwait(false) != sending) await WriteAsync(SseEvent.Ping).ConfigureAwait(false);
+            while (await Task.WhenAny(sending, Task.Delay(PingInterval, _cancellation)).ConfigureAwait(false) != sending)
+            {
+                await WriteAsync(SseEvent.Ping).ConfigureAwait(false);
+            }
 
             return await sending.ConfigureAwait(false);
         }

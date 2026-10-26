@@ -166,10 +166,12 @@ public sealed partial class ContentDecompositor : IDecompositor
         var scanner = new JsonValueScanner();
 
         for (var index = start; index < content.Length; index++)
+        {
             if (scanner.Closes(content[index]))
             {
                 return index + 1;
             }
+        }
 
         return -1;
     }
@@ -206,7 +208,10 @@ public sealed partial class ContentDecompositor : IDecompositor
     private static string ReadTagName(string content, int start, int open)
     {
         var index = start;
-        while (index < open && !char.IsWhiteSpace(content[index]) && content[index] != StructureMarkers.Xml.TagClose) index++;
+        while (index < open && !char.IsWhiteSpace(content[index]) && content[index] != StructureMarkers.Xml.TagClose)
+        {
+            index++;
+        }
 
         return content[start..index].TrimStart(StructureMarkers.Xml.TagOpen);
     }

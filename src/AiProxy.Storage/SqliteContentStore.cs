@@ -148,6 +148,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
             cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         foreach (var part in record.Parts)
+        {
             await connection.ExecuteAsync(new CommandDefinition(
                 insertChunk,
                 new
@@ -162,6 +163,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }

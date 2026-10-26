@@ -43,10 +43,12 @@ public sealed class McpToolInventoryGenerator : IIncrementalGenerator
                 }
 
                 foreach (var hint in new[] { "ReadOnly", "Destructive", "Idempotent", "OpenWorld" })
+                {
                     if (!tool.Attribute.NamedArguments.Any(argument => argument.Key == hint && argument.Value.Value is bool))
                     {
                         output.ReportDiagnostic(Diagnostic.Create(MissingHint, tool.Method.Locations.FirstOrDefault(), tool.Method.Name, hint));
                     }
+                }
             }
 
             source.AppendLine("    };\n}");

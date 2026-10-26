@@ -58,7 +58,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ArgumentNullException.ThrowIfNull(inspector);
         ArgumentNullException.ThrowIfNull(providerHosts);
         ArgumentNullException.ThrowIfNull(loggerFactory);
-        Server = new ProxyServer(false, false, false);
+        Server = new ProxyServer(false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
         _guardLauncher = guardLauncher;
         _markerWait = markerWait;
@@ -119,7 +119,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
         }
 
-        _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, true);
+        _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port);
         _endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequestAsync;
         Server.AddEndPoint(_endPoint);
         if (_options.TrustRootCertificate)

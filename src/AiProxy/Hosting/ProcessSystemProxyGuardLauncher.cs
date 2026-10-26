@@ -18,7 +18,10 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        foreach (var argument in BuildArguments(processPath, Environment.GetCommandLineArgs()[0], dataDirectory)) start.ArgumentList.Add(argument);
+        foreach (var argument in BuildArguments(processPath, Environment.GetCommandLineArgs()[0], dataDirectory))
+        {
+            start.ArgumentList.Add(argument);
+        }
 
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         var session = new Session(process, guardExited);

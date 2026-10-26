@@ -24,10 +24,12 @@ public sealed class ContentRouter : IContentRouter
         ArgumentNullException.ThrowIfNull(part);
 
         foreach (var handler in _handlers)
+        {
             if (handler.CanHandle(part.Type))
             {
                 return new ContentRoute(part.Type, handler, $"the {handler.GetType().Name} claims {part.Type}");
             }
+        }
 
         return new ContentRoute(part.Type, _fallback, $"no handler claims {part.Type}, so the fallback runs");
     }

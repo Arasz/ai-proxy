@@ -38,9 +38,11 @@ public static class GainReportBuilder
             .ToArray();
         var attributions = new List<GainAttribution>();
         foreach (var (dimension, key) in Dimensions)
+        {
             attributions.AddRange(attributed.GroupBy(row => key(row.Path), StringComparer.Ordinal)
                 .OrderBy(static group => group.Key, StringComparer.Ordinal)
                 .Select(group => new GainAttribution(dimension, group.Key, Sum(group.Select(static row => row.Totals)))));
+        }
 
         return new GainReport(1, now, query, new GainMeasurement(), summary,
             requests.OrderByDescending(static row => row.At).ThenBy(static row => row.Id, StringComparer.Ordinal).Take(query.HistoryLimit).ToArray(),

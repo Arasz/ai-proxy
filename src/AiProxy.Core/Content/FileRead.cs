@@ -26,10 +26,12 @@ internal sealed record FileRead(string Path, bool AllowLarge)
         }
 
         for (var index = 0; index < count; index++)
+        {
             if (NumberOf(lines[index]) != index + 1)
             {
                 return null;
             }
+        }
 
         return count < LineCap || AllowLarge ? Path : null;
     }
@@ -37,10 +39,16 @@ internal sealed record FileRead(string Path, bool AllowLarge)
     private static int? NumberOf(string line)
     {
         var start = 0;
-        while (start < line.Length && line[start] == ' ') start++;
+        while (start < line.Length && line[start] == ' ')
+        {
+            start++;
+        }
 
         var end = start;
-        while (end < line.Length && char.IsAsciiDigit(line[end])) end++;
+        while (end < line.Length && char.IsAsciiDigit(line[end]))
+        {
+            end++;
+        }
 
         if (end == start || end >= line.Length || line[end] != '\t')
         {

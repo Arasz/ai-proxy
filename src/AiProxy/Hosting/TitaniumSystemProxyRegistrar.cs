@@ -50,7 +50,7 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     /// </summary>
     public static void ClearSystemProxy()
     {
-        using var server = new ProxyServer(false, false, false);
+        using var server = new ProxyServer(false);
         var result = server.TryDisableSystemProxy(ProxyProtocolType.AllHttp);
         if (!result.Succeeded)
         {

@@ -150,11 +150,13 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     {
         var next = 0;
         foreach (var index in matched)
+        {
             for (var line = Math.Max(next, index - context); line <= Math.Min(total - 1, index + context); line++)
             {
                 yield return line;
                 next = line + 1;
             }
+        }
     }
 
     private static string Render(int index, string line, Match? match, int window)

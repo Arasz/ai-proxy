@@ -21,7 +21,10 @@ public sealed class OriginalStoreTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _path, $"{_path}-wal", $"{_path}-shm" }) File.Delete(file);
+        foreach (var file in new[] { _path, $"{_path}-wal", $"{_path}-shm" })
+        {
+            File.Delete(file);
+        }
     }
 
     [Fact]

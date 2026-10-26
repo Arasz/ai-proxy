@@ -14,7 +14,9 @@ public sealed class GainCsv
         if (settings.History)
         {
             foreach (var row in report.History)
+            {
                 Add(csv, "history", Stamp(row.At), row.Id, row.Project, row.Provider, row.Totals);
+            }
         }
 
         if (settings.All || settings.Daily || settings.Graph)
@@ -33,6 +35,7 @@ public sealed class GainCsv
         }
 
         foreach (var row in report.Attributions)
+        {
             if (settings.Pipeline is not null || row.Dimension switch
                 {
                     "method" => settings.ByMethod, "rule" => settings.ByRule, "layer" => settings.ByLayer, "pipeline" => settings.ByPipeline, _ => false
@@ -40,17 +43,22 @@ public sealed class GainCsv
             {
                 Add(csv, $"by-{row.Dimension}", "", row.Name, "", "", row.Totals);
             }
+        }
 
         if (settings.Failures)
         {
             foreach (var row in report.Failures)
+            {
                 Add(csv, "failure", Stamp(row.At), row.Stage, row.Project, "", new GainTotals(), row.Error);
+            }
         }
 
         if (settings.Recalls)
         {
             foreach (var row in report.Recalls)
+            {
                 Add(csv, "recall", Stamp(row.At), row.PreviewId, row.Project, "", new GainTotals(EstimatedRetrievedTokens: row.EstimatedTokens), row.Error);
+            }
         }
 
         return csv.ToString();
@@ -58,7 +66,10 @@ public sealed class GainCsv
 
     private static void Buckets(StringBuilder csv, string section, IReadOnlyList<GainBucket> buckets)
     {
-        foreach (var row in buckets) Add(csv, section, Stamp(row.Start), "", "", "", row.Totals);
+        foreach (var row in buckets)
+        {
+            Add(csv, section, Stamp(row.Start), "", "", "", row.Totals);
+        }
     }
 
     private static void Add(StringBuilder csv, string section, string at, string name, string? project, string? provider, GainTotals totals, string? error = null)

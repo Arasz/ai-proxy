@@ -23,7 +23,10 @@ public sealed class ScoredLogPayloadTests
                 continue;
             }
 
-            foreach (var question in payload.Value.GetProperty("questions").EnumerateArray()) data.Add(payload.Name, question.GetProperty("a").GetString()!);
+            foreach (var question in payload.Value.GetProperty("questions").EnumerateArray())
+            {
+                data.Add(payload.Name, question.GetProperty("a").GetString()!);
+            }
         }
 
         return data;
