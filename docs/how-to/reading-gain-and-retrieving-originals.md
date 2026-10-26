@@ -8,7 +8,9 @@ line. Both talk to the running proxy over its local HTTP endpoint and never open
 ## The endpoint
 
 The proxy listens for these clients on `http://127.0.0.1:17432`. Set `ASPNETCORE_URLS` (or `--urls`)
-to move it; both commands then need `--endpoint` with the same URL. The listener is loopback only.
+to move it; both commands then need `--endpoint` with the same URL. By default the listener is loopback only,
+and it answers only requests addressed to `localhost`, `127.0.0.1` or `[::1]`, so a web page cannot reach it
+by rebinding a domain name. Set `AllowedHosts` if you move it to another address on purpose.
 
 ## See what the proxy saved
 
@@ -23,8 +25,8 @@ ai-proxy gain --watch         # live view, Ctrl+C exits
 
 Token counts are estimates at 2.89 characters per token, and they cover the first request only.
 What a retrieval later reads back is listed under `--recalls` and is not netted out of the savings.
-Character and byte counts are measured. A request the proxy left unchanged still counts, with zero
-saved; one that grew (the `proxy_retrieve` tool definition adds a little) shows a negative number.
+Character and byte counts are measured. A request the proxy inspected but left unchanged still counts,
+with zero saved (requests it does not inspect, such as a body over 8 MB or a chunked body, are not counted); one that grew (the `proxy_retrieve` tool definition adds a little) shows a negative number.
 
 `ai-proxy gain --reset` deletes the statistics that match the other filters, after a confirmation
 (`--yes` skips it). Kept originals and captures are not touched.
