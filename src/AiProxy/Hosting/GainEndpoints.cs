@@ -48,9 +48,9 @@ public static partial class GainEndpoints
             var project = context.Request.Headers[GainApi.ProjectHeader].FirstOrDefault();
             try
             {
-                await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? "unknown" : "caller",
+                await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? GainLabels.Unknown : GainLabels.Attributions.Caller,
                     request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
-                    null, "retrieve_original", "unknown", "retrieval", "ccr", cancellationToken);
+                    null, GainLabels.RetrieveOriginal, GainLabels.Unknown, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, cancellationToken);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {

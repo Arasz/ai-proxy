@@ -24,7 +24,7 @@ public sealed partial class ProviderRequestInspector(
     ICcrRuntime ccr,
     ILogger<ProviderRequestInspector> logger,
     TimeProvider time,
-    IGainStore? gain = null)
+    IGainStore gain)
 {
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
@@ -78,7 +78,7 @@ public sealed partial class ProviderRequestInspector(
             {
                 Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
                 exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, project, "ccr-plan", failure.GetType().Name));
-                await RecordGainAsync(exchange, request.Method, body, body, "ccr-plan-failed");
+                await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.CcrPlanFailed);
                 e.GenericResponse(
                     CcrPlan.LedgerUnavailable,
                     (System.Net.HttpStatusCode)529,
@@ -96,12 +96,12 @@ public sealed partial class ProviderRequestInspector(
             {
                 Apply(e, exchange, compressed);
                 await RecordGainAsync(exchange, request.Method, body,
-                    compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? "unchanged");
+                    compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
             }
         }
         else
         {
-            await RecordGainAsync(exchange, request.Method, body, body, "unchanged");
+            await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.Unchanged);
         }
 
         exchange.Stages.Add("inspector", time.GetElapsedTime(started));
@@ -248,7 +248,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         exchange.ForwardedBytes = forwarded.Length;
-        await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, compressed?.Summary?.Path ?? "unchanged");
+        await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
         e.UserData = exchange;
         await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
     }
@@ -314,9 +314,8 @@ public sealed partial class ProviderRequestInspector(
     {
         exchange.GainRule = rule;
         exchange.GainMethod = method;
-        exchange.GainLayer = rule == "unchanged" ? "unknown" : "tool_result";
-        exchange.GainPipeline = compression.Compresses ? "content" : "passthrough";
-        if (gain is null) { return; }
+        exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
+        exchange.GainPipeline = compression.Compresses ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
         try
         {
             await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,

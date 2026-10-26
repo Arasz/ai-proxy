@@ -383,6 +383,7 @@ public sealed class CcrRelayTests : IDisposable
         message.Headers.TryAddWithoutValidation("Authorization", "Bearer secret");
         message.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         message.Headers.TryAddWithoutValidation("anthropic-beta", "context-1");
+        message.Headers.TryAddWithoutValidation(GainApi.ProjectHeader, "/repo/project");
         var response = await client.SendAsync(message, TestContext.Current.CancellationToken);
         await response.Content.LoadIntoBufferAsync(TestContext.Current.CancellationToken);
         return response;

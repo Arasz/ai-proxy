@@ -26,7 +26,7 @@ public sealed class HttpsInspectionTests
         var hosts = new LoopbackProviderHosts(Dialect.Anthropic);
         await using var proxy = new TitaniumProxyService(
             new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), ConfigureSystemProxy: false, TrustRootCertificate: false, directory.Path),
-            new ProviderRequestInspector(new MarkerCompressionPipeline(), hosts, new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
+            new ProviderRequestInspector(new MarkerCompressionPipeline(), hosts, new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             hosts,
             NullLoggerFactory.Instance);
         proxy.Server.ServerCertificateValidationCallback += (_, e) =>

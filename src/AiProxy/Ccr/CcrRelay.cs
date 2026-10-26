@@ -22,7 +22,7 @@ namespace AiProxy.Ccr;
 /// <param name="retrievers">Makes a retriever for one answer.</param>
 /// <param name="options">The CCR numbers.</param>
 /// <param name="logger">Where each retrieval and failure is logged.</param>
-public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore? gain = null, TimeProvider? time = null) : IDisposable
+public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore gain, TimeProvider time) : IDisposable
 {
     /// <summary>The header naming the id the original request is kept under.</summary>
     public const string ContentIdHeader = "x-ai-proxy-content-id";
@@ -81,7 +81,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         var answer = ClientResponse(response, exchange.ContentId);
         var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
-        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time ?? TimeProvider.System), exchange, headers, request.RequestUri, body, plan, originals);
+        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time), exchange, headers, request.RequestUri, body, plan, originals);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), closeServerConnection: true);
     }
 
@@ -135,7 +135,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private sealed record ForwardedHeader(string Name, string Value);
 
     /// <summary>What a conversation reads and writes through.</summary>
-    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore? Gain, TimeProvider Time);
+    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore Gain, TimeProvider Time);
 
     /// <summary>One client response across its upstream rounds.</summary>
     private sealed class Conversation(
@@ -289,11 +289,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         private async Task RecordRecallAsync(string input, CcrRetrieval answer)
         {
-            if (relay.Gain is null) { return; }
             try
             {
                 string id = "";
-                string mode = "unknown";
+                string mode = GainLabels.Unknown;
                 try
                 {
                     using var arguments = JsonDocument.Parse(input);
@@ -305,13 +304,13 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                         }
                         if (arguments.RootElement.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String)
                         {
-                            mode = selected.GetString() ?? "unknown";
+                            mode = selected.GetString() ?? GainLabels.Unknown;
                         }
                     }
                 }
                 catch (JsonException) { }
                 await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
-                    exchange.GainProject is null ? "unknown" : "caller", mode, answer.Text.Length,
+                    exchange.GainProject is null ? GainLabels.Unknown : GainLabels.Attributions.Caller, mode, answer.Text.Length,
                     GainReportBuilder.Tokens(answer.Text.Length), answer.Error), exchange.Dialect.ToString().ToLowerInvariant(),
                     exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation).ConfigureAwait(false);
             }

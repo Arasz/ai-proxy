@@ -10,7 +10,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
 {
     public override async Task<int> ExecuteAsync(CommandContext context, GainSettings settings, CancellationToken cancellationToken)
     {
-        var runtime = (GainRuntime)context.Data!;
+        var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The gain command was registered without its runtime.");
         if (settings.Quota || settings.Tier is not null)
         {
             throw new ArgumentException("Quota/tier estimates are not supported: no verified subscription quota model is available. Use the estimated initial-request reductions instead.");
@@ -23,7 +23,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         {
             throw new ArgumentException("--skip-env is not supported: gain is a statistics UI and launches no child processes.");
         }
-        if (GainSettings.Validator.Error(settings, runtime.Interactive) is { } validationError)
+        if (GainSettings.Validator.Error(settings, runtime) is { } validationError)
         {
             throw new ArgumentException(validationError);
         }
@@ -49,11 +49,11 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         if (settings.Reset)
         {
             var reset = await client.ResetGainAsync(query, cancellationToken).ConfigureAwait(false);
-            if (settings.Format == "json")
+            if (settings.Format == GainFormats.Json)
             {
                 await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(reset, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);
             }
-            else if (settings.Format == "csv")
+            else if (settings.Format == GainFormats.Csv)
             {
                 await runtime.Output.WriteLineAsync($"removed,cutoff\r\n{reset.Removed.ToString(CultureInfo.InvariantCulture)},{reset.Cutoff:O}").ConfigureAwait(false);
             }
@@ -69,11 +69,11 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
             await new GainWatch(runtime).RunAsync(client, query, settings, report, cancellationToken).ConfigureAwait(false);
             return 0;
         }
-        if (settings.Format == "json")
+        if (settings.Format == GainFormats.Json)
         {
             await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(report, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);
         }
-        else if (settings.Format == "csv")
+        else if (settings.Format == GainFormats.Csv)
         {
             await runtime.Output.WriteAsync(new GainCsv().Render(report, settings)).ConfigureAwait(false);
         }

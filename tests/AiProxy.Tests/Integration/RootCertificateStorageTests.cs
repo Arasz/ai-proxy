@@ -91,7 +91,7 @@ public sealed class RootCertificateStorageTests
             {
                 RootCertificatePassword = password,
             },
-            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System),
+            new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             NullLoggerFactory.Instance);
         await service.StartAsync(TestContext.Current.CancellationToken);

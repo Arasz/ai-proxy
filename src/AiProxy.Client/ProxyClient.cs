@@ -67,7 +67,7 @@ public sealed class ProxyClient(HttpClient http)
             ["method"] = query.Method, ["rule"] = query.Rule, ["layer"] = query.Layer,
             ["pipeline"] = query.Pipeline, ["historyLimit"] = query.HistoryLimit.ToString(CultureInfo.InvariantCulture),
         };
-        return "?" + string.Join("&", values.Where(static pair => pair.Value is not null)
-            .Select(static pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value!)));
+        return "?" + string.Join("&", values
+            .SelectMany(static pair => pair.Value is { } value ? [Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(value)] : Array.Empty<string>()));
     }
 }

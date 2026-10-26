@@ -22,11 +22,7 @@ public static class GainReportBuilder
             EstimatedRetrievedTokens = recalls.Sum(static recall => recall.EstimatedTokens),
         };
         var attributions = new List<GainAttribution>();
-        foreach (var (dimension, key) in new (string, Func<GainHistoryEntry, string>)[]
-        {
-            ("method", static row => row.Method), ("rule", static row => row.Rule),
-            ("layer", static row => row.Layer), ("pipeline", static row => row.Pipeline),
-        })
+        foreach (var (dimension, key) in Dimensions)
         {
             attributions.AddRange(requests.GroupBy(key, StringComparer.Ordinal)
                 .OrderBy(static group => group.Key, StringComparer.Ordinal)
@@ -67,4 +63,13 @@ public static class GainReportBuilder
         var day = Day(at);
         return day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
     }
+
+    private static readonly Dimension[] Dimensions =
+    [
+        new("method", static row => row.Method), new("rule", static row => row.Rule),
+        new("layer", static row => row.Layer), new("pipeline", static row => row.Pipeline),
+    ];
+
+    /// <summary>One attribution dimension and how a request names its value in it.</summary>
+    private sealed record Dimension(string Name, Func<GainHistoryEntry, string> Key);
 }

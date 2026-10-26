@@ -21,6 +21,7 @@ public sealed class GainEndpointTests
     [Theory]
     [InlineData("from=garbage")]
     [InlineData("from=2026-12-02&to=2026-12-01")]
+    [InlineData("from=2026-12-01&to=2026-12-01")]
     [InlineData("historyLimit=-1")]
     [InlineData("historyLimit=1001")]
     [InlineData("historyLimit=bad")]

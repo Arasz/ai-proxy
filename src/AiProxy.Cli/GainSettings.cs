@@ -9,8 +9,8 @@ public sealed class GainSettings : CommandSettings
 {
     [CommandOption("-p|--project"), Description("Filter to the current project directory.")]
     public bool Project { get; init; }
-    [CommandOption("-f|--format <FORMAT>"), DefaultValue("text"), Description("Output format: text, json, csv.")]
-    public string Format { get; init; } = "text";
+    [CommandOption("-f|--format <FORMAT>"), DefaultValue(GainFormats.Text), Description("Output format: text, json, csv.")]
+    public string Format { get; init; } = GainFormats.Text;
     [CommandOption("--endpoint <URL>"), DefaultValue(GainApi.DefaultEndpoint)]
     public string Endpoint { get; init; } = GainApi.DefaultEndpoint;
     [CommandOption("-g|--graph"), Description("Show an ASCII graph of daily estimated savings.")]
@@ -74,16 +74,16 @@ public sealed class GainSettings : CommandSettings
 
     internal static class Validator
     {
-        public static string? Error(GainSettings settings, bool interactive)
+        public static string? Error(GainSettings settings, GainRuntime runtime)
         {
-            if (settings.Format is not ("text" or "json" or "csv")) { return "Output format must be text, json or csv."; }
+            if (settings.Format is not (GainFormats.Text or GainFormats.Json or GainFormats.Csv)) { return "Output format must be text, json or csv."; }
             if (!Uri.TryCreate(settings.Endpoint, UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https")) { return "The endpoint must be an absolute HTTP or HTTPS URL."; }
             if (settings.Limit is < 1 or > 1000) { return "History limit must be between 1 and 1000."; }
             if (settings.Project && settings.ProjectPath is not null) { return "Choose --project or --project-path, not both."; }
             if (settings.Yes && !settings.Reset) { return "--yes is only valid with --reset."; }
             if (settings.Reset && settings.Watch && !settings.Text) { return "Reset cannot be combined with --watch. Use --text for a static reset."; }
-            if (settings.Watch && !settings.Text && settings.Format != "text") { return "Watch requires text format; use --text for static JSON/CSV."; }
-            if (settings.Watch && !settings.Text && !interactive) { return "Watch requires an interactive terminal. Use --text for pipes or redirected output."; }
+            if (settings.Watch && !settings.Text && settings.Format != GainFormats.Text) { return "Watch requires text format; use --text for static JSON/CSV."; }
+            if (settings.Watch && !settings.Text && !runtime.Interactive) { return "Watch requires an interactive terminal. Use --text for pipes or redirected output."; }
             return null;
         }
     }

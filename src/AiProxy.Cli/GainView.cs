@@ -20,11 +20,23 @@ public sealed class GainView
         {
             views.Add(new Text("History\n"));
             views.Add(Table(["UTC", "Request", "Project", "Provider", "Pipeline", "Saved tokens"],
-                report.History.Select(row => new[] { Stamp(row.At), row.Id, row.Project ?? "unknown", row.Provider ?? "unknown", row.Pipeline, Number(row.Totals.EstimatedSavedTokens) })));
+                report.History.Select(row => new[] { Stamp(row.At), row.Id, row.Project ?? GainLabels.Unknown, row.Provider ?? GainLabels.Unknown, row.Pipeline, Number(row.Totals.EstimatedSavedTokens) })));
         }
-        AddBuckets(views, "Daily (UTC)", report.Daily, settings.All || settings.Daily);
-        AddBuckets(views, "Weekly (Monday UTC)", report.Weekly, settings.All || settings.Weekly);
-        AddBuckets(views, "Monthly (UTC)", report.Monthly, settings.All || settings.Monthly);
+        if (settings.All || settings.Daily)
+        {
+            AddBuckets(views, "Daily (UTC)", report.Daily);
+        }
+
+        if (settings.All || settings.Weekly)
+        {
+            AddBuckets(views, "Weekly (Monday UTC)", report.Weekly);
+        }
+
+        if (settings.All || settings.Monthly)
+        {
+            AddBuckets(views, "Monthly (UTC)", report.Monthly);
+        }
+
         if (settings.Graph)
         {
             views.Add(new Text("Daily savings (estimated tokens)\n"));
@@ -59,14 +71,13 @@ public sealed class GainView
         if (settings.Recalls)
         {
             views.Add(new Text("Recalls (caller attribution; origins may be unknown)\n"));
-            views.Add(Table(["UTC", "Preview", "Project", "Mode", "Tokens", "Error"], report.Recalls.Select(row => new[] { Stamp(row.At), row.PreviewId, row.Project ?? "unknown", row.Mode, Number(row.EstimatedTokens), row.Error ?? "" })));
+            views.Add(Table(["UTC", "Preview", "Project", "Mode", "Tokens", "Error"], report.Recalls.Select(row => new[] { Stamp(row.At), row.PreviewId, row.Project ?? GainLabels.Unknown, row.Mode, Number(row.EstimatedTokens), row.Error ?? "" })));
         }
         return new Rows(views);
     }
 
-    private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets, bool shown)
+    private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
     {
-        if (!shown) { return; }
         views.Add(new Text(title + "\n"));
         views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens"], buckets.Select(row => new[] { Stamp(row.Start), Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedRetrievedTokens) })));
     }
