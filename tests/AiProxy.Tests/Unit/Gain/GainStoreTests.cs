@@ -137,6 +137,32 @@ public sealed class GainStoreTests
         Assert.Contains(all.Weekly, bucket => bucket.Start == DateTimeOffset.Parse("2026-11-09T00:00Z") && bucket.Totals.Requests == 1);
     }
 
+    [Fact]
+    public async Task A_recall_counts_once_in_each_attribution_dimension_so_the_totals_reconcile_with_the_summary()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        await store.RecordAsync(Entry("request", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecallAsync(
+            new GainRecall(DateTimeOffset.Parse("2026-11-01T11:00Z"), "0123456789abcdef", "/a", GainLabels.Attributions.Caller, "whole", 289, 100, null),
+            "anthropic", GainLabels.RetrieveOriginal, GainLabels.Unknown, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+
+        foreach (var dimension in new[] { "method", "rule", "layer", "pipeline" })
+        {
+            var rows = report.Attributions.Where(row => row.Dimension == dimension).ToArray();
+            Assert.Equal(report.Summary.Requests, rows.Sum(static row => row.Totals.Requests));
+            Assert.Equal(report.Summary.Recalls, rows.Sum(static row => row.Totals.Recalls));
+            Assert.Equal(report.Summary.EstimatedRetrievedTokens, rows.Sum(static row => row.Totals.EstimatedRetrievedTokens));
+        }
+
+        var ccr = Assert.Single(report.Attributions, row => row.Dimension == "pipeline" && row.Name == GainLabels.Pipelines.Ccr);
+        Assert.Equal(1, ccr.Totals.Recalls);
+        Assert.Equal(0, ccr.Totals.Requests);
+    }
+
     private static GainHistoryEntry Entry(string id,string at,string project,string rule,long original,long forwarded) =>
         new(id,DateTimeOffset.Parse(at),project,"anthropic","POST",rule,"tool_result","content",
             GainReportBuilder.RequestTotals(original,forwarded,original,forwarded));

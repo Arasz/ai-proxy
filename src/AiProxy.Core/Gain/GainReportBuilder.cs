@@ -12,19 +12,23 @@ public static class GainReportBuilder
             Tokens(originalCharacters), Tokens(forwardedCharacters), Tokens(originalCharacters) - Tokens(forwardedCharacters));
 
     public static GainReport Build(GainQuery query, DateTimeOffset now, IReadOnlyList<GainHistoryEntry> requests,
-        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecall> recalls)
+        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents)
     {
+        var recalls = recallEvents.Select(static recallEvent => recallEvent.Recall).ToArray();
         var summary = Sum(requests.Select(static request => request.Totals));
         summary = summary with
         {
-            Recalls = recalls.Count,
+            Recalls = recalls.Length,
             RetrievedCharacters = recalls.Sum(static recall => recall.Characters),
             EstimatedRetrievedTokens = recalls.Sum(static recall => recall.EstimatedTokens),
         };
+        var attributed = requests.Select(static request => new Attributed(new GainPath(request.Method, request.Rule, request.Layer, request.Pipeline), request.Totals))
+            .Concat(recallEvents.Select(static recallEvent => new Attributed(recallEvent.Path, RecallTotals(recallEvent.Recall))))
+            .ToArray();
         var attributions = new List<GainAttribution>();
         foreach (var (dimension, key) in Dimensions)
         {
-            attributions.AddRange(requests.GroupBy(key, StringComparer.Ordinal)
+            attributions.AddRange(attributed.GroupBy(row => key(row.Path), StringComparer.Ordinal)
                 .OrderBy(static group => group.Key, StringComparer.Ordinal)
                 .Select(group => new GainAttribution(dimension, group.Key, Sum(group.Select(static row => row.Totals)))));
         }
@@ -52,6 +56,9 @@ public static class GainReportBuilder
         sum.Recalls + row.Recalls, sum.RetrievedCharacters + row.RetrievedCharacters,
         sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens));
 
+    private static GainTotals RecallTotals(GainRecall recall) =>
+        new(Recalls: 1, RetrievedCharacters: recall.Characters, EstimatedRetrievedTokens: recall.EstimatedTokens);
+
     private static GainBucket[] Buckets(IReadOnlyList<GainHistoryEntry> rows, Func<DateTimeOffset, DateTimeOffset> start) =>
         rows.GroupBy(row => start(row.At)).OrderBy(static group => group.Key)
             .Select(static group => new GainBucket(group.Key, Sum(group.Select(static row => row.Totals)))).ToArray();
@@ -66,10 +73,13 @@ public static class GainReportBuilder
 
     private static readonly Dimension[] Dimensions =
     [
-        new("method", static row => row.Method), new("rule", static row => row.Rule),
-        new("layer", static row => row.Layer), new("pipeline", static row => row.Pipeline),
+        new("method", static path => path.Method), new("rule", static path => path.Rule),
+        new("layer", static path => path.Layer), new("pipeline", static path => path.Pipeline),
     ];
 
-    /// <summary>One attribution dimension and how a request names its value in it.</summary>
-    private sealed record Dimension(string Name, Func<GainHistoryEntry, string> Key);
+    /// <summary>One attribution dimension and how a path names its value in it.</summary>
+    private sealed record Dimension(string Name, Func<GainPath, string> Key);
+
+    /// <summary>Totals to attribute, with the path they belong to.</summary>
+    private sealed record Attributed(GainPath Path, GainTotals Totals);
 }

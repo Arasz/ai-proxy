@@ -28,6 +28,10 @@ public sealed record GainHistoryEntry(string Id, DateTimeOffset At, string? Proj
     string Method, string Rule, string Layer, string Pipeline, GainTotals Totals);
 /// <summary>Totals assigned once within one attribution dimension.</summary>
 public sealed record GainAttribution(string Dimension, string Name, GainTotals Totals);
+/// <summary>The method, rule, layer and pipeline an event is attributed to.</summary>
+public sealed record GainPath(string Method, string Rule, string Layer, string Pipeline);
+/// <summary>A recall as the ledger holds it: the recall and the path it is attributed to.</summary>
+public sealed record GainRecallEvent(GainRecall Recall, GainPath Path);
 /// <summary>A failed stage without request or credential contents.</summary>
 public sealed record GainFailure(DateTimeOffset At, string RequestId, string? Project, string Stage, string Error);
 /// <summary>A retrieval's caller attribution; unknown origins remain unknown.</summary>

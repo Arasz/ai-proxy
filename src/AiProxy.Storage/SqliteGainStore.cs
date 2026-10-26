@@ -43,18 +43,18 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(
-            "SELECT kind AS Kind,payload AS Payload FROM gain_event WHERE " + Predicate,
+            "SELECT kind AS Kind,method AS Method,rule AS Rule,layer AS Layer,pipeline AS Pipeline,payload AS Payload FROM gain_event WHERE " + Predicate,
             Parameters(query), cancellationToken: cancellationToken));
         var requests = new List<GainHistoryEntry>();
         var failures = new List<GainFailure>();
-        var recalls = new List<GainRecall>();
+        var recalls = new List<GainRecallEvent>();
         foreach (var row in rows)
         {
             switch (row.Kind)
             {
                 case Kinds.Request when JsonSerializer.Deserialize<GainHistoryEntry>(row.Payload) is { } request: requests.Add(request); break;
                 case Kinds.Failure when JsonSerializer.Deserialize<GainFailure>(row.Payload) is { } failure: failures.Add(failure); break;
-                case Kinds.Recall when JsonSerializer.Deserialize<GainRecall>(row.Payload) is { } recall: recalls.Add(recall); break;
+                case Kinds.Recall when JsonSerializer.Deserialize<GainRecall>(row.Payload) is { } recall: recalls.Add(new GainRecallEvent(recall, new GainPath(row.Method, row.Rule, row.Layer, row.Pipeline))); break;
             }
         }
         return GainReportBuilder.Build(query, time.GetUtcNow(), requests, failures, recalls);
@@ -160,7 +160,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record Row(string Kind, string Payload);
+    private sealed record Row(string Kind, string Method, string Rule, string Layer, string Pipeline, string Payload);
 
     /// <summary>Whether a write is on a proxied request's path, which must not wait long, or is a reset, which may.</summary>
     private enum WritePath
