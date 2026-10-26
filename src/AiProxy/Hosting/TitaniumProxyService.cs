@@ -98,12 +98,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _server.AddEndPoint(_endPoint);
         if (_options.TrustRootCertificate)
         {
-            _server.CertificateManager.EnsureRootCertificate(userTrustRootCertificate: true, machineTrustRootCertificate: false);
-            if (!_server.CertificateManager.IsRootCertificateUserTrusted())
-            {
-                throw new InvalidOperationException(
-                    "The ai-proxy HTTPS inspection certificate is not trusted. Trust the ai-proxy root certificate for this user, then start ai-proxy again.");
-            }
+            new TitaniumRootCertificate(_server.CertificateManager).EnsureTrusted();
         }
 
         try
