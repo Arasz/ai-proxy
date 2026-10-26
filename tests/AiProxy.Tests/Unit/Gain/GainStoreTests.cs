@@ -10,6 +10,126 @@ namespace AiProxy.Tests.Unit.Gain;
 
 public sealed class GainStoreTests
 {
+    [Theory]
+    [InlineData("request", "Id", 1)]
+    [InlineData("failure", "Error", 1)]
+    [InlineData("recall", "PreviewId", 1)]
+    [InlineData("request", "Id", 0)]
+    [InlineData("failure", "Error", 0)]
+    [InlineData("recall", "PreviewId", 0)]
+    public async Task Excluded_detail_payloads_are_not_deserialized_but_still_contribute_to_the_report(string kind, string field, int limit)
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "gain.db");
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(path), clock);
+        var old = Entry("old", "2026-11-01T10:00Z", "/a", "log", 289, 100);
+        var recent = Entry("recent", "2026-11-02T10:00Z", "/a", "log", 578, 289);
+        foreach (var entry in new[] { old, recent })
+        {
+            await store.RecordAsync(entry, [new GainFailure(entry.At, entry.Id, entry.Project, "compression", "Failure")], TestContext.Current.CancellationToken);
+            await store.RecallAsync(new GainRecall(entry.At, entry.Id, entry.Project, "caller", "whole", 289, 100, null),
+                entry.Provider, entry.Method, entry.Rule, entry.Layer, entry.Pipeline, TestContext.Current.CancellationToken);
+        }
+        await using (var connection = new SqliteConnection($"Data Source={path}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE gain_event SET payload = json_set(payload, @field, 1) WHERE kind = @kind AND at = @at";
+            command.Parameters.AddWithValue("@field", "$." + field);
+            command.Parameters.AddWithValue("@kind", kind);
+            command.Parameters.AddWithValue("@at", old.At.UtcTicks);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
+        }
+
+        var report = await store.QueryAsync(new GainQuery(HistoryLimit: limit), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, report.Summary.Requests);
+        Assert.Equal(867, report.Summary.OriginalCharacters);
+        Assert.Equal(2, report.Summary.Recalls);
+        Assert.Equal(578, report.Summary.RetrievedCharacters);
+        Assert.Equal(limit, report.History.Count);
+        Assert.Equal(limit, report.Failures.Count);
+        Assert.Equal(limit, report.Recalls.Count);
+        if (limit > 0)
+        {
+            Assert.Equal("recent", Assert.Single(report.History).Id);
+            Assert.Equal("recent", Assert.Single(report.Failures).RequestId);
+            Assert.Equal("recent", Assert.Single(report.Recalls).PreviewId);
+        }
+    }
+
+    [Fact]
+    public async Task One_tick_before_a_utc_month_and_monday_boundary_stays_in_the_previous_buckets_with_per_request_rounding()
+    {
+        using var directory = new TemporaryDirectory();
+        var boundary = DateTimeOffset.Parse("2026-06-01T00:00Z");
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(boundary));
+        var before = Entry("before", "2026-05-31T00:00Z", "/a", "log", 2, 3) with { At = boundary.AddTicks(-1) };
+        var after = before with { Id = "after", At = boundary };
+        await store.RecordAsync(before, [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(after, [], TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(HistoryLimit: 0), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, report.Summary.Requests);
+        Assert.Equal(0, report.Summary.EstimatedOriginalTokens);
+        Assert.Equal(2, report.Summary.EstimatedForwardedTokens);
+        Assert.Equal(-2, report.Summary.EstimatedSavedTokens);
+        Assert.Equal(new[] { boundary.AddDays(-1), boundary }, report.Daily.Select(static row => row.Start));
+        Assert.Equal(new[] { boundary.AddDays(-7), boundary }, report.Weekly.Select(static row => row.Start));
+        Assert.Equal(new[] { DateTimeOffset.Parse("2026-05-01T00:00Z"), boundary }, report.Monthly.Select(static row => row.Start));
+        Assert.All(report.Daily.Concat(report.Weekly).Concat(report.Monthly), static row =>
+        {
+            Assert.Equal(1, row.Totals.Requests);
+            Assert.Equal(-1, row.Totals.EstimatedSavedTokens);
+        });
+        Assert.Empty(report.History);
+    }
+
+    [Fact]
+    public async Task An_empty_or_recall_only_report_keeps_unknown_attribution_and_aggregates_with_no_details()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+
+        var empty = await store.QueryAsync(new GainQuery(HistoryLimit: 0), TestContext.Current.CancellationToken);
+        await store.RecallAsync(new GainRecall(clock.GetUtcNow(), "preview", null, "unknown", "whole", 289, 100, null),
+            null, "retrieve_original", "unknown", "retrieval", "ccr", TestContext.Current.CancellationToken);
+        var report = await store.QueryAsync(new GainQuery(HistoryLimit: 0), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new GainTotals(), empty.Summary);
+        Assert.Empty(empty.Attributions);
+        Assert.Equal(new GainTotals(Recalls: 1, RetrievedCharacters: 289, EstimatedRetrievedTokens: 100), report.Summary);
+        Assert.Null(report.Filters.Project);
+        Assert.Equal(4, report.Attributions.Count);
+        Assert.All(report.Attributions, static row => Assert.Equal(1, row.Totals.Recalls));
+        Assert.Empty(report.Daily);
+        Assert.Empty(report.Weekly);
+        Assert.Empty(report.Monthly);
+        Assert.Empty(report.History);
+        Assert.Empty(report.Failures);
+        Assert.Empty(report.Recalls);
+    }
+
+    [Fact]
+    public async Task Tied_request_ids_use_ordinal_order_in_the_bounded_history()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var options = new GainStoreOptions(Path.Combine(directory.Path, "gain.db"));
+        var store = new SqliteGainStore(options, clock);
+        await store.RecordAsync(Entry("\uE000", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("\U00010000", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        store = new SqliteGainStore(options, clock);
+
+        var report = await store.QueryAsync(new GainQuery(HistoryLimit: 1), TestContext.Current.CancellationToken);
+
+        Assert.Equal("\U00010000", Assert.Single(report.History).Id);
+        Assert.Equal(2, report.Summary.Requests);
+    }
+
     [Fact]
     public async Task Unicode_byte_counts_remain_distinct_from_characters_in_every_aggregate_view()
     {
