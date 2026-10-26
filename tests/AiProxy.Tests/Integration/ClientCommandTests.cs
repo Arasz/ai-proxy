@@ -52,7 +52,7 @@ public sealed class ClientCommandTests
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         var executable = Path.Combine(directory.Path, "claude");
-        await File.WriteAllTextAsync(executable, "#!/bin/sh\nprintf '%s\\n' \"$HTTP_PROXY\" \"$HTTPS_PROXY\" \"$NODE_EXTRA_CA_CERTS\" \"$ANTHROPIC_CUSTOM_HEADERS\" \"$NO_PROXY\" \"$@\"\nread input\nprintf 'stdin:%s\\n' \"$input\"\nprintf 'child stderr\\n' >&2\nexit 17\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(executable, "#!/bin/sh\nprintf 'HTTP_PROXY=%s\\nHTTPS_PROXY=%s\\nhttp_proxy=%s\\nhttps_proxy=%s\\n' \"$HTTP_PROXY\" \"$HTTPS_PROXY\" \"$http_proxy\" \"$https_proxy\"\nprintf '%s\\n' \"$NODE_EXTRA_CA_CERTS\" \"$ANTHROPIC_CUSTOM_HEADERS\" \"$NO_PROXY\" \"$@\"\nread input\nprintf 'stdin:%s\\n' \"$input\"\nprintf 'child stderr\\n' >&2\nexit 17\n", TestContext.Current.CancellationToken);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
@@ -74,7 +74,10 @@ public sealed class ClientCommandTests
         Assert.Equal(17, result.ExitCode);
         Assert.Contains("stdin:fixture input", result.Output, StringComparison.Ordinal);
         Assert.Contains("child stderr", result.Error, StringComparison.Ordinal);
-        Assert.Contains($"http://127.0.0.1:{port}", result.Output, StringComparison.Ordinal);
+        foreach (var variable in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
+        {
+            Assert.Contains($"{variable}=http://127.0.0.1:{port}\n", result.Output, StringComparison.Ordinal);
+        }
         Assert.Contains(ca, result.Output, StringComparison.Ordinal);
         Assert.Contains("Other: preserved", result.Output, StringComparison.Ordinal);
         Assert.Contains($"X-Ai-Proxy-Project: {Environment.CurrentDirectory}", result.Output, StringComparison.Ordinal);
