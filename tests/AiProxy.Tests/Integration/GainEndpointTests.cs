@@ -33,4 +33,34 @@ public sealed class GainEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
+
+    [Theory]
+    [InlineData("evil.test")]
+    [InlineData("evil.test:17432")]
+    public async Task A_request_named_for_another_host_is_refused_so_a_rebound_page_cannot_read_gain_or_originals(string host)
+    {
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/gain");
+        request.Headers.Host = host;
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("localhost")]
+    public async Task A_request_named_for_the_loopback_host_is_served(string host)
+    {
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/gain");
+        request.Headers.Host = $"{host}:{proxy.BaseAddress.Port}";
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
