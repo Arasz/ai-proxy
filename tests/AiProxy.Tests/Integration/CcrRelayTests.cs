@@ -31,7 +31,7 @@ public sealed class CcrRelayTests : IDisposable
 
     private static readonly string RetrieveFile = JsonSerializer.Serialize(new { id = ViewId, mode = "whole" });
 
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-ccr-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-ccr-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {

@@ -8,7 +8,7 @@ namespace AiProxy.Tests.Unit.Storage;
 /// <summary>The CCR originals and the thread ledger, against a real database file.</summary>
 public sealed class OriginalStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"ai-proxy-originals-{Guid.NewGuid():N}.db");
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"ai-proxy-originals-{Guid.CreateVersion7():N}.db");
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
     private readonly SqliteOriginalStore _store;
 

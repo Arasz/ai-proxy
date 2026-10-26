@@ -49,7 +49,7 @@ public sealed partial class ProviderRequestInspector(
 
         var started = time.GetTimestamp();
         var exchange = new CapturedExchange { Dialect = dialect, GainProject = project };
-        var captureId = Guid.NewGuid().ToString("N");
+        var captureId = Guid.CreateVersion7().ToString("N");
 
         var stage = time.GetTimestamp();
         var body = await e.GetRequestBody(CancellationToken.None);

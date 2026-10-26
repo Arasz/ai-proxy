@@ -14,28 +14,28 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     /// <summary>How long a request-path write waits for the ledger before it gives up; the request goes on unrecorded.</summary>
     public static readonly TimeSpan RequestWait = TimeSpan.FromSeconds(ContentSchema.RequestCommandTimeoutSeconds);
 
+    private static readonly string[] Attributions = new[] { "method", "rule", "layer", "pipeline" };
+
     private readonly SemaphoreSlim _writer = new(1, 1);
     private bool _initialized;
 
-    public async ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken)
-    {
+    public async ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken) =>
         await WriteAsync(async connection =>
         {
-            using var transaction = connection.BeginTransaction();
+            await using var transaction = connection.BeginTransaction();
             await InsertAsync(connection, Kinds.Request, entry.Id, entry.At, entry.Project, entry.Provider,
                 entry.Method, entry.Rule, entry.Layer, entry.Pipeline, JsonSerializer.Serialize(entry), transaction, cancellationToken);
             foreach (var failure in failures)
             {
-                await InsertAsync(connection, Kinds.Failure, Guid.NewGuid().ToString("N"), failure.At, failure.Project,
+                await InsertAsync(connection, Kinds.Failure, Guid.CreateVersion7().ToString("N"), failure.At, failure.Project,
                     entry.Provider, entry.Method, entry.Rule, entry.Layer, entry.Pipeline,
                     JsonSerializer.Serialize(failure), transaction, cancellationToken);
             }
             await transaction.CommitAsync(cancellationToken);
         }, WritePath.Request, cancellationToken);
-    }
 
     public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) =>
-        WriteAsync(connection => InsertAsync(connection, Kinds.Recall, Guid.NewGuid().ToString("N"), recall.At,
+        WriteAsync(connection => InsertAsync(connection, Kinds.Recall, Guid.CreateVersion7().ToString("N"), recall.At,
             recall.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(recall), null, cancellationToken), WritePath.Request, cancellationToken);
 
     public async ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
@@ -43,7 +43,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
         connection.CreateCollation("ordinal", string.CompareOrdinal);
-        using var transaction = connection.BeginTransaction(deferred: true);
+        await using var transaction = connection.BeginTransaction(deferred: true);
         var parameters = Parameters(query);
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
             AggregateSql, parameters, transaction, cancellationToken: cancellationToken))).ToArray();
@@ -55,7 +55,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             "at DESC,sequence", cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        var attributions = new[] { "method", "rule", "layer", "pipeline" }.SelectMany(dimension =>
+        var attributions = Attributions.SelectMany(dimension =>
             rows.Where(row => row.View == dimension).OrderBy(static row => row.Name, StringComparer.Ordinal)
                 .Select(row => new GainAttribution(dimension, row.Name, Totals(row)))).ToArray();
         return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
@@ -71,7 +71,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         };
     }
 
-    private static GainTotals Totals(AggregateRow row) => JsonSerializer.Deserialize<GainTotals>(row.Totals)!;
+    private static GainTotals Totals(AggregateRow row) => JsonSerializer.Deserialize<GainTotals>(row.TotalCount)!;
 
     private static GainBucket[] Buckets(IEnumerable<AggregateRow> rows, string view) =>
         rows.Where(row => row.View == view).OrderBy(static row => row.Start)
@@ -83,7 +83,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         var parameters = new DynamicParameters(filters);
         parameters.Add("Kind", kind);
         var payloads = await connection.QueryAsync<string>(new CommandDefinition(
-            "SELECT payload FROM gain_event WHERE kind = @Kind AND " + Predicate + " ORDER BY " + order + " LIMIT @HistoryLimit",
+            $"SELECT payload FROM gain_event WHERE kind = @Kind AND {Predicate} ORDER BY {order} LIMIT @HistoryLimit",
             parameters, transaction, cancellationToken: cancellationToken));
         return payloads.Select(static payload => JsonSerializer.Deserialize<T>(payload)).OfType<T>().ToArray();
     }
@@ -95,13 +95,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await WriteAsync(async connection =>
         {
             // The sequence snapshot excludes a later insert even if its event timestamp is backdated.
-            using var transaction = connection.BeginTransaction();
+            await using var transaction = connection.BeginTransaction();
             var snapshot = await connection.ExecuteScalarAsync<long>(new CommandDefinition("SELECT COALESCE(MAX(sequence),0) FROM gain_event", transaction: transaction, cancellationToken: cancellationToken));
             var parameters = new DynamicParameters(Parameters(query));
             parameters.Add("Cutoff", cutoff.UtcTicks);
             parameters.Add("Snapshot", snapshot);
             removed = await connection.ExecuteAsync(new CommandDefinition(
-                "DELETE FROM gain_event WHERE sequence <= @Snapshot AND at <= @Cutoff AND " + Predicate,
+                $"DELETE FROM gain_event WHERE sequence <= @Snapshot AND at <= @Cutoff AND {Predicate}",
                 parameters, transaction, cancellationToken: cancellationToken));
             await transaction.CommitAsync(cancellationToken);
         }, WritePath.Reset, cancellationToken);
@@ -122,14 +122,12 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private static async Task InsertAsync(SqliteConnection connection, string kind, string id, DateTimeOffset at,
         string? project, string? provider, string method, string rule, string layer, string pipeline,
-        string payload, SqliteTransaction? transaction, CancellationToken cancellationToken)
-    {
+        string payload, SqliteTransaction? transaction, CancellationToken cancellationToken) =>
         await connection.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO gain_event(kind,id,at,project,provider,method,rule,layer,pipeline,payload)
-            VALUES(@kind,@id,@at,@project,@provider,@method,@rule,@layer,@pipeline,@payload)
-            """, new { kind, id, at = at.UtcTicks, project, provider, method, rule, layer, pipeline, payload },
+                                                            INSERT INTO gain_event(kind,id,at,project,provider,method,rule,layer,pipeline,payload)
+                                                            VALUES(@kind,@id,@at,@project,@provider,@method,@rule,@layer,@pipeline,@payload)
+                                                            """, new { kind, id, at = at.UtcTicks, project, provider, method, rule, layer, pipeline, payload },
             transaction, ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken));
-    }
 
     private async ValueTask WriteAsync(Func<SqliteConnection, Task> write, WritePath path, CancellationToken cancellationToken)
     {
@@ -188,7 +186,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record AggregateRow(string View, long Start, string Name, string Totals);
+    private sealed record AggregateRow(string View, long Start, string Name, string TotalCount);
 
     private const string SumJson = """
         json_object(
@@ -205,35 +203,23 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0))
         """;
 
-    private const string AggregateSql = """
-        WITH metrics AS (
-            SELECT kind,at,method,rule,layer,pipeline,
-                CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
-                    ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
-                        'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
-            FROM gain_event WHERE kind IN ('request','recall') AND
-        """ + Predicate + """
-        )
-        SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set(
-        """ + SumJson + """
-            ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
-            '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
-            '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
-        FROM metrics
-        UNION ALL SELECT 'daily',at - at % 864000000000,'',
-        """ + SumJson + """
-        FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
-        UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'',
-        """ + SumJson + """
-        FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
-        UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',
-        """ + SumJson + """
-        FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
-        UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,
-        """ + SumJson + """
-        FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
-        GROUP BY dimension,Name
-        """;
+    private const string AggregateSql = $"""
+                                         WITH metrics AS (
+                                             SELECT kind,at,method,rule,layer,pipeline,
+                                                 CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
+                                                     ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
+                                                         'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
+                                             FROM gain_event WHERE kind IN ('request','recall') AND{Predicate})
+                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
+                                             '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
+                                             '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
+                                         FROM metrics
+                                         UNION ALL SELECT 'daily',at - at % 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
+                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
+                                         GROUP BY dimension,Name
+                                         """;
 
     /// <summary>Whether a write is on a proxied request's path, which must not wait long, or is a reset, which may.</summary>
     private enum WritePath

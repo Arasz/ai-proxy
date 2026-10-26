@@ -12,7 +12,7 @@ public sealed class ContentStoreTests : IDisposable
 {
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
-        $"ai-proxy-store-{Guid.NewGuid():N}.db");
+        $"ai-proxy-store-{Guid.CreateVersion7():N}.db");
 
     private readonly ContentQueue _queue;
     private readonly SqliteContentStore _store;

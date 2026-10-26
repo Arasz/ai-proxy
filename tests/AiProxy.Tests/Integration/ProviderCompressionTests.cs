@@ -19,7 +19,7 @@ public sealed class ProviderCompressionTests : IDisposable
         2026-03-12 10:00:06 INFO worker=api-1 the last line
         """;
 
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {

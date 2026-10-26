@@ -12,7 +12,7 @@ public sealed class ContentStoreWorkerTests : IDisposable
 {
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
-        $"ai-proxy-worker-{Guid.NewGuid():N}.db");
+        $"ai-proxy-worker-{Guid.CreateVersion7():N}.db");
     private readonly ContentStoreOptions _options;
     private readonly ContentQueue _queue;
     private readonly SqliteContentStore _store;

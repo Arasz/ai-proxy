@@ -7,7 +7,7 @@ namespace AiProxy.Tests.Integration;
 
 public sealed class ContentEndpointTests : IAsyncDisposable
 {
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-content-{Guid.CreateVersion7():N}.db");
 
     [Fact]
     public async Task A_stored_original_is_served_and_an_unknown_id_returns_not_found()

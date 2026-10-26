@@ -17,7 +17,7 @@ public sealed class ClientsAgainstProxyTests : IDisposable
 
     private static readonly string Stateless = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"stateless {index:D4}: linked module m{index} into bin/m{index}"));
 
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-clients-{Guid.NewGuid():N}.db");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"ai-proxy-clients-{Guid.CreateVersion7():N}.db");
 
     public void Dispose()
     {
