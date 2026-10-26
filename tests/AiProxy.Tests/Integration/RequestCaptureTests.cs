@@ -163,6 +163,23 @@ public sealed class RequestCaptureTests : IDisposable
     }
 
     [Fact]
+    public void Capture_file_inspection_survives_the_last_writer_closing_after_enumeration()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, SqliteCaptureStore.FileName);
+        using var writer = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString());
+        writer.Open();
+        writer.Execute("PRAGMA journal_mode=WAL; CREATE TABLE capture_request (body TEXT); INSERT INTO capture_request VALUES (@Body)",
+            new { Body = "capture-inspection-marker" });
+        Assert.True(File.Exists(path + "-wal"));
+
+        var bytes = ReadCaptureFiles(directory.Path, writer.Close);
+
+        Assert.True(Contains(bytes, Encoding.UTF8.GetBytes("capture-inspection-marker")));
+    }
+
+    [Fact]
     public async Task Traffic_to_a_host_that_is_not_a_provider_is_never_captured()
     {
         await using var upstream = await FakeUpstream.StartAsync();
@@ -783,10 +800,24 @@ public sealed class RequestCaptureTests : IDisposable
     }
 
     /// <summary>Every byte of the capture database and its journal files, wherever SQLite put a page.</summary>
-    private static byte[] ReadCaptureFiles(ProxyHost proxy)
+    private static byte[] ReadCaptureFiles(ProxyHost proxy) => ReadCaptureFiles(proxy.DataDirectory);
+
+    private static byte[] ReadCaptureFiles(string directory, Action? beforeRead = null)
     {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.Combine(directory, SqliteCaptureStore.FileName),
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false,
+        }.ToString());
+        connection.Open();
+        using var snapshot = connection.BeginTransaction(deferred: true);
+        // Keep a reader active so closing the writer cannot delete the journal files mid-copy.
+        connection.ExecuteScalar<long>("SELECT COUNT(*) FROM capture_request", transaction: snapshot);
+        var files = Directory.GetFiles(directory, $"{SqliteCaptureStore.FileName}*");
+        beforeRead?.Invoke();
         using var all = new MemoryStream();
-        foreach (var file in Directory.GetFiles(proxy.DataDirectory, $"{SqliteCaptureStore.FileName}*"))
+        foreach (var file in files)
         {
             using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             stream.CopyTo(all);

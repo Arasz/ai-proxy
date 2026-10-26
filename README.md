@@ -1,13 +1,11 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Arasz/ai-proxy/main/content/icon.png" width="128" alt="ai-proxy">
-</p>
+![ai-proxy](https://raw.githubusercontent.com/Arasz/ai-proxy/main/content/icon.png)
 
 # ai-proxy
 
 [![build](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml/badge.svg)](https://github.com/Arasz/ai-proxy/actions/workflows/build.yml)
 [![publish](https://github.com/Arasz/ai-proxy/actions/workflows/publish.yml/badge.svg)](https://github.com/Arasz/ai-proxy/actions/workflows/publish.yml)
-[![NuGet](https://img.shields.io/nuget/v/ai-proxy/.svg)](https://www.nuget.org/packages/ai-proxy)
-[![M8ven Score](https://m8ven.ai/badge/mcp/arasz-ai-proxy-1h8736)](https://m8ven.ai/mcp/arasz-ai-proxy-1h8736?s=readme)
+[![NuGet](https://img.shields.io/nuget/v/ai-proxy.svg)](https://www.nuget.org/packages/ai-proxy)
+[M8ven Score](https://m8ven.ai/mcp/arasz-ai-proxy-1h8736?s=readme)
 
 ai-proxy installs itself as the current user's system HTTP and HTTPS proxy while it runs. It
 routes the standard API hosts for OpenAI, Anthropic, Google Gemini, and OpenRouter, and passes
