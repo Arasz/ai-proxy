@@ -30,6 +30,23 @@ public sealed class RootCertificateStorageTests
     }
 
     [Fact]
+    public async Task The_public_root_certificate_is_written_as_pem_for_clients_that_take_a_ca_file()
+    {
+        using var directory = new TemporaryDirectory();
+
+        await StartAndStopAsync(directory.Path, password: null);
+
+        var pem = await File.ReadAllTextAsync(Path.Combine(directory.Path, TitaniumProxyService.RootCertificatePemFileName), TestContext.Current.CancellationToken);
+        Assert.StartsWith("-----BEGIN CERTIFICATE-----", pem, StringComparison.Ordinal);
+        Assert.DoesNotContain("PRIVATE KEY", pem, StringComparison.Ordinal);
+        using var fromPem = System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPem(pem);
+        using var fromPfx = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(
+            Path.Combine(directory.Path, TitaniumProxyService.RootCertificateFileName), "");
+        Assert.Equal(fromPfx.Thumbprint, fromPem.Thumbprint);
+        Assert.False(fromPem.HasPrivateKey);
+    }
+
+    [Fact]
     public async Task An_existing_directory_with_open_permissions_is_tightened()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file modes only.");

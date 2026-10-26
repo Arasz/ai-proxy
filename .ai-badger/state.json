@@ -3,6 +3,22 @@
   "next": "Goal reached: CCR + C#/Python/JS/TS code views + gain/mcp clients (0.10.0-0.15.0). Owner restarts proxy from main and gathers data (ai-proxy gain; [proxy view in upstream bodies; log 1601). Follow-ups: aggregate GET /gain in SQL (watch reloads all rows); log Tree-sitter grammar-load failure (musl package lacks natives); ''' strings in blank-line fallback; verify Codex custom-header option for X-Ai-Proxy-Project; CI setup-dotnet 409.",
   "completedTasks": [
     {
+      "taskId": "aip-publish-nuget-readme-gain-sql",
+      "date": "2026-10-26",
+      "title": "Public CA file and installed-tool setup",
+      "pr": 80,
+      "version": "0.15.2",
+      "summary": "Startup exports its public root certificate as PEM; README install, proxy/CA, gain and MCP instructions and the package icon are included. Local package install, CLI/MCP smoke and certificate tests passed."
+    },
+    {
+      "taskId": "aip-validate-codex-header-aggregate-gain",
+      "date": "2026-10-26",
+      "title": "SQL gain reports and verified Codex project headers",
+      "pr": 78,
+      "version": "0.15.1",
+      "summary": "Gain queries aggregate existing ledger JSON in SQL and bound detail reads in one snapshot. Codex project-header instructions were verified against a local mock. CI and independent code/test reviews passed; production first-use schema race is tracked in issue79."
+    },
+    {
       "taskId": "aip-retrieval-mcp-cli-gain-api",
       "date": "2026-10-26",
       "title": "Gain ledger and loopback API; ai-proxy gain and ai-proxy mcp in the one tool",
