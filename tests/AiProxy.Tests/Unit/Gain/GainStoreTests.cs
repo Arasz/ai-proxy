@@ -217,7 +217,7 @@ public sealed class GainStoreTests
         var path = Path.Combine(directory.Path, "gain.db");
         var store = new SqliteGainStore(new GainStoreOptions(path), TimeProvider.System);
         await store.RecordAsync(Entry("first", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
-        await using var holder = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path}");
+        await using var holder = new SqliteConnection($"Data Source={path}");
         await holder.OpenAsync(TestContext.Current.CancellationToken);
         await using var exclusive = holder.CreateCommand();
         exclusive.CommandText = "BEGIN EXCLUSIVE";

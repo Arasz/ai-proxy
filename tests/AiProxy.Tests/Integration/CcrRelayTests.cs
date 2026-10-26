@@ -150,7 +150,7 @@ public sealed class CcrRelayTests : IDisposable
         {
         }
 
-        var row = await ReadResponseRowAsync(Path.Combine(proxy.DataDirectory, AiProxy.Storage.SqliteCaptureStore.FileName));
+        var row = await ReadResponseRowAsync(Path.Combine(proxy.DataDirectory, Storage.SqliteCaptureStore.FileName));
         Assert.Equal(200, row.Status);
         Assert.Equal(10, row.OutputTokens);
         Assert.Contains("ccr.round-1", row.Stages, StringComparison.Ordinal);

@@ -23,6 +23,6 @@ public sealed class CcrRegistrationTests
         }
 
         Assert.Same(CcrOptions.Default, app.Services.GetService<CcrOptions>());
-        Assert.IsType<AiProxy.Ccr.CcrRuntime>(app.Services.GetRequiredService<AiProxy.Ccr.ICcrRuntime>());
+        Assert.IsType<Ccr.CcrRuntime>(app.Services.GetRequiredService<Ccr.ICcrRuntime>());
     }
 }

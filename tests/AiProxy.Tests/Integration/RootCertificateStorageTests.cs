@@ -39,8 +39,8 @@ public sealed class RootCertificateStorageTests
         var pem = await File.ReadAllTextAsync(Path.Combine(directory.Path, TitaniumProxyService.RootCertificatePemFileName), TestContext.Current.CancellationToken);
         Assert.StartsWith("-----BEGIN CERTIFICATE-----", pem, StringComparison.Ordinal);
         Assert.DoesNotContain("PRIVATE KEY", pem, StringComparison.Ordinal);
-        using var fromPem = System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPem(pem);
-        using var fromPfx = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(
+        using var fromPem = X509Certificate2.CreateFromPem(pem);
+        using var fromPfx = X509CertificateLoader.LoadPkcs12FromFile(
             Path.Combine(directory.Path, TitaniumProxyService.RootCertificateFileName), "");
         Assert.Equal(fromPfx.Thumbprint, fromPem.Thumbprint);
         Assert.False(fromPem.HasPrivateKey);
