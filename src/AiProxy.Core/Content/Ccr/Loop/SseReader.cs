@@ -10,52 +10,81 @@ public sealed class SseReader
     public async IAsyncEnumerable<SseEvent> ReadAsync(Stream stream, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true);
-        var name = "message";
-        var data = new StringBuilder();
-        var any = false;
+        var builder = new EventBuilder();
         while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
             if (line.Length == 0)
             {
-                if (any)
+                if (builder.Complete() is { } completed)
                 {
-                    yield return new SseEvent(name, data.ToString());
+                    yield return completed;
                 }
 
-                name = "message";
-                data.Clear();
-                any = false;
                 continue;
             }
 
+            builder.Accept(line);
+        }
+
+        if (builder.Complete() is { } trailing)
+        {
+            yield return trailing;
+        }
+    }
+
+    private sealed class EventBuilder
+    {
+        private string _name = Protocol.DefaultEvent;
+        private readonly StringBuilder _data = new();
+        private bool _any;
+
+        public void Accept(string line)
+        {
             if (line.StartsWith(':'))
             {
-                continue;
+                return;
             }
 
             var colon = line.IndexOf(':');
             var field = colon < 0 ? line : line[..colon];
-            var value = colon < 0 ? "" : line[(colon + 1)..].TrimStart(' ');
-            if (field == "event")
+            var value = colon < 0 ? string.Empty : line[(colon + 1)..].TrimStart(' ');
+            switch (field)
             {
-                name = value;
-                any = true;
-            }
-            else if (field == "data")
-            {
-                if (data.Length > 0)
-                {
-                    data.Append('\n');
-                }
-
-                data.Append(value);
-                any = true;
+                case Protocol.EventField:
+                    _name = value;
+                    _any = true;
+                    break;
+                case Protocol.DataField:
+                    AppendData(value);
+                    break;
             }
         }
 
-        if (any)
+        private void AppendData(string value)
         {
-            yield return new SseEvent(name, data.ToString());
+            if (_data.Length > 0)
+            {
+                _data.Append('\n');
+            }
+
+            _data.Append(value);
+            _any = true;
         }
+
+        public SseEvent? Complete()
+        {
+            var completed = _any ? new SseEvent(_name, _data.ToString()) : null;
+            _name = Protocol.DefaultEvent;
+            _data.Clear();
+            _any = false;
+            return completed;
+        }
+    }
+
+    private static class Protocol
+    {
+        public const string DefaultEvent = "message";
+        public const string EventField = "event";
+        public const string DataField = "data";
     }
 }

@@ -77,12 +77,12 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         HttpResponseMessage response;
         try
         {
-            response = await _http.SendAsync(Message(request.RequestUri, headers, body), HttpCompletionOption.ResponseHeadersRead, CancellationToken.None).ConfigureAwait(false);
+            response = await _http.SendAsync(Message(request.RequestUri, headers, body), HttpCompletionOption.ResponseHeadersRead, CancellationToken.None);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
             Log.UpstreamUnreachable(logger, request.RequestUri.Host, exception);
-            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, "ai-proxy could not reach the provider.").Data);
+            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, Messages.UpstreamUnreachable).Data);
             e.GenericResponse(error, HttpStatusCode.BadGateway, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
             return;
         }
@@ -155,41 +155,37 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
 
-        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response) =>
+            async (client, cancellationToken) =>
             {
                 using (response)
                 {
-                    await using var upstream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    await using var upstream = await response.Content.ReadAsStreamAsync(cancellationToken);
                     var buffer = new byte[16 * 1024];
                     int read;
                     while ((read = await upstream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                     {
                         exchange.Response?.Append(buffer.AsSpan(0, read));
-                        await client.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                        await client.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                     }
                 }
             };
-        }
 
-        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first) =>
+            async (client, cancellationToken) =>
             {
                 _client = client;
                 _cancellation = cancellationToken;
                 try
                 {
-                    await LoopAsync(first).ConfigureAwait(false);
+                    await LoopAsync(first);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
                     Log.LoopFailed(relay.Logger, uri.Host, exception);
-                    await WriteAsync(SseEvent.Error(MessagesApi.Errors.Api, "ai-proxy lost the provider response.")).ConfigureAwait(false);
+                    await WriteAsync(SseEvent.Error(MessagesApi.Errors.Api, Messages.ResponseLost));
                 }
             };
-        }
 
         private async Task LoopAsync(HttpResponseMessage first)
         {
@@ -198,69 +194,105 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             var response = first;
             while (true)
             {
-                var started = Stopwatch.GetTimestamp();
-                using (response)
-                {
-                    await using var upstream = await response.Content.ReadAsStreamAsync(_cancellation).ConfigureAwait(false);
-                    await foreach (var sse in new SseReader().ReadAsync(upstream, _cancellation).ConfigureAwait(false))
-                    foreach (var passed in loop.Round.Accept(sse))
-                    {
-                        await WriteAsync(passed).ConfigureAwait(false);
-                    }
-                }
-
-                exchange.Stages.Add($"ccr.round-{loop.Answered + 1}", Stopwatch.GetElapsedTime(started));
+                await ReadRoundAsync(loop, response);
                 switch (loop.Decide())
                 {
-                    case RetrievalStep.Fail when loop.Round.Failed:
-                        return;
-                    case RetrievalStep.Fail when !loop.Round.Ended:
-                        Log.StreamCutOff(relay.Logger, uri.Host, loop.Answered + 1);
-                        await WriteAsync(loop.Failure("The provider stream ended before the message did; retry the turn.")).ConfigureAwait(false);
-                        return;
                     case RetrievalStep.Fail:
-                        Log.LimitExceeded(relay.Logger, uri.Host, loop.Answered);
-                        await WriteAsync(loop.Failure("The model kept calling proxy_retrieve after its limit; retry the turn.")).ConfigureAwait(false);
+                        await FailAsync(loop);
                         return;
                     case RetrievalStep.Release:
-                        if (!await LinkAsync(loop).ConfigureAwait(false))
-                        {
-                            await WriteAsync(loop.Failure("ai-proxy could not record the thread; retry the turn.")).ConfigureAwait(false);
-                            return;
-                        }
-
-                        foreach (var released in loop.Finish())
-                        {
-                            await WriteAsync(released).ConfigureAwait(false);
-                        }
-
+                        await ReleaseAsync(loop);
                         return;
                 }
 
                 if (plan.Mode == CcrMode.Stateless && loop.Round.Lossy)
                 {
-                    await WriteAsync(loop.Failure("ai-proxy could not rebuild the assistant message for a retrieval; retry the turn.")).ConfigureAwait(false);
+                    await WriteAsync(loop.Failure(Messages.LossyMessage));
                     return;
                 }
 
-                var results = loop.ToolResults(await AnswerAsync(loop).ConfigureAwait(false));
-                forwarded = plan.Mode == CcrMode.Thread
-                    ? RetrievalFollowUp.Thread(forwarded, loop.Round.MessageId, results)
-                    : RetrievalFollowUp.Stateless(forwarded, loop.Round.Content(), results);
-                loop.NextRound();
-                response = await SendWithPingsAsync(forwarded).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode)
+                forwarded = await FollowUpAsync(loop, forwarded);
+                response = await SendWithPingsAsync(forwarded);
+                if (response.IsSuccessStatusCode)
                 {
-                    using (response)
+                    continue;
+                }
+
+                await RefuseFollowUpAsync(loop, response);
+                return;
+            }
+        }
+
+        private async Task ReadRoundAsync(RetrievalLoop loop, HttpResponseMessage response)
+        {
+            var started = Stopwatch.GetTimestamp();
+            using (response)
+            {
+                await using var upstream = await response.Content.ReadAsStreamAsync(_cancellation);
+                await foreach (var sse in new SseReader().ReadAsync(upstream, _cancellation).ConfigureAwait(false))
+                {
+                    foreach (var passed in loop.Round.Accept(sse))
                     {
-                        var error = await response.Content.ReadAsStringAsync(_cancellation).ConfigureAwait(false);
-                        Log.FollowUpRefused(relay.Logger, uri.Host, (int)response.StatusCode, error);
-                        await WriteAsync(IsJson(error) ? new SseEvent(MessagesApi.Events.Error, error) : SseEvent.Error(MessagesApi.Errors.Api, $"The provider refused a retrieval follow-up with {(int)response.StatusCode}."))
-                            .ConfigureAwait(false);
-                        loop.Failure("follow-up refused");
-                        return;
+                        await WriteAsync(passed);
                     }
                 }
+            }
+
+            exchange.Stages.Add(Labels.RoundPrefix + (loop.Answered + 1), Stopwatch.GetElapsedTime(started));
+        }
+
+        private async Task FailAsync(RetrievalLoop loop)
+        {
+            if (loop.Round.Failed)
+            {
+                return;
+            }
+
+            if (!loop.Round.Ended)
+            {
+                Log.StreamCutOff(relay.Logger, uri.Host, loop.Answered + 1);
+                await WriteAsync(loop.Failure(Messages.StreamCutOff));
+                return;
+            }
+
+            Log.LimitExceeded(relay.Logger, uri.Host, loop.Answered);
+            await WriteAsync(loop.Failure(Messages.LimitExceeded));
+        }
+
+        private async Task ReleaseAsync(RetrievalLoop loop)
+        {
+            if (!await LinkAsync(loop).ConfigureAwait(false))
+            {
+                await WriteAsync(loop.Failure(Messages.ThreadNotRecorded));
+                return;
+            }
+
+            foreach (var released in loop.Finish())
+            {
+                await WriteAsync(released);
+            }
+        }
+
+        private async Task<byte[]> FollowUpAsync(RetrievalLoop loop, byte[] forwarded)
+        {
+            var results = loop.ToolResults(await AnswerAsync(loop).ConfigureAwait(false));
+            var followUp = plan.Mode == CcrMode.Thread
+                ? RetrievalFollowUp.Thread(forwarded, loop.Round.MessageId, results)
+                : RetrievalFollowUp.Stateless(forwarded, loop.Round.Content(), results);
+            loop.NextRound();
+            return followUp;
+        }
+
+        private async Task RefuseFollowUpAsync(RetrievalLoop loop, HttpResponseMessage response)
+        {
+            using (response)
+            {
+                var error = await response.Content.ReadAsStringAsync(_cancellation);
+                Log.FollowUpRefused(relay.Logger, uri.Host, (int)response.StatusCode, error);
+                await WriteAsync(IsJson(error)
+                    ? new SseEvent(MessagesApi.Events.Error, error)
+                    : SseEvent.Error(MessagesApi.Errors.Api, string.Format(Messages.FollowUpRefused, (int)response.StatusCode)));
+                loop.Failure(Messages.FollowUpRefusedTrigger);
             }
         }
 
@@ -273,7 +305,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
             try
             {
-                await relay.Store.LinkThreadAsync(loop.FirstMessageId, loop.Round.MessageId, _cancellation).ConfigureAwait(false);
+                await relay.Store.LinkThreadAsync(loop.FirstMessageId, loop.Round.MessageId, _cancellation);
                 return true;
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
@@ -290,8 +322,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             {
                 var answer = loop.AtLimit ? CcrRetrieval.Limit() : relay.Retrievers().Answer(call.Input, await OriginalAsync(call.Input).ConfigureAwait(false), relay.Options);
                 answers[call.Id] = answer;
-                Log.Retrieved(relay.Logger, call.Input, answer.Error ?? "ok", answer.Text.Length, loop.Answered);
-                await RecordRecallAsync(call.Input, answer).ConfigureAwait(false);
+                Log.Retrieved(relay.Logger, call.Input, answer.Error ?? Labels.Success, answer.Text.Length, loop.Answered);
+                await RecordRecallAsync(call.Input, answer);
             }
 
             return answers;
@@ -326,7 +358,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
                         exchange.GainProject is null ? GainLabels.Unknown : GainLabels.Attributions.Caller, mode, answer.Text.Length,
                         GainReportBuilder.Tokens(answer.Text.Length), answer.Error), exchange.Dialect.ToString().ToLowerInvariant(),
-                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation).ConfigureAwait(false);
+                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation);
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
             {
@@ -361,7 +393,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
             try
             {
-                return await relay.Store.FindAsync(id, _cancellation).ConfigureAwait(false);
+                return await relay.Store.FindAsync(id, _cancellation);
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
             {
@@ -388,19 +420,37 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, _cancellation);
             while (await Task.WhenAny(sending, Task.Delay(PingInterval, _cancellation)).ConfigureAwait(false) != sending)
             {
-                await WriteAsync(SseEvent.Ping).ConfigureAwait(false);
+                await WriteAsync(SseEvent.Ping);
             }
 
-            return await sending.ConfigureAwait(false);
+            return await sending;
         }
 
         private async Task WriteAsync(SseEvent sse)
         {
             var bytes = sse.ToBytes();
             exchange.Response?.Append(bytes);
-            await _client.WriteAsync(bytes, _cancellation).ConfigureAwait(false);
-            await _client.FlushAsync(_cancellation).ConfigureAwait(false);
+            await _client.WriteAsync(bytes, _cancellation);
+            await _client.FlushAsync(_cancellation);
         }
+    }
+
+    private static class Messages
+    {
+        public const string UpstreamUnreachable = "ai-proxy could not reach the provider.";
+        public const string ResponseLost = "ai-proxy lost the provider response.";
+        public const string StreamCutOff = "The provider stream ended before the message did; retry the turn.";
+        public const string LimitExceeded = "The model kept calling proxy_retrieve after its limit; retry the turn.";
+        public const string ThreadNotRecorded = "ai-proxy could not record the thread; retry the turn.";
+        public const string LossyMessage = "ai-proxy could not rebuild the assistant message for a retrieval; retry the turn.";
+        public const string FollowUpRefused = "The provider refused a retrieval follow-up with {0}.";
+        public const string FollowUpRefusedTrigger = "follow-up refused";
+    }
+
+    private static class Labels
+    {
+        public const string RoundPrefix = "ccr.round-";
+        public const string Success = "ok";
     }
 
     private static partial class Log
