@@ -12,7 +12,10 @@ internal sealed class JsonValueScanner
     /// <param name="character">The next character of the text.</param>
     public bool Closes(char character)
     {
-        if (!_inString) return ReadOutsideString(character);
+        if (!_inString)
+        {
+            return ReadOutsideString(character);
+        }
 
         // Nothing inside a string can close the value.
         ReadInsideString(character);
@@ -23,8 +26,11 @@ internal sealed class JsonValueScanner
     private void ReadInsideString(char character)
     {
         if (_escaped)
+        {
             _escaped = false;
+        }
         else
+        {
             switch (character)
             {
                 case StructureMarkers.Json.Escape:
@@ -34,6 +40,7 @@ internal sealed class JsonValueScanner
                     _inString = false;
                     break;
             }
+        }
     }
 
     private bool ReadOutsideString(char character)

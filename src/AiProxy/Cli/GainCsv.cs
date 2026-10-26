@@ -12,26 +12,46 @@ public sealed class GainCsv
         var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error\r\n");
         Add(csv, "summary", Stamp(report.GeneratedAt), report.Measurement.Kind, "", "", report.Summary);
         if (settings.History)
+        {
             foreach (var row in report.History)
                 Add(csv, "history", Stamp(row.At), row.Id, row.Project, row.Provider, row.Totals);
+        }
 
-        if (settings.All || settings.Daily || settings.Graph) Buckets(csv, "daily", report.Daily);
-        if (settings.All || settings.Weekly) Buckets(csv, "weekly", report.Weekly);
-        if (settings.All || settings.Monthly) Buckets(csv, "monthly", report.Monthly);
+        if (settings.All || settings.Daily || settings.Graph)
+        {
+            Buckets(csv, "daily", report.Daily);
+        }
+
+        if (settings.All || settings.Weekly)
+        {
+            Buckets(csv, "weekly", report.Weekly);
+        }
+
+        if (settings.All || settings.Monthly)
+        {
+            Buckets(csv, "monthly", report.Monthly);
+        }
+
         foreach (var row in report.Attributions)
             if (settings.Pipeline is not null || row.Dimension switch
                 {
                     "method" => settings.ByMethod, "rule" => settings.ByRule, "layer" => settings.ByLayer, "pipeline" => settings.ByPipeline, _ => false
                 })
+            {
                 Add(csv, $"by-{row.Dimension}", "", row.Name, "", "", row.Totals);
+            }
 
         if (settings.Failures)
+        {
             foreach (var row in report.Failures)
                 Add(csv, "failure", Stamp(row.At), row.Stage, row.Project, "", new GainTotals(), row.Error);
+        }
 
         if (settings.Recalls)
+        {
             foreach (var row in report.Recalls)
                 Add(csv, "recall", Stamp(row.At), row.PreviewId, row.Project, "", new GainTotals(EstimatedRetrievedTokens: row.EstimatedTokens), row.Error);
+        }
 
         return csv.ToString();
     }

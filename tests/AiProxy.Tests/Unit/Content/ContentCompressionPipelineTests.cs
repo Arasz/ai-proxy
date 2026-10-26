@@ -324,7 +324,10 @@ public sealed class ContentCompressionPipelineTests
         {
             OnStore?.Invoke();
 
-            if (Failure is not null) throw Failure;
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
 
             Records.Add(record);
             return ValueTask.CompletedTask;

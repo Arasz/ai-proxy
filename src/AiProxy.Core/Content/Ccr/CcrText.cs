@@ -13,7 +13,10 @@ internal static class CcrText
 
     public static string[] LinesOf(string text)
     {
-        if (text.Length == 0) return [];
+        if (text.Length == 0)
+        {
+            return [];
+        }
 
         var lines = text.Split('\n');
         return text.EndsWith('\n') ? lines[..^1] : lines;

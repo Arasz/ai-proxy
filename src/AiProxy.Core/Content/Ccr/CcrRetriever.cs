@@ -14,9 +14,15 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     public CcrRetrieval Answer(string arguments, string? original, CcrOptions options)
     {
         var parsed = parser.Parse(arguments, options);
-        if (parsed.Request is not { } request) return CcrRetrieval.Fail(CcrRetrieval.BadInput, parsed.Reason);
+        if (parsed.Request is not { } request)
+        {
+            return CcrRetrieval.Fail(CcrRetrieval.BadInput, parsed.Reason);
+        }
 
-        if (original is null || IdOf(original) != request.Id) return CcrRetrieval.Fail(CcrRetrieval.NotKept, Invariant($"No text is kept for {request.Id}. Re-run the tool that produced it."));
+        if (original is null || IdOf(original) != request.Id)
+        {
+            return CcrRetrieval.Fail(CcrRetrieval.NotKept, Invariant($"No text is kept for {request.Id}. Re-run the tool that produced it."));
+        }
 
         var lines = LinesOf(original);
         var header = Invariant($"[{CcrRetrieval.Name} {request.Id} {request.Mode}: {lines.Length} lines]");
@@ -31,7 +37,10 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
 
     private static CcrRetrieval AnswerLines(string header, string[] lines, int start, int end, CcrOptions options)
     {
-        if (start < 1 || end < start || end > lines.Length) return CcrRetrieval.Fail(CcrRetrieval.BadRange, Invariant($"Lines {start}-{end} are outside 1-{lines.Length}; the text has {lines.Length} lines."));
+        if (start < 1 || end < start || end > lines.Length)
+        {
+            return CcrRetrieval.Fail(CcrRetrieval.BadRange, Invariant($"Lines {start}-{end} are outside 1-{lines.Length}; the text has {lines.Length} lines."));
+        }
 
         var cap = options.CharactersOf(options.RetrievalTokens);
         var text = new StringBuilder(header);
@@ -56,10 +65,16 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     private static CcrRetrieval AnswerPattern(string header, string[] lines, string pattern, int context, CcrOptions options)
     {
         var regex = Compile(pattern, options);
-        if (regex is null) return CcrRetrieval.Fail(CcrRetrieval.BadPattern, "The pattern is not a valid .NET regular expression for non-backtracking matching.");
+        if (regex is null)
+        {
+            return CcrRetrieval.Fail(CcrRetrieval.BadPattern, "The pattern is not a valid .NET regular expression for non-backtracking matching.");
+        }
 
         var scan = FindMatches(regex, lines, options.MaximumMatches);
-        if (scan.TimedOutAt is { } line) return CcrRetrieval.Fail(CcrRetrieval.BadPattern, Invariant($"The pattern ran longer than {options.PatternTimeout.TotalMilliseconds} ms on line {line + 1}."));
+        if (scan.TimedOutAt is { } line)
+        {
+            return CcrRetrieval.Fail(CcrRetrieval.BadPattern, Invariant($"The pattern ran longer than {options.PatternTimeout.TotalMilliseconds} ms on line {line + 1}."));
+        }
 
         return scan.Matches.Count == 0
             ? CcrRetrieval.Answered($"{header}\n[no line matches]")
@@ -88,9 +103,15 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
             {
                 var line = lines[current];
                 var match = regex.Match(line, 0, line.EndsWith('\r') ? line.Length - 1 : line.Length);
-                if (!match.Success) continue;
+                if (!match.Success)
+                {
+                    continue;
+                }
 
-                if (matches.Count == maximum) return MatchScan.AtLimit(matches);
+                if (matches.Count == maximum)
+                {
+                    return MatchScan.AtLimit(matches);
+                }
 
                 matches[current] = match;
             }
@@ -113,7 +134,10 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         {
             var entry = $"{(last >= 0 && index > last + 1 ? "\n--" : "")}\n{Render(index, lines[index], scan.Matches.GetValueOrDefault(index), options.MatchWindow)}";
             var note = Invariant($"\n[stopped at the size cap after line {last + 1}: ask for lines from {last + 2} or narrow the pattern]");
-            if (text.Length + entry.Length + Math.Max(note.Length, stopNote.Length) > cap) return text.Append(note).ToString();
+            if (text.Length + entry.Length + Math.Max(note.Length, stopNote.Length) > cap)
+            {
+                return text.Append(note).ToString();
+            }
 
             text.Append(entry);
             last = index;
@@ -135,13 +159,22 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
 
     private static string Render(int index, string line, Match? match, int window)
     {
-        if (line.Length <= window) return Invariant($"{index + 1}\t{line}");
+        if (line.Length <= window)
+        {
+            return Invariant($"{index + 1}\t{line}");
+        }
 
         var start = match is null ? 0 : Math.Clamp(match.Index + match.Length / 2 - window / 2, 0, line.Length - window);
         var end = start + window;
-        if (start > 0 && char.IsLowSurrogate(line[start]) && char.IsHighSurrogate(line[start - 1])) start++;
+        if (start > 0 && char.IsLowSurrogate(line[start]) && char.IsHighSurrogate(line[start - 1]))
+        {
+            start++;
+        }
 
-        if (end < line.Length && char.IsHighSurrogate(line[end - 1]) && char.IsLowSurrogate(line[end])) end--;
+        if (end < line.Length && char.IsHighSurrogate(line[end - 1]) && char.IsLowSurrogate(line[end]))
+        {
+            end--;
+        }
 
         return Invariant($"{index + 1}\t[characters {start + 1}-{end} of {line.Length}] {line[start..end]}");
     }

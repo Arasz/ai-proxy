@@ -12,7 +12,10 @@ internal static class OrderedSubsequence
         foreach (var character in candidate)
         {
             position = source.IndexOf(character, position);
-            if (position < 0) return false;
+            if (position < 0)
+            {
+                return false;
+            }
 
             position++;
         }

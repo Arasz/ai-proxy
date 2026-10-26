@@ -13,7 +13,10 @@ public static class McpServerProcess
     /// <summary>Runs the stdio server against the configured proxy endpoint.</summary>
     public static async Task<int> RunAsync(string endpoint, CancellationToken cancellationToken = default)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) throw new ArgumentException("--endpoint must be an absolute HTTP or HTTPS proxy URL.", nameof(endpoint));
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+        {
+            throw new ArgumentException("--endpoint must be an absolute HTTP or HTTPS proxy URL.", nameof(endpoint));
+        }
 
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();

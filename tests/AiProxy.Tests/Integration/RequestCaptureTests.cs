@@ -66,7 +66,9 @@ public sealed class RequestCaptureTests : IDisposable
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _contentDatabasePath, $"{_contentDatabasePath}-wal", $"{_contentDatabasePath}-shm" })
             if (File.Exists(file))
+            {
                 File.Delete(file);
+            }
     }
 
     [Fact]
@@ -669,7 +671,10 @@ public sealed class RequestCaptureTests : IDisposable
             {
             }
 
-            if (value is not null) return value;
+            if (value is not null)
+            {
+                return value;
+            }
 
             Assert.False(deadline.IsCancellationRequested, "timed out waiting for the capture");
             try
@@ -685,7 +690,10 @@ public sealed class RequestCaptureTests : IDisposable
     private Task<ProxyHost> StartProxyAsync(bool capture, bool compression = false, IRequestCaptureStore? store = null, ILoggerProvider? logs = null, TimeProvider? time = null)
     {
         var configuration = new Dictionary<string, string>();
-        if (capture) configuration["Proxy:Capture"] = "true";
+        if (capture)
+        {
+            configuration["Proxy:Capture"] = "true";
+        }
 
         if (compression)
         {

@@ -29,14 +29,20 @@ internal sealed class ToolCallFiles
     public FileRead? ReadFor(JsonElement result)
     {
         var id = ResultId(result);
-        if (id is null || _results.GetValueOrDefault(id) != 1 || result.IsTrue(ToolCallJson.IsError)) return null;
+        if (id is null || _results.GetValueOrDefault(id) != 1 || result.IsTrue(ToolCallJson.IsError))
+        {
+            return null;
+        }
 
         return _calls.GetValueOrDefault(id);
     }
 
     private void Visit(JsonElement element)
     {
-        if (element.IsObject) Note(element);
+        if (element.IsObject)
+        {
+            Note(element);
+        }
 
         foreach (var child in element.Children()) Visit(child);
     }
@@ -57,9 +63,13 @@ internal sealed class ToolCallFiles
 
         var calls = element.PropertyOrDefault(ToolCallJson.ToolCalls);
         if (calls.IsArray)
+        {
             foreach (var call in calls.EnumerateArray())
             {
-                if (!call.IsObject || call.StringProperty(ToolCallJson.Id) is not { } chatId) continue;
+                if (!call.IsObject || call.StringProperty(ToolCallJson.Id) is not { } chatId)
+                {
+                    continue;
+                }
 
                 var function = call.PropertyOrDefault(ToolCallJson.Function);
                 var path = function.IsObject
@@ -67,8 +77,12 @@ internal sealed class ToolCallFiles
                     : null;
                 AddCall(chatId, path);
             }
+        }
 
-        if (ResultId(element) is { } resultId) _results[resultId] = _results.GetValueOrDefault(resultId) + 1;
+        if (ResultId(element) is { } resultId)
+        {
+            _results[resultId] = _results.GetValueOrDefault(resultId) + 1;
+        }
     }
 
     private void AddCall(string id, FileRead? path)
@@ -79,19 +93,31 @@ internal sealed class ToolCallFiles
 
     private static string? ResultId(JsonElement element)
     {
-        if (!element.IsObject) return null;
+        if (!element.IsObject)
+        {
+            return null;
+        }
 
         var type = element.StringProperty(ToolCallJson.Type);
-        if (type == ToolCallJson.ToolResult) return element.StringProperty(ToolCallJson.ToolUseId);
+        if (type == ToolCallJson.ToolResult)
+        {
+            return element.StringProperty(ToolCallJson.ToolUseId);
+        }
 
-        if (type == ToolCallJson.FunctionCallOutput) return element.StringProperty(ToolCallJson.CallId);
+        if (type == ToolCallJson.FunctionCallOutput)
+        {
+            return element.StringProperty(ToolCallJson.CallId);
+        }
 
         return element.StringProperty(ToolCallJson.Role) == ToolCallJson.Tool ? element.StringProperty(ToolCallJson.ToolCallId) : null;
     }
 
     private static FileRead? PathOf(string? name, string? arguments)
     {
-        if (!IsReadName(name) || arguments is null) return null;
+        if (!IsReadName(name) || arguments is null)
+        {
+            return null;
+        }
 
         using var document = JsonDocument.TryParse(arguments);
         return document is null ? null : PathOf(name, document.RootElement);
@@ -99,7 +125,10 @@ internal sealed class ToolCallFiles
 
     private static FileRead? PathOf(string? name, JsonElement input)
     {
-        if (!IsReadName(name) || !input.IsObject) return null;
+        if (!IsReadName(name) || !input.IsObject)
+        {
+            return null;
+        }
 
         string? path = null;
         var paths = 0;
@@ -125,7 +154,10 @@ internal sealed class ToolCallFiles
     /// <summary>Whether one segment of the name is "read": Read, read_file, readFile, but not thread.</summary>
     private static bool IsReadName(string? name)
     {
-        if (name is null) return false;
+        if (name is null)
+        {
+            return false;
+        }
 
         var start = 0;
         for (var index = 1; index <= name.Length; index++)
@@ -133,9 +165,15 @@ internal sealed class ToolCallFiles
             var ends = index == name.Length ||
                        !char.IsLetterOrDigit(name[index]) ||
                        (char.IsUpper(name[index]) && char.IsLower(name[index - 1]));
-            if (!ends) continue;
+            if (!ends)
+            {
+                continue;
+            }
 
-            if (name.AsSpan(start, index - start).Equals("read", StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.AsSpan(start, index - start).Equals("read", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
 
             start = index < name.Length && !char.IsLetterOrDigit(name[index]) ? index + 1 : index;
         }

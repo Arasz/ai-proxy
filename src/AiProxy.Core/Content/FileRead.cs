@@ -20,11 +20,16 @@ internal sealed record FileRead(string Path, bool AllowLarge)
         var lines = text.Split('\n');
         var count = lines.Length > 1 && lines[^1].Length == 0 ? lines.Length - 1 : lines.Length;
 
-        if (NumberOf(lines[0]) is null) return Path;
+        if (NumberOf(lines[0]) is null)
+        {
+            return Path;
+        }
 
         for (var index = 0; index < count; index++)
             if (NumberOf(lines[index]) != index + 1)
+            {
                 return null;
+            }
 
         return count < LineCap || AllowLarge ? Path : null;
     }
@@ -37,7 +42,10 @@ internal sealed record FileRead(string Path, bool AllowLarge)
         var end = start;
         while (end < line.Length && char.IsAsciiDigit(line[end])) end++;
 
-        if (end == start || end >= line.Length || line[end] != '\t') return null;
+        if (end == start || end >= line.Length || line[end] != '\t')
+        {
+            return null;
+        }
 
         return int.TryParse(line.AsSpan(start, end - start), out var number) ? number : null;
     }

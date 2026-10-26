@@ -56,7 +56,11 @@ internal sealed class ProxyHost : IAsyncDisposable
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
-        if (logging is not null) builder.Logging.AddProvider(logging);
+        if (logging is not null)
+        {
+            builder.Logging.AddProvider(logging);
+        }
+
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         var portListener = new TcpListener(IPAddress.Loopback, 0);
@@ -73,13 +77,25 @@ internal sealed class ProxyHost : IAsyncDisposable
             builder,
             services =>
             {
-                if (compression is not null) services.AddSingleton(compression);
+                if (compression is not null)
+                {
+                    services.AddSingleton(compression);
+                }
 
-                if (providerHosts is not null) services.AddSingleton(providerHosts);
+                if (providerHosts is not null)
+                {
+                    services.AddSingleton(providerHosts);
+                }
 
-                if (capture is not null) services.AddSingleton(capture);
+                if (capture is not null)
+                {
+                    services.AddSingleton(capture);
+                }
 
-                if (time is not null) services.AddSingleton(time);
+                if (time is not null)
+                {
+                    services.AddSingleton(time);
+                }
 
                 configure?.Invoke(services);
             },

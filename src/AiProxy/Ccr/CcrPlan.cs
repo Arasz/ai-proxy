@@ -69,7 +69,10 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         ReadOnlyMemory<byte> body,
         CancellationToken cancellationToken)
     {
-        if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request) return Forward;
+        if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
+        {
+            return Forward;
+        }
 
         return request.Thread switch
         {

@@ -22,10 +22,12 @@ public static class ContentEndpoints
             var record = await store.GetAsync(requestId, cancellationToken);
 
             if (record is null)
+            {
                 return Results.Problem(
                     title: "content_not_found",
                     detail: $"no compressed request with the id {requestId} was kept",
                     statusCode: StatusCodes.Status404NotFound);
+            }
 
             return Results.Text(record.Original);
         });

@@ -58,7 +58,10 @@ public sealed class GuardCommand
 
         using (marker)
         {
-            if (marker.PreviousRunDied) _clear();
+            if (marker.PreviousRunDied)
+            {
+                _clear();
+            }
 
             marker.Delete();
         }

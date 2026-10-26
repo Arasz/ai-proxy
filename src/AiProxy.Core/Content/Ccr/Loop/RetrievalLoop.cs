@@ -86,7 +86,10 @@ public sealed class RetrievalLoop
     /// <summary>Decides what follows the current round, once its upstream response ended or failed.</summary>
     public RetrievalStep Decide()
     {
-        if (FirstMessageId.Length == 0) FirstMessageId = Round.MessageId;
+        if (FirstMessageId.Length == 0)
+        {
+            FirstMessageId = Round.MessageId;
+        }
 
         if (Round.Failed || !Round.Ended)
         {
@@ -143,7 +146,10 @@ public sealed class RetrievalLoop
     private SseEvent MergedDelta()
     {
         var delta = Round.Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
-        if (delta[Fields.Usage] is not JsonObject usage) delta[Fields.Usage] = usage = [];
+        if (delta[Fields.Usage] is not JsonObject usage)
+        {
+            delta[Fields.Usage] = usage = [];
+        }
 
         usage[Fields.OutputTokens] = _outputTokens;
         return SseEvent.Of(Events.MessageDelta, delta);
@@ -152,14 +158,20 @@ public sealed class RetrievalLoop
     /// <summary>The error event of a failed loop.</summary>
     public SseEvent Failure(string message)
     {
-        if (State != RetrievalState.Failed) Move(RetrievalState.Failed, message);
+        if (State != RetrievalState.Failed)
+        {
+            Move(RetrievalState.Failed, message);
+        }
 
         return SseEvent.Error(Errors.Api, message);
     }
 
     private void Move(RetrievalState to, string trigger)
     {
-        if (!Transitions[State].Contains(to)) throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
+        if (!Transitions[State].Contains(to))
+        {
+            throw new InvalidOperationException($"The retrieval loop cannot move from {State} to {to} ({trigger}).");
+        }
 
         _history.Add(new RetrievalMove(State, to, trigger));
         State = to;

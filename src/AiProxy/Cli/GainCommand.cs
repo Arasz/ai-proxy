@@ -13,17 +13,44 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
     public override async Task<int> ExecuteAsync(CommandContext context, GainSettings settings, CancellationToken cancellationToken)
     {
         var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The gain command was registered without its runtime.");
-        if (settings.Quota || settings.Tier is not null) throw new ArgumentException("Quota/tier estimates are not supported: no verified subscription quota model is available. Use the estimated initial-request reductions instead.");
-        if (settings.Shadow) throw new ArgumentException("Shadow statistics are not supported: this proxy does not record shadow executions.");
-        if (settings.SkipEnv) throw new ArgumentException("--skip-env is not supported: gain is a statistics UI and launches no child processes.");
-        if (GainSettings.Validator.Error(settings, runtime) is { } validationError) throw new ArgumentException(validationError);
+        if (settings.Quota || settings.Tier is not null)
+        {
+            throw new ArgumentException("Quota/tier estimates are not supported: no verified subscription quota model is available. Use the estimated initial-request reductions instead.");
+        }
+
+        if (settings.Shadow)
+        {
+            throw new ArgumentException("Shadow statistics are not supported: this proxy does not record shadow executions.");
+        }
+
+        if (settings.SkipEnv)
+        {
+            throw new ArgumentException("--skip-env is not supported: gain is a statistics UI and launches no child processes.");
+        }
+
+        if (GainSettings.Validator.Error(settings, runtime) is { } validationError)
+        {
+            throw new ArgumentException(validationError);
+        }
+
         var query = Query(settings, runtime.Directory);
-        if (query is { From: { } from, To: { } to } && from >= to) throw new ArgumentException("The from timestamp must be before the to timestamp.");
+        if (query is { From: { } from, To: { } to } && from >= to)
+        {
+            throw new ArgumentException("The from timestamp must be before the to timestamp.");
+        }
+
         if (settings is { Reset: true, Yes: false })
         {
-            if (!runtime.Interactive) throw new ArgumentException("Reset needs confirmation. Run interactively or pass --yes after reviewing the filters.");
+            if (!runtime.Interactive)
+            {
+                throw new ArgumentException("Reset needs confirmation. Run interactively or pass --yes after reviewing the filters.");
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
-            if (!(runtime.PromptConsole ?? runtime.Console).Confirm("Reset gain and recall statistics matching these filters?", false)) return 0;
+            if (!(runtime.PromptConsole ?? runtime.Console).Confirm("Reset gain and recall statistics matching these filters?", false))
+            {
+                return 0;
+            }
         }
 
         var client = runtime.Client;
@@ -31,11 +58,18 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         {
             var reset = await client.ResetGainAsync(settings.Endpoint, query, cancellationToken).ConfigureAwait(false);
             if (settings.Format == GainFormats.Json)
+            {
                 await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(reset, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);
+            }
             else if (settings.Format == GainFormats.Csv)
+            {
                 await runtime.Output.WriteLineAsync($"removed,cutoff\r\n{reset.Removed.ToString(CultureInfo.InvariantCulture)},{reset.Cutoff:O}").ConfigureAwait(false);
+            }
             else
+            {
                 runtime.Console.Write(new Text($"Reset {reset.Removed} metadata rows through {reset.Cutoff:O}. Originals were preserved.\n"));
+            }
+
             return 0;
         }
 
@@ -47,11 +81,18 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         }
 
         if (settings.Format == GainFormats.Json)
+        {
             await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(report, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);
+        }
         else if (settings.Format == GainFormats.Csv)
+        {
             await runtime.Output.WriteAsync(new GainCsv().Render(report, settings)).ConfigureAwait(false);
+        }
         else
+        {
             runtime.Console.Write(new GainView().Render(report, settings));
+        }
+
         return 0;
     }
 
@@ -65,8 +106,16 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
 
     private static DateTimeOffset? ParseDate(string? value)
     {
-        if (value is null) return null;
-        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)) return parsed;
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+        {
+            return parsed;
+        }
+
         throw new ArgumentException("Expected an ISO timestamp, for example 2026-10-25T00:00:00Z.");
     }
 }

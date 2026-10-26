@@ -36,7 +36,9 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
 
             if (!Uri.TryCreate(proxy, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttp
                                                                           || endpoint.UserInfo.Length != 0 || endpoint.AbsolutePath != Strings.Network.RootPath || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0)
+            {
                 throw new ArgumentException(Messages.InvalidProxy);
+            }
 
             var ca = GetRootCa(settings);
             var project = GetProjectDirectory();

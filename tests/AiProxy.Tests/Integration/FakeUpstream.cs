@@ -55,10 +55,14 @@ internal sealed class FakeUpstream : IAsyncDisposable
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
         if (certificate is null)
+        {
             builder.WebHost.UseUrls("http://127.0.0.1:0");
+        }
         else
+        {
             builder.WebHost.ConfigureKestrel(kestrel =>
                 kestrel.Listen(IPAddress.Loopback, 0, listen => listen.UseHttps(certificate)));
+        }
 
         var app = builder.Build();
         var upstream = new FakeUpstream(app);

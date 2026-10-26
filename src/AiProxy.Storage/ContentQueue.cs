@@ -69,7 +69,10 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
         foreach (var jobPayload in rows)
         {
             var record = JsonSerializer.Deserialize<ContentRecord>(jobPayload.Payload, SerializerOptions);
-            if (record is not null) jobs.Add(new ContentJob(jobPayload.JobId, record));
+            if (record is not null)
+            {
+                jobs.Add(new ContentJob(jobPayload.JobId, record));
+            }
         }
 
         return jobs;

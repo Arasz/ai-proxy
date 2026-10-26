@@ -46,7 +46,10 @@ internal static class LexedSource
         for (var index = 0; index < text.Length; index++)
         {
             var before = index == 0 ? previous : text[index - 1];
-            if (text[index] == '\r' || (text[index] == '\n' && before != '\r')) lines++;
+            if (text[index] == '\r' || (text[index] == '\n' && before != '\r'))
+            {
+                lines++;
+            }
         }
 
         return lines;

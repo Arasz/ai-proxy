@@ -46,14 +46,23 @@ public sealed class CSharpCodeLexer : ICodeLexer
     public CodeLexResult Lex(string text)
     {
         var tree = CSharpSyntaxTree.ParseText(text);
-        if (tree.GetDiagnostics().Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)) return Unsupported();
+        if (tree.GetDiagnostics().Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            return Unsupported();
+        }
 
         var root = tree.GetRoot();
         var triviaLexingResult = ProcessTriviaTokens(root);
-        if (!triviaLexingResult.Supported) return triviaLexingResult;
+        if (!triviaLexingResult.Supported)
+        {
+            return triviaLexingResult;
+        }
 
         var tokenLexingResult = ProcessTokens(root);
-        if (!tokenLexingResult.Supported) return tokenLexingResult;
+        if (!tokenLexingResult.Supported)
+        {
+            return tokenLexingResult;
+        }
 
         var spans = new List<CodeToken>(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count);
         spans.AddRange(triviaLexingResult.Tokens);
@@ -68,7 +77,10 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var spans = new List<CodeToken>();
         foreach (var token in root.DescendantTokens(descendIntoTrivia: false))
         {
-            if (token.IsKind(SyntaxKind.EndOfFileToken) || token.Span.Length == 0) continue;
+            if (token.IsKind(SyntaxKind.EndOfFileToken) || token.Span.Length == 0)
+            {
+                continue;
+            }
 
             var kind = TokenKind(token);
             var valueText = kind == CodeTokenKind.Identifier ? token.ValueText : null;
@@ -85,10 +97,15 @@ public sealed class CSharpCodeLexer : ICodeLexer
         {
             if (trivia.Kind() is SyntaxKind.DisabledTextTrivia or SyntaxKind.SkippedTokensTrivia
                 || (trivia.HasStructure && trivia.GetStructure() is DirectiveTriviaSyntax))
+            {
                 return Unsupported();
+            }
 
             var kind = TriviaKind(trivia.Kind());
-            if (kind is null || trivia.Span.Length == 0) continue;
+            if (kind is null || trivia.Span.Length == 0)
+            {
+                continue;
+            }
 
             var triviaSpan = kind == CodeTokenKind.Comment && trivia.HasStructure ? trivia.FullSpan : trivia.Span;
             spans.Add(new CodeToken(kind.Value, trivia.ToFullString(), triviaSpan.Start, 1));
@@ -118,9 +135,14 @@ public sealed class CSharpCodeLexer : ICodeLexer
             || token.IsKind(SyntaxKind.InterpolatedStringTextToken)
             || token.Parent is InterpolatedStringTextSyntax
             || (token.Parent is InterpolatedStringExpressionSyntax && InterpolatedStringTokenKinds.Contains(kind)))
+        {
             return CodeTokenKind.String;
+        }
 
-        if (kind == SyntaxKind.IdentifierToken) return CodeTokenKind.Identifier;
+        if (kind == SyntaxKind.IdentifierToken)
+        {
+            return CodeTokenKind.Identifier;
+        }
 
         return SyntaxFacts.IsKeywordKind(kind) || SyntaxFacts.IsContextualKeyword(kind)
             ? CodeTokenKind.Keyword
@@ -135,7 +157,10 @@ public sealed class CSharpCodeLexer : ICodeLexer
         var line = 1;
         foreach (var codeToken in spans)
         {
-            if (codeToken.Offset < position) return null;
+            if (codeToken.Offset < position)
+            {
+                return null;
+            }
 
             if (codeToken.Offset > position)
             {
@@ -165,7 +190,9 @@ public sealed class CSharpCodeLexer : ICodeLexer
             var current = text[scanPosition];
             if (current is '\r' or '\u0085' or '\u2028' or '\u2029'
                 || (current == '\n' && (scanPosition == 0 || text[scanPosition - 1] != '\r')))
+            {
                 line++;
+            }
 
             scanPosition++;
         }

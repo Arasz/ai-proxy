@@ -25,7 +25,10 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
         process.Exited += session.OnExited;
         try
         {
-            if (!process.Start()) throw new InvalidOperationException("The system proxy guard process did not start.");
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("The system proxy guard process did not start.");
+            }
         }
         catch
         {
@@ -76,7 +79,10 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
 
         public void OnExited(object? sender, EventArgs e)
         {
-            if (!_closing) guardExited();
+            if (!_closing)
+            {
+                guardExited();
+            }
         }
     }
 }

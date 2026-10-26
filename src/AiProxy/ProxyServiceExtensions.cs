@@ -29,9 +29,15 @@ public static partial class ProxyServiceExtensions
 
             var compression = settings.Compression;
             var options = runtimeOptions ?? ProxyRuntimeOptions.Default;
-            if (settings.RootCertificatePassword is { Length: > 0 } rootPassword) options = options with { RootCertificatePassword = rootPassword };
+            if (settings.RootCertificatePassword is { Length: > 0 } rootPassword)
+            {
+                options = options with { RootCertificatePassword = rootPassword };
+            }
 
-            if (settings.Port is { } port) options = options with { Port = port };
+            if (settings.Port is { } port)
+            {
+                options = options with { Port = port };
+            }
 
             var capturePath = settings.Capture ? CapturePath(options) : null;
 
@@ -160,7 +166,10 @@ public static partial class ProxyServiceExtensions
             app.MapGet("/health", () => Results.Json(new { status = "ok" }));
             app.MapGainEndpoints();
 
-            if (settings.Compression.Enabled) app.MapContentEndpoints();
+            if (settings.Compression.Enabled)
+            {
+                app.MapContentEndpoints();
+            }
 
             return app;
         }

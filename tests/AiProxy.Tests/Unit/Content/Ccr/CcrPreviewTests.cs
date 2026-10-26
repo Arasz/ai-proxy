@@ -350,7 +350,10 @@ public sealed partial class CcrPreviewTests
                 continue;
             }
 
-            if (shown == line) return next;
+            if (shown == line)
+            {
+                return next;
+            }
 
             next++;
         }

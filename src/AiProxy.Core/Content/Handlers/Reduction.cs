@@ -28,7 +28,10 @@ public static class Reduction
                 continue;
             }
 
-            if (seen.Add(key)) kept.Add(line);
+            if (seen.Add(key))
+            {
+                kept.Add(line);
+            }
         }
 
         return string.Join("\n", kept);

@@ -69,7 +69,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase))
             .Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
         exchange.Relayed = true;
-        if (exchange.CaptureId is not null) exchange.Response = ResponseBuffer.For(EventStream, null);
+        if (exchange.CaptureId is not null)
+        {
+            exchange.Response = ResponseBuffer.For(EventStream, null);
+        }
 
         HttpResponseMessage response;
         try
@@ -95,7 +98,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         var message = new HttpRequestMessage(HttpMethod.Post, uri) { Content = new ByteArrayContent(body) };
         foreach (var header in headers)
             if (!message.Headers.TryAddWithoutValidation(header.Name, header.Value))
+            {
                 message.Content.Headers.TryAddWithoutValidation(header.Name, header.Value);
+            }
 
         return message;
     }
@@ -109,13 +114,19 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         };
         foreach (var (name, values) in upstream.Headers.Concat(upstream.Content.Headers))
         {
-            if (HopByHop.Contains(name)) continue;
+            if (HopByHop.Contains(name))
+            {
+                continue;
+            }
 
             foreach (var value in values) response.Headers.AddHeader(name, value);
         }
 
         response.Headers.AddHeader(HeaderNames.TransferEncoding, Chunked);
-        if (contentId is not null) response.Headers.AddHeader(ContentIdHeader, contentId);
+        if (contentId is not null)
+        {
+            response.Headers.AddHeader(ContentIdHeader, contentId);
+        }
 
         return response;
     }
@@ -229,6 +240,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 loop.NextRound();
                 response = await SendWithPingsAsync(forwarded).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
+                {
                     using (response)
                     {
                         var error = await response.Content.ReadAsStringAsync(_cancellation).ConfigureAwait(false);
@@ -238,12 +250,16 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                         loop.Failure("follow-up refused");
                         return;
                     }
+                }
             }
         }
 
         private async Task<bool> LinkAsync(RetrievalLoop loop)
         {
-            if (plan.Mode != CcrMode.Thread || loop.FirstMessageId.Length == 0 || loop.Round.MessageId.Length == 0) return true;
+            if (plan.Mode != CcrMode.Thread || loop.FirstMessageId.Length == 0 || loop.Round.MessageId.Length == 0)
+            {
+                return true;
+            }
 
             try
             {
@@ -282,8 +298,15 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     using var arguments = JsonDocument.Parse(input);
                     if (arguments.RootElement.ValueKind == JsonValueKind.Object)
                     {
-                        if (arguments.RootElement.TryGetProperty("id", out var identifier) && identifier.ValueKind == JsonValueKind.String) id = identifier.GetString() ?? "";
-                        if (arguments.RootElement.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String) mode = selected.GetString() ?? GainLabels.Unknown;
+                        if (arguments.RootElement.TryGetProperty("id", out var identifier) && identifier.ValueKind == JsonValueKind.String)
+                        {
+                            id = identifier.GetString() ?? "";
+                        }
+
+                        if (arguments.RootElement.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String)
+                        {
+                            mode = selected.GetString() ?? GainLabels.Unknown;
+                        }
                     }
                 }
                 catch (JsonException)
@@ -316,9 +339,15 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 return null;
             }
 
-            if (id is null) return null;
+            if (id is null)
+            {
+                return null;
+            }
 
-            if (originals.TryGetValue(id, out var original)) return original;
+            if (originals.TryGetValue(id, out var original))
+            {
+                return original;
+            }
 
             try
             {

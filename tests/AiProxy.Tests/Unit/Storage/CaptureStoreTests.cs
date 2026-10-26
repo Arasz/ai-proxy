@@ -24,7 +24,10 @@ public sealed class CaptureStoreTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+        if (Directory.Exists(_directory))
+        {
+            Directory.Delete(_directory, true);
+        }
     }
 
     [Fact]
@@ -78,11 +81,17 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix file modes do not apply on Windows.");
         Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
         await File.WriteAllBytesAsync(_databasePath, [], TestContext.Current.CancellationToken);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(_databasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(_databasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+        }
 
         await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
 
-        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_databasePath));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(_databasePath));
+        }
     }
 
     [Fact]
@@ -101,7 +110,10 @@ public sealed class CaptureStoreTests : IDisposable
 
         await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
 
-        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(directory));
+        }
     }
 
     [Fact]

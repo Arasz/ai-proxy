@@ -78,11 +78,15 @@ internal static class JsonExtensions
         public IEnumerable<JsonElement> Children()
         {
             if (element.IsObject)
+            {
                 foreach (var property in element.EnumerateObject())
                     yield return property.Value;
+            }
             else if (element.IsArray)
+            {
                 foreach (var item in element.EnumerateArray())
                     yield return item;
+            }
         }
 
         /// <summary>The property of the object, or an undefined element when there is none.</summary>
@@ -118,7 +122,10 @@ internal static class JsonExtensions
         /// <remarks>A string such as a lone surrogate does not transcode, so it reads as absent.</remarks>
         public string? ReadString()
         {
-            if (!element.IsString) return null;
+            if (!element.IsString)
+            {
+                return null;
+            }
 
             try
             {

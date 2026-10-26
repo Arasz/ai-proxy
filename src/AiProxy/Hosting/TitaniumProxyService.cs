@@ -84,7 +84,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         Server.BeforeRequest -= BeforeRequestAsync;
         Server.BeforeResponse -= BeforeResponseAsync;
         Server.AfterResponse -= AfterResponseAsync;
-        if (_endPoint is not null) _endPoint.BeforeTunnelConnectRequest -= BeforeTunnelConnectRequestAsync;
+        if (_endPoint is not null)
+        {
+            _endPoint.BeforeTunnelConnectRequest -= BeforeTunnelConnectRequestAsync;
+        }
+
         ReleaseSystemProxy();
         if (_started)
         {
@@ -110,18 +114,27 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         Server.EnableRequestTimingCapture = _inspector.CapturesResponses;
 
         PrepareRootCertificate();
-        if (_options.ConfigureSystemProxy) _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
+        if (_options.ConfigureSystemProxy)
+        {
+            _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
+        }
 
         _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port, true);
         _endPoint.BeforeTunnelConnectRequest += BeforeTunnelConnectRequestAsync;
         Server.AddEndPoint(_endPoint);
-        if (_options.TrustRootCertificate) new TitaniumRootCertificate(Server.CertificateManager).EnsureTrusted();
+        if (_options.TrustRootCertificate)
+        {
+            new TitaniumRootCertificate(Server.CertificateManager).EnsureTrusted();
+        }
 
         try
         {
             Server.Start(false);
             _started = true;
-            if (_options.ConfigureSystemProxy) SetSystemProxy();
+            if (_options.ConfigureSystemProxy)
+            {
+                SetSystemProxy();
+            }
         }
         catch
         {
@@ -213,16 +226,23 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         TryGuard(guard => guard.Dispose());
         _guard = null;
         if (restored)
+        {
             _marker?.Delete();
+        }
         else
+        {
             _marker?.Dispose();
+        }
 
         _marker = null;
     }
 
     private void TryGuard(Action<ISystemProxyGuardSession> action)
     {
-        if (_guard is null) return;
+        if (_guard is null)
+        {
+            return;
+        }
 
         try
         {
@@ -241,11 +261,20 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         certificates.PfxFilePath = Path.GetFullPath(Path.Combine(_options.DataDirectory, RootCertificateFileName));
         certificates.PfxPassword = _options.RootCertificatePassword ?? "";
         certificates.SaveFakeCertificates = false;
-        if (!certificates.CreateRootCertificate()) throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
+        if (!certificates.CreateRootCertificate())
+        {
+            throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
+        }
 
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
 
-        if (certificates.RootCertificate is { } root) File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
+        if (certificates.RootCertificate is { } root)
+        {
+            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
+        }
     }
 
     private static void CreatePrivateDirectory(string path)
@@ -273,7 +302,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
-        if (_inspector.CapturesResponses) await _inspector.AfterResponseAsync(sender, e);
+        if (_inspector.CapturesResponses)
+        {
+            await _inspector.AfterResponseAsync(sender, e);
+        }
 
         CloseClientAfterUpstreamClosed(e);
     }
@@ -284,7 +316,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// </summary>
     private void CloseClientAfterUpstreamClosed(SessionEventArgs e)
     {
-        if (_upstreamStateUnreadable) return;
+        if (_upstreamStateUnreadable)
+        {
+            return;
+        }
 
         bool closed;
         try
@@ -298,9 +333,15 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             return;
         }
 
-        if (!closed) return;
+        if (!closed)
+        {
+            return;
+        }
 
-        if (e.HttpClient.Response.IsChunked) Log.UpstreamClosedMidStream(_logger, e.HttpClient.Request.RequestUri.Host);
+        if (e.HttpClient.Response.IsChunked)
+        {
+            Log.UpstreamClosedMidStream(_logger, e.HttpClient.Request.RequestUri.Host);
+        }
 
         e.TerminateSession();
     }

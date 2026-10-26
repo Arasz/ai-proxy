@@ -22,12 +22,19 @@ public sealed partial class ContentDecompositor
             {
                 var line = LineAt(_position);
 
-                if (TakeFence(line) || TakeStructure(line)) continue;
+                if (TakeFence(line) || TakeStructure(line))
+                {
+                    continue;
+                }
 
                 if (line.IsBlank)
+                {
                     EndBlock();
+                }
                 else
+                {
                     ExtendBlock(line);
+                }
 
                 _position = line.Next;
             }
@@ -48,7 +55,10 @@ public sealed partial class ContentDecompositor
 
         private bool TakeFence(Line line)
         {
-            if (!line.Trimmed.StartsWith(StructureMarkers.Fence.Backticks, StringComparison.Ordinal)) return false;
+            if (!line.Trimmed.StartsWith(StructureMarkers.Fence.Backticks, StringComparison.Ordinal))
+            {
+                return false;
+            }
 
             var fenceEnd = FindFenceEnd(content, line.Next, line.Trimmed[0]);
 
@@ -63,10 +73,16 @@ public sealed partial class ContentDecompositor
 
         private bool TakeJson(Line line)
         {
-            if (!line.StartsJson) return false;
+            if (!line.StartsJson)
+            {
+                return false;
+            }
 
             var valueEnd = FindJsonEnd(content, _position);
-            if (valueEnd > _position && content[_position..valueEnd].IsJson()) return Take(valueEnd, ContentType.Json);
+            if (valueEnd > _position && content[_position..valueEnd].IsJson())
+            {
+                return Take(valueEnd, ContentType.Json);
+            }
 
             _failedAttempts++;
 
@@ -75,10 +91,16 @@ public sealed partial class ContentDecompositor
 
         private bool TakeXml(Line line)
         {
-            if (!line.StartsXml) return false;
+            if (!line.StartsXml)
+            {
+                return false;
+            }
 
             var elementEnd = FindXmlEnd(content, _position);
-            if (elementEnd > _position && IsXml(content[_position..elementEnd])) return Take(elementEnd, ContentType.Xml);
+            if (elementEnd > _position && IsXml(content[_position..elementEnd]))
+            {
+                return Take(elementEnd, ContentType.Xml);
+            }
 
             _failedAttempts++;
 
@@ -97,14 +119,20 @@ public sealed partial class ContentDecompositor
 
         private void ExtendBlock(Line line)
         {
-            if (_blockStart < 0) _blockStart = _position;
+            if (_blockStart < 0)
+            {
+                _blockStart = _position;
+            }
 
             _blockEnd = line.End;
         }
 
         private void EndBlock()
         {
-            if (_blockStart < 0) return;
+            if (_blockStart < 0)
+            {
+                return;
+            }
 
             _spans.Add(new Span(_blockStart, _blockEnd - _blockStart, Classify(content[_blockStart.._blockEnd]), false));
             _blockStart = -1;

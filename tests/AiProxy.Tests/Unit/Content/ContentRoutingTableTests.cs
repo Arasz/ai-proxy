@@ -109,7 +109,10 @@ public sealed class ContentRoutingTableTests
         foreach (var word in kept.Split(' '))
         {
             position = Array.IndexOf(words, word, position);
-            if (position < 0) return false;
+            if (position < 0)
+            {
+                return false;
+            }
 
             position++;
         }

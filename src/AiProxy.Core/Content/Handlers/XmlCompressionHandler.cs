@@ -52,14 +52,22 @@ public sealed class XmlCompressionHandler : ICompressionHandler
     /// <param name="text">The text node to judge.</param>
     private static bool IsIndentation(XText text)
     {
-        if (!string.IsNullOrWhiteSpace(text.Value)) return false;
+        if (!string.IsNullOrWhiteSpace(text.Value))
+        {
+            return false;
+        }
 
         var parent = text.Parent;
-        if (parent is null) return false;
+        if (parent is null)
+        {
+            return false;
+        }
 
         for (var ancestor = parent; ancestor is not null; ancestor = ancestor.Parent)
             if (ancestor.Attribute(XmlNamespace + "space")?.Value == "preserve")
+            {
                 return false;
+            }
 
         var mixed = parent.Nodes().OfType<XText>().Any(node => !string.IsNullOrWhiteSpace(node.Value));
 

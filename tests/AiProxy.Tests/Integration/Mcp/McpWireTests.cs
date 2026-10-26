@@ -148,7 +148,11 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Server.StandardInput.Close();
-        if (!Server.HasExited) Server.Kill(true);
+        if (!Server.HasExited)
+        {
+            Server.Kill(true);
+        }
+
         await Server.WaitForExitAsync();
         Server.Dispose();
     }
@@ -182,7 +186,10 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
             var line = await Server.StandardOutput.ReadLineAsync(timeout.Token);
             Assert.True(line is not null, $"MCP process closed stdout: {(Errors.IsCompleted ? await Errors : "stderr still open")}");
             using var document = JsonDocument.Parse(line!);
-            if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id) return document.RootElement.Clone();
+            if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id)
+            {
+                return document.RootElement.Clone();
+            }
         }
     }
 

@@ -29,7 +29,9 @@ public sealed class ProviderCompressionTests : IDisposable
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
             if (File.Exists(file))
+            {
                 File.Delete(file);
+            }
     }
 
     [Fact]

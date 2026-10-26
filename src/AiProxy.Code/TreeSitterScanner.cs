@@ -28,12 +28,24 @@ internal static class TreeSitterScanner
     /// <summary>Tokens and removable imports, or unsupported for an unloadable grammar, any error, missing node or unmodelled construct.</summary>
     public static CodeLexResult Lex(string text, TreeSitterLanguage language, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
     {
-        if (language.Value is not { } loaded) return Unsupported();
+        if (language.Value is not { } loaded)
+        {
+            return Unsupported();
+        }
+
         using var parser = new Parser(loaded);
         using var tree = parser.Parse(text);
-        if (tree is null || tree.RootNode.HasError) return Unsupported();
+        if (tree is null || tree.RootNode.HasError)
+        {
+            return Unsupported();
+        }
+
         var spans = Spans(text, tree.RootNode, grammar, isKeyword);
-        if (spans is null) return Unsupported();
+        if (spans is null)
+        {
+            return Unsupported();
+        }
+
         var tokens = Cover(text, spans, grammar);
         return tokens is null
             ? Unsupported()
@@ -50,11 +62,19 @@ internal static class TreeSitterScanner
             var item = stack.Pop();
             if (item.Node is not { } node)
             {
-                if (item.End > item.Start) spans.Add(new CodeToken(CodeTokenKind.String, text[item.Start..item.End], item.Start, 0));
+                if (item.End > item.Start)
+                {
+                    spans.Add(new CodeToken(CodeTokenKind.String, text[item.Start..item.End], item.Start, 0));
+                }
+
                 continue;
             }
 
-            if (node.IsError || node.IsMissing || grammar.IsUnsupported(node) || node.EndIndex > text.Length) return null;
+            if (node.IsError || node.IsMissing || grammar.IsUnsupported(node) || node.EndIndex > text.Length)
+            {
+                return null;
+            }
+
             var children = node.Children;
             if (node.IsNamed && grammar.Strings.TryGetValue(node.Type, out var embedded))
             {
@@ -64,7 +84,11 @@ internal static class TreeSitterScanner
 
             if (children.Count == 0)
             {
-                if (node.EndIndex > node.StartIndex) spans.Add(Leaf(text, node, grammar, isKeyword));
+                if (node.EndIndex > node.StartIndex)
+                {
+                    spans.Add(Leaf(text, node, grammar, isKeyword));
+                }
+
                 continue;
             }
 
@@ -93,8 +117,16 @@ internal static class TreeSitterScanner
     private static CodeToken Leaf(string text, Node node, TreeSitterGrammar grammar, Func<string, bool> isKeyword)
     {
         var spelling = text[node.StartIndex..node.EndIndex];
-        if (grammar.Comments.Contains(node.Type)) return new CodeToken(CodeTokenKind.Comment, spelling.TrimEnd('\r'), node.StartIndex, 0);
-        if (node.IsNamed && grammar.Identifiers.Contains(node.Type) && !grammar.IsFixedName(node)) return new CodeToken(CodeTokenKind.Identifier, spelling, node.StartIndex, 0, grammar.ValueText(spelling));
+        if (grammar.Comments.Contains(node.Type))
+        {
+            return new CodeToken(CodeTokenKind.Comment, spelling.TrimEnd('\r'), node.StartIndex, 0);
+        }
+
+        if (node.IsNamed && grammar.Identifiers.Contains(node.Type) && !grammar.IsFixedName(node))
+        {
+            return new CodeToken(CodeTokenKind.Identifier, spelling, node.StartIndex, 0, grammar.ValueText(spelling));
+        }
+
         var keyword = node.IsNamed ? isKeyword(spelling) : spelling.All(static character => char.IsAsciiLetter(character) || character == '_');
         return new CodeToken(keyword ? CodeTokenKind.Keyword : CodeTokenKind.Other, spelling, node.StartIndex, 0);
     }
@@ -105,7 +137,11 @@ internal static class TreeSitterScanner
         var position = 0;
         foreach (var span in spans)
         {
-            if (span.Offset < position) return null;
+            if (span.Offset < position)
+            {
+                return null;
+            }
+
             AddGap(text, position, span.Offset, tokens);
             tokens.Add(span);
             position = span.Offset + span.Text.Length;
@@ -131,10 +167,14 @@ internal static class TreeSitterScanner
             var kind = GapKind(text[start]);
             var stop = start + 1;
             if (kind == CodeTokenKind.NewLine)
+            {
                 stop += text[start] == '\r' && stop < end && text[stop] == '\n' ? 1 : 0;
+            }
             else
+            {
                 while (stop < end && GapKind(text[stop]) == kind)
                     stop++;
+            }
 
             tokens.Add(new CodeToken(kind, text[start..stop], start, 0));
             start = stop;
@@ -156,7 +196,9 @@ internal static class TreeSitterScanner
         var breaks = 0;
         for (var index = start; index < start + length; index++)
             if (text[index] == '\r' || (text[index] == '\n' && (index == 0 || text[index - 1] != '\r')))
+            {
                 breaks++;
+            }
 
         return breaks;
     }
@@ -175,7 +217,10 @@ internal static class TreeSitterScanner
                 || !StartsLine(tokens, first)
                 || !EndsLine(tokens, statement.EndIndex == text.Length ? tokens.Count : after)
                 || (grammar.ImportNeedsTerminator && !Terminated(tokens, first, removedEnd)))
+            {
                 continue;
+            }
+
             imports.Add(new CodeSpan(statement.StartIndex, statement.EndIndex - statement.StartIndex));
             removedEnd = statement.EndIndex;
         }
@@ -187,7 +232,9 @@ internal static class TreeSitterScanner
     {
         for (index--; index >= 0 && tokens[index].Kind != CodeTokenKind.NewLine; index--)
             if (tokens[index].Kind != CodeTokenKind.Whitespace)
+            {
                 return false;
+            }
 
         return true;
     }
@@ -196,7 +243,9 @@ internal static class TreeSitterScanner
     {
         for (; index < tokens.Count && tokens[index].Kind != CodeTokenKind.NewLine; index++)
             if (tokens[index].Kind is not (CodeTokenKind.Whitespace or CodeTokenKind.Comment))
+            {
                 return false;
+            }
 
         return true;
     }
@@ -206,7 +255,10 @@ internal static class TreeSitterScanner
         for (index--; index >= 0; index--)
         {
             var token = tokens[index];
-            if (token.Kind is not (CodeTokenKind.Whitespace or CodeTokenKind.NewLine or CodeTokenKind.Comment)) return token.Text == ";" || token.Offset + token.Text.Length == removedEnd;
+            if (token.Kind is not (CodeTokenKind.Whitespace or CodeTokenKind.NewLine or CodeTokenKind.Comment))
+            {
+                return token.Text == ";" || token.Offset + token.Text.Length == removedEnd;
+            }
         }
 
         return true;

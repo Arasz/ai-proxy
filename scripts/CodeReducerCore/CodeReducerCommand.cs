@@ -35,12 +35,18 @@ public static class CodeReducerCommand
 
     private static void Validate(JsonElement root)
     {
-        if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException();
+        }
 
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in root.EnumerateObject())
         {
-            if (!names.Add(property.Name)) throw new JsonException();
+            if (!names.Add(property.Name))
+            {
+                throw new JsonException();
+            }
 
             var valid = property.Name switch
             {
@@ -49,9 +55,15 @@ public static class CodeReducerCommand
                 "removeComments" or "removeImports" or "renameIdentifiers" => property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
                 _ => false
             };
-            if (!valid) throw new JsonException();
+            if (!valid)
+            {
+                throw new JsonException();
+            }
         }
 
-        if (!names.Contains("text")) throw new JsonException();
+        if (!names.Contains("text"))
+        {
+            throw new JsonException();
+        }
     }
 }

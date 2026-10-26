@@ -42,7 +42,10 @@ public sealed class ResponseBuffer
     public void Append(ReadOnlySpan<byte> bytes)
     {
         Length += bytes.Length;
-        if (_strategy is null || _strategy.Append(bytes)) return;
+        if (_strategy is null || _strategy.Append(bytes))
+        {
+            return;
+        }
 
         OverCap = true;
         _strategy = null;
@@ -70,7 +73,10 @@ public sealed class ResponseBuffer
 
         public bool Append(ReadOnlySpan<byte> bytes)
         {
-            if (_bytes.Length + bytes.Length > MaxBytes) return false;
+            if (_bytes.Length + bytes.Length > MaxBytes)
+            {
+                return false;
+            }
 
             _bytes.Write(bytes);
             return true;

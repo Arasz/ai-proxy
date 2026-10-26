@@ -19,11 +19,15 @@ public static class ProxyApplication
             string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.HttpPorts]) &&
             string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.HttpsPorts]) &&
             !builder.Configuration.GetSection(Strings.Configuration.KestrelEndpoints).GetChildren().Any())
+        {
             builder.WebHost.UseUrls(GainApi.DefaultEndpoint);
+        }
 
         if (string.IsNullOrWhiteSpace(builder.Configuration[Strings.Configuration.AllowedHosts]))
             // Only loopback names: a page rebound to 127.0.0.1 sends its own host and is refused.
+        {
             builder.Configuration[Strings.Configuration.AllowedHosts] = Strings.Network.LoopbackHosts;
+        }
 
         builder.Services.AddProxy(builder.Configuration, runtimeOptions);
 

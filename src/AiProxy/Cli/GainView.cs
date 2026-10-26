@@ -26,11 +26,20 @@ public sealed class GainView
                 report.History.Select(static row => new[] { Stamp(row.At), row.Id, row.Project ?? GainLabels.Unknown, row.Provider ?? GainLabels.Unknown, row.Pipeline, Number(row.Totals.EstimatedSavedTokens) })));
         }
 
-        if (settings.All || settings.Daily) AddBuckets(views, "Daily (UTC)", report.Daily);
+        if (settings.All || settings.Daily)
+        {
+            AddBuckets(views, "Daily (UTC)", report.Daily);
+        }
 
-        if (settings.All || settings.Weekly) AddBuckets(views, "Weekly (Monday UTC)", report.Weekly);
+        if (settings.All || settings.Weekly)
+        {
+            AddBuckets(views, "Weekly (Monday UTC)", report.Weekly);
+        }
 
-        if (settings.All || settings.Monthly) AddBuckets(views, "Monthly (UTC)", report.Monthly);
+        if (settings.All || settings.Monthly)
+        {
+            AddBuckets(views, "Monthly (UTC)", report.Monthly);
+        }
 
         if (settings.Graph)
         {
@@ -43,14 +52,33 @@ public sealed class GainView
                 views.Add(new Text($"{row.Start:yyyy-MM-dd} {Number(value),10} {new string(value < 0 ? '<' : '#', length)}\n"));
             }
 
-            if (report.Daily.Count == 0) views.Add(new Text("No recorded days.\n"));
+            if (report.Daily.Count == 0)
+            {
+                views.Add(new Text("No recorded days.\n"));
+            }
         }
 
         var dimensions = new List<string>();
-        if (settings.ByMethod || settings.Pipeline is not null) dimensions.Add("method");
-        if (settings.ByRule || settings.Pipeline is not null) dimensions.Add("rule");
-        if (settings.ByLayer || settings.Pipeline is not null) dimensions.Add("layer");
-        if (settings.ByPipeline || settings.Pipeline is not null) dimensions.Add("pipeline");
+        if (settings.ByMethod || settings.Pipeline is not null)
+        {
+            dimensions.Add("method");
+        }
+
+        if (settings.ByRule || settings.Pipeline is not null)
+        {
+            dimensions.Add("rule");
+        }
+
+        if (settings.ByLayer || settings.Pipeline is not null)
+        {
+            dimensions.Add("layer");
+        }
+
+        if (settings.ByPipeline || settings.Pipeline is not null)
+        {
+            dimensions.Add("pipeline");
+        }
+
         foreach (var dimension in dimensions)
         {
             views.Add(new Text($"By {dimension}\n"));
@@ -92,7 +120,11 @@ public sealed class GainView
             any = true;
         }
 
-        if (!any) table.AddRow(columns.Select((_, index) => (IRenderable)new Text(index == 0 ? "No records" : "")).ToArray());
+        if (!any)
+        {
+            table.AddRow(columns.Select((_, index) => (IRenderable)new Text(index == 0 ? "No records" : "")).ToArray());
+        }
+
         return table;
     }
 

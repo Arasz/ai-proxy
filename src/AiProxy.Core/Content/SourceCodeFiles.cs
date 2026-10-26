@@ -19,7 +19,10 @@ public static class SourceCodeFiles
     /// <param name="path">The path of the file, or null when it is not known.</param>
     public static string? LanguageOf(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
 
         var name = Path.GetFileName(path);
         var dot = name.LastIndexOf('.');

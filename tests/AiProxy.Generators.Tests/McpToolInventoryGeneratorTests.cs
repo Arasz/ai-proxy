@@ -55,7 +55,11 @@ public sealed class McpToolInventoryGeneratorTests
                          public void Retrieve() { }
                      }
                      """.Replace("ARGUMENTS", arguments);
-        if (extraTool) source += "public sealed class MoreTools { [ModelContextProtocol.Server.McpServerTool(Name = \"second_tool\", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)] public void Second() {} }";
+        if (extraTool)
+        {
+            source += "public sealed class MoreTools { [ModelContextProtocol.Server.McpServerTool(Name = \"second_tool\", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)] public void Second() {} }";
+        }
+
         var compilation = CSharpCompilation.Create("Fixture", [CSharpSyntaxTree.ParseText(source)],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

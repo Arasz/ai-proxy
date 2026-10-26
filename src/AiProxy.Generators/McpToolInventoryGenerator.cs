@@ -34,12 +34,19 @@ public sealed class McpToolInventoryGenerator : IIncrementalGenerator
             foreach (var tool in tools.OrderBy(static tool => tool.Name, StringComparer.Ordinal))
             {
                 if (tool.Name is not { Length: > 0 } name || string.IsNullOrWhiteSpace(name))
+                {
                     output.ReportDiagnostic(Diagnostic.Create(MissingName, tool.Method.Locations.FirstOrDefault(), tool.Method.Name));
+                }
                 else
+                {
                     source.Append("        ").Append(SymbolDisplay.FormatLiteral(name, true)).AppendLine(",");
+                }
+
                 foreach (var hint in new[] { "ReadOnly", "Destructive", "Idempotent", "OpenWorld" })
                     if (!tool.Attribute.NamedArguments.Any(argument => argument.Key == hint && argument.Value.Value is bool))
+                    {
                         output.ReportDiagnostic(Diagnostic.Create(MissingHint, tool.Method.Locations.FirstOrDefault(), tool.Method.Name, hint));
+                    }
             }
 
             source.AppendLine("    };\n}");

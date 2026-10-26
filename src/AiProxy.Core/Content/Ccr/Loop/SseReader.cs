@@ -17,7 +17,10 @@ public sealed class SseReader
         {
             if (line.Length == 0)
             {
-                if (any) yield return new SseEvent(name, data.ToString());
+                if (any)
+                {
+                    yield return new SseEvent(name, data.ToString());
+                }
 
                 name = "message";
                 data.Clear();
@@ -25,7 +28,10 @@ public sealed class SseReader
                 continue;
             }
 
-            if (line.StartsWith(':')) continue;
+            if (line.StartsWith(':'))
+            {
+                continue;
+            }
 
             var colon = line.IndexOf(':');
             var field = colon < 0 ? line : line[..colon];
@@ -37,13 +43,19 @@ public sealed class SseReader
             }
             else if (field == "data")
             {
-                if (data.Length > 0) data.Append('\n');
+                if (data.Length > 0)
+                {
+                    data.Append('\n');
+                }
 
                 data.Append(value);
                 any = true;
             }
         }
 
-        if (any) yield return new SseEvent(name, data.ToString());
+        if (any)
+        {
+            yield return new SseEvent(name, data.ToString());
+        }
     }
 }

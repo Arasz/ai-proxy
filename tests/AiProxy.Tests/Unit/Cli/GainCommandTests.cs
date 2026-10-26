@@ -107,7 +107,11 @@ public sealed class GainCommandTests
     public async Task Reset_requires_yes_or_explicit_prompt_acceptance(bool yes, bool interactive, string input, int expectedExit, int expectedPosts)
     {
         using var fixture = new Fixture();
-        if (input.Length > 0) fixture.Console.Input.PushTextWithEnter(input);
+        if (input.Length > 0)
+        {
+            fixture.Console.Input.PushTextWithEnter(input);
+        }
+
         var runtime = fixture.Runtime with { Interactive = interactive };
         var args = yes ? new[] { "gain", "--reset", "--yes", "--project-path", "/safe", "-f", "json" } : new[] { "gain", "--reset", "--project-path", "/safe", "-f", "json" };
         var exit = await new CliApplication(runtime).RunAsync(args, TestContext.Current.CancellationToken);

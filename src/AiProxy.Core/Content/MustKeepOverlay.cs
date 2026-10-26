@@ -44,7 +44,10 @@ public static partial class MustKeepOverlay
     public static OverlayResult Apply(string reducedText, string originalText)
     {
         var tokens = Tokens(originalText);
-        if (tokens.Decisions.Count == 0 && tokens.Others.Count == 0) return new OverlayResult(reducedText, 0, false);
+        if (tokens.Decisions.Count == 0 && tokens.Others.Count == 0)
+        {
+            return new OverlayResult(reducedText, 0, false);
+        }
 
         var kept = TokenSet(reducedText);
         var block = new List<string>(tokens.Decisions.Where(token => !kept.Contains(token)));
@@ -67,7 +70,10 @@ public static partial class MustKeepOverlay
             length += added;
         }
 
-        if (block.Count == 0) return new OverlayResult(reducedText, 0, ceilingReached);
+        if (block.Count == 0)
+        {
+            return new OverlayResult(reducedText, 0, ceilingReached);
+        }
 
         return new OverlayResult(reducedText + BlockLabel + string.Join(" ", block), block.Count, ceilingReached);
     }
@@ -94,11 +100,15 @@ public static partial class MustKeepOverlay
         foreach (var pattern in DecisionPatterns)
         foreach (Match match in pattern.Matches(text))
             if (seen.Add(match.Value))
+            {
                 decisions.Add(match.Value);
+            }
 
         foreach (Match match in IdentifierPattern.Matches(text))
             if (seen.Add(match.Value))
+            {
                 others.Add(match.Value);
+            }
 
         return new OverlayTokens(decisions, others);
     }

@@ -43,7 +43,10 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
             "SELECT continue_from FROM ccr_thread WHERE message_id = @MessageId;",
             new { MessageId = messageId },
             cancellationToken)).ConfigureAwait(false);
-        if (continueFrom is not null) await RefreshAsync(connection, messageId, cancellationToken).ConfigureAwait(false);
+        if (continueFrom is not null)
+        {
+            await RefreshAsync(connection, messageId, cancellationToken).ConfigureAwait(false);
+        }
 
         return continueFrom;
     }

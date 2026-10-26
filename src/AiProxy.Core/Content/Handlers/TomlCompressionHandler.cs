@@ -29,7 +29,10 @@ public sealed class TomlCompressionHandler : ICompressionHandler
             }
 
             var trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
 
             kept.Add(line);
         }

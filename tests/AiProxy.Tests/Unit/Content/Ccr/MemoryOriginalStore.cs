@@ -40,6 +40,9 @@ internal sealed class MemoryOriginalStore : IOriginalStore
 
     private void ThrowIfFailing()
     {
-        if (Failure is not null) throw Failure;
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
     }
 }

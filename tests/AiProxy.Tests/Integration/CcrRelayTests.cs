@@ -394,7 +394,10 @@ public sealed class CcrRelayTests : IDisposable
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT status, output_tokens, stages FROM capture_response;";
             await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
-            if (await reader.ReadAsync(TestContext.Current.CancellationToken)) return new ResponseRow(reader.GetInt32(0), reader.IsDBNull(1) ? -1 : reader.GetInt64(1), reader.GetString(2));
+            if (await reader.ReadAsync(TestContext.Current.CancellationToken))
+            {
+                return new ResponseRow(reader.GetInt32(0), reader.IsDBNull(1) ? -1 : reader.GetInt64(1), reader.GetString(2));
+            }
 
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }

@@ -29,10 +29,16 @@ public sealed class CcrPreviewOverlay
     {
         foreach (var token in MustKeepOverlay.Identifiers(hiddenText))
         {
-            if (_known.Contains(token)) continue;
+            if (_known.Contains(token))
+            {
+                continue;
+            }
 
             var added = token.Length + (_count > 0 ? 1 : 0);
-            if (_block.Length + added > room) break;
+            if (_block.Length + added > room)
+            {
+                break;
+            }
 
             _block.Append(_count > 0 ? " " : "").Append(token);
             _count++;

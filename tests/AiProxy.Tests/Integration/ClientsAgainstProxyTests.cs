@@ -90,7 +90,10 @@ public sealed class ClientsAgainstProxyTests : IDisposable
                 ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = toolResult })
             })
         };
-        if (thread) request["thread"] = new JsonObject { ["type"] = "create" };
+        if (thread)
+        {
+            request["thread"] = new JsonObject { ["type"] = "create" };
+        }
 
         return request.ToJsonString();
     }

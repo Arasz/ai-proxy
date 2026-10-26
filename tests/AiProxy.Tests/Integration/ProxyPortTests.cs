@@ -48,7 +48,10 @@ public sealed class ProxyPortTests
     private static (Uri Address, ProxyRuntimeOptions Options) Compose(string? port)
     {
         var builder = WebApplication.CreateBuilder();
-        if (port is not null) builder.Configuration["Proxy:Port"] = port;
+        if (port is not null)
+        {
+            builder.Configuration["Proxy:Port"] = port;
+        }
 
         var app = ProxyApplication.Create(builder);
         return (app.Services.GetRequiredService<TitaniumProxyService>().Address, app.Services.GetRequiredService<ProxyRuntimeOptions>());

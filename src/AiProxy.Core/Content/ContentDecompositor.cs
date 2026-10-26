@@ -102,18 +102,35 @@ public sealed partial class ContentDecompositor : IDecompositor
     private static ContentType Classify(string text)
     {
         var lines = text.Split(StructureMarkers.NewLine).Where(static line => line.Trim().Length > 0).ToArray();
-        if (lines.Length == 0) return ContentType.Prose;
+        if (lines.Length == 0)
+        {
+            return ContentType.Prose;
+        }
 
-        if (lines[0].TrimStart().StartsWith(StructureMarkers.Shell.Prompt)) return ContentType.ShellTranscript;
+        if (lines[0].TrimStart().StartsWith(StructureMarkers.Shell.Prompt))
+        {
+            return ContentType.ShellTranscript;
+        }
 
-        if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= MinimumMatchingLines) return ContentType.Log;
+        if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= MinimumMatchingLines)
+        {
+            return ContentType.Log;
+        }
 
-        if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= MinimumMatchingLines) return ContentType.SourceCode;
+        if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= MinimumMatchingLines)
+        {
+            return ContentType.SourceCode;
+        }
 
         if (lines.Length >= MinimumMatchingLines && lines.Count(static line => PathLinePattern.IsMatch(line) && line.Contains(StructureMarkers.ExtensionSeparator, StringComparison.Ordinal)) >= lines.Length * MajorityShare)
+        {
             return ContentType.DirectoryListing;
+        }
 
-        if (lines.Length >= MinimumMatchingLines && lines.Count(static line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * MajorityShare) return ContentType.Toml;
+        if (lines.Length >= MinimumMatchingLines && lines.Count(static line => ConfigurationLinePattern.IsMatch(line)) >= lines.Length * MajorityShare)
+        {
+            return ContentType.Toml;
+        }
 
         return lines.Any(static line => MarkdownLinePattern.IsMatch(line)) ? ContentType.Markdown : ContentType.Prose;
     }
@@ -128,9 +145,15 @@ public sealed partial class ContentDecompositor : IDecompositor
             var line = content[position..(lineEnd < 0 ? content.Length : lineEnd)];
             var trimmed = line.Trim();
 
-            if (trimmed.StartsWith(marker) && trimmed.Trim(marker).Length == 0) return lineEnd < 0 ? content.Length : lineEnd + 1;
+            if (trimmed.StartsWith(marker) && trimmed.Trim(marker).Length == 0)
+            {
+                return lineEnd < 0 ? content.Length : lineEnd + 1;
+            }
 
-            if (lineEnd < 0) return -1;
+            if (lineEnd < 0)
+            {
+                return -1;
+            }
 
             position = lineEnd + 1;
         }
@@ -144,7 +167,9 @@ public sealed partial class ContentDecompositor : IDecompositor
 
         for (var index = start; index < content.Length; index++)
             if (scanner.Closes(content[index]))
+            {
                 return index + 1;
+            }
 
         return -1;
     }
@@ -152,15 +177,27 @@ public sealed partial class ContentDecompositor : IDecompositor
     private static int FindXmlEnd(string content, int start)
     {
         var open = content.IndexOf(StructureMarkers.Xml.TagClose, start);
-        if (open < 0) return -1;
+        if (open < 0)
+        {
+            return -1;
+        }
 
-        if (open > start && content[open - 1] == StructureMarkers.Xml.SelfClosingSlash) return open + 1;
+        if (open > start && content[open - 1] == StructureMarkers.Xml.SelfClosingSlash)
+        {
+            return open + 1;
+        }
 
         var name = ReadTagName(content, start, open);
-        if (name.Length == 0) return -1;
+        if (name.Length == 0)
+        {
+            return -1;
+        }
 
         var close = content.IndexOf($"{StructureMarkers.Xml.ClosingTagOpen}{name}", open, StringComparison.Ordinal);
-        if (close < 0) return -1;
+        if (close < 0)
+        {
+            return -1;
+        }
 
         var closeEnd = content.IndexOf(StructureMarkers.Xml.TagClose, close);
         return closeEnd < 0 ? -1 : closeEnd + 1;

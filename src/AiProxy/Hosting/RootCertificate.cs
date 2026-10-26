@@ -47,12 +47,17 @@ internal static class RootCertificateExtensions
         public void EnsureTrusted()
         {
             root.Load();
-            if (root.IsTrusted()) return;
+            if (root.IsTrusted())
+            {
+                return;
+            }
 
             root.Trust();
             if (!root.IsTrusted())
+            {
                 throw new InvalidOperationException(
                     "The ai-proxy HTTPS inspection certificate is not trusted. Trust the ai-proxy root certificate for this user, then start ai-proxy again.");
+            }
         }
     }
 }

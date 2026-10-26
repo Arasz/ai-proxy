@@ -30,7 +30,10 @@ public static class LiteralBlocks
             segments.Add(new LiteralSegment(line, literal));
 
             var trimmed = line.TrimStart();
-            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal)) literal = !literal;
+            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                literal = !literal;
+            }
         }
 
         return segments;
@@ -64,7 +67,10 @@ public static class LiteralBlocks
             foreach (var candidate in TomlDelimiters)
             {
                 var count = CountOf(line, candidate);
-                if (count == 0) continue;
+                if (count == 0)
+                {
+                    continue;
+                }
 
                 if (count % 2 == 1)
                 {
@@ -116,7 +122,10 @@ public static class LiteralBlocks
 
             if (inBlockComment)
             {
-                if (line.Contains("*/", StringComparison.Ordinal)) inBlockComment = false;
+                if (line.Contains("*/", StringComparison.Ordinal))
+                {
+                    inBlockComment = false;
+                }
             }
             else if (line.Contains("/*", StringComparison.Ordinal) && !line.Contains("*/", StringComparison.Ordinal))
             {
@@ -133,13 +142,19 @@ public static class LiteralBlocks
 
         for (var index = 0; index < text.Length; index++)
         {
-            if (text[index] != '\n') continue;
+            if (text[index] != '\n')
+            {
+                continue;
+            }
 
             yield return text[start..(index + 1)];
             start = index + 1;
         }
 
-        if (start < text.Length) yield return text[start..];
+        if (start < text.Length)
+        {
+            yield return text[start..];
+        }
     }
 
     private static int CountOf(string text, string value)

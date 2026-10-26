@@ -13,9 +13,13 @@ public sealed class StageTimings
     {
         var index = _stages.FindIndex(stage => string.Equals(stage.Name, name, StringComparison.Ordinal));
         if (index < 0)
+        {
             _stages.Add(new StageTiming(name, elapsed));
+        }
         else
+        {
             _stages[index] = _stages[index] with { Elapsed = _stages[index].Elapsed + elapsed };
+        }
     }
 
     /// <summary>Adds every stage of <paramref name="stages" />, each name prefixed with <paramref name="prefix" />.</summary>

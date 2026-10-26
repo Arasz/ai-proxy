@@ -126,13 +126,21 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     private async ValueTask WriteAsync(Func<SqliteConnection, Task> write, WritePath path, CancellationToken cancellationToken)
     {
         if (path == WritePath.Reset)
+        {
             await _writer.WaitAsync(cancellationToken);
-        else if (!await _writer.WaitAsync(RequestWait, cancellationToken)) throw new TimeoutException("The gain ledger is busy; this request is not recorded.");
+        }
+        else if (!await _writer.WaitAsync(RequestWait, cancellationToken))
+        {
+            throw new TimeoutException("The gain ledger is busy; this request is not recorded.");
+        }
 
         try
         {
             await using var connection = Open();
-            if (path == WritePath.Request) connection.DefaultTimeout = ContentSchema.RequestCommandTimeoutSeconds;
+            if (path == WritePath.Request)
+            {
+                connection.DefaultTimeout = ContentSchema.RequestCommandTimeoutSeconds;
+            }
 
             await InitializeAsync(connection, cancellationToken);
             await write(connection);
@@ -145,21 +153,30 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private async Task EnsureAsync(CancellationToken cancellationToken)
     {
-        if (_initialized) return;
+        if (_initialized)
+        {
+            return;
+        }
 
         await WriteAsync(static _ => Task.CompletedTask, WritePath.Reset, cancellationToken);
     }
 
     private SqliteConnection Open()
     {
-        if (Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath)) is { } directory) Directory.CreateDirectory(directory);
+        if (Path.GetDirectoryName(Path.GetFullPath(options.DatabasePath)) is { } directory)
+        {
+            Directory.CreateDirectory(directory);
+        }
 
         return ContentSchema.Open(options.DatabasePath);
     }
 
     private async Task InitializeAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        if (_initialized) return;
+        if (_initialized)
+        {
+            return;
+        }
 
         await connection.ExecuteAsync(new CommandDefinition(Sql.Schema, cancellationToken: cancellationToken));
         _initialized = true;

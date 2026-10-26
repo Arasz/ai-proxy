@@ -46,7 +46,10 @@ public static class ContentSchema
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode;";
         var mode = Convert.ToString(command.ExecuteScalar());
-        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase)) connection.Execute("PRAGMA journal_mode = WAL;");
+        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+        {
+            connection.Execute("PRAGMA journal_mode = WAL;");
+        }
 
         return connection;
     }
@@ -69,7 +72,10 @@ public static class ContentSchema
             using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt64(command.ExecuteScalar());
-            if (version >= SchemaVersion) return;
+            if (version >= SchemaVersion)
+            {
+                return;
+            }
 
             connection.Execute(Sql.Statements, commandTimeoutSeconds);
             connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);

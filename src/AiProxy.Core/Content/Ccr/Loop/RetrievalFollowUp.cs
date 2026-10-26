@@ -18,7 +18,10 @@ public static class RetrievalFollowUp
         request.Remove(Fields.Tools);
         request.Remove(Fields.ToolChoice);
         request[Fields.Thread] = new JsonObject { [Fields.Type] = ThreadTypes.Continue, [Fields.PreviousMessageId] = previousMessageId };
-        if (request[Fields.Diagnostics] is JsonObject diagnostics && diagnostics.ContainsKey(Fields.PreviousMessageId)) diagnostics[Fields.PreviousMessageId] = previousMessageId;
+        if (request[Fields.Diagnostics] is JsonObject diagnostics && diagnostics.ContainsKey(Fields.PreviousMessageId))
+        {
+            diagnostics[Fields.PreviousMessageId] = previousMessageId;
+        }
 
         return JsonSerializer.SerializeToUtf8Bytes(request, MessagesApi.Json);
     }
@@ -27,7 +30,10 @@ public static class RetrievalFollowUp
     public static byte[] Stateless(ReadOnlySpan<byte> forwarded, JsonArray assistantContent, IReadOnlyList<ToolResult> toolResults)
     {
         var request = RequestOf(forwarded);
-        if (request[Fields.Messages] is not JsonArray messages) throw new InvalidOperationException("The forwarded request has no messages array to continue.");
+        if (request[Fields.Messages] is not JsonArray messages)
+        {
+            throw new InvalidOperationException("The forwarded request has no messages array to continue.");
+        }
 
         messages.Add(JsonSerializer.SerializeToNode(new Turn<JsonArray>(Roles.Assistant, assistantContent), MessagesApi.Json));
         messages.Add(JsonSerializer.SerializeToNode(new Turn<IReadOnlyList<ToolResult>>(Roles.User, toolResults), MessagesApi.Json));

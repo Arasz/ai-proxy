@@ -18,7 +18,10 @@ public sealed class ScoredLogPayloadTests
 
         foreach (var payload in document.RootElement.GetProperty("payloads").EnumerateObject())
         {
-            if (payload.Value.GetProperty("kind").GetString() != "log") continue;
+            if (payload.Value.GetProperty("kind").GetString() != "log")
+            {
+                continue;
+            }
 
             foreach (var question in payload.Value.GetProperty("questions").EnumerateArray()) data.Add(payload.Name, question.GetProperty("a").GetString()!);
         }

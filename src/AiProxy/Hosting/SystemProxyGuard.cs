@@ -12,7 +12,10 @@ public sealed class SystemProxyGuard(Action clear)
         var restored = false;
         while (input.ReadLine() is { } line) restored |= line == RestoredLine;
 
-        if (restored) return false;
+        if (restored)
+        {
+            return false;
+        }
 
         clear();
         return true;

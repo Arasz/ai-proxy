@@ -17,7 +17,10 @@ if (GuardCommand.IsRequested(args))
     return new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait).Run(input);
 }
 
-if (CliApplication.IsCommandInvocation(args)) return await CliApplication.RunProcessAsync(args);
+if (CliApplication.IsCommandInvocation(args))
+{
+    return await CliApplication.RunProcessAsync(args);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -60,7 +60,11 @@ public sealed class ClientCommandTests
         await File.WriteAllTextAsync(executable,
             "#!/bin/sh\nprintf 'HTTP_PROXY=%s\\nHTTPS_PROXY=%s\\nhttp_proxy=%s\\nhttps_proxy=%s\\n' \"$HTTP_PROXY\" \"$HTTPS_PROXY\" \"$http_proxy\" \"$https_proxy\"\nprintf '%s\\n' \"$NODE_EXTRA_CA_CERTS\" \"$ANTHROPIC_CUSTOM_HEADERS\" \"$NO_PROXY\" \"$@\"\nread input\nprintf 'stdin:%s\\n' \"$input\"\nprintf 'child stderr\\n' >&2\nexit 17\n",
             TestContext.Current.CancellationToken);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
         var ca = Path.Combine(directory.Path, "root ca.pem");
         await File.WriteAllTextAsync(ca, "public CA fixture", TestContext.Current.CancellationToken);
         using var listener = new TcpListener(IPAddress.Loopback, 0);

@@ -32,7 +32,9 @@ public sealed class ContentStoreWorkerTests : IDisposable
 
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
             if (File.Exists(file))
+            {
                 File.Delete(file);
+            }
     }
 
     private static ContentRecord Record()
@@ -163,7 +165,10 @@ public sealed class ContentStoreWorkerTests : IDisposable
         {
             Calls++;
 
-            if (Calls <= Failures) throw new InvalidOperationException("the disk is full");
+            if (Calls <= Failures)
+            {
+                throw new InvalidOperationException("the disk is full");
+            }
 
             return ValueTask.CompletedTask;
         }

@@ -53,9 +53,11 @@ public sealed class SystemProxyMarker : IDisposable
             catch (IOException exception)
             {
                 if (DateTime.UtcNow >= deadline)
+                {
                     throw new InvalidOperationException(
                         $"Another ai-proxy instance already owns the system proxy ({path} is in use). Stop it, then start ai-proxy again.",
                         exception);
+                }
 
                 Thread.Sleep(50);
             }
@@ -88,7 +90,10 @@ public sealed class SystemProxyMarker : IDisposable
 
     private static string? ReadEndpoint(FileStream stream)
     {
-        if (stream.Length == 0) return null;
+        if (stream.Length == 0)
+        {
+            return null;
+        }
 
         var text = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true).ReadToEnd().Trim();
         return text.Length == 0 ? "unknown" : text;

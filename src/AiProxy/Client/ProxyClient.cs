@@ -47,14 +47,20 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        if (response.IsSuccessStatusCode) return;
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
         var detail = response.ReasonPhrase;
         try
         {
             using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
             if (problem.RootElement.ValueKind == JsonValueKind.Object &&
                 problem.RootElement.TryGetProperty("detail", out var value) && value.ValueKind == JsonValueKind.String)
+            {
                 detail = value.GetString();
+            }
         }
         catch (JsonException)
         {

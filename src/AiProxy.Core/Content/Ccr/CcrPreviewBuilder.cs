@@ -24,9 +24,14 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         {
             if (options.TokensOf(original.Length) < options.MinimumTokens
                 || CcrPreview.IsIn(original))
+            {
                 return null;
+            }
 
-            if (!Initialize(original, options)) return null;
+            if (!Initialize(original, options))
+            {
+                return null;
+            }
 
             var signalSpent = SelectSignals((int)(_lineRoom * options.SignalShare));
             SelectHeadAndTail(_lineRoom - signalSpent, options.HeadShare);
@@ -71,7 +76,10 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     {
         var headRoom = (int)(room * headShare);
         var headSpent = Take(headRoom, Enumerable.Range(0, _lines.Length));
-        if (headSpent == 0 && !_shown[0] && _lines[0].Length > _budget && CutFirstLine(headRoom)) headSpent = headRoom;
+        if (headSpent == 0 && !_shown[0] && _lines[0].Length > _budget && CutFirstLine(headRoom))
+        {
+            headSpent = headRoom;
+        }
 
         Take(room - headSpent, Enumerable.Range(0, _lines.Length).Reverse());
     }
@@ -79,9 +87,15 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     private bool CutFirstLine(int room)
     {
         var length = room - (Cut(_lines[0].Length, _lines[0].Length).Length + 2);
-        if (length > 0 && char.IsHighSurrogate(_lines[0][length - 1])) length--;
+        if (length > 0 && char.IsHighSurrogate(_lines[0][length - 1]))
+        {
+            length--;
+        }
 
-        if (length <= 0) return false;
+        if (length <= 0)
+        {
+            return false;
+        }
 
         _cut = _lines[0][..length];
         _shown[0] = true;
@@ -94,10 +108,16 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         var spent = 0;
         foreach (var index in order)
         {
-            if (_shown[index]) continue;
+            if (_shown[index])
+            {
+                continue;
+            }
 
             var cost = _lines[index].Length + 1;
-            if (spent + cost > room) break;
+            if (spent + cost > room)
+            {
+                break;
+            }
 
             _shown[index] = true;
             spent += cost;
@@ -108,7 +128,10 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
 
     private void AssembleBody()
     {
-        if (_cut is not null) _hidden.Append(_lines[0], _cut.Length, _lines[0].Length - _cut.Length).Append('\n');
+        if (_cut is not null)
+        {
+            _hidden.Append(_lines[0], _cut.Length, _lines[0].Length - _cut.Length).Append('\n');
+        }
 
         for (var index = 0; index < _lines.Length;) index = _shown[index] ? AddShownLine(index) : AddHiddenRun(index);
     }
@@ -143,7 +166,10 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
 
     private CcrPreview? Finish()
     {
-        if (_hidden.Length == 0) return null;
+        if (_hidden.Length == 0)
+        {
+            return null;
+        }
 
         var count = _shown.Count(line => line);
         var text = $"{Header(count)}\n{string.Join("\n", _body)}";

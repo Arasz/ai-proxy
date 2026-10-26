@@ -212,18 +212,27 @@ public sealed class UpstreamDropTests
             while (true)
             {
                 var read = await stream.ReadAsync(buffer);
-                if (read == 0) return;
+                if (read == 0)
+                {
+                    return;
+                }
 
                 received.AddRange(buffer.AsSpan(0, read));
                 var text = Encoding.ASCII.GetString(received.ToArray());
                 var end = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
-                if (end < 0) continue;
+                if (end < 0)
+                {
+                    continue;
+                }
 
                 var length = text[..end].Split("\r\n")
                     .Where(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
                     .Select(line => int.Parse(line["Content-Length:".Length..].Trim(), CultureInfo.InvariantCulture))
                     .FirstOrDefault();
-                if (received.Count >= end + 4 + length) return;
+                if (received.Count >= end + 4 + length)
+                {
+                    return;
+                }
             }
         }
     }

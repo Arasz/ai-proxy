@@ -36,7 +36,10 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!_prepared) Prepare();
+        if (!_prepared)
+        {
+            Prepare();
+        }
 
         await using var connection = ContentSchema.Open(_databasePath);
         await connection.ExecuteAsync(new CommandDefinition(
@@ -59,7 +62,10 @@ public sealed class SqliteCaptureStore : IRequestCaptureStore
     {
         ArgumentNullException.ThrowIfNull(response);
 
-        if (!_prepared) Prepare();
+        if (!_prepared)
+        {
+            Prepare();
+        }
 
         await using var connection = ContentSchema.Open(_databasePath);
         await connection.ExecuteAsync(new CommandDefinition(

@@ -298,7 +298,10 @@ public sealed class TitaniumProxyServiceTests
 
         public void Set(ExplicitProxyEndPoint endPoint)
         {
-            if (FailSet) throw new InvalidOperationException("networksetup failed");
+            if (FailSet)
+            {
+                throw new InvalidOperationException("networksetup failed");
+            }
 
             _events?.Add("set");
             EndPoint = endPoint;
@@ -308,7 +311,10 @@ public sealed class TitaniumProxyServiceTests
         {
             _events?.Add("restore");
             RestoreCount++;
-            if (FailRestore) throw new InvalidOperationException("networksetup failed");
+            if (FailRestore)
+            {
+                throw new InvalidOperationException("networksetup failed");
+            }
         }
 
         public void Clear()
@@ -333,7 +339,10 @@ public sealed class TitaniumProxyServiceTests
         public ISystemProxyGuardSession Launch(string dataDirectory, Action guardExited)
         {
             _events.Add("launch");
-            if (Fail) throw new InvalidOperationException("cannot start the guard");
+            if (Fail)
+            {
+                throw new InvalidOperationException("cannot start the guard");
+            }
 
             _markerPath = Path.Combine(dataDirectory, SystemProxyMarker.FileName);
             return new Session(this);
@@ -345,7 +354,10 @@ public sealed class TitaniumProxyServiceTests
             {
                 owner._events.Add("restored");
                 owner.MarkerLengthWhenRestoredWasReported = new FileInfo(owner._markerPath).Length;
-                if (owner.ReportThrows) throw new IOException("Broken pipe");
+                if (owner.ReportThrows)
+                {
+                    throw new IOException("Broken pipe");
+                }
             }
 
             public void Dispose()

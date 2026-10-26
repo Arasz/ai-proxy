@@ -32,7 +32,10 @@ public static class MessagesJsonExtensions
         /// <summary>The event with its block <c>index</c> set to the client's; unchanged when the numbers agree or the data is not an object.</summary>
         public SseEvent Renumbered(int upstreamIndex, int clientIndex)
         {
-            if (upstreamIndex == clientIndex || JsonNode.Parse(sse.Data) is not JsonObject data) return sse;
+            if (upstreamIndex == clientIndex || JsonNode.Parse(sse.Data) is not JsonObject data)
+            {
+                return sse;
+            }
 
             data[Fields.Index] = clientIndex;
             return sse with { Data = data.ToJsonString(MessagesApi.Json) };

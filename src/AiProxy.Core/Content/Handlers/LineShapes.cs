@@ -36,7 +36,10 @@ public static class LineShapes
                 continue;
             }
 
-            if (tokens.SequenceEqual(first, StringComparer.Ordinal)) continue;
+            if (tokens.SequenceEqual(first, StringComparer.Ordinal))
+            {
+                continue;
+            }
 
             var changed = tokens.Where((token, index) => IsPair(token) || !string.Equals(token, first[index], StringComparison.Ordinal));
             kept.Add(string.Join(" ", changed) + ending);
@@ -58,7 +61,10 @@ public static class LineShapes
     private static string Mask(string token)
     {
         var equals = token.IndexOf('=', StringComparison.Ordinal);
-        if (equals > 0) return token[..(equals + 1)];
+        if (equals > 0)
+        {
+            return token[..(equals + 1)];
+        }
 
         return token.Any(char.IsAsciiDigit) ? "\0" : token;
     }

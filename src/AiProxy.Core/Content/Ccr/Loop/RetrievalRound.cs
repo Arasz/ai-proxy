@@ -87,7 +87,10 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     /// <summary>Takes one upstream event and returns what the client gets now; an event it cannot read passes on as it came.</summary>
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
     {
-        if (JsonNode.Parse(sse.Data) is not JsonObject data) return [sse];
+        if (JsonNode.Parse(sse.Data) is not JsonObject data)
+        {
+            return [sse];
+        }
 
         switch (sse.Name)
         {
@@ -138,7 +141,10 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 
     private IReadOnlyList<SseEvent> Start(SseEvent sse, JsonObject data)
     {
-        if (data.NumberOf(Fields.Index) is not { } index || data[Fields.ContentBlock] is not JsonObject received) return [sse];
+        if (data.NumberOf(Fields.Index) is not { } index || data[Fields.ContentBlock] is not JsonObject received)
+        {
+            return [sse];
+        }
 
         var block = new Block(index, received.DeepClone().AsObject());
         _blocks[index] = block;
@@ -155,14 +161,23 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 
     private IReadOnlyList<SseEvent> Continue(SseEvent sse, JsonObject data)
     {
-        if (data.NumberOf(Fields.Index) is not { } index || !_blocks.TryGetValue(index, out var block)) return [sse];
+        if (data.NumberOf(Fields.Index) is not { } index || !_blocks.TryGetValue(index, out var block))
+        {
+            return [sse];
+        }
 
         if (sse.Name == Events.ContentBlockStop)
+        {
             Close(block);
+        }
         else if (data[Fields.Delta] is JsonObject delta)
+        {
             Fold(block, delta);
+        }
         else
+        {
             Lossy = true;
+        }
 
         if (block.Held)
         {
@@ -191,7 +206,10 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
                 block.PartialJson.Append(delta.TextOf(Fields.PartialJson));
                 break;
             case Deltas.Citations:
-                if (content[Fields.Citations] is not JsonArray citations) content[Fields.Citations] = citations = [];
+                if (content[Fields.Citations] is not JsonArray citations)
+                {
+                    content[Fields.Citations] = citations = [];
+                }
 
                 citations.Add(delta[Fields.Citation]?.DeepClone());
                 break;
@@ -203,7 +221,10 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
 
     private void Close(Block block)
     {
-        if (block.PartialJson.Length == 0) return;
+        if (block.PartialJson.Length == 0)
+        {
+            return;
+        }
 
         try
         {

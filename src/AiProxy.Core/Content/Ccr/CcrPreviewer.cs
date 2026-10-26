@@ -19,10 +19,16 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
     /// <param name="cancellationToken">The request's token.</param>
     public async ValueTask<CcrPreview?> PreviewAsync(string original, string reduced, CcrMode mode, CancellationToken cancellationToken)
     {
-        if (mode == CcrMode.Off || options.TokensOf(reduced.Length) < options.MinimumTokens) return null;
+        if (mode == CcrMode.Off || options.TokensOf(reduced.Length) < options.MinimumTokens)
+        {
+            return null;
+        }
 
         var preview = builders().Build(original, options);
-        if (preview is null || mode != CcrMode.Thread) return preview;
+        if (preview is null || mode != CcrMode.Thread)
+        {
+            return preview;
+        }
 
         await KeepAsync(preview.Id, original, mode, cancellationToken).ConfigureAwait(false);
         return preview;
@@ -35,7 +41,10 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
     /// <param name="cancellationToken">The request's token.</param>
     public async ValueTask KeepAsync(string id, string original, CcrMode mode, CancellationToken cancellationToken)
     {
-        if (mode != CcrMode.Thread) return;
+        if (mode != CcrMode.Thread)
+        {
+            return;
+        }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(KeepTimeout);

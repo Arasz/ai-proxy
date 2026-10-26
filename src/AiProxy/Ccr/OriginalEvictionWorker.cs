@@ -14,7 +14,10 @@ public sealed partial class OriginalEvictionWorker(SqliteOriginalStore store, IL
             try
             {
                 var evicted = await store.EvictAsync(stoppingToken).ConfigureAwait(false);
-                if (evicted > 0) Log.Evicted(logger, evicted);
+                if (evicted > 0)
+                {
+                    Log.Evicted(logger, evicted);
+                }
 
                 await Task.Delay(Interval, time, stoppingToken).ConfigureAwait(false);
             }

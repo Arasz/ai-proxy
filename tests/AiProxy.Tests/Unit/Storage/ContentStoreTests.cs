@@ -31,7 +31,9 @@ public sealed class ContentStoreTests : IDisposable
 
         foreach (var file in new[] { _databasePath, $"{_databasePath}-wal", $"{_databasePath}-shm" })
             if (File.Exists(file))
+            {
                 File.Delete(file);
+            }
     }
 
     private static ContentRecord Record()
