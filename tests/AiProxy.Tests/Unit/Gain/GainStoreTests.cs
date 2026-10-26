@@ -10,6 +10,33 @@ namespace AiProxy.Tests.Unit.Gain;
 
 public sealed class GainStoreTests
 {
+    [Fact]
+    public async Task Unicode_byte_counts_remain_distinct_from_characters_in_every_aggregate_view()
+    {
+        using var directory = new TemporaryDirectory();
+        var at = DateTimeOffset.Parse("2026-11-02T12:00Z");
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(at));
+        const string original = "é🙂abcdef";
+        const string forwarded = "🙂a";
+        var entry = new GainHistoryEntry("unicode", at, "/unicode", "anthropic", "POST", "log", "tool_result", "content",
+            new GainTotals(1, original.Length, forwarded.Length, Encoding.UTF8.GetByteCount(original), Encoding.UTF8.GetByteCount(forwarded), 3, 1, 2));
+        await store.RecordAsync(entry, [], TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(HistoryLimit: 0), TestContext.Current.CancellationToken);
+
+        // é takes one UTF-16 code unit and two UTF-8 bytes; 🙂 takes two and four.
+        var expected = new GainTotals(1, 9, 3, 12, 5, 3, 1, 2);
+        Assert.Equal(expected, report.Summary);
+        Assert.Equal(new GainBucket(DateTimeOffset.Parse("2026-11-02T00:00Z"), expected), Assert.Single(report.Daily));
+        Assert.Equal(new GainBucket(DateTimeOffset.Parse("2026-11-02T00:00Z"), expected), Assert.Single(report.Weekly));
+        Assert.Equal(new GainBucket(DateTimeOffset.Parse("2026-11-01T00:00Z"), expected), Assert.Single(report.Monthly));
+        Assert.Collection(report.Attributions,
+            row => Assert.Equal(new GainAttribution("method", "POST", expected), row),
+            row => Assert.Equal(new GainAttribution("rule", "log", expected), row),
+            row => Assert.Equal(new GainAttribution("layer", "tool_result", expected), row),
+            row => Assert.Equal(new GainAttribution("pipeline", "content", expected), row));
+    }
+
     [Theory]
     [InlineData("request", "Id", 1)]
     [InlineData("failure", "Error", 1)]
