@@ -66,7 +66,7 @@ Live provider authentication and ChatGPT sign-in were outside that check.
 
 Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
 another). Requests without the header have no project and show up only in unfiltered views.
-Statistics start with this release; older requests are not backfilled.
+Statistics start with version 0.15.0; older requests are not backfilled.
 
 ## Let an agent read originals back
 
