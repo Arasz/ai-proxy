@@ -57,7 +57,8 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
             }
 
             var start = new ProcessStartInfo(settings.Executable) { UseShellExecute = false };
-            foreach (var argument in context.Remaining.Raw)
+            IEnumerable<string> arguments = context.Data is string[] forwardedArguments ? forwardedArguments : context.Remaining.Raw;
+            foreach (var argument in arguments)
             {
                 start.ArgumentList.Add(argument);
             }
