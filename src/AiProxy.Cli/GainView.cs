@@ -78,7 +78,7 @@ public sealed class GainView
 
     private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
     {
-        views.Add(new Text(title + "\n"));
+        views.Add(new Text($"{title}\n"));
         views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens"], buckets.Select(row => new[] { Stamp(row.Start), Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedRetrievedTokens) })));
     }
 

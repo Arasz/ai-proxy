@@ -30,7 +30,7 @@ public sealed class GainEndpointTests
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
         using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
-        using var response = await client.GetAsync("/gain?" + filter, TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync($"/gain?{filter}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }

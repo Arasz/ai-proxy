@@ -57,7 +57,7 @@ public sealed class CcrRequestTests
 
         var appended = Encoding.UTF8.GetString(CcrRequest.AppendTool(Bytes(body))!);
 
-        const string expected = """{"tools":[{"name":"Read","description":"café <b>"} , {"name":"Bash"} ,""" + CcrRetrieval.Definition + """],"messages":[{"role":"user","content":"tools ]"}]}""";
+        const string expected = $$"""{"tools":[{"name":"Read","description":"café <b>"} , {"name":"Bash"} ,{{CcrRetrieval.Definition}}],"messages":[{"role":"user","content":"tools ]"}]}""";
         Assert.Equal(expected, appended);
         using var parsed = JsonDocument.Parse(appended);
         Assert.Equal("proxy_retrieve", parsed.RootElement.GetProperty("tools")[2].GetProperty("name").GetString());
@@ -73,7 +73,7 @@ public sealed class CcrRequestTests
     [Fact]
     public void A_request_that_already_carries_the_tool_is_left_alone()
     {
-        var body = Bytes("""{"tools":[""" + CcrRetrieval.Definition + "]}");
+        var body = Bytes($$"""{"tools":[{{CcrRetrieval.Definition}}]}""");
 
         Assert.Null(CcrRequest.AppendTool(body));
     }

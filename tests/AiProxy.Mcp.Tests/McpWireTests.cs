@@ -77,7 +77,7 @@ public sealed class McpWireTests
     [InlineData(null)]
     public async Task Named_retrieve_original_reports_domain_errors_but_zero_matches_are_success(string? error)
     {
-        var text = error is null ? "[no line matches]" : "[proxy_retrieve error " + error + "]";
+        var text = error is null ? "[no line matches]" : $"[proxy_retrieve error {error}]";
         await using var proxy = await ProxyStub.StartAsync(new RetrievalResponse(text, error));
         await using var server = new McpProcess(proxy.Endpoint);
         await server.InitializeAsync();
@@ -174,7 +174,7 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
         while (true)
         {
             var line = await Server.StandardOutput.ReadLineAsync(timeout.Token);
-            Assert.True(line is not null, "MCP process closed stdout: " + (Errors.IsCompleted ? await Errors : "stderr still open"));
+            Assert.True(line is not null, $"MCP process closed stdout: {(Errors.IsCompleted ? await Errors : "stderr still open")}");
             using var document = JsonDocument.Parse(line!);
             if (document.RootElement.TryGetProperty("id", out var received) && received.ValueKind == JsonValueKind.Number && received.GetInt32() == id)
             {

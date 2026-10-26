@@ -63,7 +63,7 @@ public sealed class GainStoreTests
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             await using var command = connection.CreateCommand();
             command.CommandText = "UPDATE gain_event SET payload = json_set(payload, @field, 1) WHERE kind = @kind AND at = @at";
-            command.Parameters.AddWithValue("@field", "$." + field);
+            command.Parameters.AddWithValue("@field", $"$.{field}");
             command.Parameters.AddWithValue("@kind", kind);
             command.Parameters.AddWithValue("@at", old.At.UtcTicks);
             Assert.Equal(1, await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));

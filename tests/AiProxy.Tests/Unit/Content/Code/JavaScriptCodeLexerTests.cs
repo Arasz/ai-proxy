@@ -63,7 +63,7 @@ public sealed class JavaScriptCodeLexerTests
     [Fact]
     public void Reducer_returns_the_exact_original_for_a_parse_error()
     {
-        const string source = Padding + "function f( {\n";
+        const string source = $"{Padding}function f( {{\n";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.js", null, Hint);
 
@@ -85,26 +85,13 @@ public sealed class JavaScriptCodeLexerTests
     [Fact]
     public void Reducer_removes_bound_imports_but_keeps_side_effect_require_and_asi_hazard_imports()
     {
-        const string source = Padding
-            + "import a, { b as c } from 'm';\n"
-            + "import * as ns from \"n\"\n"
-            + "import 'side-effect';\n"
-            + "const r = require('x');\n"
-            + "export { q } from 'z';\n"
-            + "let y = r\n"
-            + "import d from 'hazard';\n"
-            + "(y)\n";
+        const string source = $"{Padding}import a, {{ b as c }} from 'm';\nimport * as ns from \"n\"\nimport 'side-effect';\nconst r = require('x');\nexport {{ q }} from 'z';\nlet y = r\nimport d from 'hazard';\n(y)\n";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.mjs", null, Hint);
 
         Assert.True(result.Changed);
         Assert.Equal(
-            "import 'side-effect';\n"
-            + "const r = require('x');\n"
-            + "export { q } from 'z';\n"
-            + "let y = r\n"
-            + "import d from 'hazard';\n"
-            + $"(y)\n{Hint}",
+            $"import 'side-effect';\nconst r = require('x');\nexport {{ q }} from 'z';\nlet y = r\nimport d from 'hazard';\n(y)\n{Hint}",
             result.Text);
     }
 
@@ -112,9 +99,7 @@ public sealed class JavaScriptCodeLexerTests
     public void Renaming_never_picks_a_keyword_or_renames_reserved_names()
     {
         var names = LexedSource.ManyNames(300).ToArray();
-        var source = Padding
-            + "function f() { return [this, arguments, this, arguments, undefined, undefined, console, console]; }\n"
-            + string.Concat(names.Select(static name => $"let {name} = {name};\n"));
+        var source = $"{Padding}function f() {{ return [this, arguments, this, arguments, undefined, undefined, console, console]; }}\n{string.Concat(names.Select(static name => $"let {name} = {name};\n"))}";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.js", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -165,9 +150,7 @@ public sealed class JavaScriptCodeLexerTests
     public void Renaming_never_picks_the_spelling_of_a_jsx_tag_or_attribute()
     {
         var names = LexedSource.ManyNames(60).ToArray();
-        var source = Padding
-            + "const e = <a b=\"1\">text</a>;\n"
-            + string.Concat(names.Select(static name => $"let {name} = {name};\n"));
+        var source = $"{Padding}const e = <a b=\"1\">text</a>;\n{string.Concat(names.Select(static name => $"let {name} = {name};\n"))}";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.jsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -181,9 +164,7 @@ public sealed class JavaScriptCodeLexerTests
     public void Renaming_never_touches_jsx_namespace_names_used_repeatedly()
     {
         const string jsx = "<div namespace_prefix:attribute_label=\"1\"><i namespace_prefix:attribute_label=\"2\" /></div>";
-        const string source = Padding
-            + "const repeated_value = 1, other_value = repeated_value + repeated_value;\n"
-            + $"export const e = {jsx};\n";
+        const string source = $"{Padding}const repeated_value = 1, other_value = repeated_value + repeated_value;\nexport const e = {jsx};\n";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.jsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -196,7 +177,7 @@ public sealed class JavaScriptCodeLexerTests
     [Fact]
     public void Reducer_keeps_an_import_that_shares_its_line_with_code()
     {
-        const string source = Padding + "a(); import b from 'm';\nb();\n";
+        const string source = $"{Padding}a(); import b from 'm';\nb();\n";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.js", null, Hint);
 
@@ -207,7 +188,7 @@ public sealed class JavaScriptCodeLexerTests
     [Fact]
     public void Reducer_does_not_blank_a_using_shaped_statement_when_no_import_is_removable()
     {
-        const string source = Padding + "using x = a.b;\nlet y = x;\n";
+        const string source = $"{Padding}using x = a.b;\nlet y = x;\n";
 
         var result = new CodeReducer(new JavaScriptCodeLexer()).Reduce(source, "example.js", null, Hint);
 
@@ -238,7 +219,7 @@ public sealed class JavaScriptCodeLexerTests
     [InlineData("/* a license, but not a bang comment */", CodeTokenKind.Comment)]
     public void Comments_a_tool_reads_are_kept_as_code(string comment, CodeTokenKind expected)
     {
-        var source = comment + "\nlet x = 1;\n";
+        var source = $"{comment}\nlet x = 1;\n";
 
         var result = new JavaScriptCodeLexer().Lex(source);
 

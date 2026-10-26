@@ -83,9 +83,7 @@ public sealed class TypeScriptCodeLexerTests
     public void Renaming_never_picks_a_keyword_or_renames_type_keywords()
     {
         var names = LexedSource.ManyNames(300).ToArray();
-        var source = Padding
-            + "type Q = Partial<Record<string, number>>; let p: Partial<Q> = {}; let r: Record<string, Q> = {};\n"
-            + string.Concat(names.Select(static name => $"let {name}: number = {name};\n"));
+        var source = $"{Padding}type Q = Partial<Record<string, number>>; let p: Partial<Q> = {{}}; let r: Record<string, Q> = {{}};\n{string.Concat(names.Select(static name => $"let {name}: number = {name};\n"))}";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.ts", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -112,7 +110,7 @@ public sealed class TypeScriptCodeLexerTests
 
         Assert.True(result.Changed);
         Assert.Equal(
-            "1\t/// <reference types=\"node\" />\n3\t// @ts-ignore\n4\tlet a: number = f();\n5\t// @ts-expect-error\n6\tlet b: string = 1;\n" + Hint,
+            $"1\t/// <reference types=\"node\" />\n3\t// @ts-ignore\n4\tlet a: number = f();\n5\t// @ts-expect-error\n6\tlet b: string = 1;\n{Hint}",
             result.Text);
     }
 
@@ -135,7 +133,7 @@ public sealed class TypeScriptCodeLexerTests
     [InlineData("/* a license, but not a bang comment */", CodeTokenKind.Comment)]
     public void Comments_a_tool_reads_are_kept_as_code(string comment, CodeTokenKind expected)
     {
-        var source = comment + "\nlet x = 1;\n";
+        var source = $"{comment}\nlet x = 1;\n";
 
         var result = new TypeScriptCodeLexer().Lex(source, "a.ts");
 
@@ -148,10 +146,7 @@ public sealed class TypeScriptCodeLexerTests
     public void Renaming_never_touches_jsx_tag_or_attribute_names()
     {
         const string jsx = "<div className=\"card\"><Item className=\"x\" /><ui.Panel ns:label={long_value} /></div>";
-        const string source = Padding
-            + "const Item = (props: { className: string }) => props.className;\n"
-            + "const long_value = 1, long_other = long_value + long_value;\n"
-            + $"export const e = {jsx};\n";
+        const string source = $"{Padding}const Item = (props: {{ className: string }}) => props.className;\nconst long_value = 1, long_other = long_value + long_value;\nexport const e = {jsx};\n";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -190,9 +185,7 @@ public sealed class TypeScriptCodeLexerTests
     public void Renaming_never_picks_the_spelling_of_a_jsx_tag_or_attribute()
     {
         var names = LexedSource.ManyNames(60).ToArray();
-        var source = Padding
-            + "const e = <a b=\"1\">text</a>;\n"
-            + string.Concat(names.Select(static name => $"let {name} = {name};\n"));
+        var source = $"{Padding}const e = <a b=\"1\">text</a>;\n{string.Concat(names.Select(static name => $"let {name} = {name};\n"))}";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -206,9 +199,7 @@ public sealed class TypeScriptCodeLexerTests
     public void Renaming_never_touches_jsx_namespace_names_used_repeatedly()
     {
         const string jsx = "<div namespace_prefix:attribute_label=\"1\"><i namespace_prefix:attribute_label=\"2\" /></div>";
-        const string source = Padding
-            + "const repeated_value = 1, other_value = repeated_value + repeated_value;\n"
-            + $"export const e = {jsx};\n";
+        const string source = $"{Padding}const repeated_value = 1, other_value = repeated_value + repeated_value;\nexport const e = {jsx};\n";
 
         var result = new CodeReducer(new TypeScriptCodeLexer()).Reduce(source, "a.tsx", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 

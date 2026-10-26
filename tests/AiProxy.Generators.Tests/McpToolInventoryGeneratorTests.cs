@@ -20,7 +20,7 @@ public sealed class McpToolInventoryGeneratorTests
     public void Missing_explicit_contract_argument_is_a_compile_error(string omitted, string diagnostic)
     {
         string[] arguments = ["Name = \"retrieve_original\"", "ReadOnly = true", "Destructive = false", "Idempotent = true", "OpenWorld = false"];
-        var result = Generate(string.Join(", ", arguments.Where(argument => !argument.StartsWith(omitted + " =", StringComparison.Ordinal))));
+        var result = Generate(string.Join(", ", arguments.Where(argument => !argument.StartsWith($"{omitted} =", StringComparison.Ordinal))));
         var error = Assert.Single(result.Diagnostics);
         Assert.Equal(diagnostic, error.Id);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);

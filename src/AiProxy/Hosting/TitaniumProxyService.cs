@@ -269,7 +269,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         if (certificates.RootCertificate is { } root)
         {
-            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), root.ExportCertificatePem() + "\n");
+            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
         }
     }
 

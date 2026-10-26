@@ -61,7 +61,7 @@ public sealed class PythonCodeLexerTests
     [Fact]
     public void Reducer_returns_the_exact_original_for_a_parse_error()
     {
-        const string source = Padding + "def f(:\n    pass\n";
+        const string source = $"{Padding}def f(:\n    pass\n";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", null, Hint);
 
@@ -84,23 +84,14 @@ public sealed class PythonCodeLexerTests
     [Fact]
     public void Reducer_removes_module_imports_but_keeps_future_nested_and_shared_line_imports()
     {
-        const string source = Padding
-            + "from __future__ import annotations\n"
-            + "import os, sys\n"
-            + "from a.b import (\n    c,\n    d,\n)\n"
-            + "from . import e  # why\n"
-            + "import g; h = 1\n"
-            + "try:\n    import json\nexcept ImportError:\n    json = None\n"
-            + "x = os\n";
+        const string source =
+            $"{Padding}from __future__ import annotations\nimport os, sys\nfrom a.b import (\n    c,\n    d,\n)\nfrom . import e  # why\nimport g; h = 1\ntry:\n    import json\nexcept ImportError:\n    json = None\nx = os\n";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RemoveComments: true), Hint);
 
         Assert.True(result.Changed);
         Assert.Equal(
-            "from __future__ import annotations\n"
-            + "import g; h = 1\n"
-            + "try:\n    import json\nexcept ImportError:\n    json = None\n"
-            + $"x = os\n{Hint}",
+            $"from __future__ import annotations\nimport g; h = 1\ntry:\n    import json\nexcept ImportError:\n    json = None\nx = os\n{Hint}",
             result.Text);
     }
 
@@ -108,9 +99,7 @@ public sealed class PythonCodeLexerTests
     public void Renaming_never_picks_a_keyword_or_renames_reserved_names()
     {
         var names = LexedSource.ManyNames(300).ToArray();
-        var source = Padding
-            + "class K:\n    def m(self, match, case):\n        print(self, match, case, type, len)\n        return self\n"
-            + string.Concat(names.Select(static name => $"{name} = {name}\n"));
+        var source = $"{Padding}class K:\n    def m(self, match, case):\n        print(self, match, case, type, len)\n        return self\n{string.Concat(names.Select(static name => $"{name} = {name}\n"))}";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -138,7 +127,7 @@ public sealed class PythonCodeLexerTests
 
         Assert.True(result.Changed);
         Assert.Equal(
-            "1\t#!/usr/bin/env python\n2\t# -*- coding: utf-8 -*-\n5\tx = os.path  # type: ignore\n6\ty = 1\n" + Hint,
+            $"1\t#!/usr/bin/env python\n2\t# -*- coding: utf-8 -*-\n5\tx = os.path  # type: ignore\n6\ty = 1\n{Hint}",
             result.Text);
     }
 
@@ -164,7 +153,7 @@ public sealed class PythonCodeLexerTests
     [InlineData("x = 1  # the type of x", 1, CodeTokenKind.Comment)]
     public void Comments_a_tool_reads_are_kept_as_code(string line, int lineNumber, CodeTokenKind expected)
     {
-        var source = string.Concat(Enumerable.Repeat("y = 0\n", lineNumber - 1)) + line + "\n";
+        var source = $"{string.Concat(Enumerable.Repeat("y = 0\n", lineNumber - 1))}{line}\n";
 
         var result = new PythonCodeLexer().Lex(source);
 
@@ -177,7 +166,7 @@ public sealed class PythonCodeLexerTests
     [Fact]
     public void Renaming_never_picks_a_name_spelled_by_a_string()
     {
-        const string source = Padding + "alpha_name = 1\nprint(alpha_name, getattr(C, \"a\"), getattr(C, 'b'))\n";
+        const string source = $"{Padding}alpha_name = 1\nprint(alpha_name, getattr(C, \"a\"), getattr(C, 'b'))\n";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 
@@ -210,7 +199,7 @@ public sealed class PythonCodeLexerTests
     [Fact]
     public void Reducer_keeps_an_import_that_shares_its_line_with_code()
     {
-        const string source = Padding + "x = 1; import os\ny = os\n";
+        const string source = $"{Padding}x = 1; import os\ny = os\n";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", null, Hint);
 
@@ -222,9 +211,7 @@ public sealed class PythonCodeLexerTests
     public void Renaming_treats_spellings_that_normalize_alike_as_one_name()
     {
         var names = LexedSource.ManyNames(40).ToArray();
-        var source = Padding
-            + "ﬁle = 1\nfile = ﬁle + file\n"
-            + string.Concat(names.Select(static name => $"{name} = {name}\n"));
+        var source = $"{Padding}ﬁle = 1\nfile = ﬁle + file\n{string.Concat(names.Select(static name => $"{name} = {name}\n"))}";
 
         var result = new CodeReducer(new PythonCodeLexer()).Reduce(source, "example.py", new CodeReductionOptions(RenameIdentifiers: true), Hint);
 

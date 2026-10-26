@@ -129,7 +129,8 @@ public sealed class CcrRelayTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         upstream.Handler = Script(Sse.Message("msg_X", "end_turn", 1, Sse.Text("plain")));
         await using var proxy = await StartProxyAsync();
-        var body = """{"model":"m","stream":true,"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":""" + JsonSerializer.Serialize(Large) + """}]}],"thread":{"type":"continue","previous_message_id":"msg_unknown"}}""";
+        var body =
+            $$$"""{"model":"m","stream":true,"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":{{{JsonSerializer.Serialize(Large)}}}}]}],"thread":{"type":"continue","previous_message_id":"msg_unknown"}}""";
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -209,7 +210,7 @@ public sealed class CcrRelayTests : IDisposable
         var view = ToolResultOf(upstream.Requests[0].Body);
         Assert.EndsWith(CcrView.Hint(ViewId), view, StringComparison.Ordinal);
         Assert.DoesNotContain("doc comment", view, StringComparison.Ordinal);
-        Assert.EndsWith("\n" + CodeFile, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+        Assert.EndsWith($"\n{CodeFile}", ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -229,7 +230,7 @@ public sealed class CcrRelayTests : IDisposable
         var view = ToolResultOf(upstream.Requests[0].Body);
         Assert.EndsWith(CcrView.Hint(id), view, StringComparison.Ordinal);
         Assert.DoesNotContain("module comment", view, StringComparison.Ordinal);
-        Assert.EndsWith("\n" + PythonFile, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+        Assert.EndsWith($"\n{PythonFile}", ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -251,7 +252,7 @@ public sealed class CcrRelayTests : IDisposable
         var view = ToolResultOf(upstream.Requests[0].Body);
         Assert.EndsWith(CcrView.Hint(id), view, StringComparison.Ordinal);
         Assert.DoesNotContain("doc comment", view, StringComparison.Ordinal);
-        Assert.EndsWith("\n" + typeScript, ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
+        Assert.EndsWith($"\n{typeScript}", ToolResultOf(upstream.Requests[1].Body), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -272,7 +273,7 @@ public sealed class CcrRelayTests : IDisposable
 
         Assert.Contains("done", await continued.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
         Assert.Equal(3, upstream.Requests.Count);
-        Assert.EndsWith("\n" + CodeFile, ToolResultOf(upstream.Requests[2].Body), StringComparison.Ordinal);
+        Assert.EndsWith($"\n{CodeFile}", ToolResultOf(upstream.Requests[2].Body), StringComparison.Ordinal);
     }
 
     [Fact]

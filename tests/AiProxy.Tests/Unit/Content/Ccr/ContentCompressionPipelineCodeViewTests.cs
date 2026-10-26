@@ -113,9 +113,7 @@ public sealed class ContentCompressionPipelineCodeViewTests
     [Fact]
     public async Task A_file_large_enough_for_a_preview_sends_the_preview_under_the_same_id()
     {
-        var large = "using System;\n\npublic sealed class Large\n{\n"
-            + string.Concat(Enumerable.Range(1, 400).Select(index => $"    // Member {index} keeps this comment.\n    public int Value{index} => {index};\n"))
-            + "}\n";
+        var large = $"using System;\n\npublic sealed class Large\n{{\n{string.Concat(Enumerable.Range(1, 400).Select(index => $"    // Member {index} keeps this comment.\n    public int Value{index} => {index};\n"))}}}\n";
 
         var result = await CompressAsync(new MemoryOriginalStore(), CcrMode.Stateless, new ReadFile("src/Large.cs", large));
 

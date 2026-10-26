@@ -175,7 +175,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         }
 
         var count = _shown.Count(line => line);
-        var text = Header(count) + "\n" + string.Join("\n", _body);
+        var text = $"{Header(count)}\n{string.Join("\n", _body)}";
         return new CcrPreview(_id, text + overlay.Build(text, _hidden.ToString(), _overlayRoom), count, _lines.Length);
     }
 

@@ -236,7 +236,7 @@ public sealed class ToolOutputFilePathTests
     [InlineData(1999)]
     public void A_numbered_result_ending_in_a_newline_carries_its_path(int lines)
     {
-        var body = NumberedBody("""{"file_path":"src/A.cs"}""", Numbered(1, lines) + "\n");
+        var body = NumberedBody("""{"file_path":"src/A.cs"}""", $"{Numbered(1, lines)}\n");
 
         Assert.Equal("src/A.cs", Assert.Single(Find(body)).FilePath);
     }
@@ -244,7 +244,7 @@ public sealed class ToolOutputFilePathTests
     [Fact]
     public void A_numbered_result_with_a_trailing_system_reminder_carries_no_path()
     {
-        var content = Numbered(1, 3) + "\n\n<system-reminder>\nWhenever you read a file, check it.\n</system-reminder>\n";
+        var content = $"{Numbered(1, 3)}\n\n<system-reminder>\nWhenever you read a file, check it.\n</system-reminder>\n";
         var body = NumberedBody("""{"file_path":"src/A.cs"}""", content);
 
         Assert.Null(Assert.Single(Find(body)).FilePath);

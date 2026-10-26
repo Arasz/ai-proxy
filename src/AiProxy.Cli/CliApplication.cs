@@ -31,7 +31,7 @@ public sealed class CliApplication(GainRuntime runtime)
         }
         catch (Exception exception) when (exception is CommandAppException or HttpRequestException or System.Text.Json.JsonException or ArgumentException)
         {
-            await runtime.Error.WriteLineAsync("ai-proxy: " + exception.Message).ConfigureAwait(false);
+            await runtime.Error.WriteLineAsync($"ai-proxy: {exception.Message}").ConfigureAwait(false);
             return 1;
         }
     }

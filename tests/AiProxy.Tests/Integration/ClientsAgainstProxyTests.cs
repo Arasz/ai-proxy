@@ -112,10 +112,9 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private static string Rpc(int id, string method, object parameters) =>
-        JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters }) + "\n";
+    private static string Rpc(int id, string method, object parameters) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters })}\n";
 
-    private static string Notification(string method) => JsonSerializer.Serialize(new { jsonrpc = "2.0", method }) + "\n";
+    private static string Notification(string method) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", method })}\n";
 
     private static async Task<ProcessResult> RunAsync(string? input, params string[] arguments)
     {

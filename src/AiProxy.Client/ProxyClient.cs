@@ -15,7 +15,7 @@ public sealed class ProxyClient(HttpClient http)
     };
 
     public static HttpClient CreateHttpClient(string endpoint = GainApi.DefaultEndpoint) =>
-        new(new SocketsHttpHandler { UseProxy = false }) { BaseAddress = new Uri(endpoint.TrimEnd('/') + "/") };
+        new(new SocketsHttpHandler { UseProxy = false }) { BaseAddress = new Uri($"{endpoint.TrimEnd('/')}/") };
 
     public async Task<RetrievalResponse> RetrieveAsync(RetrievalRequest request, CancellationToken cancellationToken = default)
     {
@@ -27,7 +27,7 @@ public sealed class ProxyClient(HttpClient http)
 
     public async Task<GainReport> GetGainAsync(GainQuery query, CancellationToken cancellationToken = default)
     {
-        using var response = await http.GetAsync("gain" + QueryString(query), cancellationToken).ConfigureAwait(false);
+        using var response = await http.GetAsync($"gain{QueryString(query)}", cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainReport>(Json, cancellationToken).ConfigureAwait(false)
             ?? throw new HttpRequestException("The proxy returned an empty gain response.");
@@ -67,7 +67,7 @@ public sealed class ProxyClient(HttpClient http)
             ["method"] = query.Method, ["rule"] = query.Rule, ["layer"] = query.Layer,
             ["pipeline"] = query.Pipeline, ["historyLimit"] = query.HistoryLimit.ToString(CultureInfo.InvariantCulture),
         };
-        return "?" + string.Join("&", values
-            .SelectMany(static pair => pair.Value is { } value ? [Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(value)] : Array.Empty<string>()));
+        return $"?{string.Join("&", values
+            .SelectMany(static pair => pair.Value is { } value ? [$"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(value)}"] : Array.Empty<string>()))}";
     }
 }

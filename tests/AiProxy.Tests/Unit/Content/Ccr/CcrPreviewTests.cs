@@ -135,14 +135,14 @@ public sealed partial class CcrPreviewTests
     {
         var original = Log(400);
 
-        Assert.NotEqual(Build(original + "a").Id, Build(original + "b").Id);
+        Assert.NotEqual(Build($"{original}a").Id, Build($"{original}b").Id);
     }
 
     [Fact]
     public void A_region_one_character_under_the_minimum_is_not_previewed()
     {
         // 3,000 estimated tokens at 2.89 characters each is 8,670 characters.
-        var original = new string('x', 59) + string.Concat(Enumerable.Repeat("\n" + new string('y', 99), 86));
+        var original = new string('x', 59) + string.Concat(Enumerable.Repeat($"\n{new string('y', 99)}", 86));
 
         Assert.Equal(8_659, original.Length);
         Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original + new string('z', 10), Options));
@@ -151,7 +151,7 @@ public sealed partial class CcrPreviewTests
     [Fact]
     public void A_region_at_the_minimum_is_previewed()
     {
-        var original = new string('x', 59) + string.Concat(Enumerable.Repeat("\n" + new string('y', 99), 86)) + new string('z', 11);
+        var original = new string('x', 59) + string.Concat(Enumerable.Repeat($"\n{new string('y', 99)}", 86)) + new string('z', 11);
 
         Assert.Equal(8_670, original.Length);
         Assert.NotNull(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
@@ -160,7 +160,7 @@ public sealed partial class CcrPreviewTests
     [Fact]
     public void A_region_that_already_holds_a_preview_marker_is_not_previewed_again()
     {
-        var original = "[proxy preview 0123456789abcdef: 1 of 2 lines shown.]\n" + Log(400);
+        var original = $"[proxy preview 0123456789abcdef: 1 of 2 lines shown.]\n{Log(400)}";
 
         Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
     }
@@ -171,7 +171,7 @@ public sealed partial class CcrPreviewTests
         var preview = Build(Log(400));
 
         Assert.True(CcrPreview.IsIn(preview.Text));
-        Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(preview.Text + "\n" + Log(400), Options));
+        Assert.Null(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build($"{preview.Text}\n{Log(400)}", Options));
     }
 
     [Theory]
@@ -180,7 +180,7 @@ public sealed partial class CcrPreviewTests
     [InlineData("[proxy preview 0123456789ABCDEF: 1 of 2 lines shown.]")]
     public void Text_that_only_mentions_the_marker_is_still_previewed(string mention)
     {
-        var original = mention + "\n" + Log(400);
+        var original = $"{mention}\n{Log(400)}";
 
         Assert.NotNull(new CcrPreviewBuilder(new CcrPreviewOverlay()).Build(original, Options));
     }
@@ -289,13 +289,13 @@ public sealed partial class CcrPreviewTests
     [Fact]
     public void A_single_line_longer_than_the_budget_is_cut_and_the_cut_is_named()
     {
-        var original = "{\"items\":[" + string.Join(",", Enumerable.Range(1, 2000).Select(index => $"{{\"id\":{index}}}")) + "]}";
+        var original = $"{{\"items\":[{string.Join(",", Enumerable.Range(1, 2000).Select(index => $"{{\"id\":{index}}}"))}]}}";
 
         var preview = Build(original);
 
         var body = Body(preview.Text).ToList();
         Assert.StartsWith(body[0], original, StringComparison.Ordinal);
-        Assert.Matches(@"^\[line 1 cut at character \d+ of " + original.Length + @"\]$", body[1]);
+        Assert.Matches($@"^\[line 1 cut at character \d+ of {original.Length}\]$", body[1]);
         Assert.Equal(1, preview.ShownLines);
     }
 
@@ -303,7 +303,7 @@ public sealed partial class CcrPreviewTests
     public void A_single_line_cut_preserves_a_unicode_character_crossing_the_boundary()
     {
         var boundary = Body(Build(new string('q', 20_000)).Text).First().Length;
-        var original = new string('q', boundary - 1) + "😀" + new string('q', 20_000 - boundary - 1);
+        var original = $"{new string('q', boundary - 1)}😀{new string('q', 20_000 - boundary - 1)}";
 
         var preview = Build(original);
 
@@ -316,11 +316,11 @@ public sealed partial class CcrPreviewTests
         "plain" => Log(400),
         "signals" => Log(800, index => index % 3 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
         "sparse-signals" => Log(2000, index => index % 20 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
-        "wide" => Log(300, index => $"{index}: " + new string((char)('a' + (index % 26)), 40 + (index * 7 % 500))),
+        "wide" => Log(300, index => $"{index}: {new string((char)('a' + (index % 26)), 40 + (index * 7 % 500))}"),
         "identifiers" => Log(800, index => $"call SomeServiceName{index}.HandleRequest{index} /usr/lib/x{index}.so 0x{index:x4}"),
         "crlf" => Log(400, index => $"step {index}: compiling module m{index}   \r"),
         "one-line" => new string('q', 20_000),
-        "unicode-cut" => "a" + string.Concat(Enumerable.Repeat("😀", 10_000)),
+        "unicode-cut" => $"a{string.Concat(Enumerable.Repeat("😀", 10_000))}",
         _ => throw new ArgumentOutOfRangeException(nameof(shape))
     };
 

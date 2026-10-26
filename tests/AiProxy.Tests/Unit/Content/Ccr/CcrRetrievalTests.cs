@@ -77,7 +77,7 @@ public sealed class CcrRetrievalTests
     [Fact]
     public void A_lines_result_over_the_cap_stops_and_names_the_next_start_line()
     {
-        var original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"{index} " + new string('w', 100)));
+        var original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"{index} {new string('w', 100)}"));
 
         var result = Retriever().Answer($$"""{"id":"{{IdOf(original)}}","mode":"lines","start":1,"end":400}""", original, Options);
 
@@ -165,7 +165,7 @@ public sealed class CcrRetrievalTests
     [Fact]
     public void A_pattern_result_over_the_size_cap_stops_and_says_where()
     {
-        var original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"{index} match " + new string('w', 200)));
+        var original = string.Join("\n", Enumerable.Range(1, 400).Select(index => $"{index} match {new string('w', 200)}"));
         var options = Options with { MaximumMatches = 400 };
 
         var result = Retriever().Answer(
@@ -180,7 +180,7 @@ public sealed class CcrRetrievalTests
     [Fact]
     public void Pattern_on_a_long_line_returns_a_window_around_the_match()
     {
-        var original = "short\n" + new string('a', 600) + "NEEDLE" + new string('b', 600) + "\nshort";
+        var original = $"short\n{new string('a', 600)}NEEDLE{new string('b', 600)}\nshort";
 
         var result = Retriever().Answer(
             $$"""{"id":"{{IdOf(original)}}","mode":"pattern","pattern":"NEEDLE"}""", original, Options);
@@ -198,16 +198,16 @@ public sealed class CcrRetrievalTests
     public void A_pattern_window_keeps_complete_unicode_characters_at_both_edges(bool pairAtStart)
     {
         var original = pairAtStart
-            ? new string('a', 120) + "😀" + new string('b', 119) + "X" + new string('c', 500)
-            : new string('a', 120) + "X" + new string('b', 118) + "😀" + new string('c', 500);
+            ? $"{new string('a', 120)}😀{new string('b', 119)}X{new string('c', 500)}"
+            : $"{new string('a', 120)}X{new string('b', 118)}😀{new string('c', 500)}";
 
         var result = Retriever().Answer(Pattern("X", id: IdOf(original)), original, Options);
 
         Assert.Null(result.Error);
         var line = Assert.Single(Body(result));
         var expected = pairAtStart
-            ? "1\t[characters 123-361 of 742] " + new string('b', 119) + "X" + new string('c', 119)
-            : "1\t[characters 1-239 of 741] " + new string('a', 120) + "X" + new string('b', 118);
+            ? $"1\t[characters 123-361 of 742] {new string('b', 119)}X{new string('c', 119)}"
+            : $"1\t[characters 1-239 of 741] {new string('a', 120)}X{new string('b', 118)}";
         Assert.Equal(expected, line);
         Assert.True(new UTF8Encoding(false, true).GetByteCount(result.Text) > 0);
     }
@@ -233,7 +233,7 @@ public sealed class CcrRetrievalTests
     [Fact]
     public void A_catastrophic_backtracking_pattern_returns_a_normal_answer()
     {
-        var original = string.Join("\n", Enumerable.Range(1, 50).Select(_ => new string('a', 40) + "!"));
+        var original = string.Join("\n", Enumerable.Range(1, 50).Select(_ => $"{new string('a', 40)}!"));
         var arguments = $$"""{"id":"{{IdOf(original)}}","mode":"pattern","pattern":"^(a+)+$"}""";
 
         var result = Retriever().Answer(arguments, original, Options);
@@ -289,7 +289,7 @@ public sealed class CcrRetrievalTests
     [InlineData('\uDC00')]
     public void A_raw_unpaired_surrogate_in_the_arguments_is_bad_input(char surrogate)
     {
-        var arguments = "{\"id\":\"" + Id + "\",\"mode\":\"pattern\",\"pattern\":\"" + surrogate + "\"}";
+        var arguments = $"{{\"id\":\"{Id}\",\"mode\":\"pattern\",\"pattern\":\"{surrogate}\"}}";
 
         Assert.Equal(CcrRetrieval.BadInput, Answer(arguments).Error);
     }

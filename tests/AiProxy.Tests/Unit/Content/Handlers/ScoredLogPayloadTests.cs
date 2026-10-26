@@ -36,7 +36,7 @@ public sealed class ScoredLogPayloadTests
     [MemberData(nameof(Answers))]
     public async Task A_pre_registered_answer_survives_the_reduction(string payload, string answer)
     {
-        var text = await File.ReadAllTextAsync(Path.Combine(Root, "payloads", payload + ".txt"), TestContext.Current.CancellationToken);
+        var text = await File.ReadAllTextAsync(Path.Combine(Root, "payloads", $"{payload}.txt"), TestContext.Current.CancellationToken);
 
         var result = await new LogCompressionHandler().HandleAsync(
             new ContentPart("request", 1, ContentType.Log, text),

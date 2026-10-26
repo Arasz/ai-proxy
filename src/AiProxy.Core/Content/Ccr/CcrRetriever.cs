@@ -31,7 +31,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         {
             RetrievalJson.LinesMode => AnswerLines(header, lines, request.Start!.Value, request.End!.Value, options),
             RetrievalJson.PatternMode => AnswerPattern(header, lines, request.Pattern!, request.Context, options),
-            _ => CcrRetrieval.Answered(header + "\n" + original)
+            _ => CcrRetrieval.Answered($"{header}\n{original}")
         };
     }
 
@@ -77,7 +77,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         }
 
         return scan.Matches.Count == 0
-            ? CcrRetrieval.Answered(header + "\n[no line matches]")
+            ? CcrRetrieval.Answered($"{header}\n[no line matches]")
             : CcrRetrieval.Answered(RenderMatches(header, lines, scan, context, options));
     }
 
@@ -132,7 +132,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         var last = -1;
         foreach (var index in Shown(scan.Matches.Keys, context, lines.Length))
         {
-            var entry = (last >= 0 && index > last + 1 ? "\n--" : "") + "\n" + Render(index, lines[index], scan.Matches.GetValueOrDefault(index), options.MatchWindow);
+            var entry = $"{(last >= 0 && index > last + 1 ? "\n--" : "")}\n{Render(index, lines[index], scan.Matches.GetValueOrDefault(index), options.MatchWindow)}";
             var note = Invariant($"\n[stopped at the size cap after line {last + 1}: ask for lines from {last + 2} or narrow the pattern]");
             if (text.Length + entry.Length + Math.Max(note.Length, stopNote.Length) > cap)
             {

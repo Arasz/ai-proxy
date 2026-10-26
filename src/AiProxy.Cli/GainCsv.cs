@@ -22,7 +22,7 @@ public sealed class GainCsv
             if (settings.Pipeline is not null || (row.Dimension switch
                 { "method" => settings.ByMethod, "rule" => settings.ByRule, "layer" => settings.ByLayer, "pipeline" => settings.ByPipeline, _ => false }))
             {
-                Add(csv, "by-" + row.Dimension, "", row.Name, "", "", row.Totals);
+                Add(csv, $"by-{row.Dimension}", "", row.Name, "", "", row.Totals);
             }
         }
         if (settings.Failures)
@@ -44,6 +44,6 @@ public sealed class GainCsv
         var fields = new[] { section, at, name, project ?? "", provider ?? "", totals.Requests.ToString(CultureInfo.InvariantCulture), totals.EstimatedSavedTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedRetrievedTokens.ToString(CultureInfo.InvariantCulture), error ?? "" };
         csv.AppendJoin(',', fields.Select(Escape)).Append("\r\n");
     }
-    private static string Escape(string value) => value.IndexOfAny([',', '"', '\r', '\n']) < 0 ? value : "\"" + value.Replace("\"", "\"\"") + "\"";
+    private static string Escape(string value) => value.IndexOfAny([',', '"', '\r', '\n']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
     private static string Stamp(DateTimeOffset value) => value.ToString("O", CultureInfo.InvariantCulture);
 }
