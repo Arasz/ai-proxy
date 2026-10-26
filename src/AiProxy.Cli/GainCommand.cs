@@ -28,11 +28,11 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
             throw new ArgumentException(validationError);
         }
         var query = Query(settings, runtime.Directory);
-        if (query.From is { } from && query.To is { } to && from >= to)
+        if (query is { From: { } from, To: { } to } && from >= to)
         {
             throw new ArgumentException("The from timestamp must be before the to timestamp.");
         }
-        if (settings.Reset && !settings.Yes)
+        if (settings is { Reset: true, Yes: false })
         {
             if (!runtime.Interactive)
             {
@@ -64,7 +64,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
             return 0;
         }
         var report = await client.GetGainAsync(query, cancellationToken).ConfigureAwait(false);
-        if (settings.Watch && !settings.Text)
+        if (settings is { Watch: true, Text: false })
         {
             await new GainWatch(runtime).RunAsync(client, query, settings, report, cancellationToken).ConfigureAwait(false);
             return 0;

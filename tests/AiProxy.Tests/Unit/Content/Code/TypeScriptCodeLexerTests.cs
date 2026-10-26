@@ -19,7 +19,7 @@ public sealed class TypeScriptCodeLexerTests
         Assert.Equal(["/** 😀 */", "// c"], LexedSource.Texts(result, CodeTokenKind.Comment));
         Assert.Equal(["`a", " // b`"], LexedSource.Texts(result, CodeTokenKind.String));
         Assert.Equal(3, LexedSource.Single(result, CodeTokenKind.Comment, "// c").Line);
-        Assert.Contains(result.Tokens, static token => token.Kind == CodeTokenKind.Keyword && token.Text == "string");
+        Assert.Contains(result.Tokens, static token => token is { Kind: CodeTokenKind.Keyword, Text: "string" });
     }
 
     [Fact]

@@ -448,13 +448,13 @@ public sealed class GainStoreTests
 
         foreach (var dimension in new[] { "method", "rule", "layer", "pipeline" })
         {
-            var rows = report.Attributions.Where(row => row.Dimension == dimension).ToArray();
-            Assert.Equal(report.Summary.Requests, rows.Sum(static row => row.Totals.Requests));
-            Assert.Equal(report.Summary.Recalls, rows.Sum(static row => row.Totals.Recalls));
-            Assert.Equal(report.Summary.EstimatedRetrievedTokens, rows.Sum(static row => row.Totals.EstimatedRetrievedTokens));
+            var attributions = report.Attributions.Where(row => row.Dimension == dimension).ToArray();
+            Assert.Equal(report.Summary.Requests, attributions.Sum(static row => row.Totals.Requests));
+            Assert.Equal(report.Summary.Recalls, attributions.Sum(static row => row.Totals.Recalls));
+            Assert.Equal(report.Summary.EstimatedRetrievedTokens, attributions.Sum(static row => row.Totals.EstimatedRetrievedTokens));
         }
 
-        var ccr = Assert.Single(report.Attributions, row => row.Dimension == "pipeline" && row.Name == GainLabels.Pipelines.Ccr);
+        var ccr = Assert.Single(report.Attributions, static row => row is { Dimension: "pipeline", Name: GainLabels.Pipelines.Ccr });
         Assert.Equal(1, ccr.Totals.Recalls);
         Assert.Equal(0, ccr.Totals.Requests);
     }

@@ -100,7 +100,7 @@ public static partial class GainEndpoints
     private static string? Validate(GainQuery query)
     {
         if (query.HistoryLimit is < 0 or > 1000) { return "historyLimit must be from 0 to 1000."; }
-        if (query.From is { } from && query.To is { } to && from >= to) { return "from must be earlier than to."; }
+        if (query is { From: { } from, To: { } to } && from >= to) { return "from must be earlier than to."; }
         foreach (var value in new[] { query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline })
         {
             if (value is not null && (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl)))

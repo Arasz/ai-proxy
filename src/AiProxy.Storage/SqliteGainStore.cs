@@ -56,11 +56,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await transaction.CommitAsync(cancellationToken);
 
         var attributions = Attributions.SelectMany(dimension =>
-            rows.Where(row => row.View == dimension).OrderBy(static row => row.Name, StringComparer.Ordinal)
-                .Select(row => new GainAttribution(dimension, row.Name, Totals(row)))).ToArray();
+            rows.Where(row => row.View == dimension)
+                .OrderBy(static row => row.Name, StringComparer.Ordinal)
+                .Select(row => new GainAttribution(dimension, row.Name, row.ConvertToTotals())))
+            .ToArray();
         return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
         {
-            Summary = Totals(rows.Single(static row => row.View == "summary")),
+            Summary = rows.Single(static row => row.View == "summary").ConvertToTotals(),
             History = history,
             Daily = Buckets(rows, "daily"),
             Weekly = Buckets(rows, "weekly"),
@@ -92,12 +94,10 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         return new GainResetResult(removed, cutoff);
     }
 
-    private static GainTotals Totals(AggregateRow row) => JsonSerializer.Deserialize<GainTotals>(row.TotalCount) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
-
     private static GainBucket[] Buckets(IEnumerable<AggregateRow> rows, string view) =>
     [
         .. rows.Where(row => row.View == view).OrderBy(static row => row.Start)
-            .Select(static row => new GainBucket(new DateTimeOffset(row.Start, TimeSpan.Zero), Totals(row)))
+            .Select(static row => new GainBucket(new DateTimeOffset(row.Start, TimeSpan.Zero), row.ConvertToTotals()))
     ];
 
     private static async Task<T[]> DetailsAsync<T>(SqliteConnection connection, SqliteTransaction transaction,
@@ -175,7 +175,10 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record AggregateRow(string View, long Start, string Name, string TotalCount);
+    private sealed record AggregateRow(string View, long Start, string Name, string Totals)
+    {
+        public GainTotals ConvertToTotals() => JsonSerializer.Deserialize<GainTotals>(Totals) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
+    }
 
     internal sealed record GainEventInput(
         string Kind,
