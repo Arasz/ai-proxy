@@ -62,6 +62,8 @@ public sealed class CliApplication(GainRuntime runtime)
 
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
+        var separator = args.Length > 0 && args[0] == HarnessProcess.Command ? Array.IndexOf(args, "--") : -1;
+        var harnessArguments = separator >= 0 ? args[(separator + 1)..] : null;
         var app = new CommandApp();
         app.Configure(config =>
         {
@@ -74,13 +76,17 @@ public sealed class CliApplication(GainRuntime runtime)
                 .WithDescription("Show estimated initial-request token reductions and history.");
             config.AddCommand<McpCommand>(McpServerProcess.Command)
                 .WithDescription("Run the retrieval MCP server over stdio.");
-            config.AddCommand<HarnessProcess>(HarnessProcess.Command)
+            var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)
                 .WithDescription("Launch a harness executable through the running proxy.")
                 .WithExample(HarnessProcess.Command, "claude", "--", "--model", "opus");
+            if (harnessArguments is not null)
+            {
+                harness.WithData(harnessArguments);
+            }
         });
         try
         {
-            return await app.RunAsync(args, cancellationToken).ConfigureAwait(false);
+            return await app.RunAsync(separator >= 0 ? args[..separator] : args, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

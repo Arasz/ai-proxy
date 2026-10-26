@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.16.1](0.16.1-harness-arguments.md) | Preserve empty harness arguments and pass child options literally after the launcher separator. | Pending |
 | [0.16.0](0.16.0-claude-launcher.md) | Launch Claude Code through the running proxy; root help avoids startup, and compression summaries are logged again. | #83 |
 | [0.15.3](0.15.3-nuget-readme-images.md) | The token icon uses NuGet-supported Markdown, the version badge URL is fixed, and M8ven uses a text link. | #82 |
 | [0.15.2](0.15.2-public-ca-and-install-guide.md) | Startup exports the public CA as PEM; the README documents installed-tool and agent setup and shows the package icon. | #80 |

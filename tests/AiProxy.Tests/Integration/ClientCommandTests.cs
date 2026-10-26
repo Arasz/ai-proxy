@@ -50,15 +50,17 @@ public sealed class ClientCommandTests
         Assert.Contains("<EXECUTABLE>", result.Output, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Harness_inherits_the_console_environment_arguments_and_exit_status()
+    [Theory]
+    [InlineData("", "--model", "literal $(whoami); argument", "", "space value", "--", "--help", "--proxy", "")]
+    [InlineData("", "", "")]
+    public async Task Harness_inherits_the_console_environment_arguments_and_exit_status(params string[] arguments)
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "The fake executable uses a POSIX shell.");
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         var executable = Path.Combine(directory.Path, "claude");
         await File.WriteAllTextAsync(executable,
-            "#!/bin/sh\nprintf 'HTTP_PROXY=%s\\nHTTPS_PROXY=%s\\nhttp_proxy=%s\\nhttps_proxy=%s\\n' \"$HTTP_PROXY\" \"$HTTPS_PROXY\" \"$http_proxy\" \"$https_proxy\"\nprintf '%s\\n' \"$NODE_EXTRA_CA_CERTS\" \"$ANTHROPIC_CUSTOM_HEADERS\" \"$NO_PROXY\" \"$@\"\nread input\nprintf 'stdin:%s\\n' \"$input\"\nprintf 'child stderr\\n' >&2\nexit 17\n",
+            "#!/bin/sh\nprintf 'HTTP_PROXY=%s\\nHTTPS_PROXY=%s\\nhttp_proxy=%s\\nhttps_proxy=%s\\n' \"$HTTP_PROXY\" \"$HTTPS_PROXY\" \"$http_proxy\" \"$https_proxy\"\nprintf '%s\\n' \"$NODE_EXTRA_CA_CERTS\" \"$ANTHROPIC_CUSTOM_HEADERS\" \"$NO_PROXY\"\nprintf 'arg:<%s>\\n' \"$@\"\nread input\nprintf 'stdin:%s\\n' \"$input\"\nprintf 'child stderr\\n' >&2\nexit 17\n",
             TestContext.Current.CancellationToken);
         if (!OperatingSystem.IsWindows())
         {
@@ -78,7 +80,7 @@ public sealed class ClientCommandTests
             ["no_proxy"] = null,
             ["Proxy__Port"] = port.ToString(CultureInfo.InvariantCulture)
         };
-        var result = await RunAsync(["harness", "--ca-file", ca, "claude", "--", "--model", "literal $(whoami); argument"], environment);
+        var result = await RunAsync(["harness", "--ca-file", ca, "claude", "--", .. arguments], environment);
         Assert.Equal(17, result.ExitCode);
         Assert.Contains("stdin:fixture input", result.Output, StringComparison.Ordinal);
         Assert.Contains("child stderr", result.Error, StringComparison.Ordinal);
@@ -92,7 +94,8 @@ public sealed class ClientCommandTests
         Assert.Contains($"X-Ai-Proxy-Project: {Environment.CurrentDirectory}", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("stale", result.Output, StringComparison.Ordinal);
         Assert.Contains("example.test,localhost,127.0.0.1,::1", result.Output, StringComparison.Ordinal);
-        Assert.Contains("--model\nliteral $(whoami); argument", result.Output, StringComparison.Ordinal);
+        Assert.Equal(arguments.Select(static argument => $"arg:<{argument}>"),
+            result.Output.Split('\n').Where(static line => line.StartsWith("arg:<", StringComparison.Ordinal)));
     }
 
     [Theory]
