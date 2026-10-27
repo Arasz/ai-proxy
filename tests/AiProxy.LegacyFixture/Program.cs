@@ -53,6 +53,12 @@ await using (var marker = new FileStream(markerPath, FileMode.OpenOrCreate, File
         proxy = $"http://127.0.0.1:{port}", api = app.Urls.Single()
     }));
     await app.WaitForShutdownAsync();
+    if (Environment.GetEnvironmentVariable("LEGACY_RELEASE_MARKER_THEN_HANG") == "true")
+    {
+        await marker.DisposeAsync();
+        File.Delete(markerPath);
+        await Task.Delay(Timeout.InfiniteTimeSpan);
+    }
 }
 
 File.Delete(markerPath);

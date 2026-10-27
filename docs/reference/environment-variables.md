@@ -170,14 +170,20 @@ The command validates proxy settings and API URLs before requesting shutdown. An
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between
 preflight and startup. Endpoint checks compare addresses as well as ports and reject overlapping
-replacement proxy and API endpoints before shutdown.
+replacement proxy and API endpoints, including dual-stack and API-to-API overlaps, before shutdown.
 
 Version 0.16.1 and earlier have no control pipe or process lease. For a held system proxy marker,
 restart asks the operating system for its exact holder and verifies the same user, executable
 entry assembly, and process birth. Unix sends SIGTERM; Windows tries the exact process's main
 window. After ten seconds, restart revalidates the owner before terminating only that process,
 then waits for exit and marker cleanup. It never signals process groups, child trees, unrelated
-listeners, or unknown marker holders.
+listeners, or unknown marker holders. A process that releases its marker but hangs during shutdown
+can still be terminated after its captured process birth, current user, and entry point are rechecked.
+Recovery guards finish cleanup without receiving shutdown signals.
+
+Managed `dotnet` launches require the actual AiProxy assembly identity. Relative entry paths are
+resolved against the target process directory where the operating system exposes it. On Windows,
+use an absolute managed entry path or the installed apphost; an unverifiable relative path is rejected.
 
 Known legacy ports are inherited. Health responses identify HTTP API listeners but do not
 authorize shutdown; an unresponsive API can still restart. When legacy listener settings cannot

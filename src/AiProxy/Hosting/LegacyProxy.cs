@@ -121,7 +121,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            await VerifyAsync(process, owner, token);
+            await VerifyAsync(process, owner, token, requireMarker: false);
             EnsureBirth(process, owner);
             process.Kill();
             using var forced = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -154,11 +154,12 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         }
     }
 
-    private async Task VerifyAsync(Process process, ProxyControl.ProxyInfo owner, CancellationToken token)
+    private async Task VerifyAsync(Process process, ProxyControl.ProxyInfo owner, CancellationToken token, bool requireMarker = true)
     {
         process.Refresh();
         if (!MatchesIdentity(owner.Pid, owner.ProcessStartToken, process.Id, new ProcessIdentity(process).StartToken) ||
-            !(await HoldersAsync(token)).SequenceEqual([owner.Pid]) || !await IsProxyAsync(process, token))
+            (requireMarker && !(await HoldersAsync(token)).SequenceEqual([owner.Pid])) ||
+            !await IsCurrentUserAsync(process, token) || !await IsProxyAsync(process, token))
         {
             throw new IOException("The legacy ai-proxy owner identity changed. No shutdown signal was sent.");
         }
@@ -220,6 +221,24 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         return [.. result];
     }
 
+    private static async Task<bool> IsCurrentUserAsync(Process process, CancellationToken token)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return WindowsLegacyProxy.IsCurrentUser(process);
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            var uids = File.ReadLines($"/proc/{process.Id}/status").Single(line => line.StartsWith("Uid:", StringComparison.Ordinal))
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+            return uids.Length == 4 && uids.All(uid => uid == GetEffectiveUserId().ToString(CultureInfo.InvariantCulture));
+        }
+
+        var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", process.Id.ToString(CultureInfo.InvariantCulture), "-u", Environment.UserName, "-Fp"], token);
+        return output.Split('\n').Contains($"p{process.Id.ToString(CultureInfo.InvariantCulture)}", StringComparer.Ordinal);
+    }
+
     private static async Task<bool> IsProxyAsync(Process process, CancellationToken token)
     {
         if (OperatingSystem.IsWindows() && !WindowsLegacyProxy.IsCurrentUser(process))
@@ -247,7 +266,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
                     ? (await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", process.Id.ToString(CultureInfo.InvariantCulture), "-d", "cwd", "-Fn"], token)).Split('\n').FirstOrDefault(line => line.StartsWith('n'))?[1..]
                     : null;
             var entry = ManagedEntry(arguments, workingDirectory);
-            return entry is not null && (OperatingSystem.IsWindows() && !Path.IsPathFullyQualified(entry) || IsEntryAssembly(entry));
+            return entry is not null && IsEntryAssembly(entry);
         }
 
         return IsNativeEntry(executable);
@@ -332,8 +351,12 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
             return null;
         }
 
-        return Path.IsPathFullyQualified(arguments[index]) || workingDirectory is null
-            ? arguments[index] : Path.GetFullPath(arguments[index], workingDirectory);
+        if (Path.IsPathFullyQualified(arguments[index]))
+        {
+            return arguments[index];
+        }
+
+        return workingDirectory is null ? null : Path.GetFullPath(arguments[index], workingDirectory);
     }
 
     private static string[] SplitCommand(string command)

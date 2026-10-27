@@ -50,6 +50,19 @@ public sealed class RestartTests
     }
 
     [Fact]
+    public async Task A_legacy_proxy_that_releases_its_marker_then_hangs_is_still_terminated_by_exact_identity()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var legacy = Child.StartLegacy(directory.Path, releaseMarkerThenHang: true);
+        await legacy.ReadyAsync();
+        await using var replacement = Child.Start(directory.Path, true, false);
+        await replacement.ReadyAsync();
+        Assert.True(legacy.Process.HasExited);
+        Assert.NotEqual(0, legacy.Process.ExitCode);
+        Assert.Equal(replacement.Process.Id, (await ReadInfoAsync(directory.Path)).Pid);
+    }
+
+    [Fact]
     public async Task A_verified_legacy_proxy_that_ignores_graceful_shutdown_is_terminated_and_replaced()
     {
         using var directory = new TemporaryDirectory();
@@ -97,6 +110,29 @@ public sealed class RestartTests
         await probe.ConnectAsync(IPAddress.IPv6Loopback, port, TestContext.Current.CancellationToken);
         using var accepted = await sentinel.AcceptTcpClientAsync(TestContext.Current.CancellationToken);
         Assert.True(accepted.Connected);
+    }
+
+    [Theory]
+    [InlineData("dual-stack")]
+    [InlineData("api-pair")]
+    public async Task Colliding_replacement_api_bindings_are_rejected_before_shutdown(string collision)
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        using var reservation = new TcpListener(IPAddress.Loopback, 0);
+        reservation.Start();
+        var available = ((IPEndPoint)reservation.LocalEndpoint).Port;
+        reservation.Stop();
+        var urls = collision == "dual-stack"
+            ? $"http://[::]:{new Uri(before.ProxyUrl).Port}"
+            : $"http://127.0.0.1:{available};http://0.0.0.0:{available}";
+        await using var contender = Child.Start(directory.Path, true, false, $"--urls={urls}");
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
     }
 
     [Fact]
@@ -626,7 +662,7 @@ public sealed class RestartTests
         public Process Process => process;
         public string Output => string.Join("\n", _output);
 
-        public static Child StartLegacy(string directory, bool hungApi = false, bool ignoreTermination = false, bool guard = false)
+        public static Child StartLegacy(string directory, bool hungApi = false, bool ignoreTermination = false, bool guard = false, bool releaseMarkerThenHang = false)
         {
             var executable = Path.Combine(AppContext.BaseDirectory, "legacy-fixture", OperatingSystem.IsWindows() ? "AiProxy.exe" : "AiProxy");
             var start = new ProcessStartInfo(executable)
@@ -642,6 +678,7 @@ public sealed class RestartTests
             start.Environment["LEGACY_PROXY_DIRECTORY"] = directory;
             start.Environment["LEGACY_HUNG_API"] = hungApi ? "true" : "false";
             start.Environment["LEGACY_IGNORE_TERMINATION"] = ignoreTermination ? "true" : "false";
+            start.Environment["LEGACY_RELEASE_MARKER_THEN_HANG"] = releaseMarkerThenHang ? "true" : "false";
             var process = new Process { StartInfo = start };
             var child = new Child(process);
             process.OutputDataReceived += (_, args) => child.Record(args.Data);

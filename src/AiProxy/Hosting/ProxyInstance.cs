@@ -104,8 +104,9 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         var owned = (ownedUrls ?? owner.ApiUrls.Append(owner.ProxyUrl).ToArray()).Select(static url => new Uri(url)).ToArray();
         var proxyPort = settings.Port ?? new Uri(owner.ProxyUrl).Port;
         var api = HasApiConfiguration(configuration) ? ApiAddresses(configuration) : owner.ApiUrls.Select(static url => new Uri(url)).ToArray();
-        if (proxyPort != 0 && api.Any(address => address.Port == proxyPort &&
-                (EndpointAddress(address).Equals(IPAddress.Any) || EndpointAddress(address).Equals(IPAddress.Loopback))))
+        var proxy = new Uri($"http://127.0.0.1:{proxyPort}");
+        if (api.Any(address => EndpointsOverlap(proxy, address)) ||
+            api.Where((address, index) => api.Take(index).Any(previous => EndpointsOverlap(previous, address))).Any())
         {
             throw new IOException("The requested proxy and API endpoints overlap. Choose different ports before restarting.");
         }
@@ -121,13 +122,30 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
     }
 
+    private static bool EndpointsOverlap(Uri first, Uri second)
+    {
+        if (first.Port == 0 || first.Port != second.Port)
+        {
+            return false;
+        }
+
+        var firstAddresses = first.Host == "localhost" ? new[] { IPAddress.Loopback, IPAddress.IPv6Loopback } : [EndpointAddress(first)];
+        var secondAddresses = second.Host == "localhost" ? new[] { IPAddress.Loopback, IPAddress.IPv6Loopback } : [EndpointAddress(second)];
+        return firstAddresses.Any(left => secondAddresses.Any(right =>
+            left.Equals(IPAddress.IPv6Any) || right.Equals(IPAddress.IPv6Any) ||
+            left.AddressFamily == right.AddressFamily &&
+            (left.Equals(IPAddress.Any) || right.Equals(IPAddress.Any) || left.Equals(right))));
+    }
+
     private static IPAddress EndpointAddress(Uri address) => address.Host == "localhost"
         ? IPAddress.Loopback
         : IPAddress.TryParse(address.Host.Trim('[', ']'), out var ip) ? ip : IPAddress.Any;
 
     private static bool OwnsEndpoint(Uri previous, IPAddress address, int port) =>
         previous.Port == port && (EndpointAddress(previous).Equals(address) ||
-            EndpointAddress(previous).Equals(address.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any));
+            EndpointAddress(previous).Equals(IPAddress.IPv6Any) ||
+            previous.Host == "localhost" && (address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback)) ||
+            address.AddressFamily == AddressFamily.InterNetwork && EndpointAddress(previous).Equals(IPAddress.Any));
 
     private static bool HasApiConfiguration(IConfiguration configuration)
     {
@@ -148,6 +166,11 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         {
             using var probe = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             probe.ExclusiveAddressUse = true;
+            if (address.Equals(IPAddress.IPv6Any))
+            {
+                probe.DualMode = true;
+            }
+
             probe.Bind(new IPEndPoint(address, port));
         }
         catch (SocketException exception)

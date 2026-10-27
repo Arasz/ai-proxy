@@ -33,6 +33,23 @@ public sealed class LegacyProxyTests
         Assert.Equal(expected is null ? null : Path.Combine(targetDirectory, expected), LegacyProxy.ManagedEntry(arguments, targetDirectory));
     }
 
+    [Fact]
+    public void A_relative_managed_entry_without_a_verified_target_directory_is_rejected()
+    {
+        Assert.Null(LegacyProxy.ManagedEntry(["dotnet", "AiProxy.dll"], null));
+    }
+
+    [Fact]
+    public void Renaming_an_unrelated_assembly_to_the_product_name_does_not_identify_the_product()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var renamed = Path.Combine(directory.Path, "AiProxy.dll");
+        File.Copy(typeof(LegacyProxyTests).Assembly.Location, renamed);
+        Assert.False(LegacyProxy.IsEntryAssembly(renamed));
+        Assert.False(LegacyProxy.IsNativeEntry(Path.Combine(directory.Path, "AiProxy")));
+    }
+
     [Theory]
     [InlineData("/Users/example/.dotnet/tools/.store/.stage/old/ai-proxy.osx-arm64/0.16.1/tools/net10.0/osx-arm64/AiProxy", true)]
     [InlineData("/tmp/unrelated/AiProxy", false)]
