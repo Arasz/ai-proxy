@@ -40,4 +40,16 @@ internal static class KnownNames
     {
         public const string ProjectPrefix = $"{GainApi.ProjectHeader}: ";
     }
+
+    internal static class MarkerDiscovery
+    {
+        public const string MacLsof = "/usr/sbin/lsof";
+        public const string LinuxLsof = "/usr/bin/lsof";
+        public const string ProcessIds = "-t";
+        public const string EndOptions = "--";
+        public const string RestartManager = "rstrtmgr.dll";
+        public const string UnknownOwner = "the process holding the system proxy marker";
+        public const string KnownOwnerFormat = "the process holding the system proxy marker (PID {0})";
+        public const string StopOwnerFormat = "Stop {0} manually, then start ai-proxy again.";
+    }
 }

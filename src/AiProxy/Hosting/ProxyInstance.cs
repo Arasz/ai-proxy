@@ -11,6 +11,7 @@ namespace AiProxy.Hosting;
 /// <summary>Owns the process lease outside the host and its control pipe.</summary>
 internal sealed class ProxyInstance(FileStream lease) : IDisposable
 {
+    private const int MarkerDiscoveryTimeoutMilliseconds = 3000;
     private const string LeaseFileName = "process.lock";
     private const string StartupFileName = "startup.lock";
     private const string RestartFlag = "--restart";
@@ -158,7 +159,68 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
         catch (IOException exception)
         {
-            throw new IOException("An older ai-proxy instance holds the system proxy marker. Stop it manually, then start ai-proxy again.", exception);
+            var pid = FindMarkerOwner(path);
+            var owner = pid is null ? KnownNames.MarkerDiscovery.UnknownOwner : string.Format(CultureInfo.InvariantCulture, KnownNames.MarkerDiscovery.KnownOwnerFormat, pid);
+            throw new IOException(string.Format(CultureInfo.InvariantCulture, KnownNames.MarkerDiscovery.StopOwnerFormat, owner), exception);
+        }
+    }
+
+    internal static int? MarkerOwnerPid(string output)
+    {
+        var pids = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (pids.Length == 0 || pids.Any(value => int.TryParse(value, out var pid) is false || pid <= 0))
+        {
+            return null;
+        }
+
+        int[] distinct = [.. pids.Select(value => int.Parse(value, CultureInfo.InvariantCulture)).Distinct()];
+        return distinct.Length == 1 ? distinct[0] : null;
+    }
+
+    private static int? FindMarkerOwner(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return WindowsMarkerOwner.Find(path);
+        }
+
+        var executable = OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof;
+        return FindUnixMarkerOwner(path, executable);
+    }
+
+    internal static int? FindUnixMarkerOwner(string path, string executable)
+    {
+        try
+        {
+            var start = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add(KnownNames.MarkerDiscovery.ProcessIds);
+            start.ArgumentList.Add(KnownNames.MarkerDiscovery.EndOptions);
+            start.ArgumentList.Add(path);
+            using var process = Process.Start(start);
+            if (process is null)
+            {
+                return null;
+            }
+
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            if (process.WaitForExit(MarkerDiscoveryTimeoutMilliseconds) is false)
+            {
+                process.Kill();
+                return null;
+            }
+
+            if (process.ExitCode is not 0)
+            {
+                return null;
+            }
+
+            _ = error.GetAwaiter().GetResult();
+            return MarkerOwnerPid(output.GetAwaiter().GetResult());
+        }
+        catch (Exception exception) when (exception is IOException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return null;
         }
     }
 

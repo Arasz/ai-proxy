@@ -172,7 +172,9 @@ Port availability cannot prove ownership, and another process can still take a p
 preflight and startup. There is no process scan, signal, or kill fallback.
 
 Version 0.16.1 and earlier have no control pipe or process lease. A held system proxy marker
-produces a manual-stop error before certificate preparation. If an older instance disabled
+produces a manual-stop error before certificate preparation. The error includes the PID when
+the operating system identifies one process with the marker open; otherwise it leaves the PID
+unspecified. Unix uses `lsof`, and Windows uses Restart Manager. If an older instance disabled
 system proxy integration, only occupied known requested ports can reveal a conflict. An older
 instance on unknown nondefault ports cannot be discovered safely; stop it manually.
 

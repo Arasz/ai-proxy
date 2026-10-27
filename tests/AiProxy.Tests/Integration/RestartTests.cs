@@ -17,6 +17,23 @@ public sealed class RestartTests
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    [Theory]
+    [InlineData("", null)]
+    [InlineData("123\n456\n", null)]
+    [InlineData("invalid\n", null)]
+    [InlineData("123\n123\n", 123)]
+    public void Marker_pid_is_reported_only_for_one_unambiguous_process(string output, int? expected)
+    {
+        Assert.Equal(expected, ProxyInstance.MarkerOwnerPid(output));
+    }
+
+    [Fact]
+    public void Missing_marker_discovery_tool_does_not_invent_a_pid()
+    {
+        using var directory = new TemporaryDirectory();
+        Assert.Null(ProxyInstance.FindUnixMarkerOwner(directory.Path, Path.Combine(directory.Path, "missing-lsof")));
+    }
+
     [Fact]
     public async Task Restart_without_an_owner_starts_an_owned_instance_with_actual_endpoints()
     {
@@ -99,6 +116,7 @@ public sealed class RestartTests
             Assert.NotEqual(0, child.Process.ExitCode);
             Assert.Contains("Stop", child.Output);
             Assert.Contains("manually", child.Output);
+            Assert.Contains($"PID {Environment.ProcessId}", child.Output);
         }
 
         Assert.Equal("legacy private certificate bytes", await File.ReadAllTextAsync(certificate, TestContext.Current.CancellationToken));
@@ -194,8 +212,11 @@ public sealed class RestartTests
             var header = new byte[4];
             BinaryPrimitives.WriteInt32BigEndian(header, kind == "oversized" ? 16385 : kind == "malformed" ? 1 : 100);
             await pipe.WriteAsync(header, deadline.Token);
-            await pipe.WriteAsync("!"u8.ToArray(), deadline.Token);
-            await pipe.FlushAsync(deadline.Token);
+            if (kind is not "oversized")
+            {
+                await pipe.WriteAsync("!"u8.ToArray(), deadline.Token);
+                await pipe.FlushAsync(deadline.Token);
+            }
         }
 
         // The hostile connection stays open while a valid client waits behind it.
