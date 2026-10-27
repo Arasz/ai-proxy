@@ -10,6 +10,7 @@ Active records:
 
 | File | What it is |
 |---|---|
+| [2026-10-26-mcp-directory-listings.md](2026-10-26-mcp-directory-listings.md) | Research record: how to list the ai-proxy MCP server across Smithery, npm, PyPI, Claude Directory, and ChatGPT/OpenAI, and their requirements. |
 | [2026-10-25-retrieval-mcp-cli-gain-research.md](2026-10-25-retrieval-mcp-cli-gain-research.md) | Retrieval-only MCP, proxy gain API and Spectre CLI research, proposed contracts, scope traceability and mutation-focused test design. |
 | [2026-10-25-ccr-core.md](2026-10-25-ccr-core.md) | Inactive CCR preview and retrieval core, provisional settings, parent graph and review evidence. |
 | [2026-10-25-ccr-runtime-plan.md](2026-10-25-ccr-runtime-plan.md) | CCR runtime implementation plan: evidence, scope, shape, steps and gates for the in-request retrieval loop. |
