@@ -187,7 +187,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
 
         if (OperatingSystem.IsMacOS())
         {
-            var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-u", Environment.UserName, "-Fp", "--", MarkerPath], token);
+            var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-u", Environment.UserName, "-Fp", "--", MarkerPath], token, allowNoMatches: true);
             return [.. output.Split('\n').Where(line => line.StartsWith('p')).Select(line => int.Parse(line.AsSpan(1), CultureInfo.InvariantCulture)).Distinct()];
         }
 
@@ -235,7 +235,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
             return uids.Length == 4 && uids.All(uid => uid == GetEffectiveUserId().ToString(CultureInfo.InvariantCulture));
         }
 
-        var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", process.Id.ToString(CultureInfo.InvariantCulture), "-u", Environment.UserName, "-Fp"], token);
+        var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", process.Id.ToString(CultureInfo.InvariantCulture), "-u", Environment.UserName, "-Fp"], token, allowNoMatches: true);
         return output.Split('\n').Contains($"p{process.Id.ToString(CultureInfo.InvariantCulture)}", StringComparer.Ordinal);
     }
 
@@ -365,6 +365,37 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         return [.. matches.Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Success ? match.Groups[2].Value : match.Groups[3].Value)];
     }
 
+    internal static async Task<IPEndPoint[]> MacListenersAsync(CancellationToken token)
+    {
+        var output = await ExecuteAsync("/usr/sbin/lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-Ftn"], token, allowNoMatches: true);
+        var endpoints = new List<IPEndPoint>();
+        var ipv6 = false;
+        foreach (var line in output.Split('\n'))
+        {
+            if (line.StartsWith('t'))
+            {
+                ipv6 = line == "tIPv6";
+            }
+            else if (line.StartsWith('n'))
+            {
+                var value = line[1..];
+                if (value.StartsWith("*:", StringComparison.Ordinal))
+                {
+                    value = (ipv6 ? "[::]" : "0.0.0.0") + value[1..];
+                }
+
+                if (!IPEndPoint.TryParse(value, out var endpoint))
+                {
+                    throw new IOException("Cannot parse the operating system's TCP listener inventory. No owner was stopped.");
+                }
+
+                endpoints.Add(endpoint);
+            }
+        }
+
+        return [.. endpoints.Distinct()];
+    }
+
     private static async Task<string[]> ListenersAsync(int pid, CancellationToken token)
     {
         if (OperatingSystem.IsWindows())
@@ -377,7 +408,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
 
         if (OperatingSystem.IsMacOS())
         {
-            var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", pid.ToString(CultureInfo.InvariantCulture), "-iTCP", "-sTCP:LISTEN", "-nP", "-Fn"], token);
+            var output = await ExecuteAsync("/usr/sbin/lsof", ["-a", "-p", pid.ToString(CultureInfo.InvariantCulture), "-iTCP", "-sTCP:LISTEN", "-nP", "-Fn"], token, allowNoMatches: true);
             return [.. output.Split('\n').Where(line => line.StartsWith('n')).Select(line => NormalizeEndpoint(line[1..])).Distinct()];
         }
 
@@ -419,7 +450,7 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         return $"http://{normalized}";
     }
 
-    private static async Task<string> ExecuteAsync(string executable, string[] arguments, CancellationToken token)
+    internal static async Task<string> ExecuteAsync(string executable, string[] arguments, CancellationToken token, bool allowNoMatches = false)
     {
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments)
@@ -435,8 +466,14 @@ internal sealed partial class LegacyProxy(string directory, int? requestedProxyP
         try
         {
             await process.WaitForExitAsync(deadline.Token);
-            await error;
-            return await output;
+            var stderr = await error;
+            var stdout = await output;
+            if (process.ExitCode != 0 && !(allowNoMatches && process.ExitCode == 1 && stdout.Length == 0 && stderr.Length == 0))
+            {
+                throw new IOException($"Operating system discovery failed with exit code {process.ExitCode}. No owner was stopped.");
+            }
+
+            return stdout;
         }
         finally
         {

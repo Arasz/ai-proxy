@@ -112,6 +112,67 @@ public sealed class RestartTests
         Assert.True(accepted.Connected);
     }
 
+    [Fact]
+    public async Task A_wildcard_owner_does_not_hide_an_unrelated_specific_listener()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false, true, "--urls=http://[::]:0");
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        var port = new Uri(before.ApiUrls.Single()).Port;
+        using var sentinel = new TcpListener(IPAddress.IPv6Loopback, port);
+        sentinel.Server.DualMode = false;
+        sentinel.Start();
+        await using var contender = Child.Start(directory.Path, true, true, $"--urls=http://[::1]:{port}");
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    [Fact]
+    public async Task An_unoccupied_api_address_expansion_can_reuse_the_owners_ipv4_port()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false, true, "--urls=http://0.0.0.0:0");
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        var port = new Uri(before.ApiUrls.Single()).Port;
+        await using var replacement = Child.Start(directory.Path, true, true, $"--urls=http://unknown.invalid:{port}");
+        await replacement.ReadyAsync();
+        Assert.True(owner.Process.HasExited);
+        Assert.Equal(port, new Uri((await ReadInfoAsync(directory.Path)).ApiUrls.Single()).Port);
+        using var http = new HttpClient(new HttpClientHandler { UseProxy = false });
+        Assert.Contains("ok", await http.GetStringAsync($"http://127.0.0.1:{port}/health", TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("localhost")]
+    [InlineData("unknown.invalid")]
+    [InlineData("http-ports")]
+    public async Task Api_host_expansion_probes_unrelated_ipv6_listeners_before_shutdown(string host)
+    {
+        using var directory = new TemporaryDirectory();
+        var ownerOptions = host == "localhost" ? Array.Empty<string>() : ["--urls=http://0.0.0.0:0"];
+        await using var owner = Child.Start(directory.Path, false, true, ownerOptions);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        var port = new Uri(host == "localhost" ? before.ProxyUrl : before.ApiUrls.Single()).Port;
+        using var sentinel = new TcpListener(IPAddress.IPv6Loopback, port);
+        sentinel.Server.DualMode = false;
+        sentinel.Start();
+        var options = host == "http-ports" ? new[] { $"--http_ports={port}", "--Proxy:Port=0" } : [$"--urls=http://{host}:{port}"];
+        await using var contender = Child.Start(directory.Path, true, host != "http-ports", options);
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        using var probe = new TcpClient(AddressFamily.InterNetworkV6);
+        await probe.ConnectAsync(IPAddress.IPv6Loopback, port, TestContext.Current.CancellationToken);
+        using var accepted = await sentinel.AcceptTcpClientAsync(TestContext.Current.CancellationToken);
+        Assert.True(accepted.Connected);
+    }
+
     [Theory]
     [InlineData("dual-stack")]
     [InlineData("api-pair")]

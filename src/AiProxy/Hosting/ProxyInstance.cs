@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
 using AiProxy.Configuration;
 using AiProxy.Core.Gain;
 
@@ -56,7 +57,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             var ports = (configuration[$"{scheme}_ports"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries);
             foreach (var port in ports)
             {
-                endpoints.Add($"{scheme}://0.0.0.0:{port}");
+                endpoints.Add($"{scheme}://[::]:{port}");
             }
         }
 
@@ -80,7 +81,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
     [
         .. urls.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(static url =>
         {
-            const string defaultAddress = "://0.0.0.0:";
+            const string defaultAddress = "://[::]:";
 
             var normalized = url
                 .Replace("://*:", defaultAddress, StringComparison.Ordinal)
@@ -111,14 +112,14 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             throw new IOException("The requested proxy and API endpoints overlap. Choose different ports before restarting.");
         }
 
-        if (!owned.Any(address => OwnsEndpoint(address, IPAddress.Loopback, proxyPort)))
-        {
-            ProbePort(IPAddress.Loopback, proxyPort);
-        }
+        ProbePort(IPAddress.Loopback, proxyPort, owned);
 
-        foreach (var address in api.Where(address => !owned.Any(previous => OwnsEndpoint(previous, EndpointAddress(address), address.Port))))
+        foreach (var url in api)
         {
-            ProbePort(EndpointAddress(address), address.Port);
+            foreach (var address in EndpointAddresses(url))
+            {
+                ProbePort(address, url.Port, owned);
+            }
         }
     }
 
@@ -129,23 +130,30 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             return false;
         }
 
-        var firstAddresses = first.Host == "localhost" ? new[] { IPAddress.Loopback, IPAddress.IPv6Loopback } : [EndpointAddress(first)];
-        var secondAddresses = second.Host == "localhost" ? new[] { IPAddress.Loopback, IPAddress.IPv6Loopback } : [EndpointAddress(second)];
-        return firstAddresses.Any(left => secondAddresses.Any(right =>
-            left.Equals(IPAddress.IPv6Any) || right.Equals(IPAddress.IPv6Any) ||
-            left.AddressFamily == right.AddressFamily &&
-            (left.Equals(IPAddress.Any) || right.Equals(IPAddress.Any) || left.Equals(right))));
+        var firstAddresses = EndpointAddresses(first);
+        var secondAddresses = EndpointAddresses(second);
+        return firstAddresses.Any(left => secondAddresses.Any(right => AddressesOverlap(left, right)));
     }
 
-    private static IPAddress EndpointAddress(Uri address) => address.Host == "localhost"
-        ? IPAddress.Loopback
-        : IPAddress.TryParse(address.Host.Trim('[', ']'), out var ip) ? ip : IPAddress.Any;
+    private static IPAddress[] EndpointAddresses(Uri address)
+    {
+        if (address.Host == "localhost")
+        {
+            return Socket.OSSupportsIPv6 ? [IPAddress.Loopback, IPAddress.IPv6Loopback] : [IPAddress.Loopback];
+        }
 
-    private static bool OwnsEndpoint(Uri previous, IPAddress address, int port) =>
-        previous.Port == port && (EndpointAddress(previous).Equals(address) ||
-            EndpointAddress(previous).Equals(IPAddress.IPv6Any) ||
-            previous.Host == "localhost" && (address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback)) ||
-            address.AddressFamily == AddressFamily.InterNetwork && EndpointAddress(previous).Equals(IPAddress.Any));
+        if (!IPAddress.TryParse(address.Host.Trim('[', ']'), out var ip) || ip.Equals(IPAddress.IPv6Any))
+        {
+            return Socket.OSSupportsIPv6 ? [IPAddress.Any, IPAddress.IPv6Any] : [IPAddress.Any];
+        }
+
+        return [ip];
+    }
+
+    private static bool AddressesOverlap(IPAddress first, IPAddress second) =>
+        first.AddressFamily == second.AddressFamily &&
+        (first.Equals(second) || first.Equals(IPAddress.Any) || second.Equals(IPAddress.Any) ||
+            first.Equals(IPAddress.IPv6Any) || second.Equals(IPAddress.IPv6Any));
 
     private static bool HasApiConfiguration(IConfiguration configuration)
     {
@@ -155,9 +163,23 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                configuration.GetSection("Kestrel:Endpoints").GetChildren().Any();
     }
 
-    private static void ProbePort(IPAddress address, int port)
+    private static void ProbePort(IPAddress address, int port, Uri[]? owned = null)
     {
         if (port == 0)
+        {
+            return;
+        }
+
+        var active = OperatingSystem.IsMacOS()
+            ? LegacyProxy.MacListenersAsync(CancellationToken.None).GetAwaiter().GetResult()
+            : IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+        var listeners = active.Where(endpoint => endpoint.Port == port && AddressesOverlap(address, endpoint.Address)).ToArray();
+        if (listeners.Any(endpoint => owned is null || !owned.Any(previous => previous.Port == port && EndpointAddresses(previous).Contains(endpoint.Address))))
+        {
+            throw new IOException($"Requested endpoint {address}:{port} is already in use by another listener. Stop its owner manually or choose another port before restarting.");
+        }
+
+        if (listeners.Length > 0)
         {
             return;
         }
@@ -168,10 +190,11 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             probe.ExclusiveAddressUse = true;
             if (address.Equals(IPAddress.IPv6Any))
             {
-                probe.DualMode = true;
+                probe.DualMode = false;
             }
 
             probe.Bind(new IPEndPoint(address, port));
+            probe.Listen(1);
         }
         catch (SocketException exception)
         {
@@ -281,9 +304,12 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
     {
         ProbeLegacyMarker(directory, waitForCleanup);
         ProbePort(IPAddress.Loopback, builder.GetProbeProxyPort());
-        foreach (var address in ApiAddresses(builder.Configuration))
+        foreach (var url in ApiAddresses(builder.Configuration))
         {
-            ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
+            foreach (var address in EndpointAddresses(url))
+            {
+                ProbePort(address, url.Port);
+            }
         }
     }
 

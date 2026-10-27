@@ -4,6 +4,14 @@ namespace AiProxy.Tests.Integration;
 
 public sealed class LegacyProxyTests
 {
+    [Fact]
+    public async Task Failed_operating_system_discovery_is_not_treated_as_an_empty_inventory()
+    {
+        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
+        string[] arguments = OperatingSystem.IsWindows() ? ["/c", "exit", "42"] : ["-c", "exit 42"];
+        await Assert.ThrowsAsync<IOException>(() => LegacyProxy.ExecuteAsync(executable, arguments, TestContext.Current.CancellationToken));
+    }
+
     [Theory]
     [InlineData(123, "native:1", 124, "native:1")]
     [InlineData(123, "native:1", 123, "native:2")]
