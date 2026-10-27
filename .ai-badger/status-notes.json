@@ -2,5 +2,9 @@
   "aip-implement-csharp-code-reducer-safely": {
     "notes": "PR #49 stages the inactive reducer and JSON CLI only; no VERSION bump or activation release. Roslyn package lives in AiProxy.Code; host references remain Core+Storage. Review and QA corrected contextual identifier consistency, XML documentation trivia spans, UTF8 literals, interpolation format text, global:: imports and quadratic line mapping. Final code a3048d4: Release build/test gate and CI lanes pass, independent QA75/75 with six mutation families constrained and restored. Real complete-view character counts with synthetic hint: code_file7509\u21925414 rename-off/4571 on; large12812\u219211288/9142. No token, model-edit or real retrieval acceptance is claimed. ADR0004 records Roslyn for C# and owner-approved Tree-sitter later languages. Next task aip-activate-csharp-reducer-with-retrieval retains CCR design/implementation, trusted call-ID/path metadata, exact stored file lookup beyond pending queue64, and original-request fallback if storage/readability fails. Full design acceptance still gates activation.",
     "gapsRequiringDecision": null
+  },
+  "aip-ship-claude-launcher-package-verification": {
+    "notes": "PR84 c68317a merged after CI and CodeRabbit approval. publish40420792644 accepted all6 payloads and shell. Mac indexing delayed; public-feed install now passed. Exact argv tests author RED2/11 GREEN11; independent mutationRED2/2 GREEN2/2. Evidence /Users/arasz/.codex/artifacts/ai-proxy/ship83. Global0.16.1 PID98087 listens9080 (rtk-proxy occupies8080), API17432 and forwarding200; macOS HTTP/HTTPS proxy9080. ConfigureSystemProxy/TrustRootCertificate are runtime-only options, not current environment-bindable settings.",
+    "gapsRequiringDecision": null
   }
 }

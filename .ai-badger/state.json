@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-10-26T09:15:34.310854+00:00",
-  "next": "Goal reached: CCR + C#/Python/JS/TS code views + gain/mcp clients (0.10.0-0.15.0). Owner restarts proxy from main and gathers data (ai-proxy gain; [proxy view in upstream bodies; log 1601). Follow-ups: aggregate GET /gain in SQL (watch reloads all rows); log Tree-sitter grammar-load failure (musl package lacks natives); ''' strings in blank-line fallback; verify Codex custom-header option for X-Ai-Proxy-Project; CI setup-dotnet 409.",
+  "lastUpdated": "2026-10-27T00:09:40.946918+00:00",
+  "next": "Restart flag first, then doctor, SQLite issue79, installed-tool CI, Codex launcher, musl grammars, compression reporting, lifecycle commands (user authorized continuation).",
   "completedTasks": [
+    {
+      "taskId": "aip-ship-claude-launcher-package-verification",
+      "date": "2026-10-27",
+      "title": "Ship and verify installed launcher package",
+      "pr": 84,
+      "version": "0.16.1",
+      "summary": "PR83 shipped; PR84 fixes empty harness arguments. Public NuGet0.16.1 clean install and all6 installed smoke cases pass; global proxy runs9080/API17432.",
+      "hasNotes": true
+    },
     {
       "taskId": "aip-publish-nuget-readme-gain-sql",
       "date": "2026-10-26",
