@@ -1,5 +1,6 @@
 using AiProxy.Hosting;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Tests.Integration;
@@ -34,7 +35,6 @@ public sealed class ProxyPortTests
 
     [Theory]
     [InlineData("abc")]
-    [InlineData("0")]
     [InlineData("70000")]
     [InlineData("-1")]
     [InlineData("  ")]
@@ -43,6 +43,42 @@ public sealed class ProxyPortTests
         var failure = Assert.ThrowsAny<Exception>(() => Compose(value));
 
         Assert.Contains("Proxy:Port", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Isolated_configuration_controls_runtime_and_port_zero_publishes_the_bound_port()
+    {
+        using var directory = new TemporaryDirectory();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Configuration["Proxy:Port"] = "0";
+        builder.Configuration["Proxy:DataDirectory"] = directory.Path;
+        builder.Configuration["Proxy:ConfigureSystemProxy"] = "false";
+        builder.Configuration["Proxy:TrustRootCertificate"] = "false";
+        builder.Configuration["Proxy:Compression:Enabled"] = "false";
+        await using var app = ProxyApplication.Create(builder);
+        var options = app.Services.GetRequiredService<ProxyRuntimeOptions>();
+        Assert.Equal(directory.Path, options.DataDirectory);
+        Assert.False(options.ConfigureSystemProxy);
+        Assert.False(options.TrustRootCertificate);
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        var address = app.Services.GetRequiredService<TitaniumProxyService>().Address;
+        Assert.InRange(address.Port, 1, 65535);
+        await app.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Absent_runtime_settings_preserve_injected_options(bool enabled)
+    {
+        using var directory = new TemporaryDirectory();
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Proxy:Compression:Enabled"] = "false";
+        var injected = new ProxyRuntimeOptions(System.Net.IPAddress.Loopback, 0, enabled, enabled, directory.Path);
+        await using var app = ProxyApplication.Create(builder, runtimeOptions: injected);
+        Assert.Equal(injected, app.Services.GetRequiredService<ProxyRuntimeOptions>());
+        Assert.False(Directory.Exists(directory.Path));
     }
 
     private static (Uri Address, ProxyRuntimeOptions Options) Compose(string? port)

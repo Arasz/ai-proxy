@@ -22,9 +22,4 @@ if (CliApplication.IsCommandInvocation(args))
     return await CliApplication.RunProcessAsync(args);
 }
 
-var builder = WebApplication.CreateBuilder(args);
-
-var app = ProxyApplication.Create(builder);
-
-app.Run();
-return 0;
+return await ProxyInstance.RunAsync(args);

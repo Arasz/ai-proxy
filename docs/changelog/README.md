@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.17.0](0.17.0-owned-instance-restart.md) | Gracefully restart an owned instance, retain its ports, serialize competing starts, and configure isolated runtime state. | [#85](https://github.com/Arasz/ai-proxy/pull/85) |
 | [0.16.1](0.16.1-harness-arguments.md) | Preserve empty harness arguments and pass child options literally after the launcher separator. | [#84](https://github.com/Arasz/ai-proxy/pull/84) |
 | [0.16.0](0.16.0-claude-launcher.md) | Launch Claude Code through the running proxy; root help avoids startup, and compression summaries are logged again. | #83 |
 | [0.15.3](0.15.3-nuget-readme-images.md) | The token icon uses NuGet-supported Markdown, the version badge URL is fixed, and M8ven uses a text link. | #82 |

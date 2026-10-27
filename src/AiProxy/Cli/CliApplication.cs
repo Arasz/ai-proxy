@@ -22,7 +22,13 @@ public sealed class CliApplication(GainRuntime runtime)
 
     public static bool IsCommandInvocation(string[] args)
     {
-        return args.Length > 0 && Commands.Contains(args[0]);
+        return IsRootHelp(args) || args.Length > 0 && Commands.Contains(args[0]);
+    }
+
+    private static bool IsRootHelp(string[] args)
+    {
+        return args.Any(argument => argument is "-h" or "-?" or "--help") &&
+               (args.Length == 0 || args[0] is not (GainCommand.Command or McpServerProcess.Command or HarnessProcess.Command));
     }
 
     public static async Task<int> RunProcessAsync(string[] args)
@@ -62,6 +68,13 @@ public sealed class CliApplication(GainRuntime runtime)
 
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
+        if (IsRootHelp(args))
+        {
+            await runtime.Output.WriteLineAsync("Start: ai-proxy [--restart] [configuration options]").ConfigureAwait(false);
+            await runtime.Output.WriteLineAsync("  --restart  Gracefully replace the owned proxy instance, waiting for its exit.").ConfigureAwait(false);
+            args = ["--help"];
+        }
+
         var separator = args.Length > 0 && args[0] == HarnessProcess.Command ? Array.IndexOf(args, "--") : -1;
         var harnessArguments = separator >= 0 ? args[(separator + 1)..] : null;
         var app = new CommandApp();

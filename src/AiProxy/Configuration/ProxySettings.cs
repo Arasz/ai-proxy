@@ -9,8 +9,17 @@ public sealed record ProxySettings
     public const string SectionName = "Proxy";
 
     /// <summary>The loopback port the listener binds; unset keeps the default.</summary>
-    [Range(1, 65535, ErrorMessage = "Proxy:Port must be a port number from 1 to 65535.")]
+    [Range(0, 65535, ErrorMessage = "Proxy:Port must be a port number from 0 to 65535.")]
     public int? Port { get; init; }
+
+    /// <summary>The directory where private state (root CA, control socket, leases) is stored; unset keeps the runtime default.</summary>
+    public string? DataDirectory { get; init; }
+
+    /// <summary>Whether to configure the machine proxy; unset keeps the runtime default.</summary>
+    public bool? ConfigureSystemProxy { get; init; }
+
+    /// <summary>Whether to trust the root certificate; unset keeps the runtime default.</summary>
+    public bool? TrustRootCertificate { get; init; }
 
     /// <summary>Password protecting the root CA pfx file; unset or empty keeps the runtime option.</summary>
     public string? RootCertificatePassword { get; init; }
@@ -23,7 +32,4 @@ public sealed record ProxySettings
 
     /// <summary>The recoverable compression settings.</summary>
     public CcrSettings Ccr { get; init; } = new();
-
-    /// <summary>The directory where private state (root CA, control socket, leases) is stored.</summary>
-    public string? DataDirectory { get; init; }
 }

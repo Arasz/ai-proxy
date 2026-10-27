@@ -1,0 +1,56 @@
+name: lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "global.json"
+      - "Directory.*.props"
+      - "nuget.config"
+      - "VERSION"
+      - ".github/workflows/lifecycle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "global.json"
+      - "Directory.*.props"
+      - "nuget.config"
+      - "VERSION"
+      - ".github/workflows/lifecycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lifecycle:
+    name: lifecycle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      MSBUILDDISABLENODEREUSE: 1
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Prepare the local package feed
+        run: New-Item -ItemType Directory -Force .nupkg-local | Out-Null
+      - name: Run isolated native lifecycle tests
+        run: dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --filter-class 'AiProxy.Tests.Integration.RestartTests' --minimum-expected-tests 1
