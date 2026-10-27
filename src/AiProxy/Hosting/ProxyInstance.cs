@@ -152,7 +152,16 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             }
             catch (IOException) when (arguments.Contains("--restart", StringComparer.Ordinal))
             {
-                var previous = await ProxyControl.StopOwnedAsync(directory, CancellationToken.None, owner => ProbeReplacement(builder.Configuration, settings, owner)).ConfigureAwait(false);
+                ProxyControl.Info previous;
+                try
+                {
+                    previous = await ProxyControl.StopOwnedAsync(directory, CancellationToken.None,
+                        owner => ProbeReplacement(builder.Configuration, settings, owner)).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException exception)
+                {
+                    throw new IOException("The ai-proxy control peer did not finish shutdown within the deadline. Stop the owner manually, then retry.", exception);
+                }
                 if (settings.Port is null)
                 {
                     builder.Configuration["Proxy:Port"] = new Uri(previous.ProxyUrl).Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -163,7 +172,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                     builder.WebHost.UseUrls(previous.ApiUrls);
                 }
 
-                // A competing restarter may win the lease. Never reconnect and stop that replacement.
+                // The startup claim excludes replacements; require the old process lease after its exact PID exits.
                 instance = Acquire(directory);
             }
 

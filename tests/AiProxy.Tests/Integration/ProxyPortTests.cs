@@ -67,6 +67,20 @@ public sealed class ProxyPortTests
         await app.StopAsync(TestContext.Current.CancellationToken);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Absent_runtime_settings_preserve_injected_options(bool enabled)
+    {
+        using var directory = new TemporaryDirectory();
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Proxy:Compression:Enabled"] = "false";
+        var injected = new ProxyRuntimeOptions(System.Net.IPAddress.Loopback, 0, enabled, enabled, directory.Path);
+        await using var app = ProxyApplication.Create(builder, runtimeOptions: injected);
+        Assert.Equal(injected, app.Services.GetRequiredService<ProxyRuntimeOptions>());
+        Assert.False(Directory.Exists(directory.Path));
+    }
+
     private static (Uri Address, ProxyRuntimeOptions Options) Compose(string? port)
     {
         var builder = WebApplication.CreateBuilder();

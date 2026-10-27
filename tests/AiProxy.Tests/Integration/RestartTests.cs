@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
@@ -254,6 +255,163 @@ public sealed class RestartTests
         Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
     }
 
+    [Fact]
+    public async Task A_shutdown_acknowledgement_is_not_completion_while_the_exact_owner_is_alive()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var actual = await ReadInfoAsync(directory.Path);
+        using var fakeDirectory = new TemporaryDirectory();
+        using var lease = ProxyInstance.Acquire(fakeDirectory.Path);
+        await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var acknowledged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serving = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(deadline.Token);
+            await ReadAsync<JsonElement>(server, deadline.Token);
+            await WriteAsync(server, actual, deadline.Token);
+            var stop = await ReadAsync<JsonElement>(server, deadline.Token);
+            Assert.Equal(actual.Nonce, stop.GetProperty("nonce").GetString());
+            await WriteAsync(server, new { accepted = true }, deadline.Token);
+            acknowledged.SetResult();
+        }, TestContext.Current.CancellationToken);
+        var operation = ProxyControl.StopOwnedAsync(fakeDirectory.Path, deadline.Token);
+        await acknowledged.Task.WaitAsync(deadline.Token);
+        await Assert.ThrowsAsync<TimeoutException>(() => operation.WaitAsync(TimeSpan.FromMilliseconds(150), deadline.Token));
+        Assert.False(child.Process.HasExited);
+        await StopAsync(directory.Path);
+        await child.ExitAsync();
+        Assert.Equal(actual.Pid, (await operation).Pid);
+        await serving;
+    }
+
+    [Theory]
+    [InlineData("product")]
+    [InlineData("protocol")]
+    [InlineData("nonce")]
+    [InlineData("pid")]
+    [InlineData("start")]
+    public async Task An_incompatible_or_mismatched_identity_is_rejected_without_a_stop_request(string field)
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var actual = await ReadInfoAsync(directory.Path);
+        var forged = field switch
+        {
+            "product" => actual with { Product = "unrelated" },
+            "protocol" => actual with { Protocol = 99 },
+            "nonce" => actual with { Nonce = "" },
+            "pid" => actual with { Pid = Environment.ProcessId },
+            _ => actual with { StartUtc = actual.StartUtc.AddSeconds(1) }
+        };
+        using var fakeDirectory = new TemporaryDirectory();
+        using var lease = ProxyInstance.Acquire(fakeDirectory.Path);
+        await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serving = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(deadline.Token);
+            await ReadAsync<JsonElement>(server, deadline.Token);
+            await WriteAsync(server, forged, deadline.Token);
+            var next = new byte[1];
+            Assert.Equal(0, await server.ReadAsync(next, deadline.Token));
+        }, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<IOException>(() => ProxyControl.StopOwnedAsync(fakeDirectory.Path, deadline.Token));
+        await serving;
+        Assert.False(child.Process.HasExited);
+        Assert.Equal(actual.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    [Fact]
+    public async Task Explicit_ports_override_inherited_ports_without_a_reserve_and_release_race()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        var oldProxy = new Uri(before.ProxyUrl).Port;
+        var oldApi = new Uri(before.ApiUrls.Single()).Port;
+        await using var replacement = Child.Start(directory.Path, true, false,
+            $"--Proxy:Port={oldApi}", $"--urls=http://127.0.0.1:{oldProxy}");
+        await replacement.ReadyAsync();
+        var after = await ReadInfoAsync(directory.Path);
+        Assert.Equal(oldApi, new Uri(after.ProxyUrl).Port);
+        Assert.Equal(oldProxy, new Uri(after.ApiUrls.Single()).Port);
+        Assert.True(child.Process.HasExited);
+    }
+
+    [Fact]
+    public async Task A_concurrent_restarter_fails_while_the_winner_waits_for_exit_and_cannot_stop_its_replacement()
+    {
+        using var originalDirectory = new TemporaryDirectory();
+        await using var original = Child.Start(originalDirectory.Path, false);
+        await original.ReadyAsync();
+        var actual = await ReadInfoAsync(originalDirectory.Path);
+        using var directory = new TemporaryDirectory();
+        using var oldLease = ProxyInstance.Acquire(directory.Path);
+        await using var server = new NamedPipeServerStream(PipeName(directory.Path), PipeDirection.InOut, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var acknowledged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serving = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(deadline.Token);
+            await ReadAsync<JsonElement>(server, deadline.Token);
+            await WriteAsync(server, actual, deadline.Token);
+            await ReadAsync<JsonElement>(server, deadline.Token);
+            await WriteAsync(server, new { accepted = true }, deadline.Token);
+            acknowledged.SetResult();
+        }, TestContext.Current.CancellationToken);
+        await using var winner = Child.Start(directory.Path, true, ephemeral: false);
+        await acknowledged.Task.WaitAsync(deadline.Token);
+        await using var loser = Child.Start(directory.Path, true);
+        await loser.ExitAsync();
+        Assert.NotEqual(0, loser.Process.ExitCode);
+        Assert.Contains("in progress", loser.Output);
+        Assert.False(original.Process.HasExited);
+        await serving;
+        await server.DisposeAsync();
+        oldLease.Dispose();
+        await StopAsync(originalDirectory.Path);
+        await original.ExitAsync();
+        await winner.ReadyAsync();
+        var replacement = await ReadInfoAsync(directory.Path);
+        Assert.Equal(winner.Process.Id, replacement.Pid);
+        Assert.NotEqual(actual.Nonce, replacement.Nonce);
+        Assert.False(winner.Process.HasExited);
+        using var http = new HttpClient();
+        Assert.Contains("ok", await http.GetStringAsync(replacement.ApiUrls.Single() + "/health", deadline.Token));
+    }
+
+    [Fact]
+    public async Task An_owner_without_a_control_peer_requires_manual_stop_without_creating_certificates()
+    {
+        using var directory = new TemporaryDirectory();
+        using var owner = ProxyInstance.Acquire(directory.Path);
+        await using var contender = Child.Start(directory.Path, true);
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.Contains("manually", contender.Output);
+        Assert.Contains("control", contender.Output);
+        Assert.False(File.Exists(Path.Combine(directory.Path, "root-ca.pfx")));
+    }
+
+    private static async Task StopAsync(string directory)
+    {
+        await using var pipe = await ConnectAsync(directory);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await WriteAsync(pipe, new { command = "info", protocol = 1 }, deadline.Token);
+        var info = await ReadAsync<Info>(pipe, deadline.Token);
+        await WriteAsync(pipe, new { command = "stop", protocol = 1, nonce = info.Nonce }, deadline.Token);
+        var reply = await ReadAsync<JsonElement>(pipe, deadline.Token);
+        Assert.True(reply.GetProperty("accepted").GetBoolean());
+    }
+
     private static async Task<NamedPipeClientStream> ConnectAsync(string directory)
     {
         var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut,
@@ -382,7 +540,8 @@ public sealed class RestartTests
                 process.Kill(entireProcessTree: true);
             }
 
-            await process.WaitForExitAsync();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await process.WaitForExitAsync(deadline.Token);
             process.Dispose();
         }
     }
