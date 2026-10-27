@@ -8,14 +8,16 @@ using System.Text.Json;
 namespace AiProxy.Hosting;
 
 /// <summary>The same-user control connection for one leased proxy process.</summary>
-internal sealed class ProxyControl(ProxyControl.Info info, IHostApplicationLifetime lifetime) : IAsyncDisposable
+internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHostApplicationLifetime lifetime) : IAsyncDisposable
 {
     internal const int Protocol = 1;
     internal const int MaximumFrameBytes = 16 * 1024;
     internal static readonly TimeSpan ConnectionDeadline = TimeSpan.FromSeconds(3);
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly CancellationTokenSource _stopping = new();
-    private NamedPipeServerStream? _pipe;
+    // Binding may unlink a stale Unix socket; the caller already holds both leases.
+    private readonly NamedPipeServerStream _pipe = new(PipeName(directory), PipeDirection.InOut, 1,
+        PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
     private Task? _running;
 
     internal sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls);
@@ -33,11 +35,8 @@ internal sealed class ProxyControl(ProxyControl.Info info, IHostApplicationLifet
         return "aip-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32];
     }
 
-    internal void Start(string directory)
+    internal void Start()
     {
-        // Construction can unlink an old Unix socket, so the caller must already hold the process lease.
-        _pipe = new NamedPipeServerStream(PipeName(directory), PipeDirection.InOut, 1,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         _running = ServeAsync(_pipe);
     }
 
@@ -77,7 +76,7 @@ internal sealed class ProxyControl(ProxyControl.Info info, IHostApplicationLifet
         }
     }
 
-    internal static async Task<Info> StopOwnedAsync(string directory, CancellationToken token)
+    internal static async Task<Info> StopOwnedAsync(string directory, CancellationToken token, Action<Info>? beforeStop = null)
     {
         await using var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut,
             PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -100,6 +99,7 @@ internal sealed class ProxyControl(ProxyControl.Info info, IHostApplicationLifet
             throw new IOException("The ai-proxy owner identity changed. Stop it manually before starting again.");
         }
 
+        beforeStop?.Invoke(owner);
         await WriteAsync(pipe, new Request("stop", Protocol, owner.Nonce), deadline.Token).ConfigureAwait(false);
         var reply = await ReadAsync<Reply>(pipe, deadline.Token).ConfigureAwait(false);
         if (!reply.Accepted)
@@ -152,7 +152,7 @@ internal sealed class ProxyControl(ProxyControl.Info info, IHostApplicationLifet
             await _running.ConfigureAwait(false);
         }
 
-        _pipe?.Dispose();
+        _pipe.Dispose();
         _stopping.Dispose();
     }
 }

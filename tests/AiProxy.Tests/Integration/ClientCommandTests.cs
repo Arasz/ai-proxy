@@ -14,7 +14,7 @@ public sealed class ClientCommandTests
     [InlineData("--help")]
     public async Task Root_help_does_not_validate_or_start_the_server(string option)
     {
-        var result = await RunAsync(option);
+        var result = await RunAsync([option], new Dictionary<string, string?> { ["Proxy__Port"] = "-1" });
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("harness", result.Output, StringComparison.Ordinal);
@@ -127,7 +127,7 @@ public sealed class ClientCommandTests
     private static async Task<ProcessResult> RunAsync(string[] arguments, IReadOnlyDictionary<string, string?> environment)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
-        start.Environment["Proxy__Port"] = "-1";
+        start.Environment["Proxy__Port"] = "0";
         foreach (var (key, value) in environment)
         {
             start.Environment[key] = value;

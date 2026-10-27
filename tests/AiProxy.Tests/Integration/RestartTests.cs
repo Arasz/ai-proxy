@@ -123,6 +123,146 @@ public sealed class RestartTests
         Assert.True(accepted.Connected);
     }
 
+    [Fact]
+    public async Task Normal_start_cannot_replace_the_owner_or_unlink_its_control_socket()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        await using var contender = Child.Start(directory.Path, false);
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        Assert.False(owner.Process.HasExited);
+    }
+
+    [Fact]
+    public async Task Crash_releases_the_lease_and_allows_a_stale_control_socket_to_be_reclaimed()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var original = Child.Start(directory.Path, false);
+        await original.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        original.Process.Kill();
+        await original.ExitAsync();
+        await using var replacement = Child.Start(directory.Path, true);
+        await replacement.ReadyAsync();
+        Assert.NotEqual(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        Assert.True(File.Exists(Path.Combine(directory.Path, "process.lock")));
+    }
+
+    [Fact]
+    public async Task Wrong_nonce_does_not_stop_the_owner_and_the_next_client_can_connect()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        await using var pipe = await ConnectAsync(directory.Path);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await WriteAsync(pipe, new { command = "info", protocol = 1 }, deadline.Token);
+        var info = await ReadAsync<Info>(pipe, deadline.Token);
+        await WriteAsync(pipe, new { command = "stop", protocol = 1, nonce = "wrong-nonce" }, deadline.Token);
+        var reply = await ReadAsync<JsonElement>(pipe, deadline.Token);
+        Assert.False(reply.GetProperty("accepted").GetBoolean());
+        Assert.Equal(info.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        Assert.False(child.Process.HasExited);
+    }
+
+    [Theory]
+    [InlineData("malformed")]
+    [InlineData("wrong-protocol")]
+    [InlineData("oversized")]
+    [InlineData("incomplete")]
+    [InlineData("stalled")]
+    public async Task Invalid_or_stalled_client_loses_only_its_connection(string kind)
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var original = await ReadInfoAsync(directory.Path);
+        await using var pipe = await ConnectAsync(directory.Path);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        if (kind == "wrong-protocol")
+        {
+            await WriteAsync(pipe, new { command = "info", protocol = 99 }, deadline.Token);
+        }
+        else if (kind != "stalled")
+        {
+            var header = new byte[4];
+            BinaryPrimitives.WriteInt32BigEndian(header, kind == "oversized" ? 16385 : kind == "malformed" ? 1 : 100);
+            await pipe.WriteAsync(header, deadline.Token);
+            await pipe.WriteAsync("!"u8.ToArray(), deadline.Token);
+            await pipe.FlushAsync(deadline.Token);
+        }
+
+        // The hostile connection stays open while a valid client waits behind it.
+        Assert.Equal(original.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        Assert.False(child.Process.HasExited);
+    }
+
+    [Fact]
+    public async Task Invalid_explicit_api_configuration_is_rejected_before_stopping_the_owner()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        await using var contender = Child.Start(directory.Path, true, true, "--urls=invalid");
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_in_progress_start_excludes_other_starts_before_they_can_discover_an_owner(bool restart)
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        using var startup = new FileStream(Path.Combine(directory.Path, "startup.lock"), FileMode.OpenOrCreate,
+            FileAccess.ReadWrite, FileShare.None);
+        await using var contender = Child.Start(directory.Path, restart);
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.Contains("in progress", contender.Output);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    [Theory]
+    [InlineData("proxy")]
+    [InlineData("api")]
+    public async Task An_occupied_explicit_replacement_port_is_rejected_before_stopping_the_owner(string endpoint)
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        using var sentinel = new TcpListener(IPAddress.Loopback, 0);
+        sentinel.Start();
+        var port = ((IPEndPoint)sentinel.LocalEndpoint).Port;
+        var option = endpoint == "proxy" ? $"--Proxy:Port={port}" : $"--urls=http://127.0.0.1:{port}";
+        await using var contender = Child.Start(directory.Path, true, true, option);
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    private static async Task<NamedPipeClientStream> ConnectAsync(string directory)
+    {
+        var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut,
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await pipe.ConnectAsync(deadline.Token);
+        return pipe;
+    }
+
     private static string PipeName(string directory)
     {
         var normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
