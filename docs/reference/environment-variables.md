@@ -115,7 +115,57 @@ give them `--endpoint` when you move it. See
 |---|---|
 | `PROXY__PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
 
-A value that is not a whole number from 1 to 65535 stops startup with
-an error naming `Proxy:Port`; an empty value counts as unset and keeps `8080`; it never falls back to `8080`. A port another program already holds
-also stops startup, before the system proxy setting is changed. Set `PROXY__PORT` to run beside
-another proxy that holds `8080`.
+<!-- trust:trustchecked evidence=src/AiProxy/Configuration/ProxySettings.cs:12 -->
+A whole number from 0 to 65535 is valid. Zero asks the operating system to choose a free port;
+the listener address and system proxy marker report that actual bound port. An empty value
+counts as unset and keeps `8080`; an invalid value stops startup with an error naming `Proxy:Port`.
+<!-- /trust:trustchecked -->
+
+## Runtime isolation and restart
+
+<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31 -->
+| Variable | What it is |
+|---|---|
+| `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
+| `PROXY__CONFIGURESYSTEMPROXY` | `false` leaves the operating system proxy settings alone. Defaults to `true`. |
+| `PROXY__TRUSTROOTCERTIFICATE` | `false` creates the inspection certificate without adding it to operating system trust. Defaults to `true`. |
+
+Unset values preserve runtime defaults, including options injected by an embedding host.
+For an isolated run, use a separate data directory, disable both operating system integrations,
+and set the compression database separately or disable compression:
+
+```bash
+PROXY__DATADIRECTORY=/tmp/ai-proxy-example \
+PROXY__CONFIGURESYSTEMPROXY=false \
+PROXY__TRUSTROOTCERTIFICATE=false \
+PROXY__COMPRESSION__ENABLED=false \
+PROXY__PORT=0 ASPNETCORE_URLS=http://127.0.0.1:0 ai-proxy
+```
+<!-- /trust:trustchecked -->
+
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProxyInstance.cs:137 -->
+`ai-proxy --restart` selects the same data directory as normal startup. It requests a graceful
+stop through a same-user control pipe, waits for that exact process to exit, acquires ownership,
+and starts the replacement. The replacement remains in the foreground. It inherits the actual
+proxy port and API URLs when their configuration keys are absent. Explicit environment, file,
+or command-line configuration wins; for example, `ai-proxy --restart --Proxy:Port=9081` changes
+the proxy port. Other settings still come from the new command's configuration.
+
+Each data directory has one persistent `process.lock` held for the whole process lifetime and a
+short `startup.lock` held during start or restart. Leave both files in place. A concurrent start
+fails immediately; it does not wait and then stop the replacement. Paths are normalized to
+absolute paths, but symlink aliases are not a supported way to select the same instance.
+
+The command validates proxy settings and API URLs before requesting shutdown. An explicitly
+requested port held by an unrelated listener produces an error before the owner is stopped.
+Port availability cannot prove ownership, and another process can still take a port between
+preflight and startup. There is no process scan, signal, or kill fallback.
+
+Version 0.16.1 and earlier have no control pipe or process lease. A held system proxy marker
+produces a manual-stop error before certificate preparation. If an older instance disabled
+system proxy integration, only occupied known requested ports can reveal a conflict. An older
+instance on unknown nondefault ports cannot be discovered safely; stop it manually.
+
+Root help, including `ai-proxy --restart --help`, runs before configuration validation, ownership
+files, certificate preparation, or listeners. Use it even when the server configuration is invalid.
+<!-- /trust:trustchecked -->

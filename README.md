@@ -70,6 +70,20 @@ The forward proxy listens on `127.0.0.1:8080`. Its separate local API listens on
 curl http://127.0.0.1:17432/health
 ```
 
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProxyInstance.cs:137 -->
+To replace the running instance gracefully, keep the same data directory and run:
+
+```bash
+ai-proxy --restart
+```
+
+The command waits for the owned process to exit, then runs the replacement in the foreground.
+It preserves the actual proxy and local API ports unless configuration explicitly overrides them.
+With no owner, it starts normally. Competing starts fail while a restart is in progress.
+If an older installation holds the system proxy marker, stop it manually before restarting.
+See [runtime isolation and restart limits](docs/reference/environment-variables.md#runtime-isolation-and-restart).
+<!-- /trust:trustchecked -->
+
 ## Connect an agent
 
 Clients can require explicit proxy and certificate settings even when macOS's system proxy
