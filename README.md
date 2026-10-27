@@ -26,7 +26,7 @@ Clients that ignore the operating system proxy, or do not trust the user's root 
 will connect directly or reject inspected provider HTTPS requests.
 
 When ai-proxy stops cleanly, it restores the operating system's previous proxy settings. The
-listener binds to loopback at `127.0.0.1:8080` (set `PROXY__PORT` to change the port); it is not exposed to the local network.
+listener binds to loopback at `127.0.0.1:ProxyRuntimeOptions.DefaultPort` (set `PROXY__PORT` to change the port); it is not exposed to the local network.
 
 The proxy forwards the caller's credentials unchanged. It has no provider-owned API keys.
 Compression and recoverable previews are on by default (`PROXY__COMPRESSION__ENABLED=false` turns them off); see the
@@ -63,7 +63,7 @@ Keep this process running while using your agents. On macOS, startup registers t
 proxy and may ask once for permission to trust the HTTPS inspection certificate. Stop it with
 Ctrl+C to restore the previous proxy settings.
 
-The forward proxy listens on `127.0.0.1:8080`. Its separate local API listens on
+The forward proxy listens on `127.0.0.1:ProxyRuntimeOptions.DefaultPort`. Its separate local API listens on
 `127.0.0.1:17432`; check it from another terminal:
 
 ```bash
@@ -105,7 +105,7 @@ current directory to `ANTHROPIC_CUSTOM_HEADERS`. It preserves other custom heade
 existing proxy bypass entries. Claude keeps its terminal input and output, arguments, and
 exit status. The parent shell's environment stays unchanged.
 
-The defaults are `http://127.0.0.1:8080` (or the port in `PROXY__PORT`) and
+The defaults are `http://127.0.0.1:ProxyRuntimeOptions.DefaultPort` (or the port in `PROXY__PORT`) and
 `~/.ai-proxy/root-ca.pem`. To use a different running proxy or CA file:
 
 ```bash
@@ -121,7 +121,7 @@ client trust its inspection certificate. The project header attributes gain to t
 directory; ai-proxy removes that header before forwarding. See the
 [gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project)
 for the verified Codex project-header configuration. Keep each provider's upstream base URL;
-port 8080 is a forward proxy, not an API base URL.
+port ProxyRuntimeOptions.DefaultPort is a forward proxy, not an API base URL.
 
 ## Read gain and retrieve originals
 

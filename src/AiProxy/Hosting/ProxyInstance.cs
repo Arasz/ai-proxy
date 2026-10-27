@@ -11,8 +11,9 @@ namespace AiProxy.Hosting;
 /// <summary>Owns the process lease outside the host and its control pipe.</summary>
 internal sealed class ProxyInstance(FileStream lease) : IDisposable
 {
-    internal const string LeaseFileName = "process.lock";
-    internal const string StartupFileName = "startup.lock";
+    private const string LeaseFileName = "process.lock";
+    private const string StartupFileName = "startup.lock";
+    private const string RestartFlag = "--restart";
 
     public void Dispose()
     {
@@ -26,12 +27,14 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             FileAccess.ReadWrite, FileShare.None));
     }
 
-    private static FileStream AcquireStartup(string directory)
+
+
+    private static StartupLock AcquireStartupLock(string directory)
     {
         try
         {
-            return new FileStream(Path.Combine(directory, StartupFileName), FileMode.OpenOrCreate,
-                FileAccess.ReadWrite, FileShare.None);
+            return new StartupLock(new FileStream(Path.Combine(directory, StartupFileName), FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None));
         }
         catch (IOException exception)
         {
@@ -41,29 +44,50 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
     private static Uri[] ApiAddresses(IConfiguration configuration)
     {
-        var endpoints = configuration.GetSection("Kestrel:Endpoints").GetChildren()
-            .Select(endpoint => endpoint["Url"]).Where(url => !string.IsNullOrWhiteSpace(url)).ToArray();
-        var urls = endpoints.Length > 0 ? string.Join(';', endpoints) : configuration["urls"];
-        if (string.IsNullOrWhiteSpace(urls))
-        {
-            var ports = new List<string>();
-            foreach (var scheme in new[] { "http", "https" })
-            {
-                foreach (var port in (configuration[$"{scheme}_ports"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    ports.Add($"{scheme}://0.0.0.0:{port}");
-                }
-            }
+        var urls = ExtractEndpointsFromKestrelConfig(configuration);
+        return urls.Length > 0 ? urls : ExtractEndpointsByKnownProtocols(configuration);
+    }
 
-            urls = ports.Count > 0 ? string.Join(';', ports) : GainApi.DefaultEndpoint;
+    private static Uri[] ExtractEndpointsByKnownProtocols(IConfiguration configuration)
+    {
+        var endpoints = new List<string>();
+        foreach (var scheme in KnownNames.Network.Protocols)
+        {
+            var ports = (configuration[$"{scheme}_ports"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var port in ports)
+            {
+                endpoints.Add($"{scheme}://0.0.0.0:{port}");
+            }
         }
 
-        return urls.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(url =>
+        var combinedEndpoints = endpoints.Count > 0 ? string.Join(';', endpoints) : GainApi.DefaultEndpoint;
+        return ConverRawEndpointAddresses(combinedEndpoints);
+    }
+
+    private static Uri[] ExtractEndpointsFromKestrelConfig(IConfiguration configuration)
+    {
+        var endpointUrls = configuration.GetSection(KnownNames.Configuration.KestrelEndpoints)
+            .GetChildren()
+            .Select(static endpoint => endpoint["Url"])
+            .Where(static url => !string.IsNullOrWhiteSpace(url))
+            .ToArray();
+
+        var combinedUrls = endpointUrls.Length > 0 ? string.Join(';', endpointUrls) : configuration[KnownNames.Configuration.Urls];
+        return string.IsNullOrWhiteSpace(combinedUrls) ? [] : ConverRawEndpointAddresses(combinedUrls);
+    }
+
+    private static Uri[] ConverRawEndpointAddresses(string urls) =>
+    [
+        .. urls.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(static url =>
         {
-            var normalized = url.Replace("://*:", "://0.0.0.0:", StringComparison.Ordinal)
-                .Replace("://+:", "://0.0.0.0:", StringComparison.Ordinal);
+            const string defaultAddress = "://0.0.0.0:";
+
+            var normalized = url
+                .Replace("://*:", defaultAddress, StringComparison.Ordinal)
+                .Replace("://+:", defaultAddress, StringComparison.Ordinal);
+
             if (!Uri.TryCreate(normalized, UriKind.Absolute, out var address) ||
-                address.Scheme is not ("http" or "https") || address.AbsolutePath != "/" ||
+                !KnownNames.Network.Protocols.Contains(address.Scheme) || address.AbsolutePath != "/" ||
                 !string.IsNullOrEmpty(address.UserInfo) || !string.IsNullOrEmpty(address.Query) ||
                 !string.IsNullOrEmpty(address.Fragment) || address.Port is < 0 or > 65535 ||
                 address is { Host: "localhost", Port: 0 })
@@ -72,23 +96,25 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             }
 
             return address;
-        }).ToArray();
-    }
+        })
+    ];
 
-    private static void ProbeReplacement(IConfiguration configuration, ProxySettings settings, ProxyControl.Info owner)
+    private static void ProbeReplacement(IConfiguration configuration, ProxySettings settings, ProxyControl.ProxyInfo owner)
     {
-        var owned = owner.ApiUrls.Select(url => new Uri(url)).Append(new Uri(owner.ProxyUrl)).ToArray();
+        var owned = owner.ApiUrls.Select(static url => new Uri(url)).Append(new Uri(owner.ProxyUrl)).ToArray();
         if (settings.Port is { } port && owned.All(address => address.Port != port))
         {
             ProbePort(IPAddress.Loopback, port);
         }
 
-        if (HasApiConfiguration(configuration))
+        if (!HasApiConfiguration(configuration))
         {
-            foreach (var address in ApiAddresses(configuration).Where(address => owned.All(previous => previous.Port != address.Port)))
-            {
-                ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
-            }
+            return;
+        }
+
+        foreach (var address in ApiAddresses(configuration).Where(address => owned.All(previous => previous.Port != address.Port)))
+        {
+            ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
         }
     }
 
@@ -138,77 +164,118 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
     internal static async Task<int> RunAsync(string[] arguments)
     {
+        var startupLock = StartupLock.NoOpLock;
         try
         {
-            var builder = WebApplication.CreateBuilder(arguments.Where(argument => argument != "--restart").ToArray());
-            if (builder.Configuration[KnownNames.Configuration.ProxyPort] == "")
-            {
-                builder.Configuration[KnownNames.Configuration.ProxyPort] = null;
-            }
+            string[] strings = [.. arguments.Where(static argument => argument != RestartFlag)];
+
+            var builder = WebApplication.CreateBuilder(strings);
 
             var settings = builder.Configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
+
             Validator.ValidateObject(settings, new ValidationContext(settings), true);
+
             _ = ApiAddresses(builder.Configuration);
+
             var directory = Path.GetFullPath(settings.DataDirectory ?? ProxyRuntimeOptions.DefaultDataDirectory);
             Directory.CreateDirectory(directory);
-            using var startup = AcquireStartup(directory);
-            ProxyInstance instance;
-            try
-            {
-                instance = Acquire(directory);
-            }
-            catch (IOException) when (arguments.Contains("--restart", StringComparer.Ordinal))
-            {
-                ProxyControl.Info previous;
-                try
-                {
-                    previous = await ProxyControl.StopOwnedAsync(directory, CancellationToken.None,
-                        owner => ProbeReplacement(builder.Configuration, settings, owner)).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException exception)
-                {
-                    throw new IOException("The ai-proxy control peer did not finish shutdown within the deadline. Stop the owner manually, then retry.", exception);
-                }
 
-                if (settings.Port is null)
-                {
-                    builder.Configuration["Proxy:Port"] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
-                }
+            startupLock = AcquireStartupLock(directory);
 
-                if (!HasApiConfiguration(builder.Configuration))
-                {
-                    builder.WebHost.UseUrls(previous.ApiUrls);
-                }
+            var proxyInstance = await AcquireProxyInstance(arguments, directory, builder, settings);
 
-                // The startup claim excludes replacements; require the old process lease after its exact PID exits.
-                instance = Acquire(directory);
-            }
+            using var ownership = proxyInstance;
 
-            using var ownership = instance;
-            ProbeLegacyMarker(directory);
-            ProbePort(IPAddress.Loopback, int.Parse(builder.Configuration[KnownNames.Configuration.ProxyPort] ?? "8080", CultureInfo.InvariantCulture));
-            foreach (var address in ApiAddresses(builder.Configuration))
-            {
-                ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
-            }
+            ProbeRunningProxy(directory, builder);
 
-            await using var app = ProxyApplication.Create(builder);
-            await app.StartAsync().ConfigureAwait(false);
-            using var process = Process.GetCurrentProcess();
-            var info = new ProxyControl.Info("ai-proxy", ProxyControl.DefaultProtocol, Guid.NewGuid().ToString("N"),
-                process.Id, process.StartTime.ToUniversalTime(),
-                app.Services.GetRequiredService<TitaniumProxyService>().Address.AbsoluteUri.TrimEnd('/'),
-                app.Urls.ToArray(), new ProcessIdentity(process).StartToken);
-            await using var control = new ProxyControl(directory, info, app.Lifetime);
-            startup.Dispose();
-            control.Start();
-            await app.WaitForShutdownAsync().ConfigureAwait(false);
-            return 0;
+            return await StartProxyApplication(directory, builder, startupLock);
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or ValidationException or ArgumentException or OperationCanceledException)
         {
-            await Console.Error.WriteLineAsync($"ai-proxy: {exception.Message}").ConfigureAwait(false);
+            await Console.Error.WriteLineAsync($"ai-proxy: {exception.Message}");
             return 1;
         }
+        finally
+        {
+            await startupLock.DisposeAsync();
+        }
+    }
+
+    private static async Task<int> StartProxyApplication(string directory, WebApplicationBuilder builder, StartupLock startupLock)
+    {
+        await using var app = ProxyApplication.Create(builder);
+        await app.StartAsync();
+        using var process = Process.GetCurrentProcess();
+        var proxyInfo = new ProxyControl.ProxyInfo("ai-proxy",
+            ProxyControl.DefaultProtocol,
+            Guid.CreateVersion7().ToString("N"),
+            process.Id,
+            process.StartTime.ToUniversalTime(),
+            app.Services.GetRequiredService<TitaniumProxyService>().Address.AbsoluteUri.TrimEnd('/'),
+            [.. app.Urls],
+            new ProcessIdentity(process).StartToken);
+
+        await using var control = new ProxyControl(directory, proxyInfo, app.Lifetime);
+        await control.Start(startupLock);
+
+        await app.WaitForShutdownAsync();
+        return 0;
+    }
+
+    private static void ProbeRunningProxy(string directory, WebApplicationBuilder builder)
+    {
+        ProbeLegacyMarker(directory);
+        ProbePort(IPAddress.Loopback, builder.GetProbeProxyPort());
+        foreach (var address in ApiAddresses(builder.Configuration))
+        {
+            ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
+        }
+    }
+
+    private static async Task<ProxyInstance> AcquireProxyInstance(string[] arguments, string directory, WebApplicationBuilder builder, ProxySettings settings)
+    {
+        ProxyInstance instance;
+        try
+        {
+            instance = Acquire(directory);
+        }
+        catch (IOException) when (arguments.Contains(RestartFlag, StringComparer.Ordinal))
+        {
+            ProxyControl.ProxyInfo previous;
+            try
+            {
+                previous = await ProxyControl.StopOwnedAsync(directory, CancellationToken.None, owner => ProbeReplacement(builder.Configuration, settings, owner));
+            }
+            catch (OperationCanceledException exception)
+            {
+                throw new IOException("The ai-proxy control peer did not finish shutdown within the deadline. Stop the owner manually, then retry.", exception);
+            }
+
+            if (settings.Port is null)
+            {
+                builder.Configuration[KnownNames.Configuration.ProxyPort] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (!HasApiConfiguration(builder.Configuration))
+            {
+                builder.WebHost.UseUrls(previous.ApiUrls);
+            }
+
+            // The startup claim excludes replacements; require the old process lease after its exact PID exits.
+            instance = Acquire(directory);
+        }
+
+        return instance;
+    }
+}
+
+file static class WebApplicationBuilderExtensions
+{
+    internal static int GetProbeProxyPort(this WebApplicationBuilder builder)
+    {
+        var portFromConfig = builder.Configuration[KnownNames.Configuration.ProxyPort];
+        return string.IsNullOrEmpty(portFromConfig) ?
+            ProxyRuntimeOptions.DefaultPort :
+            int.Parse(portFromConfig, CultureInfo.InvariantCulture);
     }
 }

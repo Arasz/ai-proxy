@@ -16,7 +16,7 @@ public sealed class SystemProxyMarkerTests
         {
             Assert.False(marker.PreviousRunDied);
             Assert.Null(marker.PreviousEndpoint);
-            marker.Write(new IPEndPoint(IPAddress.Loopback, 8080));
+            marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
             marker.Write(new IPEndPoint(IPAddress.Loopback, 9090));
         }
 
@@ -59,7 +59,7 @@ public sealed class SystemProxyMarkerTests
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         var marker = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
-        marker.Write(new IPEndPoint(IPAddress.Loopback, 8080));
+        marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
 
         marker.Delete();
 
@@ -74,7 +74,7 @@ public sealed class SystemProxyMarkerTests
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         var marker = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
-        marker.Write(new IPEndPoint(IPAddress.Loopback, 8080));
+        marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
 
         marker.Truncate();
 

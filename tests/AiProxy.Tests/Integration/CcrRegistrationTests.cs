@@ -1,5 +1,6 @@
 using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
+using AiProxy.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +14,7 @@ public sealed class CcrRegistrationTests
         var builder = WebApplication.CreateBuilder();
         builder.Configuration["Proxy:Compression:Enabled"] = "true";
         builder.Configuration["Proxy:Capture"] = "false";
-        builder.Configuration["Proxy:Port"] = "8080";
+        builder.Configuration["Proxy:Port"] = ProxyRuntimeOptions.DefaultPort.ToString();
         await using var app = ProxyApplication.Create(builder);
 
         foreach (var name in new[] { "CcrPreviewBuilder", "CcrPreviewOverlay", "CcrRetriever", "CcrRetrievalParser" })

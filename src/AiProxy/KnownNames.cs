@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using AiProxy.Core.Gain;
 
 namespace AiProxy;
@@ -32,6 +33,7 @@ internal static class KnownNames
         public const string ProxyUrlFormat = "http://127.0.0.1:{0}";
         public const string LoopbackHosts = "localhost;127.0.0.1;[::1]";
         public const string LoopbackBypass = "localhost,127.0.0.1,::1";
+        public static readonly FrozenSet<string> Protocols = ["http", "https"];
     }
 
     internal static class Headers

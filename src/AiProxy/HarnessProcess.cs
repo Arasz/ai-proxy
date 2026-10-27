@@ -129,7 +129,7 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
         public const string ExecutableArgument = "<EXECUTABLE>";
         public const string ExecutableDescription = "Harness executable to launch.";
         public const string ProxyOption = "--proxy <URL>";
-        public const string ProxyDescription = "HTTP proxy URL (defaults to loopback and Proxy:Port or 8080).";
+        public const string ProxyDescription = "HTTP proxy URL (defaults to loopback and Proxy:Port or default port).";
         public const string CaFileOption = "--ca-file <PATH>";
         public const string CaFileDescription = "Root CA PEM file (defaults to ~/.ai-proxy/root-ca.pem).";
     }

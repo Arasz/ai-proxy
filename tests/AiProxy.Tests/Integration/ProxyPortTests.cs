@@ -13,8 +13,8 @@ public sealed class ProxyPortTests
     {
         var (address, options) = Compose(null);
 
-        Assert.Equal(8080, address.Port);
-        Assert.Equal(8080, options.Port);
+        Assert.Equal(ProxyRuntimeOptions.DefaultPort, address.Port);
+        Assert.Equal(ProxyRuntimeOptions.DefaultPort, options.Port);
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public sealed class ProxyPortTests
     {
         var (_, options) = Compose("");
 
-        Assert.Equal(8080, options.Port);
+        Assert.Equal(ProxyRuntimeOptions.DefaultPort, options.Port);
     }
 
     [Fact]

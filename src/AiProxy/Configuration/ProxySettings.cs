@@ -12,7 +12,7 @@ public sealed record ProxySettings
     [Range(0, 65535, ErrorMessage = "Proxy:Port must be a port number from 0 to 65535.")]
     public int? Port { get; init; }
 
-    /// <summary>The directory where private state (root CA, control socket, leases) is stored; unset keeps the runtime default.</summary>
+    /// <summary>The directory where the private state (root CA, control socket, leases) is stored; unset keeps the runtime default.</summary>
     public string? DataDirectory { get; init; }
 
     /// <summary>Whether to configure the machine proxy; unset keeps the runtime default.</summary>

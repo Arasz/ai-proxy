@@ -33,7 +33,7 @@ public sealed class GuardCommandTests
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         using var owner = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
-        owner.Write(new IPEndPoint(IPAddress.Loopback, 8080));
+        owner.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
         var clears = 0;
 
         var exitCode = new GuardCommand(directory.Path, () => clears++, TimeSpan.FromMilliseconds(100)).Run(new StringReader(""));
@@ -102,7 +102,7 @@ public sealed class GuardCommandTests
     {
         Directory.CreateDirectory(directory.Path);
         using var marker = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
-        marker.Write(new IPEndPoint(IPAddress.Loopback, 8080));
+        marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
     }
 
     private static bool Throws(Action action)

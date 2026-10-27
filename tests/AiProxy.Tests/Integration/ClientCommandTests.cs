@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
@@ -100,8 +101,8 @@ public sealed class ClientCommandTests
 
     [Theory]
     [InlineData("--ca-file", "__ai_proxy_missing_ca__.pem", "Root CA file is missing")]
-    [InlineData("--proxy", "https://localhost:8080", "must be an HTTP proxy URL")]
-    [InlineData("--proxy", "http://name:secret@localhost:8080", "must be an HTTP proxy URL")]
+    [InlineData("--proxy", "https://localhost:ProxyRuntimeOptions.DefaultPort", "must be an HTTP proxy URL")]
+    [InlineData("--proxy", "http://name:secret@localhost:ProxyRuntimeOptions.DefaultPort", "must be an HTTP proxy URL")]
     public async Task Harness_reports_invalid_configuration_without_launching(string option, string value, string message)
     {
         var result = await RunAsync("harness", "claude", option, value);
@@ -113,7 +114,7 @@ public sealed class ClientCommandTests
     [Fact]
     public async Task An_explicit_proxy_overrides_an_invalid_environment_default()
     {
-        var result = await RunAsync(["harness", "--proxy", "http://127.0.0.1:8080", "--ca-file", "__ai_proxy_missing_ca__.pem", "claude"],
+        var result = await RunAsync(["harness", "--proxy", $"http://127.0.0.1:{ProxyRuntimeOptions.DefaultPort}", "--ca-file", "__ai_proxy_missing_ca__.pem", "claude"],
             new Dictionary<string, string?> { ["Proxy__Port"] = "invalid" });
         Assert.Equal(1, result.ExitCode);
         Assert.Contains("Root CA file is missing", result.Error, StringComparison.Ordinal);

@@ -12,12 +12,16 @@ public sealed record ProxyRuntimeOptions(
     bool TrustRootCertificate,
     string DataDirectory)
 {
+    public const int DefaultPort = 8080;
+    private const string DefaultDataDirectoryName = ".ai-proxy";
+    private static readonly IPAddress DefaultListenAddress = IPAddress.Loopback;
+
     /// <summary>The per-user directory used by the installed application: <c>~/.ai-proxy</c>.</summary>
     public static string DefaultDataDirectory { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ai-proxy");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DefaultDataDirectoryName);
 
     /// <summary>The loopback endpoint used by the installed application.</summary>
-    public static ProxyRuntimeOptions Default { get; } = new(IPAddress.Loopback, 8080, true, true, DefaultDataDirectory);
+    public static ProxyRuntimeOptions Default { get; } = new(DefaultListenAddress, DefaultPort, true, true, DefaultDataDirectory);
 
     /// <summary>Password protecting the root CA pfx file; null or empty leaves the file unencrypted.</summary>
     public string? RootCertificatePassword { get; init; }
