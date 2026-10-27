@@ -18,8 +18,8 @@ internal static class ProxyInstance
             Validator.ValidateObject(settings, new ValidationContext(settings), true);
 
             var proxyApiAddressResolver = new ProxyApiAddressResolver(builder.Configuration);
-            var proxyProbe = new ProxyProbe(proxyApiAddressResolver, settings, builder.Configuration);
             var directory = EnsureDataDirectory(settings);
+            var proxyProbe = new ProxyProbe(directory, markerOwnerSearch, proxyApiAddressResolver, settings, builder.Configuration);
             await using var proxyInstanceLifetime = new ProxyInstanceLifetime(directory, builder, proxyProbe, settings, markerOwnerSearch);
 
             return await proxyInstanceLifetime.AcquireAndStartProxyInstance(arguments, cancellationToken);

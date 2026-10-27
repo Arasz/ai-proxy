@@ -34,7 +34,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
             ProxyControl.ProxyInfo previous;
             try
             {
-                previous = await ProxyControl.StopOwnedAsync(DataDirectory, cancellationToken, liveProxy => ProxyProbe.ProbeLive(liveProxy));
+                previous = await ProxyControl.StopOwnedAsync(DataDirectory, cancellationToken, liveProxy => ProxyProbe.ProbeNewProxyPorts(liveProxy));
             }
             catch (OperationCanceledException exception)
             {
@@ -54,7 +54,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
             _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
         }
 
-        await ProxyProbe.ProbeSystemProxyMarker(DataDirectory, MarkerOwnerSearch);
+        await ProxyProbe.ProbeSystemProxyAddresses();
 
         return await StartProxyApplication(_startupLease);
     }
