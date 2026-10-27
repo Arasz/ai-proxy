@@ -155,8 +155,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
 
-        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response) =>
-            async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response)
+        {
+            return async (client, cancellationToken) =>
             {
                 using (response)
                 {
@@ -170,9 +171,11 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     }
                 }
             };
+        }
 
-        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first) =>
-            async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first)
+        {
+            return async (client, cancellationToken) =>
             {
                 _client = client;
                 _cancellation = cancellationToken;
@@ -186,6 +189,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     await WriteAsync(SseEvent.Error(MessagesApi.Errors.Api, Messages.ResponseLost));
                 }
             };
+        }
 
         private async Task LoopAsync(HttpResponseMessage first)
         {

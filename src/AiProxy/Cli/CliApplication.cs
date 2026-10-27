@@ -22,7 +22,7 @@ public sealed class CliApplication(GainRuntime runtime)
 
     public static bool IsCommandInvocation(string[] args)
     {
-        return IsRootHelp(args) || args.Length > 0 && Commands.Contains(args[0]);
+        return IsRootHelp(args) || (args.Length > 0 && Commands.Contains(args[0]));
     }
 
     private static bool IsRootHelp(string[] args)

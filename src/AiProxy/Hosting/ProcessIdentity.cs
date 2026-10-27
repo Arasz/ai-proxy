@@ -8,7 +8,7 @@ internal sealed class ProcessIdentity(Process process)
 {
     internal string StartToken => OperatingSystem.IsLinux()
         ? ParseLinuxStat(File.ReadAllText($"/proc/{process.Id}/stat"))
-        : "native:" + process.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
+        : $"native:{process.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)}";
 
     internal static string ParseLinuxStat(string stat)
     {
@@ -21,6 +21,6 @@ internal sealed class ProcessIdentity(Process process)
             throw new IOException("The kernel process start identity is unavailable. Stop the owner manually before retrying.");
         }
 
-        return "linux:" + ticks.ToString(CultureInfo.InvariantCulture);
+        return $"linux:{ticks.ToString(CultureInfo.InvariantCulture)}";
     }
 }

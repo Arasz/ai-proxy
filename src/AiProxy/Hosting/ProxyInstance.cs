@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using AiProxy.Configuration;
+using AiProxy.Core.Gain;
 
 namespace AiProxy.Hosting;
 
@@ -47,13 +49,13 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             var ports = new List<string>();
             foreach (var scheme in new[] { "http", "https" })
             {
-                foreach (var port in (configuration[scheme + "_ports"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+                foreach (var port in (configuration[$"{scheme}_ports"] ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
                 {
                     ports.Add($"{scheme}://0.0.0.0:{port}");
                 }
             }
 
-            urls = ports.Count > 0 ? string.Join(';', ports) : Core.Gain.GainApi.DefaultEndpoint;
+            urls = ports.Count > 0 ? string.Join(';', ports) : GainApi.DefaultEndpoint;
         }
 
         return urls.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(url =>
@@ -64,7 +66,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                 address.Scheme is not ("http" or "https") || address.AbsolutePath != "/" ||
                 !string.IsNullOrEmpty(address.UserInfo) || !string.IsNullOrEmpty(address.Query) ||
                 !string.IsNullOrEmpty(address.Fragment) || address.Port is < 0 or > 65535 ||
-                address.Host == "localhost" && address.Port == 0)
+                address is { Host: "localhost", Port: 0 })
             {
                 throw new ArgumentException("The API URL configuration must contain HTTP(S) listener URLs with valid ports.");
             }
@@ -167,9 +169,10 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                 {
                     throw new IOException("The ai-proxy control peer did not finish shutdown within the deadline. Stop the owner manually, then retry.", exception);
                 }
+
                 if (settings.Port is null)
                 {
-                    builder.Configuration["Proxy:Port"] = new Uri(previous.ProxyUrl).Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    builder.Configuration["Proxy:Port"] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
                 }
 
                 if (!HasApiConfiguration(builder.Configuration))
@@ -183,15 +186,16 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
             using var ownership = instance;
             ProbeLegacyMarker(directory);
-            ProbePort(IPAddress.Loopback, int.Parse(builder.Configuration[KnownNames.Configuration.ProxyPort] ?? "8080", System.Globalization.CultureInfo.InvariantCulture));
+            ProbePort(IPAddress.Loopback, int.Parse(builder.Configuration[KnownNames.Configuration.ProxyPort] ?? "8080", CultureInfo.InvariantCulture));
             foreach (var address in ApiAddresses(builder.Configuration))
             {
                 ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
             }
+
             await using var app = ProxyApplication.Create(builder);
             await app.StartAsync().ConfigureAwait(false);
             using var process = Process.GetCurrentProcess();
-            var info = new ProxyControl.Info("ai-proxy", ProxyControl.Protocol, Guid.NewGuid().ToString("N"),
+            var info = new ProxyControl.Info("ai-proxy", ProxyControl.DefaultProtocol, Guid.NewGuid().ToString("N"),
                 process.Id, process.StartTime.ToUniversalTime(),
                 app.Services.GetRequiredService<TitaniumProxyService>().Address.AbsoluteUri.TrimEnd('/'),
                 app.Urls.ToArray(), new ProcessIdentity(process).StartToken);

@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using AiProxy;
 using AiProxy.Cli;
 using AiProxy.Hosting;
 using Titanium.Web.Proxy.Network;

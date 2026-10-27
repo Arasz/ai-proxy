@@ -18,7 +18,6 @@ public static class JsonExtensions
             using var document = JsonDocument.Parse(text);
             return document.RootElement.GetProperty(property).GetRawText();
         }
-
     }
 
     extension(JsonDocument)

@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Pipes;
 using System.Net;
 using System.Net.Sockets;
@@ -28,7 +29,7 @@ public sealed class RestartTests
         Assert.Equal(child.Process.Id, info.Pid);
         Assert.InRange(new Uri(info.ProxyUrl).Port, 1, 65535);
         using var http = new HttpClient();
-        Assert.Contains("ok", await http.GetStringAsync(info.ApiUrls.Single() + "/health", TestContext.Current.CancellationToken));
+        Assert.Contains("ok", await http.GetStringAsync($"{info.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -38,7 +39,7 @@ public sealed class RestartTests
         await using var original = Child.Start(directory.Path, false);
         await original.ReadyAsync();
         var before = await ReadInfoAsync(directory.Path);
-        await using var replacement = Child.Start(directory.Path, true, ephemeral: false);
+        await using var replacement = Child.Start(directory.Path, true, false);
         await replacement.ReadyAsync();
         Assert.True(original.Process.HasExited);
         Assert.Equal(0, original.Process.ExitCode);
@@ -48,7 +49,7 @@ public sealed class RestartTests
         Assert.Equal(before.ProxyUrl, after.ProxyUrl);
         Assert.Equal(before.ApiUrls, after.ApiUrls);
         using var http = new HttpClient();
-        Assert.Contains("ok", await http.GetStringAsync(after.ApiUrls.Single() + "/health", TestContext.Current.CancellationToken));
+        Assert.Contains("ok", await http.GetStringAsync($"{after.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
         using var upstream = new TcpListener(IPAddress.Loopback, 0);
         upstream.Start();
         var upstreamPort = ((IPEndPoint)upstream.LocalEndpoint).Port;
@@ -369,7 +370,7 @@ public sealed class RestartTests
             await WriteAsync(server, new { accepted = true }, deadline.Token);
             acknowledged.SetResult();
         }, TestContext.Current.CancellationToken);
-        await using var winner = Child.Start(directory.Path, true, ephemeral: false);
+        await using var winner = Child.Start(directory.Path, true, false);
         await acknowledged.Task.WaitAsync(deadline.Token);
         await using var loser = Child.Start(directory.Path, true);
         await loser.ExitAsync();
@@ -387,7 +388,7 @@ public sealed class RestartTests
         Assert.NotEqual(actual.Nonce, replacement.Nonce);
         Assert.False(winner.Process.HasExited);
         using var http = new HttpClient();
-        Assert.Contains("ok", await http.GetStringAsync(replacement.ApiUrls.Single() + "/health", deadline.Token));
+        Assert.Contains("ok", await http.GetStringAsync($"{replacement.ApiUrls.Single()}/health", deadline.Token));
     }
 
     [Fact]
@@ -415,11 +416,11 @@ public sealed class RestartTests
         {
             var stat = await File.ReadAllTextAsync($"/proc/{child.Process.Id}/stat", TestContext.Current.CancellationToken);
             var fields = stat[(stat.LastIndexOf(')') + 1)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            Assert.Equal("linux:" + fields[19], info.ProcessStartToken);
+            Assert.Equal($"linux:{fields[19]}", info.ProcessStartToken);
         }
         else
         {
-            Assert.Equal("native:" + child.Process.StartTime.ToUniversalTime().Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            Assert.Equal($"native:{child.Process.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)}",
                 info.ProcessStartToken);
         }
     }
@@ -486,7 +487,7 @@ public sealed class RestartTests
             normalized = normalized.ToUpperInvariant();
         }
 
-        return "aip-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32];
+        return $"aip-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32]}";
     }
 
     private static async Task<Info> ReadInfoAsync(string directory)
@@ -528,6 +529,18 @@ public sealed class RestartTests
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Process Process => process;
         public string Output => string.Join("\n", _output);
+
+        public async ValueTask DisposeAsync()
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(true);
+            }
+
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await process.WaitForExitAsync(deadline.Token);
+            process.Dispose();
+        }
 
         public static Child Start(string directory, bool restart, bool ephemeral = true, params string[] extra)
         {
@@ -588,18 +601,6 @@ public sealed class RestartTests
             var exited = process.WaitForExitAsync(deadline.Token);
             var result = await Task.WhenAny(_ready.Task, exited).WaitAsync(deadline.Token);
             Assert.True(result == _ready.Task, Output);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await process.WaitForExitAsync(deadline.Token);
-            process.Dispose();
         }
     }
 }

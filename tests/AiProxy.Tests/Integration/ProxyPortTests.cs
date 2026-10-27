@@ -1,3 +1,4 @@
+using System.Net;
 using AiProxy.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -75,7 +76,7 @@ public sealed class ProxyPortTests
         using var directory = new TemporaryDirectory();
         var builder = WebApplication.CreateBuilder();
         builder.Configuration["Proxy:Compression:Enabled"] = "false";
-        var injected = new ProxyRuntimeOptions(System.Net.IPAddress.Loopback, 0, enabled, enabled, directory.Path);
+        var injected = new ProxyRuntimeOptions(IPAddress.Loopback, 0, enabled, enabled, directory.Path);
         await using var app = ProxyApplication.Create(builder, runtimeOptions: injected);
         Assert.Equal(injected, app.Services.GetRequiredService<ProxyRuntimeOptions>());
         Assert.False(Directory.Exists(directory.Path));

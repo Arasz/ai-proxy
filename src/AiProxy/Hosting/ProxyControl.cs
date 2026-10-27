@@ -10,19 +10,30 @@ namespace AiProxy.Hosting;
 /// <summary>The same-user control connection for one leased proxy process.</summary>
 internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHostApplicationLifetime lifetime) : IAsyncDisposable
 {
-    internal const int Protocol = 1;
-    internal const int MaximumFrameBytes = 16 * 1024;
-    internal static readonly TimeSpan ConnectionDeadline = TimeSpan.FromSeconds(3);
+    internal const int DefaultProtocol = 1;
+    private const int MaximumFrameBytes = 16 * 1024;
+    private static readonly TimeSpan ConnectionDeadline = TimeSpan.FromSeconds(3);
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private readonly CancellationTokenSource _stopping = new();
+
     // Binding may unlink a stale Unix socket; the caller already holds both leases.
     private readonly NamedPipeServerStream _pipe = new(PipeName(directory), PipeDirection.InOut, 1,
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+
+    private readonly CancellationTokenSource _stopping = new();
     private Task? _running;
 
-    internal sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken);
-    internal sealed record Request(string Command, int Protocol, string? Nonce = null);
-    internal sealed record Reply(bool Accepted);
+    public async ValueTask DisposeAsync()
+    {
+        await _stopping.CancelAsync().ConfigureAwait(false);
+        if (_running is not null)
+        {
+            await _running.ConfigureAwait(false);
+        }
+
+        _pipe.Dispose();
+        _stopping.Dispose();
+    }
 
     internal static string PipeName(string directory)
     {
@@ -32,7 +43,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
             normalized = normalized.ToUpperInvariant();
         }
 
-        return "aip-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32];
+        return $"aip-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32]}";
     }
 
     internal void Start()
@@ -50,16 +61,18 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token);
                 deadline.CancelAfter(ConnectionDeadline);
                 var request = await ReadAsync<Request>(pipe, deadline.Token).ConfigureAwait(false);
-                if (request.Command == "info" && request.Protocol == Protocol)
+                if (request is not { Command: "info", Protocol: DefaultProtocol })
                 {
-                    await WriteAsync(pipe, info, deadline.Token).ConfigureAwait(false);
-                    var stop = await ReadAsync<Request>(pipe, deadline.Token).ConfigureAwait(false);
-                    var accepted = stop.Command == "stop" && stop.Protocol == Protocol && stop.Nonce == info.Nonce;
-                    await WriteAsync(pipe, new Reply(accepted), deadline.Token).ConfigureAwait(false);
-                    if (accepted)
-                    {
-                        lifetime.StopApplication();
-                    }
+                    continue;
+                }
+
+                await WriteAsync(pipe, info, deadline.Token).ConfigureAwait(false);
+                var stop = await ReadAsync<Request>(pipe, deadline.Token).ConfigureAwait(false);
+                var accepted = stop is { Command: "stop", Protocol: DefaultProtocol } && stop.Nonce == info.Nonce;
+                await WriteAsync(pipe, new Reply(accepted), deadline.Token).ConfigureAwait(false);
+                if (accepted)
+                {
+                    lifetime.StopApplication();
                 }
             }
             catch (Exception exception) when (exception is IOException or JsonException or OperationCanceledException)
@@ -87,9 +100,9 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(ConnectionDeadline);
         await pipe.ConnectAsync(deadline.Token).ConfigureAwait(false);
-        await WriteAsync(pipe, new Request("info", Protocol), deadline.Token).ConfigureAwait(false);
+        await WriteAsync(pipe, new Request("info", DefaultProtocol), deadline.Token).ConfigureAwait(false);
         var owner = await ReadAsync<Info>(pipe, deadline.Token).ConfigureAwait(false);
-        if (owner.Product != "ai-proxy" || owner.Protocol != Protocol || string.IsNullOrWhiteSpace(owner.Nonce) ||
+        if (owner.Product != "ai-proxy" || owner.Protocol != DefaultProtocol || string.IsNullOrWhiteSpace(owner.Nonce) ||
             owner.Pid <= 0 || owner.Pid == Environment.ProcessId || owner.StartUtc.Kind != DateTimeKind.Utc ||
             string.IsNullOrWhiteSpace(owner.ProcessStartToken) ||
             !Uri.TryCreate(owner.ProxyUrl, UriKind.Absolute, out var proxy) || proxy.Scheme != "http" ||
@@ -100,13 +113,13 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
 
         using var process = Process.GetProcessById(owner.Pid);
         if (new ProcessIdentity(process).StartToken != owner.ProcessStartToken ||
-            !OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc)
+            (!OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc))
         {
             throw new IOException("The ai-proxy owner identity changed. Stop it manually before starting again.");
         }
 
         beforeStop?.Invoke(owner);
-        await WriteAsync(pipe, new Request("stop", Protocol, owner.Nonce), deadline.Token).ConfigureAwait(false);
+        await WriteAsync(pipe, new Request("stop", DefaultProtocol, owner.Nonce), deadline.Token).ConfigureAwait(false);
         var reply = await ReadAsync<Reply>(pipe, deadline.Token).ConfigureAwait(false);
         if (!reply.Accepted)
         {
@@ -150,15 +163,9 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
         await stream.FlushAsync(token).ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await _stopping.CancelAsync().ConfigureAwait(false);
-        if (_running is not null)
-        {
-            await _running.ConfigureAwait(false);
-        }
+    internal sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken);
 
-        _pipe.Dispose();
-        _stopping.Dispose();
-    }
+    private sealed record Request(string Command, int Protocol, string? Nonce = null);
+
+    private sealed record Reply(bool Accepted);
 }

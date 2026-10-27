@@ -7,7 +7,7 @@ public sealed class ProcessIdentityTests
     [Fact]
     public void Linux_start_identity_uses_field_22_after_a_command_containing_spaces_and_closing_parentheses()
     {
-        var stat = "123 (agent ) name with spaces) S " + string.Join(' ', Enumerable.Repeat("0", 18)) + " 987654321 12 34";
+        var stat = $"123 (agent ) name with spaces) S {string.Join(' ', Enumerable.Repeat("0", 18))} 987654321 12 34";
         Assert.Equal("linux:987654321", ProcessIdentity.ParseLinuxStat(stat));
     }
 

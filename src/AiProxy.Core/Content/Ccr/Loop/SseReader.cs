@@ -34,9 +34,9 @@ public sealed class SseReader
 
     private sealed class EventBuilder
     {
-        private string _name = Protocol.DefaultEvent;
         private readonly StringBuilder _data = new();
         private bool _any;
+        private string _name = Protocol.DefaultEvent;
 
         public void Accept(string line)
         {
@@ -47,7 +47,7 @@ public sealed class SseReader
 
             var colon = line.IndexOf(':');
             var field = colon < 0 ? line : line[..colon];
-            var value = colon < 0 ? string.Empty : line[(colon + 1)..].TrimStart(' ');
+            var value = colon < 0 ? "" : line[(colon + 1)..].TrimStart(' ');
             switch (field)
             {
                 case Protocol.EventField:
