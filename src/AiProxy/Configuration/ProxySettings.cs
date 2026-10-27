@@ -23,4 +23,7 @@ public sealed record ProxySettings
 
     /// <summary>The recoverable compression settings.</summary>
     public CcrSettings Ccr { get; init; } = new();
+
+    /// <summary>The directory where private state (root CA, control socket, leases) is stored.</summary>
+    public string? DataDirectory { get; init; }
 }

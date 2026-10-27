@@ -29,6 +29,10 @@ public static partial class ProxyServiceExtensions
 
             var compression = settings.Compression;
             var options = runtimeOptions ?? ProxyRuntimeOptions.Default;
+            if (settings.DataDirectory is { Length: > 0 } dataDirectory)
+            {
+                options = options with { DataDirectory = dataDirectory };
+            }
             if (settings.RootCertificatePassword is { Length: > 0 } rootPassword)
             {
                 options = options with { RootCertificatePassword = rootPassword };
