@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Proxy;
 
 namespace AiProxy.Tests.Integration;
 

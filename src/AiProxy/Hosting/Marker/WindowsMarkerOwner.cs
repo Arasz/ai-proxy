@@ -4,17 +4,17 @@ using System.Runtime.Versioning;
 namespace AiProxy.Hosting.Marker;
 
 [SupportedOSPlatform("windows")]
-internal static partial class WindowsMarkerOwner
+internal sealed partial class WindowsMarkerOwner : IMarkerOwnerSearch
 {
     private const int MoreData = 234;
     private const int SessionKeyLength = 33;
 
-    internal static unsafe int? Find(string path)
+    public unsafe ValueTask<int?> FindMarkerOwner(string path)
     {
         var key = stackalloc char[SessionKeyLength];
         if (RmStartSession(out var session, 0, key) is not 0)
         {
-            return null;
+            return ValueTask.FromResult<int?>(null);
         }
 
         try
@@ -25,7 +25,7 @@ internal static partial class WindowsMarkerOwner
                 resources[0] = resource;
                 if (RmRegisterResources(session, 1, resources, 0, 0, 0, 0) is not 0)
                 {
-                    return null;
+                    return ValueTask.FromResult<int?>(null);
                 }
             }
 
@@ -33,13 +33,13 @@ internal static partial class WindowsMarkerOwner
             var result = RmGetList(session, out var needed, ref count, null, out _);
             if (result is not MoreData || needed is not 1)
             {
-                return null;
+                return ValueTask.FromResult<int?>(null);
             }
 
             var entry = new ProcessInfo();
             count = 1;
             result = RmGetList(session, out _, ref count, &entry, out _);
-            return result == 0 && count == 1 && entry.Process.Pid > 0 ? entry.Process.Pid : null;
+            return result == 0 && count == 1 && entry.Process.Pid > 0 ? ValueTask.FromResult<int?>(entry.Process.Pid) : ValueTask.FromResult<int?>(null);
         }
         finally
         {

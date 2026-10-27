@@ -4,7 +4,7 @@ using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Titanium.Web.Proxy.StreamExtended.Network;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>What the inspector keeps about one exchange between BeforeRequest and AfterResponse.</summary>
 public sealed class CapturedExchange

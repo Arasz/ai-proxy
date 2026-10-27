@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Gain;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Api;
 
 /// <summary>Maps the proxy-owned retrieval and statistics API.</summary>
 public static partial class GainEndpoints
@@ -16,15 +16,7 @@ public static partial class GainEndpoints
 
     public static void MapGainEndpoints(this WebApplication app)
     {
-        app.MapGet("/gain", async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
-        {
-            if (!TryQuery(request.Query, out var query, out var error))
-            {
-                return Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400);
-            }
-
-            return Results.Json(await store.QueryAsync(query, cancellationToken));
-        });
+        app.MapGet("/gain", async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) => !TryQuery(request.Query, out var query, out var error) ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400) : Results.Json(await store.QueryAsync(query, cancellationToken)));
         app.MapPost("/gain/reset", async (GainQuery query, IGainStore store, CancellationToken cancellationToken) =>
         {
             var error = Validate(query);

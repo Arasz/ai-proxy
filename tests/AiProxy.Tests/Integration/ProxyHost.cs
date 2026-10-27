@@ -3,12 +3,14 @@ using System.Net.Sockets;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Proxy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
 

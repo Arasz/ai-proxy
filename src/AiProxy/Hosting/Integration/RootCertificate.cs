@@ -1,6 +1,6 @@
 using Titanium.Web.Proxy.Network;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>The proxy's root certificate as far as trusting it goes.</summary>
 internal interface IRootCertificate

@@ -1,6 +1,6 @@
 using Titanium.Web.Proxy.Models;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Proxy;
 
 /// <summary>Installs and restores the user's operating-system proxy settings.</summary>
 public interface ISystemProxyRegistrar

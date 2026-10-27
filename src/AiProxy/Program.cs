@@ -1,6 +1,10 @@
 using System.Runtime.InteropServices;
 using AiProxy.Cli;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Guard;
+using AiProxy.Hosting.Integration;
+using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy.Network;
 
 if (GuardCommand.IsRequested(args))
@@ -22,4 +26,5 @@ if (CliApplication.IsCommandInvocation(args))
     return await CliApplication.RunProcessAsync(args);
 }
 
-return await ProxyInstance.RunAsync(args);
+var markerOwnerSearch = new MarkerOwnerSearch();
+return await ProxyInstance.RunAsync(args, markerOwnerSearch);

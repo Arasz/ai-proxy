@@ -12,7 +12,7 @@ using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Inspects, captures and compresses requests sent to provider API hosts.</summary>
 /// <param name="compression">Compresses provider bodies; the pass-through pipeline leaves them alone.</param>

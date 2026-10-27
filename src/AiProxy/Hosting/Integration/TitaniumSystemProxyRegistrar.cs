@@ -1,7 +1,8 @@
+using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.Models;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Uses Titanium's platform integrations to change and restore system proxy settings.</summary>
 public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar

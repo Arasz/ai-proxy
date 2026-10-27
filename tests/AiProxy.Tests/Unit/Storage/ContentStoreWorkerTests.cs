@@ -4,6 +4,7 @@ using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using ContentStoreWorker = AiProxy.Hosting.Integration.ContentStoreWorker;
 
 namespace AiProxy.Tests.Unit.Storage;
 

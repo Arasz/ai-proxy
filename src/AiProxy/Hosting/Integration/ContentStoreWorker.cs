@@ -1,7 +1,7 @@
 using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Writes the records the proxy compressed, one queue row at a time.</summary>
 public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQueue queue, ContentStoreOptions options, ILogger<ContentStoreWorker> logger, TimeProvider time) : BackgroundService

@@ -4,9 +4,13 @@ using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Microsoft.Extensions.Logging.Abstractions;
 using Titanium.Web.Proxy.Models;
+using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
 

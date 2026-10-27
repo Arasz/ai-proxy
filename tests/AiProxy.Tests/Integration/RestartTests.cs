@@ -9,6 +9,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 
 namespace AiProxy.Tests.Integration;
 
@@ -24,14 +26,14 @@ public sealed class RestartTests
     [InlineData("123\n123\n", 123)]
     public void Marker_pid_is_reported_only_for_one_unambiguous_process(string output, int? expected)
     {
-        Assert.Equal(expected, ProxyInstance.MarkerOwnerPid(output));
+        Assert.Equal(expected, UnixMarkerOwner.MarkerOwnerPid(output));
     }
 
     [Fact]
     public async Task Missing_marker_discovery_tool_does_not_invent_a_pid()
     {
         using var directory = new TemporaryDirectory();
-        Assert.Null(await ProxyInstance.FindUnixMarkerOwner(directory.Path, Path.Combine(directory.Path, "missing-lsof")));
+        Assert.Null(await UnixMarkerOwner.FindMarkerOwner(directory.Path, Path.Combine(directory.Path, "missing-lsof")));
     }
 
     [Fact]

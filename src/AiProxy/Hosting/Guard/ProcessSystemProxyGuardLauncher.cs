@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>Starts this executable again in guard mode, with a pipe whose closing signals that the owner is gone.</summary>
 public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
@@ -8,10 +8,7 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
     /// <inheritdoc />
     public ISystemProxyGuardSession Launch(string dataDirectory, Action guardExited)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
-        ArgumentNullException.ThrowIfNull(guardExited);
-        var processPath = Environment.ProcessPath
-                          ?? throw new InvalidOperationException("The ai-proxy executable path is unknown, so the system proxy guard cannot start.");
+        var processPath = Environment.ProcessPath ?? throw new InvalidOperationException("The ai-proxy executable path is unknown, so the system proxy guard cannot start.");
         var start = new ProcessStartInfo(processPath)
         {
             RedirectStandardInput = true,

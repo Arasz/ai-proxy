@@ -1,6 +1,6 @@
 using AiProxy.Hosting.Marker;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>The <c>--guard-system-proxy</c> mode: waits for the owner's pipe to end and, if it died, clears the system proxy under the marker lock.</summary>
 public sealed class GuardCommand(string dataDirectory, Func<Task> clearProxy, TimeSpan lockWait, TimeProvider timeProvider)

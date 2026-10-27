@@ -1,12 +1,14 @@
 using System.Net;
+using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 using Titanium.Web.Proxy.Network;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Runs the explicit HTTP(S) proxy and restores machine proxy settings on shutdown.</summary>
 public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposable

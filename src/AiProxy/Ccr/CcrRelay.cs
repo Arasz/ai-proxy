@@ -8,6 +8,7 @@ using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Ccr.Loop;
 using AiProxy.Core.Gain;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Integration;
 using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;

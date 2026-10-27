@@ -1,8 +1,10 @@
 using System.Net;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Proxy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
 

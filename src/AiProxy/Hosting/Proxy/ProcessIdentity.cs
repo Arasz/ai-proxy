@@ -1,14 +1,15 @@
 using System.Diagnostics;
 using System.Globalization;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Proxy;
 
 /// <summary>Reads a process start identity without converting Linux boot ticks to wall time.</summary>
 internal sealed class ProcessIdentity(Process process)
 {
-    internal string StartToken => OperatingSystem.IsLinux()
-        ? ParseLinuxStat(File.ReadAllText($"/proc/{process.Id}/stat"))
-        : $"native:{process.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)}";
+    internal string StartToken =>
+        OperatingSystem.IsLinux()
+            ? ParseLinuxStat(File.ReadAllText($"/proc/{process.Id}/stat"))
+            : $"native:{process.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)}";
 
     internal static string ParseLinuxStat(string stat)
     {

@@ -1,4 +1,4 @@
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>Watches the parent's pipe and clears the system proxy when the parent ends without reporting a restore.</summary>
 public sealed class SystemProxyGuard(Func<Task> clearProxy)
