@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Proxy;
 
 /// <summary>Controls the local listener, its reversible machine proxy integration, and where its private state lives.</summary>
 /// <param name="DataDirectory">User-only directory holding the root CA key.</param>

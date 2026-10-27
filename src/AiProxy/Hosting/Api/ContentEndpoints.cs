@@ -1,6 +1,6 @@
 using AiProxy.Core.Content;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Api;
 
 /// <summary>The endpoint that serves back what the proxy compressed.</summary>
 public static class ContentEndpoints
@@ -14,7 +14,7 @@ public static class ContentEndpoints
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        app.MapGet(Route, async (
+        app.MapGet(Route, static async (
             string requestId,
             IContentStore store,
             CancellationToken cancellationToken) =>

@@ -1,6 +1,6 @@
 using Titanium.Web.Proxy.Models;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Proxy;
 
 /// <summary>Installs and restores the user's operating-system proxy settings.</summary>
 public interface ISystemProxyRegistrar
@@ -12,5 +12,5 @@ public interface ISystemProxyRegistrar
     void Restore();
 
     /// <summary>Turns the HTTP and HTTPS system proxies off without needing a running server; throws when that fails.</summary>
-    void Clear();
+    Task ClearAsync();
 }

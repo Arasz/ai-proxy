@@ -37,7 +37,7 @@ An acknowledgement alone never completes restart.
 Frames have a 16 KiB byte limit and each connection has a three-second deadline. Malformed,
 incomplete, oversized, or stalled clients lose their connection; the same server disconnects
 and accepts the next client. Process exit has a separate thirty-second deadline. Failures
-require operator action; the executable never scans, signals, or kills processes.
+require operator action; the executable never signals or kills proxy processes.
 <!-- /trust:trustchecked -->
 
 ## Consequences
@@ -46,6 +46,8 @@ A loopback shutdown endpoint, persistent secret, and PID record are unnecessary.
 background supervisor. Unix pipe constructors can unlink stale socket paths, so lease ordering
 is part of correctness. Symlink aliases are not treated as equivalent data directories.
 
-Legacy versions require manual stopping when their system proxy marker is held. Without that
+Legacy versions require manual stopping when their system proxy marker is held. Unix `lsof`
+or Windows Restart Manager can report the PID of a single process with that marker open;
+unavailable or ambiguous results produce no PID. Without that
 marker, occupied known endpoints can reveal conflicts, but unknown legacy ports cannot be
 identified without scanning. Port checks authorize no shutdown and cannot prevent a later bind race.

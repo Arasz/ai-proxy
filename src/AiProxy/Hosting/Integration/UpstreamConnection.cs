@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Titanium.Web.Proxy.Http;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Reads Titanium's internal upstream connection state, which its public API does not expose.</summary>
 /// <remarks>A Titanium release that renames these members makes <see cref="IsClosed" /> throw <see cref="MissingMemberException" />.</remarks>

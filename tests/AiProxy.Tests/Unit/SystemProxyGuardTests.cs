@@ -1,26 +1,49 @@
 using AiProxy.Hosting;
+using AiProxy.Hosting.Guard;
 
 namespace AiProxy.Tests.Unit;
 
 public sealed class SystemProxyGuardTests
 {
     [Fact]
-    public void Input_that_ends_without_restored_clears_the_system_proxy()
+    public async Task Input_that_ends_without_restored_clears_the_system_proxy()
     {
         var clears = 0;
 
-        var cleared = new SystemProxyGuard(() => clears++).Run(new StringReader(""));
+        var cleared = await new SystemProxyGuard(() =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }).Run(new StringReader(""));
 
         Assert.True(cleared);
         Assert.Equal(1, clears);
     }
 
     [Fact]
-    public void Input_that_reports_restored_leaves_the_system_proxy_alone()
+    public async Task Input_that_reports_restored_leaves_the_system_proxy_alone()
     {
         var clears = 0;
 
-        var cleared = new SystemProxyGuard(() => clears++).Run(new StringReader("restored\n"));
+        var cleared = await new SystemProxyGuard(() =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }).Run(new StringReader("restored\n"));
 
         Assert.False(cleared);
         Assert.Equal(0, clears);
@@ -31,11 +54,22 @@ public sealed class SystemProxyGuardTests
     [InlineData("restor")]
     [InlineData("Restored extra\n")]
     [InlineData("restoredX\n")]
-    public void Input_that_is_not_exactly_restored_clears_the_system_proxy(string input)
+    public async Task Input_that_is_not_exactly_restored_clears_the_system_proxy(string input)
     {
         var clears = 0;
 
-        new SystemProxyGuard(() => clears++).Run(new StringReader(input));
+        await new SystemProxyGuard(() =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }).Run(new StringReader(input));
 
         Assert.Equal(1, clears);
     }

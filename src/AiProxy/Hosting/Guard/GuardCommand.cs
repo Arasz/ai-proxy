@@ -1,39 +1,22 @@
-namespace AiProxy.Hosting;
+using AiProxy.Hosting.Marker;
+
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>The <c>--guard-system-proxy</c> mode: waits for the owner's pipe to end and, if it died, clears the system proxy under the marker lock.</summary>
-public sealed class GuardCommand
+public sealed class GuardCommand(string dataDirectory, Func<Task> clearProxy, TimeSpan lockWait, TimeProvider timeProvider)
 {
     /// <summary>The first argument that selects guard mode; the second is the data directory.</summary>
     public const string Argument = "--guard-system-proxy";
-
-    private readonly Action _clear;
-
-    private readonly string _dataDirectory;
-    private readonly TimeSpan _lockWait;
-
-    /// <summary>Creates the guard for the marker in <paramref name="dataDirectory" />; <paramref name="lockWait" /> bounds the wait for that marker.</summary>
-    public GuardCommand(string dataDirectory, Action clear, TimeSpan lockWait)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
-        ArgumentNullException.ThrowIfNull(clear);
-        _dataDirectory = dataDirectory;
-        _clear = clear;
-        _lockWait = lockWait;
-    }
-
     /// <summary>True when <paramref name="args" /> ask for guard mode.</summary>
-    public static bool IsRequested(string[] args)
-    {
-        return args is [Argument, _];
-    }
+    public static bool IsRequested(string[] args) => args is [Argument, _];
 
     /// <summary>Reads <paramref name="input" /> until it ends and returns the process exit code.</summary>
-    public int Run(TextReader input)
+    public async Task<int> Run(TextReader input)
     {
-        ArgumentNullException.ThrowIfNull(input);
         try
         {
-            new SystemProxyGuard(ClearUnderLock).Run(input);
+            var systemProxyGuard = new SystemProxyGuard(ClearUnderLock);
+            await systemProxyGuard.Run(input);
             return 0;
         }
         catch (Exception exception)
@@ -43,12 +26,12 @@ public sealed class GuardCommand
         }
     }
 
-    private void ClearUnderLock()
+    private async Task ClearUnderLock()
     {
         SystemProxyMarker marker;
         try
         {
-            marker = SystemProxyMarker.Acquire(_dataDirectory, _lockWait);
+            marker = await SystemProxyMarker.Acquire(dataDirectory, lockWait, timeProvider);
         }
         catch (InvalidOperationException)
         {
@@ -60,7 +43,7 @@ public sealed class GuardCommand
         {
             if (marker.PreviousRunDied)
             {
-                _clear();
+                await clearProxy();
             }
 
             marker.Delete();

@@ -1,11 +1,14 @@
 using System.Net;
+using AiProxy.Hosting.Guard;
+using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 using Titanium.Web.Proxy.Network;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Integration;
 
 /// <summary>Runs the explicit HTTP(S) proxy and restores machine proxy settings on shutdown.</summary>
 public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposable
@@ -53,11 +56,6 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         TimeSpan markerWait,
         Func<HttpWebClient, bool>? upstreamClosed = null)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(guardLauncher);
-        ArgumentNullException.ThrowIfNull(inspector);
-        ArgumentNullException.ThrowIfNull(providerHosts);
-        ArgumentNullException.ThrowIfNull(loggerFactory);
         Server = new ProxyServer(false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
         _guardLauncher = guardLauncher;
@@ -100,7 +98,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     }
 
     /// <inheritdoc />
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
         CertificateManager.SuppressInteractiveRootStoreMutations = !_options.TrustRootCertificate;
         Server.Logging.LoggerFactory = _loggerFactory;
@@ -115,7 +113,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
         {
-            _marker = SystemProxyMarker.Acquire(_options.DataDirectory, _markerWait);
+            _marker = await SystemProxyMarker.Acquire( _options.DataDirectory, _markerWait, TimeProvider.System);
         }
 
         _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port);
@@ -132,7 +130,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             _started = true;
             if (_options.ConfigureSystemProxy)
             {
-                SetSystemProxy();
+                await SetSystemProxyAsync();
             }
         }
         catch
@@ -149,7 +147,6 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         }
 
         Log.Started(_logger, Address);
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -166,19 +163,22 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         return Task.CompletedTask;
     }
 
-    private void SetSystemProxy()
+    private async Task SetSystemProxyAsync()
     {
-        var marker = _marker!;
+        ArgumentNullException.ThrowIfNull(_marker);
+        ArgumentNullException.ThrowIfNull(_endPoint);
+
+        var marker = _marker;
         if (marker.PreviousRunDied)
         {
             Log.PreviousRunDied(_logger, marker.PreviousEndpoint);
-            _systemProxyRegistrar.Clear();
+            await _systemProxyRegistrar.ClearAsync();
         }
 
-        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint!.Port));
+        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint.Port));
         try
         {
-            _systemProxyRegistrar.Set(_endPoint!);
+            _systemProxyRegistrar.Set(_endPoint);
         }
         catch
         {
@@ -219,10 +219,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         if (restored)
         {
             _marker?.Truncate();
-            TryGuard(guard => guard.ReportRestored());
+            TryGuard(static guard => guard.ReportRestored());
         }
 
-        TryGuard(guard => guard.Dispose());
+        TryGuard(static guard => guard.Dispose());
         _guard = null;
         if (restored)
         {

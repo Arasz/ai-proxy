@@ -187,15 +187,23 @@ public sealed class TextCompressionHandlerTests
     }
 
     [Fact]
-    public async Task Each_handler_claims_only_its_own_kind()
+    public Task Each_handler_claims_only_its_own_kind()
     {
-        Assert.True(new TomlCompressionHandler().CanHandle(ContentType.Toml));
-        Assert.True(new MarkdownCompressionHandler().CanHandle(ContentType.Markdown));
-        Assert.True(new SourceCodeCompressionHandler([]).CanHandle(ContentType.SourceCode));
-        Assert.True(new ProseCompressionHandler().CanHandle(ContentType.Prose));
-        Assert.True(new DirectoryListingCompressionHandler().CanHandle(ContentType.DirectoryListing));
-        Assert.True(new PassThroughCompressionHandler().CanHandle(ContentType.Unknown));
-        Assert.False(new TomlCompressionHandler().CanHandle(ContentType.Prose));
+        try
+        {
+            Assert.True(new TomlCompressionHandler().CanHandle(ContentType.Toml));
+            Assert.True(new MarkdownCompressionHandler().CanHandle(ContentType.Markdown));
+            Assert.True(new SourceCodeCompressionHandler([]).CanHandle(ContentType.SourceCode));
+            Assert.True(new ProseCompressionHandler().CanHandle(ContentType.Prose));
+            Assert.True(new DirectoryListingCompressionHandler().CanHandle(ContentType.DirectoryListing));
+            Assert.True(new PassThroughCompressionHandler().CanHandle(ContentType.Unknown));
+            Assert.False(new TomlCompressionHandler().CanHandle(ContentType.Prose));
+            return Task.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 
     private static ContentPart Part(ContentType type, string text)

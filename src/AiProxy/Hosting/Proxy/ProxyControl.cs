@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Proxy;
 
 /// <summary>The same-user control connection for one leased proxy process.</summary>
 internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo proxyInfo, IHostApplicationLifetime lifetime) : IAsyncDisposable
@@ -43,9 +43,9 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
         return $"aip-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..32]}";
     }
 
-    internal async ValueTask Start(StartupLock startupLock)
+    internal async ValueTask Start(StartupLease startupLease)
     {
-        await startupLock.DisposeAsync();
+        await startupLease.DisposeAsync();
         _running = ServeAsync(_pipe);
     }
 
@@ -121,12 +121,13 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
 
     private static async Task<ProxyInfo> RequestShutdownAsync(ProxyInfo owner, Process process, NamedPipeClientStream pipe, CancellationTokenSource deadline, CancellationToken token)
     {
-        await pipe.WriteAsync( new Request("stop", DefaultProtocol, owner.Nonce), deadline.Token);
+        await pipe.WriteAsync(new Request("stop", DefaultProtocol, owner.Nonce), deadline.Token);
         var reply = await pipe.ReadAsync<Reply>(deadline.Token);
         if (!reply.Accepted)
         {
             throw new IOException("The ai-proxy owner refused shutdown. Stop it manually before starting again.");
         }
+
         // An acknowledgement only means shutdown was requested; final disposal must finish before replacement.
         using var exitDeadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         exitDeadline.CancelAfter(TimeSpan.FromSeconds(30));
@@ -137,7 +138,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
     private static void EnsureProcessIdentityIntegrity(Process process, ProxyInfo owner)
     {
         var processIdentity = new ProcessIdentity(process);
-        if (processIdentity.StartToken != owner.ProcessStartToken || (!OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc))
+        if (processIdentity.StartToken != owner.ProcessStartToken || !OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc)
         {
             throw new IOException("The ai-proxy owner identity changed. Stop it manually before starting again.");
         }
@@ -164,9 +165,8 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
 
 file static class PipeStreamExtensions
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-
     private const int MaximumFrameBytes = 16 * 1024;
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     extension(Stream stream)
     {

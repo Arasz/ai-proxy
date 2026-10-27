@@ -8,6 +8,7 @@ using AiProxy.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
 
 namespace AiProxy.Tests.Integration;
 

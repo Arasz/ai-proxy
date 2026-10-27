@@ -1,4 +1,4 @@
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>Starts the separate process that clears the system proxy if the owning process dies.</summary>
 public interface ISystemProxyGuardLauncher

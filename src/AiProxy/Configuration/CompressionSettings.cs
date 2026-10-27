@@ -1,8 +1,10 @@
 using AiProxy.Storage;
+using JetBrains.Annotations;
 
 namespace AiProxy.Configuration;
 
 /// <summary>What the operator configured about the compression stage, bound from <c>Proxy:Compression</c>.</summary>
+[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
 public sealed record CompressionSettings
 {
     /// <summary>Whether the stage runs at all.</summary>
@@ -18,6 +20,5 @@ public sealed record CompressionSettings
     public int? Minimum { get; init; }
 
     /// <summary>The store options the <see cref="Database" /> setting resolves to.</summary>
-    public ContentStoreOptions Store => new(
-        string.IsNullOrWhiteSpace(Database) ? ContentStoreOptions.DefaultDatabasePath : Database.Trim());
+    public ContentStoreOptions Store => new(string.IsNullOrWhiteSpace(Database) ? ContentStoreOptions.DefaultDatabasePath : Database.Trim());
 }

@@ -203,10 +203,18 @@ public sealed class LogCompressionHandlerTests
     }
 
     [Fact]
-    public async Task The_handler_claims_the_log_kind_and_nothing_else()
+    public Task The_handler_claims_the_log_kind_and_nothing_else()
     {
-        Assert.True(Handler.CanHandle(ContentType.Log));
-        Assert.False(Handler.CanHandle(ContentType.Json));
-        Assert.False(Handler.CanHandle(ContentType.Prose));
+        try
+        {
+            Assert.True(Handler.CanHandle(ContentType.Log));
+            Assert.False(Handler.CanHandle(ContentType.Json));
+            Assert.False(Handler.CanHandle(ContentType.Prose));
+            return Task.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 }

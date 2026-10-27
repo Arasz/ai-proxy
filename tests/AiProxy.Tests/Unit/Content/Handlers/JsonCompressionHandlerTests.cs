@@ -78,9 +78,17 @@ public sealed class JsonCompressionHandlerTests
     }
 
     [Fact]
-    public async Task The_handler_claims_the_json_kind_and_nothing_else()
+    public Task The_handler_claims_the_json_kind_and_nothing_else()
     {
-        Assert.True(Handler.CanHandle(ContentType.Json));
-        Assert.False(Handler.CanHandle(ContentType.Xml));
+        try
+        {
+            Assert.True(Handler.CanHandle(ContentType.Json));
+            Assert.False(Handler.CanHandle(ContentType.Xml));
+            return Task.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 }

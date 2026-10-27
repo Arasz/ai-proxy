@@ -4,8 +4,13 @@ using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Guard;
+using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Microsoft.Extensions.Logging.Abstractions;
 using Titanium.Web.Proxy.Models;
+using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
 
@@ -218,7 +223,7 @@ public sealed class TitaniumProxyServiceTests
         var release = Task.Run(async () =>
         {
             await Task.Delay(300, TestContext.Current.CancellationToken);
-            holder.Dispose();
+            await holder.DisposeAsync();
         }, TestContext.Current.CancellationToken);
         var events = new List<string>();
         await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10));
@@ -287,7 +292,6 @@ public sealed class TitaniumProxyServiceTests
 
     private sealed class RecordingSystemProxyRegistrar(List<string>? events = null) : ISystemProxyRegistrar
     {
-        private readonly List<string>? _events = events;
         public bool FailSet { get; init; }
 
         public bool FailRestore { get; init; }
@@ -303,13 +307,13 @@ public sealed class TitaniumProxyServiceTests
                 throw new InvalidOperationException("networksetup failed");
             }
 
-            _events?.Add("set");
+            events?.Add("set");
             EndPoint = endPoint;
         }
 
         public void Restore()
         {
-            _events?.Add("restore");
+            events?.Add("restore");
             RestoreCount++;
             if (FailRestore)
             {
@@ -317,9 +321,11 @@ public sealed class TitaniumProxyServiceTests
             }
         }
 
-        public void Clear()
+        /// <inheritdoc />
+        public Task ClearAsync()
         {
-            _events?.Add("clear");
+            events?.Add("clear");
+            return Task.CompletedTask;
         }
     }
 

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Guard;
 
 /// <summary>Starts this executable again in guard mode, with a pipe whose closing signals that the owner is gone.</summary>
 public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
@@ -8,10 +8,7 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
     /// <inheritdoc />
     public ISystemProxyGuardSession Launch(string dataDirectory, Action guardExited)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
-        ArgumentNullException.ThrowIfNull(guardExited);
-        var processPath = Environment.ProcessPath
-                          ?? throw new InvalidOperationException("The ai-proxy executable path is unknown, so the system proxy guard cannot start.");
+        var processPath = Environment.ProcessPath ?? throw new InvalidOperationException("The ai-proxy executable path is unknown, so the system proxy guard cannot start.");
         var start = new ProcessStartInfo(processPath)
         {
             RedirectStandardInput = true,
@@ -45,9 +42,6 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
     /// <summary>The arguments that start guard mode; the dotnet muxer needs the assembly path first.</summary>
     public static IReadOnlyList<string> BuildArguments(string processPath, string entryAssemblyPath, string dataDirectory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(processPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(entryAssemblyPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
         var fileName = processPath[(processPath.LastIndexOfAny(['/', '\\']) + 1)..];
         var isMuxer = string.Equals(Path.GetFileNameWithoutExtension(fileName), "dotnet", StringComparison.OrdinalIgnoreCase);
         return isMuxer

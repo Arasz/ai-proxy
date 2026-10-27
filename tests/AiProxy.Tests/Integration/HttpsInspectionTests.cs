@@ -8,7 +8,10 @@ using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Proxy;
 using Microsoft.Extensions.Logging.Abstractions;
+using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
 

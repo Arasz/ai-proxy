@@ -1,6 +1,9 @@
 using System.Runtime.InteropServices;
 using AiProxy.Cli;
-using AiProxy.Hosting;
+using AiProxy.Hosting.Guard;
+using AiProxy.Hosting.Integration;
+using AiProxy.Hosting.Marker;
+using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy.Network;
 
 if (GuardCommand.IsRequested(args))
@@ -13,7 +16,8 @@ if (GuardCommand.IsRequested(args))
     CertificateManager.SuppressInteractiveRootStoreMutations = true;
     using var input = new StreamReader(Console.OpenStandardInput());
     var lockWait = TimeSpan.FromSeconds(5);
-    return new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait).Run(input);
+    var guardCommand = new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait, TimeProvider.System);
+    return await guardCommand.Run(input);
 }
 
 if (CliApplication.IsCommandInvocation(args))
@@ -21,4 +25,5 @@ if (CliApplication.IsCommandInvocation(args))
     return await CliApplication.RunProcessAsync(args);
 }
 
-return await ProxyInstance.RunAsync(args);
+var markerOwnerSearch = new MarkerOwnerSearch();
+return await ProxyInstance.RunAsync(args, markerOwnerSearch);

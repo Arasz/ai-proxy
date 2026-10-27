@@ -10,7 +10,13 @@ using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Gain;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Api;
+using AiProxy.Hosting.Proxy;
 using AiProxy.Storage;
+using ContentStoreWorker = AiProxy.Hosting.Integration.ContentStoreWorker;
+using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
+using RequestLoggingMiddleware = AiProxy.Hosting.Api.RequestLoggingMiddleware;
+using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy;
 
@@ -71,7 +77,7 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton<IProviderHosts, CanonicalProviderHosts>();
             services.AddSingleton<ProviderRequestInspector>();
             services.AddSingleton<TitaniumProxyService>();
-            services.AddHostedService(provider => provider.GetRequiredService<TitaniumProxyService>());
+            services.AddHostedService(static provider => provider.GetRequiredService<TitaniumProxyService>());
 
             return services;
         }
