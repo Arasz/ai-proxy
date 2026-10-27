@@ -28,7 +28,13 @@ public static partial class ProxyServiceExtensions
             Validator.ValidateObject(settings, new ValidationContext(settings), true);
 
             var compression = settings.Compression;
-            var options = runtimeOptions ?? ProxyRuntimeOptions.Default;
+            var defaults = runtimeOptions ?? ProxyRuntimeOptions.Default;
+            var options = defaults with
+            {
+                DataDirectory = settings.DataDirectory ?? defaults.DataDirectory,
+                ConfigureSystemProxy = settings.ConfigureSystemProxy ?? defaults.ConfigureSystemProxy,
+                TrustRootCertificate = settings.TrustRootCertificate ?? defaults.TrustRootCertificate
+            };
             if (settings.RootCertificatePassword is { Length: > 0 } rootPassword)
             {
                 options = options with { RootCertificatePassword = rootPassword };

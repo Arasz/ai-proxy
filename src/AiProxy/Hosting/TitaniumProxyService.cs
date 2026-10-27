@@ -68,11 +68,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
-        Address = new Uri($"http://{options.ListenAddress}:{options.Port}");
     }
 
     /// <summary>The listener address used by system proxy settings and local clients.</summary>
-    public Uri Address { get; }
+    public Uri Address => new($"http://{_options.ListenAddress}:{_endPoint?.Port ?? _options.Port}");
 
     internal IReadOnlyList<ProxyEndPoint> EndPoints => Server.ProxyEndPoints;
 
@@ -176,7 +175,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             _systemProxyRegistrar.Clear();
         }
 
-        marker.Write(new IPEndPoint(_options.ListenAddress, _options.Port));
+        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint!.Port));
         try
         {
             _systemProxyRegistrar.Set(_endPoint!);
