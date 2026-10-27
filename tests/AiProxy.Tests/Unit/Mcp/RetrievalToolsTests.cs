@@ -27,7 +27,7 @@ public sealed class RetrievalToolsTests
     public async Task Caller_cancellation_is_propagated()
     {
         using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
+        await cancelled.CancelAsync();
         using var http = new HttpClient(new StubHandler((_, token) => Task.FromCanceled<HttpResponseMessage>(token))) { BaseAddress = new Uri("http://127.0.0.1/") };
         var tools = NewTools(http);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => tools.RetrieveOriginal("0123456789abcdef", "whole", cancellationToken: cancelled.Token));

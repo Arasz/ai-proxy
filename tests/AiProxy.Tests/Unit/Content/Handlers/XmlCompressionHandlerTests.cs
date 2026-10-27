@@ -90,9 +90,17 @@ public sealed class XmlCompressionHandlerTests
     }
 
     [Fact]
-    public async Task The_handler_claims_the_xml_kind_and_nothing_else()
+    public Task The_handler_claims_the_xml_kind_and_nothing_else()
     {
-        Assert.True(Handler.CanHandle(ContentType.Xml));
-        Assert.False(Handler.CanHandle(ContentType.Json));
+        try
+        {
+            Assert.True(Handler.CanHandle(ContentType.Xml));
+            Assert.False(Handler.CanHandle(ContentType.Json));
+            return Task.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 }

@@ -219,7 +219,7 @@ public sealed class TitaniumProxyServiceTests
         var release = Task.Run(async () =>
         {
             await Task.Delay(300, TestContext.Current.CancellationToken);
-            holder.Dispose();
+            await holder.DisposeAsync();
         }, TestContext.Current.CancellationToken);
         var events = new List<string>();
         await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10));

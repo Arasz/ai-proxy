@@ -8,19 +8,19 @@ namespace AiProxy.Tests.Unit;
 public sealed class GuardCommandTests
 {
     [Fact]
-    public void A_parent_that_died_with_a_marker_is_cleared_under_the_lock_and_the_marker_is_deleted()
+    public async Task A_parent_that_died_with_a_marker_is_cleared_under_the_lock_and_the_marker_is_deleted()
     {
         using var directory = new TemporaryDirectory();
-        LeaveMarker(directory);
+        await LeaveMarker(directory);
         var clears = 0;
         var lockedDuringClear = false;
-        var command = new GuardCommand(directory.Path, () =>
+        var command = new GuardCommand(directory.Path, clearProxy: async () =>
         {
             clears++;
-            lockedDuringClear = Throws(() => new FileStream(MarkerPath(directory), FileMode.Open, FileAccess.ReadWrite, FileShare.None));
-        }, TimeSpan.Zero);
+            lockedDuringClear = await ThrowsAsync(() => Task.FromResult(new FileStream(MarkerPath(directory), FileMode.Open, FileAccess.ReadWrite, FileShare.None)));
+        }, TimeSpan.Zero, TimeProvider.System);
 
-        var exitCode = command.Run(new StringReader(""));
+        var exitCode = await command.Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(1, clears);
@@ -37,47 +37,90 @@ public sealed class GuardCommandTests
         owner.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
         var clears = 0;
 
-        var exitCode = new GuardCommand(directory.Path, () => clears++, TimeSpan.FromMilliseconds(100)).Run(new StringReader(""));
+        var exitCode = await new GuardCommand(directory.Path, () =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }, TimeSpan.FromMilliseconds(100), TimeProvider.System).Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
     }
 
     [Fact]
-    public void A_marker_that_was_already_truncated_is_not_a_reason_to_clear()
+    public async Task A_marker_that_was_already_truncated_is_not_a_reason_to_clear()
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
-        File.WriteAllText(MarkerPath(directory), "");
+        await File.WriteAllTextAsync(MarkerPath(directory), "", TestContext.Current.CancellationToken);
         var clears = 0;
 
-        new GuardCommand(directory.Path, () => clears++, TimeSpan.Zero).Run(new StringReader(""));
+        var exitCode = await new GuardCommand(directory.Path, () =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }, TimeSpan.Zero, TimeProvider.System).Run(new StringReader(""));
 
+        Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
         Assert.False(File.Exists(MarkerPath(directory)));
     }
 
     [Fact]
-    public void A_parent_that_restored_leaves_both_the_proxy_and_the_marker_alone()
+    public async Task A_parent_that_restores_leaves_both_the_proxy_and_the_marker_alone()
     {
         using var directory = new TemporaryDirectory();
-        LeaveMarker(directory);
+        await LeaveMarker(directory);
         var clears = 0;
 
-        new GuardCommand(directory.Path, () => clears++, TimeSpan.Zero).Run(new StringReader("restored\n"));
+        await new GuardCommand(directory.Path, () =>
+        {
+            try
+            {
+                clears++;
+                return Task.CompletedTask;
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }, TimeSpan.Zero, TimeProvider.System).Run(new StringReader("restored\n"));
 
         Assert.Equal(0, clears);
         Assert.True(File.Exists(MarkerPath(directory)));
     }
 
     [Fact]
-    public void A_clear_that_fails_keeps_the_marker_and_returns_an_error_code()
+    public async Task A_clear_that_fails_keeps_the_marker_and_returns_an_error_code()
     {
         using var directory = new TemporaryDirectory();
-        LeaveMarker(directory);
-        var command = new GuardCommand(directory.Path, () => throw new InvalidOperationException("networksetup failed"), TimeSpan.Zero);
+        await LeaveMarker(directory);
+        var command = new GuardCommand(directory.Path, static () => {
+            try
+            {
+                throw new InvalidOperationException("networksetup failed");
+            }
+            catch (Exception exception)
+            {
+                return Task.FromException(exception);
+            }
+        }, TimeSpan.Zero, TimeProvider.System);
 
-        var exitCode = command.Run(new StringReader(""));
+        var exitCode = await command.Run(new StringReader(""));
 
         Assert.Equal(1, exitCode);
         Assert.True(new FileInfo(MarkerPath(directory)).Length > 0);
@@ -99,18 +142,18 @@ public sealed class GuardCommandTests
         return Path.Combine(directory.Path, SystemProxyMarker.FileName);
     }
 
-    private static void LeaveMarker(TemporaryDirectory directory)
+    private static async Task LeaveMarker(TemporaryDirectory directory)
     {
         Directory.CreateDirectory(directory.Path);
-        using var marker = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
         marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
     }
 
-    private static bool Throws(Action action)
+    private static async Task<bool> ThrowsAsync(Func<Task> action)
     {
         try
         {
-            action();
+            await action();
             return false;
         }
         catch (IOException)

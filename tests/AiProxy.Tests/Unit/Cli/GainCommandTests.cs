@@ -167,7 +167,7 @@ public sealed class GainCommandTests
         clock.Advance(TimeSpan.FromSeconds(2));
         await clock.Scheduled.Reader.ReadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(2, fixture.Handler.Uris.Count);
-        cancellation.Cancel();
+        await cancellation.CancelAsync();
         Assert.Equal(130, await running);
         clock.Advance(TimeSpan.FromMinutes(1));
         Assert.Equal(2, fixture.Handler.Uris.Count);

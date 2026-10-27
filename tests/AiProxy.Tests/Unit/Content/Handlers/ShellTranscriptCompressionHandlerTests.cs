@@ -52,9 +52,17 @@ public sealed class ShellTranscriptCompressionHandlerTests
     }
 
     [Fact]
-    public async Task The_handler_claims_the_transcript_kind_and_nothing_else()
+    public Task The_handler_claims_the_transcript_kind_and_nothing_else()
     {
-        Assert.True(Handler.CanHandle(ContentType.ShellTranscript));
-        Assert.False(Handler.CanHandle(ContentType.Log));
+        try
+        {
+            Assert.True(Handler.CanHandle(ContentType.ShellTranscript));
+            Assert.False(Handler.CanHandle(ContentType.Log));
+            return Task.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException(exception);
+        }
     }
 }
