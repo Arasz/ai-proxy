@@ -14,10 +14,17 @@ using AiProxy.Hosting.Proxy;
 namespace AiProxy.Tests.Integration;
 
 /// <summary>Real child processes their own temporary directories and ephemeral loopback listeners.</summary>
-public sealed class RestartTests
+public sealed class RestartTests : IDisposable
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static readonly HttpClient HttpClient = new();
+
+    private static readonly ConcurrentQueue<HttpClient> Clients = new();
+    private static HttpClient GetHttpClient(HttpMessageHandler? handler = null)
+    {
+        var client = handler is not null ? new HttpClient(handler) : new HttpClient();
+        Clients.Enqueue(client);
+        return client;
+    }
 
     [Theory]
     [InlineData("", null)]
@@ -48,7 +55,7 @@ public sealed class RestartTests
         Assert.Equal(1, info.Protocol);
         Assert.Equal(child.Process.Id, info.Pid);
         Assert.InRange(new Uri(info.ProxyUrl).Port, 1, 65535);
-        Assert.Contains("ok", await HttpClient.GetStringAsync($"{info.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
+        Assert.Contains("ok", await GetHttpClient().GetStringAsync($"{info.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -67,7 +74,7 @@ public sealed class RestartTests
         Assert.NotEqual(before.Nonce, after.Nonce);
         Assert.Equal(before.ProxyUrl, after.ProxyUrl);
         Assert.Equal(before.ApiUrls, after.ApiUrls);
-        Assert.Contains("ok", await HttpClient.GetStringAsync($"{after.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
+        Assert.Contains("ok", await GetHttpClient().GetStringAsync($"{after.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
         using var upstream = new TcpListener(IPAddress.Loopback, 0);
         upstream.Start();
         var upstreamPort = ((IPEndPoint)upstream.LocalEndpoint).Port;
@@ -82,8 +89,8 @@ public sealed class RestartTests
 
             await stream.WriteAsync("HTTP/1.1 200 OK\r\nContent-Length: 9\r\nConnection: close\r\n\r\nforwarded"u8.ToArray(), TestContext.Current.CancellationToken);
         }, TestContext.Current.CancellationToken);
-        using var proxied = new HttpClient(new HttpClientHandler { Proxy = new WebProxy(after.ProxyUrl), UseProxy = true });
-        Assert.Equal("forwarded", await proxied.GetStringAsync($"http://127.0.0.1:{upstreamPort}/", TestContext.Current.CancellationToken));
+        var forwardedResponse = await GetHttpClient(new HttpClientHandler { Proxy = new WebProxy(after.ProxyUrl), UseProxy = true }).GetStringAsync($"http://127.0.0.1:{upstreamPort}/", TestContext.Current.CancellationToken);
+        Assert.Equal("forwarded", forwardedResponse);
         await received.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
@@ -290,7 +297,7 @@ public sealed class RestartTests
         var actual = await ReadInfoAsync(directory.Path);
         using var fakeDirectory = new TemporaryDirectory();
 
-        ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);;
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -342,7 +349,7 @@ public sealed class RestartTests
         };
         using var fakeDirectory = new TemporaryDirectory();
 
-        ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);;
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -387,7 +394,7 @@ public sealed class RestartTests
         var actual = await ReadInfoAsync(originalDirectory.Path);
         using var fakeDirectory = new TemporaryDirectory();
 
-        var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -420,7 +427,7 @@ public sealed class RestartTests
         Assert.NotEqual(actual.Nonce, replacement.Nonce);
         Assert.False(winner.Process.HasExited);
 
-        Assert.Contains("ok", await HttpClient.GetStringAsync($"{replacement.ApiUrls.Single()}/health", deadline.Token));
+        Assert.Contains("ok", await GetHttpClient().GetStringAsync($"{replacement.ApiUrls.Single()}/health", deadline.Token));
     }
 
     [Fact]
@@ -428,7 +435,7 @@ public sealed class RestartTests
     {
         using var fakeDirectory = new TemporaryDirectory();
 
-        ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease =  ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);;
 
         await using var contender = Child.Start(fakeDirectory.Path, true);
         await contender.ExitAsync();
@@ -635,6 +642,15 @@ public sealed class RestartTests
             var exited = process.WaitForExitAsync(deadline.Token);
             var result = await Task.WhenAny(_ready.Task, exited).WaitAsync(deadline.Token);
             Assert.True(result == _ready.Task, Output);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        while (Clients.TryDequeue(out var client))
+        {
+            client.Dispose();
         }
     }
 }
