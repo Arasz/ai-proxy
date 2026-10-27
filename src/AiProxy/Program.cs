@@ -13,7 +13,8 @@ if (GuardCommand.IsRequested(args))
     CertificateManager.SuppressInteractiveRootStoreMutations = true;
     using var input = new StreamReader(Console.OpenStandardInput());
     var lockWait = TimeSpan.FromSeconds(5);
-    return new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait).Run(input);
+    var guardCommand = new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait, TimeProvider.System);
+    return await guardCommand.Run(input);
 }
 
 if (CliApplication.IsCommandInvocation(args))

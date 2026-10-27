@@ -4,6 +4,7 @@ using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Marker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Titanium.Web.Proxy.Models;
 

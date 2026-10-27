@@ -39,16 +39,13 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     }
 
     /// <inheritdoc />
-    public void Clear()
-    {
-        ClearSystemProxy();
-    }
+    public Task ClearAsync() => ClearSystemProxy();
 
     /// <summary>
     ///     Turns the HTTP and HTTPS system proxies off through a short-lived server, so no snapshot lands in a long-lived one.
-    ///     Titanium snapshots the settings it first touches and restores them at exit; a snapshot of a stale proxy must not outlive the clear.
+    ///     Titanium snapshot the settings it first touches and restores them at exit; a snapshot of a stale proxy must not outlive the clear.
     /// </summary>
-    public static void ClearSystemProxy()
+    public static Task ClearSystemProxy()
     {
         using var server = new ProxyServer(false);
         var result = server.TryDisableSystemProxy(ProxyProtocolType.AllHttp);
@@ -56,5 +53,7 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
         {
             throw new InvalidOperationException($"The system proxy could not be cleared: {result.Message}");
         }
+
+        return Task.CompletedTask;
     }
 }

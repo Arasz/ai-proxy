@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using AiProxy.Configuration;
 using AiProxy.Core.Gain;
+using AiProxy.Hosting.Marker;
 
 namespace AiProxy.Hosting;
 
@@ -168,7 +169,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            return WindowsMarkerOwner.Find(path);
+            return Marker.WindowsMarkerOwner.Find(path);
         }
 
         var executable = OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof;

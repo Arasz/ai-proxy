@@ -1,8 +1,7 @@
-using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Marker;
 
 [SupportedOSPlatform("windows")]
 internal static partial class WindowsMarkerOwner
@@ -44,12 +43,24 @@ internal static partial class WindowsMarkerOwner
         }
         finally
         {
-           var rmEndSessionResult = RmEndSession(session);
-           if (rmEndSessionResult != 0)
-           {
-           }
+            var rmEndSessionResult = RmEndSession(session);
+            if (rmEndSessionResult != 0)
+            {
+            }
         }
     }
+
+    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
+    private static unsafe partial int RmStartSession(out uint session, uint flags, char* key);
+
+    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
+    private static unsafe partial int RmRegisterResources(uint session, uint files, char** paths, uint applications, nint processes, uint services, nint serviceNames);
+
+    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
+    private static unsafe partial int RmGetList(uint session, out uint needed, ref uint count, ProcessInfo* processes, out uint reasons);
+
+    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
+    private static partial int RmEndSession(uint session);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct UniqueProcess
@@ -70,16 +81,4 @@ internal static partial class WindowsMarkerOwner
         internal uint SessionId;
         internal int Restartable;
     }
-
-    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
-    private static unsafe partial int RmStartSession(out uint session, uint flags, char* key);
-
-    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
-    private static unsafe partial int RmRegisterResources(uint session, uint files, char** paths, uint applications, nint processes, uint services, nint serviceNames);
-
-    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
-    private static unsafe partial int RmGetList(uint session, out uint needed, ref uint count, ProcessInfo* processes, out uint reasons);
-
-    [LibraryImport(KnownNames.MarkerDiscovery.RestartManager)]
-    private static partial int RmEndSession(uint session);
 }

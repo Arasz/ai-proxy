@@ -1,5 +1,6 @@
 using System.Net;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Marker;
 using AiProxy.Tests.Integration;
 
 namespace AiProxy.Tests.Unit;
@@ -28,11 +29,11 @@ public sealed class GuardCommandTests
     }
 
     [Fact]
-    public void A_marker_that_another_instance_still_holds_is_left_alone_and_nothing_is_cleared()
+    public async Task A_marker_that_another_instance_still_holds_is_left_alone_and_nothing_is_cleared()
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
-        using var owner = SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero);
+        using var owner = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
         owner.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
         var clears = 0;
 

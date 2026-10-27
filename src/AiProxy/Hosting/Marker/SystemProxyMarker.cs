@@ -1,19 +1,21 @@
 using System.Net;
 using System.Text;
 
-namespace AiProxy.Hosting;
+namespace AiProxy.Hosting.Marker;
 
 /// <summary>An exclusively held file that records an endpoint while the system proxy points at it.</summary>
 public sealed class SystemProxyMarker : IDisposable
 {
     /// <summary>File name inside <see cref="ProxyRuntimeOptions.DataDirectory" />.</summary>
-    public const string FileName = "system-proxy.lock";
+    internal const string FileName = "system-proxy.lock";
 
-    // Unix takes flock only for FileShare.None. Windows needs FileShare.Delete so the owner can delete the file it holds;
-    // other openers still conflict because their own share mode excludes our read/write access.
+    /// <summary>
+    /// Unix takes a flock only for FileShare.None.
+    /// Windows needs FileShare.Delete so the owner can delete the file it holds;
+    /// other openers still conflict because their own share mode excludes our read/write access.
+    /// </summary>
     private static readonly FileShare LockShare = OperatingSystem.IsWindows() ? FileShare.Delete : FileShare.None;
     private readonly string _path;
-
     private readonly FileStream _stream;
 
     private SystemProxyMarker(FileStream stream, string path, string? previousEndpoint)
@@ -30,20 +32,16 @@ public sealed class SystemProxyMarker : IDisposable
     public bool PreviousRunDied => PreviousEndpoint is not null;
 
     /// <summary>Releases the hold and leaves the file as it is.</summary>
-    public void Dispose()
-    {
-        _stream.Dispose();
-    }
+    public void Dispose() => _stream.Dispose();
 
     /// <summary>
     ///     Takes the marker in <paramref name="dataDirectory" />, retrying for <paramref name="wait" /> while another process holds it;
     ///     throws <see cref="InvalidOperationException" /> when it is still held.
     /// </summary>
-    public static SystemProxyMarker Acquire(string dataDirectory, TimeSpan wait)
+    public static async Task<SystemProxyMarker> Acquire(string dataDirectory, TimeSpan wait, TimeProvider timeProvider)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
         var path = Path.Combine(dataDirectory, FileName);
-        var deadline = DateTime.UtcNow + wait;
+        var deadline = timeProvider.GetUtcNow() + wait;
         while (true)
         {
             try
@@ -53,14 +51,14 @@ public sealed class SystemProxyMarker : IDisposable
             }
             catch (IOException exception)
             {
-                if (DateTime.UtcNow >= deadline)
+                if (timeProvider.GetUtcNow() >= deadline)
                 {
                     throw new InvalidOperationException(
                         $"Another ai-proxy instance already owns the system proxy ({path} is in use). Stop it, then start ai-proxy again.",
                         exception);
                 }
 
-                Thread.Sleep(50);
+                await Task.Delay(TimeSpan.FromMilliseconds(50 + Random.Shared.Next(0, 50)), timeProvider);
             }
         }
     }
