@@ -36,8 +36,7 @@ An acknowledgement alone never completes restart.
 
 Frames have a 16 KiB byte limit and each connection has a three-second deadline. Malformed,
 incomplete, oversized, or stalled clients lose their connection; the same server disconnects
-and accepts the next client. Process exit has a separate thirty-second deadline. Failures
-require operator action; the executable never scans, signals, or kills processes.
+and accepts the next client. Process exit has a separate thirty-second deadline. Modern control failures require operator action; this path does not fall back to process discovery.
 <!-- /trust:trustchecked -->
 
 ## Consequences
@@ -46,6 +45,21 @@ A loopback shutdown endpoint, persistent secret, and PID record are unnecessary.
 background supervisor. Unix pipe constructors can unlink stale socket paths, so lease ordering
 is part of correctness. Symlink aliases are not treated as equivalent data directories.
 
-Legacy versions require manual stopping when their system proxy marker is held. Without that
-marker, occupied known endpoints can reveal conflicts, but unknown legacy ports cannot be
-identified without scanning. Port checks authorize no shutdown and cannot prevent a later bind race.
+Legacy versions have no process lease or control pipe. When the process lease is available but
+the system proxy marker is held, restart discovers the marker's exact operating-system holder.
+macOS uses built-in `lsof`, Linux uses `/proc`, and Windows uses Restart Manager file registration
+for discovery only. The holder must belong to the current user and run the AiProxy entry assembly
+or a recognized SDK tool apphost, including removed staged payloads left by tool upgrades. A
+loaded AiProxy dependency does not identify the entry process. Process birth is checked again
+after asynchronous discovery, immediately before each shutdown action.
+
+Unix sends SIGTERM to that PID. Windows tries `CloseMainWindow`. After a bounded graceful wait,
+restart verifies identity again before terminating only that process. It waits for process exit
+and bounded marker cleanup, allowing an existing recovery guard to finish without signaling it.
+HTTP health identifies API listener settings, not process identity. Known settings are inherited;
+unknown API settings use the new invocation's explicit configuration or loopback defaults with
+a diagnostic. Unverified HTTPS bindings are not copied as HTTP. Replacement endpoint occupancy
+and proxy/API overlap are checked before shutdown.
+
+Without a held marker, occupied endpoints reveal conflicts but authorize no shutdown. Unknown
+marker holders and other users remain untouched. Port checks cannot prevent a later bind race.

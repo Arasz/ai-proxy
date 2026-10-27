@@ -22,6 +22,7 @@
         <ProjectReference Include="../../scripts/CodeReducerCore/CodeReducerCore.csproj"/>
         <ProjectReference Include="../../src/AiProxy/AiProxy.csproj"/>
         <ProjectReference Include="../../src/AiProxy.Storage/AiProxy.Storage.csproj"/>
+        <ProjectReference Include="../AiProxy.LegacyFixture/AiProxy.LegacyFixture.csproj" ReferenceOutputAssembly="false" Private="false"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -39,4 +40,10 @@
         <None Include="../../scripts/reducer_scoring/preregistration.json" Link="ReducerScoring/preregistration.json" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
+    <Target Name="CopyLegacyFixture" AfterTargets="Build">
+        <ItemGroup>
+            <LegacyFixtureFiles Include="$(MSBuildProjectDirectory)/../AiProxy.LegacyFixture/bin/$(Configuration)/net10.0/*"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(LegacyFixtureFiles)" DestinationFolder="$(OutDir)legacy-fixture" SkipUnchangedFiles="true"/>
+    </Target>
 </Project>

@@ -7,6 +7,7 @@
         <Project Path="src/AiProxy.Storage/AiProxy.Storage.csproj"/>
     </Folder>
     <Folder Name="/tests/">
+        <Project Path="tests/AiProxy.LegacyFixture/AiProxy.LegacyFixture.csproj"/>
         <Project Path="tests/AiProxy.Generators.Tests/AiProxy.Generators.Tests.csproj"/>
         <Project Path="tests/AiProxy.Tests/AiProxy.Tests.csproj"/>
     </Folder>

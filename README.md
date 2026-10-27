@@ -80,7 +80,8 @@ ai-proxy --restart
 The command waits for the owned process to exit, then runs the replacement in the foreground.
 It preserves the actual proxy and local API ports unless configuration explicitly overrides them.
 With no owner, it starts normally. Competing starts fail while a restart is in progress.
-If an older installation holds the system proxy marker, stop it manually before restarting.
+Older installations with a held system proxy marker are discovered through the operating system.
+Restart verifies the same user, executable entry point, and process birth before stopping that exact owner.
 See [runtime isolation and restart limits](docs/reference/environment-variables.md#runtime-isolation-and-restart).
 <!-- /trust:trustchecked -->
 

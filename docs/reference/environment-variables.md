@@ -169,12 +169,23 @@ PID remain part of the identity check.
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between
-preflight and startup. There is no process scan, signal, or kill fallback.
+preflight and startup. Endpoint checks compare addresses as well as ports and reject overlapping
+replacement proxy and API endpoints before shutdown.
 
-Version 0.16.1 and earlier have no control pipe or process lease. A held system proxy marker
-produces a manual-stop error before certificate preparation. If an older instance disabled
-system proxy integration, only occupied known requested ports can reveal a conflict. An older
-instance on unknown nondefault ports cannot be discovered safely; stop it manually.
+Version 0.16.1 and earlier have no control pipe or process lease. For a held system proxy marker,
+restart asks the operating system for its exact holder and verifies the same user, executable
+entry assembly, and process birth. Unix sends SIGTERM; Windows tries the exact process's main
+window. After ten seconds, restart revalidates the owner before terminating only that process,
+then waits for exit and marker cleanup. It never signals process groups, child trees, unrelated
+listeners, or unknown marker holders.
+
+Known legacy ports are inherited. Health responses identify HTTP API listeners but do not
+authorize shutdown; an unresponsive API can still restart. When legacy listener settings cannot
+be identified, the command reports that it uses explicit replacement configuration or loopback
+defaults. It does not copy an unverified HTTPS binding as HTTP. Use `--Proxy:Port` and `--urls`
+to set replacement listeners explicitly. These endpoints are checked before stopping the owner.
+If an older instance disabled system proxy integration, only occupied known requested ports
+can reveal a conflict; port occupancy alone never authorizes shutdown.
 
 Root help, including `ai-proxy --restart --help`, runs before configuration validation, ownership
 files, certificate preparation, or listeners. Use it even when the server configuration is invalid.

@@ -99,24 +99,35 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         })
     ];
 
-    private static void ProbeReplacement(IConfiguration configuration, ProxySettings settings, ProxyControl.ProxyInfo owner)
+    private static void ProbeReplacement(IConfiguration configuration, ProxySettings settings, ProxyControl.ProxyInfo owner, string[]? ownedUrls = null)
     {
-        var owned = owner.ApiUrls.Select(static url => new Uri(url)).Append(new Uri(owner.ProxyUrl)).ToArray();
-        if (settings.Port is { } port && owned.All(address => address.Port != port))
+        var owned = (ownedUrls ?? owner.ApiUrls.Append(owner.ProxyUrl).ToArray()).Select(static url => new Uri(url)).ToArray();
+        var proxyPort = settings.Port ?? new Uri(owner.ProxyUrl).Port;
+        var api = HasApiConfiguration(configuration) ? ApiAddresses(configuration) : owner.ApiUrls.Select(static url => new Uri(url)).ToArray();
+        if (proxyPort != 0 && api.Any(address => address.Port == proxyPort &&
+                (EndpointAddress(address).Equals(IPAddress.Any) || EndpointAddress(address).Equals(IPAddress.Loopback))))
         {
-            ProbePort(IPAddress.Loopback, port);
+            throw new IOException("The requested proxy and API endpoints overlap. Choose different ports before restarting.");
         }
 
-        if (!HasApiConfiguration(configuration))
+        if (!owned.Any(address => OwnsEndpoint(address, IPAddress.Loopback, proxyPort)))
         {
-            return;
+            ProbePort(IPAddress.Loopback, proxyPort);
         }
 
-        foreach (var address in ApiAddresses(configuration).Where(address => owned.All(previous => previous.Port != address.Port)))
+        foreach (var address in api.Where(address => !owned.Any(previous => OwnsEndpoint(previous, EndpointAddress(address), address.Port))))
         {
-            ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
+            ProbePort(EndpointAddress(address), address.Port);
         }
     }
+
+    private static IPAddress EndpointAddress(Uri address) => address.Host == "localhost"
+        ? IPAddress.Loopback
+        : IPAddress.TryParse(address.Host.Trim('[', ']'), out var ip) ? ip : IPAddress.Any;
+
+    private static bool OwnsEndpoint(Uri previous, IPAddress address, int port) =>
+        previous.Port == port && (EndpointAddress(previous).Equals(address) ||
+            EndpointAddress(previous).Equals(address.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any));
 
     private static bool HasApiConfiguration(IConfiguration configuration)
     {
@@ -145,20 +156,29 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
     }
 
-    private static void ProbeLegacyMarker(string directory)
+    private static void ProbeLegacyMarker(string directory, bool waitForCleanup)
     {
         var path = Path.Combine(directory, SystemProxyMarker.FileName);
-        try
+        var cleanup = Stopwatch.StartNew();
+        while (true)
         {
-            using var marker = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
-        }
-        catch (FileNotFoundException)
-        {
-            // A fresh or cleanly stopped instance has no system-proxy marker.
-        }
-        catch (IOException exception)
-        {
-            throw new IOException("An older ai-proxy instance holds the system proxy marker. Stop it manually, then start ai-proxy again.", exception);
+            try
+            {
+                using var marker = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+                return;
+            }
+            catch (FileNotFoundException)
+            {
+                return;
+            }
+            catch (IOException) when (waitForCleanup && cleanup.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                Thread.Sleep(50);
+            }
+            catch (IOException exception)
+            {
+                throw new IOException("The system proxy marker is still held. Retry after its owner's cleanup finishes.", exception);
+            }
         }
     }
 
@@ -186,7 +206,19 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
             using var ownership = proxyInstance;
 
-            ProbeRunningProxy(directory, builder);
+            if (arguments.Contains(RestartFlag, StringComparer.Ordinal))
+            {
+                var legacy = new LegacyProxy(directory, settings.Port);
+                var previous = await legacy.FindAsync(CancellationToken.None);
+                if (previous is not null)
+                {
+                    ProbeReplacement(builder.Configuration, settings, previous, legacy.ListenerUrls);
+                    await legacy.StopAsync(previous, CancellationToken.None);
+                    InheritEndpoints(builder, settings, previous);
+                }
+            }
+
+            ProbeRunningProxy(directory, builder, arguments.Contains(RestartFlag, StringComparer.Ordinal));
 
             return await StartProxyApplication(directory, builder, startupLock);
         }
@@ -222,13 +254,26 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         return 0;
     }
 
-    private static void ProbeRunningProxy(string directory, WebApplicationBuilder builder)
+    private static void ProbeRunningProxy(string directory, WebApplicationBuilder builder, bool waitForCleanup)
     {
-        ProbeLegacyMarker(directory);
+        ProbeLegacyMarker(directory, waitForCleanup);
         ProbePort(IPAddress.Loopback, builder.GetProbeProxyPort());
         foreach (var address in ApiAddresses(builder.Configuration))
         {
             ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);
+        }
+    }
+
+    private static void InheritEndpoints(WebApplicationBuilder builder, ProxySettings settings, ProxyControl.ProxyInfo previous)
+    {
+        if (settings.Port is null)
+        {
+            builder.Configuration[KnownNames.Configuration.ProxyPort] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
+        }
+
+        if (!HasApiConfiguration(builder.Configuration))
+        {
+            builder.WebHost.UseUrls(previous.ApiUrls);
         }
     }
 
@@ -251,15 +296,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                 throw new IOException("The ai-proxy control peer did not finish shutdown within the deadline. Stop the owner manually, then retry.", exception);
             }
 
-            if (settings.Port is null)
-            {
-                builder.Configuration[KnownNames.Configuration.ProxyPort] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (!HasApiConfiguration(builder.Configuration))
-            {
-                builder.WebHost.UseUrls(previous.ApiUrls);
-            }
+            InheritEndpoints(builder, settings, previous);
 
             // The startup claim excludes replacements; require the old process lease after its exact PID exits.
             instance = Acquire(directory);

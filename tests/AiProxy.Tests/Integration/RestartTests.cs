@@ -18,6 +18,102 @@ public sealed class RestartTests
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     [Fact]
+    public async Task Restart_replaces_a_legacy_proxy_without_a_control_pipe_and_preserves_its_ports()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var legacy = Child.StartLegacy(directory.Path);
+        await legacy.ReadyAsync();
+        var line = legacy.Output.Split('\n').Single(value => value.StartsWith("Application started LEGACY ", StringComparison.Ordinal));
+        using var endpoints = JsonDocument.Parse(line["Application started LEGACY ".Length..]);
+        await using var replacement = Child.Start(directory.Path, true, false);
+        await replacement.ReadyAsync();
+        Assert.True(legacy.Process.HasExited);
+        var after = await ReadInfoAsync(directory.Path);
+        Assert.Equal(replacement.Process.Id, after.Pid);
+        Assert.Equal(endpoints.RootElement.GetProperty("proxy").GetString(), after.ProxyUrl);
+        Assert.Equal(endpoints.RootElement.GetProperty("api").GetString(), after.ApiUrls.Single());
+        using var http = new HttpClient(new HttpClientHandler { UseProxy = false });
+        Assert.Contains("ok", await http.GetStringAsync($"{after.ApiUrls.Single()}/health", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_legacy_recovery_guard_finishes_cleanup_without_being_signalled()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var guard = Child.StartLegacy(directory.Path, guard: true);
+        await guard.ReadyAsync();
+        await using var replacement = Child.Start(directory.Path, true);
+        await replacement.ReadyAsync();
+        await guard.ExitAsync();
+        Assert.Equal(0, guard.Process.ExitCode);
+        Assert.Equal(replacement.Process.Id, (await ReadInfoAsync(directory.Path)).Pid);
+    }
+
+    [Fact]
+    public async Task A_verified_legacy_proxy_that_ignores_graceful_shutdown_is_terminated_and_replaced()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var legacy = Child.StartLegacy(directory.Path, ignoreTermination: true);
+        await legacy.ReadyAsync();
+        await using var replacement = Child.Start(directory.Path, true, false);
+        await replacement.ReadyAsync();
+        Assert.True(legacy.Process.HasExited);
+        Assert.NotEqual(0, legacy.Process.ExitCode);
+        Assert.Equal(replacement.Process.Id, (await ReadInfoAsync(directory.Path)).Pid);
+    }
+
+    [Fact]
+    public async Task A_legacy_proxy_with_an_unresponsive_api_can_restart_and_preserves_its_proxy_port()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var legacy = Child.StartLegacy(directory.Path, true);
+        await legacy.ReadyAsync();
+        var line = legacy.Output.Split('\n').Single(value => value.StartsWith("Application started LEGACY ", StringComparison.Ordinal));
+        using var endpoints = JsonDocument.Parse(line["Application started LEGACY ".Length..]);
+        await using var replacement = Child.Start(directory.Path, true, false, "--urls=http://127.0.0.1:0");
+        await replacement.ReadyAsync();
+        Assert.True(legacy.Process.HasExited);
+        var after = await ReadInfoAsync(directory.Path);
+        Assert.Equal(endpoints.RootElement.GetProperty("proxy").GetString(), after.ProxyUrl);
+    }
+
+    [Fact]
+    public async Task An_unrelated_listener_on_another_address_is_not_exempted_by_the_old_port_number()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        var port = new Uri(before.ProxyUrl).Port;
+        using var sentinel = new TcpListener(IPAddress.IPv6Loopback, port);
+        sentinel.Server.DualMode = false;
+        sentinel.Start();
+        await using var contender = Child.Start(directory.Path, true, true, $"--urls=http://[::1]:{port}");
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+        using var probe = new TcpClient(AddressFamily.InterNetworkV6);
+        await probe.ConnectAsync(IPAddress.IPv6Loopback, port, TestContext.Current.CancellationToken);
+        using var accepted = await sentinel.AcceptTcpClientAsync(TestContext.Current.CancellationToken);
+        Assert.True(accepted.Connected);
+    }
+
+    [Fact]
+    public async Task A_proxy_override_colliding_with_the_inherited_api_is_rejected_before_shutdown()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        await using var contender = Child.Start(directory.Path, true, false, $"--Proxy:Port={new Uri(before.ApiUrls.Single()).Port}");
+        await contender.ExitAsync();
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.False(owner.Process.HasExited);
+        Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
+    }
+
+    [Fact]
     public async Task Restart_without_an_owner_starts_an_owned_instance_with_actual_endpoints()
     {
         using var directory = new TemporaryDirectory();
@@ -529,6 +625,32 @@ public sealed class RestartTests
         private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Process Process => process;
         public string Output => string.Join("\n", _output);
+
+        public static Child StartLegacy(string directory, bool hungApi = false, bool ignoreTermination = false, bool guard = false)
+        {
+            var executable = Path.Combine(AppContext.BaseDirectory, "legacy-fixture", OperatingSystem.IsWindows() ? "AiProxy.exe" : "AiProxy");
+            var start = new ProcessStartInfo(executable)
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
+            };
+            if (guard)
+            {
+                start.ArgumentList.Add("--guard-system-proxy");
+                start.ArgumentList.Add(directory);
+            }
+
+            start.Environment["LEGACY_PROXY_DIRECTORY"] = directory;
+            start.Environment["LEGACY_HUNG_API"] = hungApi ? "true" : "false";
+            start.Environment["LEGACY_IGNORE_TERMINATION"] = ignoreTermination ? "true" : "false";
+            var process = new Process { StartInfo = start };
+            var child = new Child(process);
+            process.OutputDataReceived += (_, args) => child.Record(args.Data);
+            process.ErrorDataReceived += (_, args) => child.Record(args.Data);
+            Assert.True(process.Start());
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            return child;
+        }
 
         public async ValueTask DisposeAsync()
         {
