@@ -127,7 +127,7 @@ public sealed class ClientCommandTests
     private static async Task<ProcessResult> RunAsync(string[] arguments, IReadOnlyDictionary<string, string?> environment)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
-        start.Environment["Proxy__Port"] = "0";
+        start.Environment["Proxy__Port"] = "-1";
         foreach (var (key, value) in environment)
         {
             start.Environment[key] = value;
