@@ -16,26 +16,19 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
     private const string StartupFileName = "startup.lock";
     private const string RestartFlag = "--restart";
 
-    public void Dispose()
-    {
-        lease.Dispose();
-    }
+    public void Dispose() => lease.Dispose();
 
     internal static ProxyInstance Acquire(string directory)
     {
         Directory.CreateDirectory(directory);
-        return new ProxyInstance(new FileStream(Path.Combine(directory, LeaseFileName), FileMode.OpenOrCreate,
-            FileAccess.ReadWrite, FileShare.None));
+        return new ProxyInstance(new FileStream(Path.Combine(directory, LeaseFileName), FileMode.OpenOrCreate,  FileAccess.ReadWrite, FileShare.None));
     }
-
-
 
     private static StartupLock AcquireStartupLock(string directory)
     {
         try
         {
-            return new StartupLock(new FileStream(Path.Combine(directory, StartupFileName), FileMode.OpenOrCreate,
-                FileAccess.ReadWrite, FileShare.None));
+            return new StartupLock(new FileStream(Path.Combine(directory, StartupFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
         }
         catch (IOException exception)
         {
@@ -108,7 +101,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             ProbePort(IPAddress.Loopback, port);
         }
 
-        if (!HasApiConfiguration(configuration))
+        if (!configuration.HasApiConfiguration())
         {
             return;
         }
@@ -119,13 +112,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
     }
 
-    private static bool HasApiConfiguration(IConfiguration configuration)
-    {
-        return !string.IsNullOrWhiteSpace(configuration["urls"]) ||
-               !string.IsNullOrWhiteSpace(configuration["http_ports"]) ||
-               !string.IsNullOrWhiteSpace(configuration["https_ports"]) ||
-               configuration.GetSection("Kestrel:Endpoints").GetChildren().Any();
-    }
+
 
     private static void ProbePort(IPAddress address, int port)
     {
@@ -146,12 +133,12 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
     }
 
-    private static void ProbeLegacyMarker(string directory)
+    private static async Task ProbeLegacyMarker(string directory)
     {
         var path = Path.Combine(directory, SystemProxyMarker.FileName);
         try
         {
-            using var marker = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            await using var marker = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
         }
         catch (FileNotFoundException)
         {
@@ -159,7 +146,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
         catch (IOException exception)
         {
-            var pid = FindMarkerOwner(path);
+            var pid = await FindMarkerOwner(path);
             var owner = pid is null ? KnownNames.MarkerDiscovery.UnknownOwner : string.Format(CultureInfo.InvariantCulture, KnownNames.MarkerDiscovery.KnownOwnerFormat, pid);
             throw new IOException(string.Format(CultureInfo.InvariantCulture, KnownNames.MarkerDiscovery.StopOwnerFormat, owner), exception);
         }
@@ -168,16 +155,16 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
     internal static int? MarkerOwnerPid(string output)
     {
         var pids = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (pids.Length == 0 || pids.Any(value => int.TryParse(value, out var pid) is false || pid <= 0))
+        if (pids.Length == 0 || pids.Any(static value => !int.TryParse(value, out var pid) || pid <= 0))
         {
             return null;
         }
 
-        int[] distinct = [.. pids.Select(value => int.Parse(value, CultureInfo.InvariantCulture)).Distinct()];
+        int[] distinct = [.. pids.Select(static value => int.Parse(value, CultureInfo.InvariantCulture)).Distinct()];
         return distinct.Length == 1 ? distinct[0] : null;
     }
 
-    private static int? FindMarkerOwner(string path)
+    private static async Task<int?> FindMarkerOwner(string path)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -185,10 +172,10 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         }
 
         var executable = OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof;
-        return FindUnixMarkerOwner(path, executable);
+        return await FindUnixMarkerOwner(path, executable);
     }
 
-    internal static int? FindUnixMarkerOwner(string path, string executable)
+    internal static async Task<int?> FindUnixMarkerOwner(string path, string executable)
     {
         try
         {
@@ -204,7 +191,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
             var output = process.StandardOutput.ReadToEndAsync();
             var error = process.StandardError.ReadToEndAsync();
-            if (process.WaitForExit(MarkerDiscoveryTimeoutMilliseconds) is false)
+            if (!process.WaitForExit(MarkerDiscoveryTimeoutMilliseconds))
             {
                 process.Kill();
                 return null;
@@ -215,8 +202,8 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                 return null;
             }
 
-            _ = error.GetAwaiter().GetResult();
-            return MarkerOwnerPid(output.GetAwaiter().GetResult());
+            _ = await error;
+            return MarkerOwnerPid(await output);
         }
         catch (Exception exception) when (exception is IOException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
@@ -248,7 +235,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
             using var ownership = proxyInstance;
 
-            ProbeRunningProxy(directory, builder);
+            await ProbeRunningProxy(directory, builder);
 
             return await StartProxyApplication(directory, builder, startupLock);
         }
@@ -284,9 +271,9 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         return 0;
     }
 
-    private static void ProbeRunningProxy(string directory, WebApplicationBuilder builder)
+    private static async Task ProbeRunningProxy(string directory, WebApplicationBuilder builder)
     {
-        ProbeLegacyMarker(directory);
+        await ProbeLegacyMarker(directory);
         ProbePort(IPAddress.Loopback, builder.GetProbeProxyPort());
         foreach (var address in ApiAddresses(builder.Configuration))
         {
@@ -318,7 +305,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
                 builder.Configuration[KnownNames.Configuration.ProxyPort] = new Uri(previous.ProxyUrl).Port.ToString(CultureInfo.InvariantCulture);
             }
 
-            if (!HasApiConfiguration(builder.Configuration))
+            if (!builder.Configuration.HasApiConfiguration())
             {
                 builder.WebHost.UseUrls(previous.ApiUrls);
             }
@@ -339,5 +326,17 @@ file static class WebApplicationBuilderExtensions
         return string.IsNullOrEmpty(portFromConfig) ?
             ProxyRuntimeOptions.DefaultPort :
             int.Parse(portFromConfig, CultureInfo.InvariantCulture);
+    }
+}
+
+file static class ConfigurationExtensions
+{
+    extension(IConfiguration configuration)
+    {
+        internal bool HasApiConfiguration() =>
+            !string.IsNullOrWhiteSpace(configuration[KnownNames.Configuration.Urls]) ||
+            !string.IsNullOrWhiteSpace(configuration[KnownNames.Configuration.HttpPorts]) ||
+            !string.IsNullOrWhiteSpace(configuration[KnownNames.Configuration.HttpsPorts]) ||
+            configuration.GetSection(KnownNames.Configuration.KestrelEndpoints).GetChildren().Any();
     }
 }

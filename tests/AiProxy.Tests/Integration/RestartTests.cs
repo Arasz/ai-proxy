@@ -12,7 +12,7 @@ using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Integration;
 
-/// <summary>Real child processes own temporary directories and ephemeral loopback listeners.</summary>
+/// <summary>Real child processes their own temporary directories and ephemeral loopback listeners.</summary>
 public sealed class RestartTests
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -28,10 +28,10 @@ public sealed class RestartTests
     }
 
     [Fact]
-    public void Missing_marker_discovery_tool_does_not_invent_a_pid()
+    public async Task Missing_marker_discovery_tool_does_not_invent_a_pid()
     {
         using var directory = new TemporaryDirectory();
-        Assert.Null(ProxyInstance.FindUnixMarkerOwner(directory.Path, Path.Combine(directory.Path, "missing-lsof")));
+        Assert.Null(await ProxyInstance.FindUnixMarkerOwner(directory.Path, Path.Combine(directory.Path, "missing-lsof")));
     }
 
     [Fact]

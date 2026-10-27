@@ -1,19 +1,19 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace AiProxy.Hosting;
 
 [SupportedOSPlatform("windows")]
-internal sealed partial class WindowsMarkerOwner
+internal static partial class WindowsMarkerOwner
 {
     private const int MoreData = 234;
     private const int SessionKeyLength = 33;
 
     internal static unsafe int? Find(string path)
     {
-        uint session;
         var key = stackalloc char[SessionKeyLength];
-        if (RmStartSession(out session, 0, key) is not 0)
+        if (RmStartSession(out var session, 0, key) is not 0)
         {
             return null;
         }
@@ -44,7 +44,10 @@ internal sealed partial class WindowsMarkerOwner
         }
         finally
         {
-            RmEndSession(session);
+           var rmEndSessionResult = RmEndSession(session);
+           if (rmEndSessionResult != 0)
+           {
+           }
         }
     }
 
