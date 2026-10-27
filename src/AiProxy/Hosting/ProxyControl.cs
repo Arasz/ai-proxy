@@ -20,7 +20,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
     private Task? _running;
 
-    internal sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls);
+    internal sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken);
     internal sealed record Request(string Command, int Protocol, string? Nonce = null);
     internal sealed record Reply(bool Accepted);
 
@@ -87,6 +87,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
         var owner = await ReadAsync<Info>(pipe, deadline.Token).ConfigureAwait(false);
         if (owner.Product != "ai-proxy" || owner.Protocol != Protocol || string.IsNullOrWhiteSpace(owner.Nonce) ||
             owner.Pid <= 0 || owner.Pid == Environment.ProcessId || owner.StartUtc.Kind != DateTimeKind.Utc ||
+            string.IsNullOrWhiteSpace(owner.ProcessStartToken) ||
             !Uri.TryCreate(owner.ProxyUrl, UriKind.Absolute, out var proxy) || proxy.Scheme != "http" ||
             owner.ApiUrls is not { Length: > 0 } || owner.ApiUrls.Any(url => !Uri.TryCreate(url, UriKind.Absolute, out _)))
         {
@@ -94,7 +95,8 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
         }
 
         using var process = Process.GetProcessById(owner.Pid);
-        if (process.StartTime.ToUniversalTime() != owner.StartUtc)
+        if (new ProcessIdentity(process).StartToken != owner.ProcessStartToken ||
+            !OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc)
         {
             throw new IOException("The ai-proxy owner identity changed. Stop it manually before starting again.");
         }

@@ -156,6 +156,16 @@ short `startup.lock` held during start or restart. Leave both files in place. A 
 fails immediately; it does not wait and then stop the replacement. Paths are normalized to
 absolute paths, but symlink aliases are not a supported way to select the same instance.
 
+<!-- /trust:trustchecked -->
+
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProcessIdentity.cs:8 -->
+The owner also reports an exact process start token. Linux uses the kernel start ticks from
+`/proc/PID/stat`, because independently running .NET processes can convert boot time to slightly
+different UTC timestamps. macOS and Windows use the native process start time. The nonce and
+PID remain part of the identity check.
+<!-- /trust:trustchecked -->
+
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProxyInstance.cs:137 -->
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between

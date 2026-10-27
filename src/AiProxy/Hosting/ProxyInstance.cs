@@ -189,7 +189,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
             var info = new ProxyControl.Info("ai-proxy", ProxyControl.Protocol, Guid.NewGuid().ToString("N"),
                 process.Id, process.StartTime.ToUniversalTime(),
                 app.Services.GetRequiredService<TitaniumProxyService>().Address.AbsoluteUri.TrimEnd('/'),
-                app.Urls.ToArray());
+                app.Urls.ToArray(), new ProcessIdentity(process).StartToken);
             await using var control = new ProxyControl(directory, info, app.Lifetime);
             startup.Dispose();
             control.Start();

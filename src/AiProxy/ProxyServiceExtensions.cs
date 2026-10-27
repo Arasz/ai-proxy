@@ -21,7 +21,7 @@ public static partial class ProxyServiceExtensions
     {
         /// <summary>Binds the <c>Proxy</c> section and registers the listener, the provider inspection it runs, and the settings they read.</summary>
         /// <param name="configuration">The configuration holding the <c>Proxy</c> section.</param>
-        /// <param name="runtimeOptions">Where and how the listener runs; the configured port and certificate password replace its own.</param>
+        /// <param name="runtimeOptions">Runtime defaults used when the corresponding Proxy setting is unset.</param>
         public IServiceCollection AddProxy(IConfiguration configuration, ProxyRuntimeOptions? runtimeOptions = null)
         {
             var settings = configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();

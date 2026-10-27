@@ -294,6 +294,7 @@ public sealed class RestartTests
     [InlineData("nonce")]
     [InlineData("pid")]
     [InlineData("start")]
+    [InlineData("start-token")]
     public async Task An_incompatible_or_mismatched_identity_is_rejected_without_a_stop_request(string field)
     {
         using var directory = new TemporaryDirectory();
@@ -306,7 +307,8 @@ public sealed class RestartTests
             "protocol" => actual with { Protocol = 99 },
             "nonce" => actual with { Nonce = "" },
             "pid" => actual with { Pid = Environment.ProcessId },
-            _ => actual with { StartUtc = actual.StartUtc.AddSeconds(1) }
+            "start" => actual with { StartUtc = DateTime.SpecifyKind(actual.StartUtc, DateTimeKind.Unspecified) },
+            _ => actual with { ProcessStartToken = "changed-start-token" }
         };
         using var fakeDirectory = new TemporaryDirectory();
         using var lease = ProxyInstance.Acquire(fakeDirectory.Path);
@@ -401,6 +403,27 @@ public sealed class RestartTests
         Assert.False(File.Exists(Path.Combine(directory.Path, "root-ca.pfx")));
     }
 
+    [Fact]
+    public async Task Owner_reports_a_stable_process_start_token_independent_of_wall_clock_conversion()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var info = await ReadInfoAsync(directory.Path);
+        Assert.False(string.IsNullOrWhiteSpace(info.ProcessStartToken));
+        if (OperatingSystem.IsLinux())
+        {
+            var stat = await File.ReadAllTextAsync($"/proc/{child.Process.Id}/stat", TestContext.Current.CancellationToken);
+            var fields = stat[(stat.LastIndexOf(')') + 1)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            Assert.Equal("linux:" + fields[19], info.ProcessStartToken);
+        }
+        else
+        {
+            Assert.Equal("native:" + child.Process.StartTime.ToUniversalTime().Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                info.ProcessStartToken);
+        }
+    }
+
     private static async Task StopAsync(string directory)
     {
         await using var pipe = await ConnectAsync(directory);
@@ -463,7 +486,7 @@ public sealed class RestartTests
         return JsonSerializer.Deserialize<T>(bytes, Json)!;
     }
 
-    private sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls);
+    private sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string? ProcessStartToken = null);
 
     private sealed class Child(Process process) : IAsyncDisposable
     {
