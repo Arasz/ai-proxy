@@ -51,6 +51,6 @@ public sealed class UnixMarkerOwnerSearch(string executable) : IMarkerOwnerSearc
             .Select(static value => value.PlatformID)
             .ToHashSet();
 
-        return pids.Count == 0 ? null : pids.FirstOrDefault();
+        return pids.Count != 1 ? null : pids.FirstOrDefault();
     }
 }
