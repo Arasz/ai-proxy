@@ -139,6 +139,11 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
         try
         {
             var builder = WebApplication.CreateBuilder(arguments.Where(argument => argument != "--restart").ToArray());
+            if (builder.Configuration[KnownNames.Configuration.ProxyPort] == "")
+            {
+                builder.Configuration[KnownNames.Configuration.ProxyPort] = null;
+            }
+
             var settings = builder.Configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
             Validator.ValidateObject(settings, new ValidationContext(settings), true);
             _ = ApiAddresses(builder.Configuration);
@@ -178,7 +183,7 @@ internal sealed class ProxyInstance(FileStream lease) : IDisposable
 
             using var ownership = instance;
             ProbeLegacyMarker(directory);
-            ProbePort(IPAddress.Loopback, int.Parse(builder.Configuration["Proxy:Port"] ?? "8080", System.Globalization.CultureInfo.InvariantCulture));
+            ProbePort(IPAddress.Loopback, int.Parse(builder.Configuration[KnownNames.Configuration.ProxyPort] ?? "8080", System.Globalization.CultureInfo.InvariantCulture));
             foreach (var address in ApiAddresses(builder.Configuration))
             {
                 ProbePort(IPAddress.TryParse(address.Host, out var ip) ? ip : IPAddress.Any, address.Port);

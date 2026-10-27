@@ -68,9 +68,13 @@ internal sealed class ProxyControl(string directory, ProxyControl.Info info, IHo
             }
             finally
             {
-                if (pipe.IsConnected)
+                try
                 {
                     pipe.Disconnect();
+                }
+                catch (InvalidOperationException)
+                {
+                    // The pipe is already disconnected or closed.
                 }
             }
         }
