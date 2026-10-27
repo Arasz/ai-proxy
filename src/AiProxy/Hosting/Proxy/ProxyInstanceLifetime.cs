@@ -34,7 +34,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
             ProxyControl.ProxyInfo previous;
             try
             {
-                previous = await ProxyControl.StopOwnedAsync(DataDirectory, cancellationToken, liveProxy => ProxyProbe.ProbeProxy(liveProxy));
+                previous = await ProxyControl.StopOwnedAsync(DataDirectory, cancellationToken, liveProxy => ProxyProbe.ProbeLive(liveProxy));
             }
             catch (OperationCanceledException exception)
             {

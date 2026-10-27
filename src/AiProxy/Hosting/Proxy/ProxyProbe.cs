@@ -8,7 +8,7 @@ namespace AiProxy.Hosting.Proxy;
 
 internal sealed class ProxyProbe(ProxyApiAddressResolver proxyApiAddressResolver, ProxySettings proxySettings, IConfiguration configuration)
 {
-    public void ProbeProxy(ProxyControl.ProxyInfo liveProxy)
+    public void ProbeLive(ProxyControl.ProxyInfo liveProxy)
     {
         ProbeLiveProxy(liveProxy);
         ProbePort(IPAddress.Loopback, GetProxyPort());
@@ -57,7 +57,7 @@ internal sealed class ProxyProbe(ProxyApiAddressResolver proxyApiAddressResolver
         }
     }
 
-    public async Task ProbeSystemProxyMarker(string markerDirectory, IMarkerOwnerSearch markerOwnerSearch)
+    public static async Task ProbeSystemProxyMarker(string markerDirectory, IMarkerOwnerSearch markerOwnerSearch)
     {
         var path = Path.Combine(markerDirectory, SystemProxyMarker.FileName);
         try
