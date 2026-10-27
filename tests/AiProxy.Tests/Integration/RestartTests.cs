@@ -424,6 +424,40 @@ public sealed class RestartTests
         }
     }
 
+    [Fact]
+    public async Task A_client_disconnecting_after_info_does_not_prevent_subsequent_clients_from_connecting()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var original = await ReadInfoAsync(directory.Path);
+        {
+            await using var pipe = await ConnectAsync(directory.Path);
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await WriteAsync(pipe, new { command = "info", protocol = 1 }, deadline.Token);
+            var info = await ReadAsync<Info>(pipe, deadline.Token);
+            Assert.Equal(original.Nonce, info.Nonce);
+        }
+
+        var second = await ReadInfoAsync(directory.Path);
+        Assert.Equal(original.Nonce, second.Nonce);
+        Assert.False(child.Process.HasExited);
+    }
+
+    [Fact]
+    public async Task Restart_with_empty_proxy_port_inherits_the_running_port()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = Child.Start(directory.Path, false);
+        await child.ReadyAsync();
+        var before = await ReadInfoAsync(directory.Path);
+        await using var replacement = Child.Start(directory.Path, true, true, "--Proxy:Port=");
+        await replacement.ReadyAsync();
+        var after = await ReadInfoAsync(directory.Path);
+        Assert.Equal(before.ProxyUrl, after.ProxyUrl);
+        Assert.True(child.Process.HasExited);
+    }
+
     private static async Task StopAsync(string directory)
     {
         await using var pipe = await ConnectAsync(directory);
