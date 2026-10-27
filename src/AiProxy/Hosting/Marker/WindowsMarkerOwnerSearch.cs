@@ -4,7 +4,7 @@ using System.Runtime.Versioning;
 namespace AiProxy.Hosting.Marker;
 
 [SupportedOSPlatform("windows")]
-internal sealed partial class WindowsMarkerOwner : IMarkerOwnerSearch
+internal sealed partial class WindowsMarkerOwnerSearch : IMarkerOwnerSearch
 {
     private const int MoreData = 234;
     private const int SessionKeyLength = 33;

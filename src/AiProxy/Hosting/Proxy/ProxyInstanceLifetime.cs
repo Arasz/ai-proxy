@@ -8,8 +8,7 @@ namespace AiProxy.Hosting.Proxy;
 
 internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicationBuilder Builder, ProxyProbe ProxyProbe, ProxySettings Settings, IMarkerOwnerSearch MarkerOwnerSearch) : IAsyncDisposable
 {
-    private const string StartupLeaseFileName = "startup.lock";
-    private const string LeaseFileName = "process.lock";
+
     private const string ProxyName = "ai-proxy";
     private RuntimeLease _runtimeLease = RuntimeLease.NoOpLease;
 
@@ -24,10 +23,11 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
 
     public async Task<int> AcquireAndStartProxyInstance(string[] arguments, CancellationToken cancellationToken = default)
     {
-        _startupLease = AcquireStartupLease();
+        _startupLease = AcquireStartupLeaseOrFail();
+
         try
         {
-            _runtimeLease = AcquireRuntimeLease();
+            _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
         }
         catch (IOException) when (arguments.Contains(ProxyCommand.RestartFlag, StringComparer.Ordinal))
         {
@@ -51,7 +51,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
                 Builder.WebHost.UseUrls(previous.ApiUrls);
             }
 
-            _runtimeLease = AcquireRuntimeLease();
+            _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
         }
 
         await ProxyProbe.ProbeSystemProxyMarker(DataDirectory, MarkerOwnerSearch);
@@ -80,25 +80,15 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
         return 0;
     }
 
-    private StartupLease AcquireStartupLease()
+    private StartupLease AcquireStartupLeaseOrFail()
     {
         try
         {
-            var startupLeaseFileName = Path.Combine(DataDirectory, StartupLeaseFileName);
-            var startupLeaseFile = new FileStream(startupLeaseFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            return new StartupLease(startupLeaseFile);
+            return ProxyLease.AcquireStartupLease(DataDirectory);
         }
         catch (IOException exception)
         {
             throw new IOException("Another ai-proxy start or restart is in progress. Wait for it to finish, then retry.", exception);
         }
-    }
-
-    private RuntimeLease AcquireRuntimeLease()
-    {
-        Directory.CreateDirectory(DataDirectory);
-        var runtimeLeaseFileName = Path.Combine(DataDirectory, LeaseFileName);
-        var runtimeLeaseFile = new FileStream(runtimeLeaseFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        return new RuntimeLease(runtimeLeaseFile);
     }
 }

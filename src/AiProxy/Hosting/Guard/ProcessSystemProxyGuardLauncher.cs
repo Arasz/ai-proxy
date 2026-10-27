@@ -42,9 +42,6 @@ public sealed class ProcessSystemProxyGuardLauncher : ISystemProxyGuardLauncher
     /// <summary>The arguments that start guard mode; the dotnet muxer needs the assembly path first.</summary>
     public static IReadOnlyList<string> BuildArguments(string processPath, string entryAssemblyPath, string dataDirectory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(processPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(entryAssemblyPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
         var fileName = processPath[(processPath.LastIndexOfAny(['/', '\\']) + 1)..];
         var isMuxer = string.Equals(Path.GetFileNameWithoutExtension(fileName), "dotnet", StringComparison.OrdinalIgnoreCase);
         return isMuxer

@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace AiProxy.Hosting.Marker;
 
-public sealed class UnixMarkerOwner(string executable) : IMarkerOwnerSearch
+public sealed class UnixMarkerOwnerSearch(string executable) : IMarkerOwnerSearch
 {
     private const int MarkerDiscoveryTimeoutMilliseconds = 3000;
 
@@ -46,11 +46,11 @@ public sealed class UnixMarkerOwner(string executable) : IMarkerOwnerSearch
     internal static int? MarkerOwnerPid(string pidCheckOutput)
     {
         var pids = pidCheckOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(static candidate => int.TryParse(candidate, CultureInfo.InvariantCulture, out var pid) ? (IsPid: true, PlatformID: pid) : (false, default))
+            .Select(static candidate => int.TryParse(candidate, CultureInfo.InvariantCulture, out var pid) ? (IsPid: true, PlatformID: pid) : (IsPid: false, PlatformID: 0))
             .Where(static value => value is { IsPid: true, PlatformID: > 0 })
             .Select(static value => value.PlatformID)
             .ToHashSet();
 
-        return pids.Count == 0 ? null : pids.First();
+        return pids.Count == 0 ? null : pids.FirstOrDefault();
     }
 }

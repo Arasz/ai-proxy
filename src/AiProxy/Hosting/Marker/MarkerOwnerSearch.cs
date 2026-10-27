@@ -6,9 +6,9 @@ public sealed class MarkerOwnerSearch : IMarkerOwnerSearch
     {
         if (OperatingSystem.IsWindows())
         {
-            return new WindowsMarkerOwner();
+            return new WindowsMarkerOwnerSearch();
         }
-        return new UnixMarkerOwner(OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof);
+        return new UnixMarkerOwnerSearch(OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof);
     }
 
     public async ValueTask<int?> FindMarkerOwner(string path) => await GetSearchForPlatform().FindMarkerOwner(path);

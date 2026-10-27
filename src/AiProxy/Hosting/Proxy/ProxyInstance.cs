@@ -11,8 +11,8 @@ internal static class ProxyInstance
     {
         try
         {
-            string[] filteredArguments = [.. arguments.Where(static argument => argument != ProxyCommand.RestartFlag)];
-            var builder = WebApplication.CreateBuilder(filteredArguments);
+            string[] noRestartArgs = [.. arguments.Where(static argument => argument != ProxyCommand.RestartFlag)];
+            var builder = WebApplication.CreateBuilder(noRestartArgs);
             var settings = builder.Configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
 
             Validator.ValidateObject(settings, new ValidationContext(settings), true);

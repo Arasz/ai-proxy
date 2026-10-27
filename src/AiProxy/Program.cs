@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using AiProxy.Cli;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Integration;
 using AiProxy.Hosting.Marker;
