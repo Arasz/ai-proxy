@@ -116,7 +116,10 @@ public sealed class RestartTests
             Assert.NotEqual(0, child.Process.ExitCode);
             Assert.Contains("Stop", child.Output);
             Assert.Contains("manually", child.Output);
-            Assert.Contains($"PID {Environment.ProcessId}", child.Output);
+            if (OperatingSystem.IsWindows() || File.Exists(OperatingSystem.IsMacOS() ? KnownNames.MarkerDiscovery.MacLsof : KnownNames.MarkerDiscovery.LinuxLsof))
+            {
+                Assert.Contains($"PID {Environment.ProcessId}", child.Output);
+            }
         }
 
         Assert.Equal("legacy private certificate bytes", await File.ReadAllTextAsync(certificate, TestContext.Current.CancellationToken));
