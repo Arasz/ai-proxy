@@ -11,34 +11,21 @@ namespace AiProxy.Storage;
 ///     first and in the queue second, so a record that has not been written yet is still
 ///     served.
 /// </remarks>
-public sealed class SqliteContentStore : IContentStore, IContentWriter
+/// <param name="options">Where the store keeps what the proxy compressed.</param>
+/// <param name="queue">The queue that carries the record to the writer.</param>
+public sealed class SqliteContentStore(ContentStoreOptions options, ContentQueue queue) : IContentStore, IContentWriter
 {
-    private readonly string _databasePath;
-    private readonly ContentQueue _queue;
-
-    /// <summary>Holds the queue the record is published to, and the file it lives in.</summary>
-    /// <param name="options">Where the store keeps what the proxy compressed.</param>
-    /// <param name="queue">The queue that carries the record to the writer.</param>
-    public SqliteContentStore(ContentStoreOptions options, ContentQueue queue)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(queue);
-
-        _databasePath = options.ResolvedDatabasePath;
-        _queue = queue;
-    }
+    private readonly string _databasePath = options.ResolvedDatabasePath;
 
     /// <inheritdoc />
     public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
     {
-        return _queue.PublishAsync(record, cancellationToken);
+        return queue.PublishAsync(record, cancellationToken);
     }
 
     /// <inheritdoc />
     public async ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(requestId);
-
         await using var connection = ContentSchema.Open(_databasePath);
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
@@ -61,7 +48,7 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
 
         if (row is null)
         {
-            var pending = await _queue.FindPendingAsync(requestId, cancellationToken).ConfigureAwait(false);
+            var pending = await queue.FindPendingAsync(requestId, cancellationToken).ConfigureAwait(false);
 
             return pending;
         }
@@ -107,8 +94,6 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
     /// <inheritdoc />
     public async ValueTask PersistAsync(ContentRecord record, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(record);
-
         await using var connection = ContentSchema.Open(_databasePath);
         connection.Ensure();
 

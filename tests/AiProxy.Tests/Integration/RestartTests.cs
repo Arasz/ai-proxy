@@ -298,7 +298,7 @@ public sealed class RestartTests : IDisposable
         var actual = await ReadInfoAsync(directory.Path);
         using var fakeDirectory = new TemporaryDirectory();
 
-        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = new ProxyLease().AcquireRuntimeLease(fakeDirectory.Path);
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -350,7 +350,7 @@ public sealed class RestartTests : IDisposable
         };
         using var fakeDirectory = new TemporaryDirectory();
 
-        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = new ProxyLease().AcquireRuntimeLease(fakeDirectory.Path);
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -395,7 +395,7 @@ public sealed class RestartTests : IDisposable
         var actual = await ReadInfoAsync(originalDirectory.Path);
         using var fakeDirectory = new TemporaryDirectory();
 
-        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = new ProxyLease().AcquireRuntimeLease(fakeDirectory.Path);
 
         await using var server = new NamedPipeServerStream(PipeName(fakeDirectory.Path), PipeDirection.InOut, 1,
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
@@ -436,7 +436,7 @@ public sealed class RestartTests : IDisposable
     {
         using var fakeDirectory = new TemporaryDirectory();
 
-        await using var runtimeLease = ProxyLease.AcquireRuntimeLease(fakeDirectory.Path);
+        await using var runtimeLease = new ProxyLease().AcquireRuntimeLease(fakeDirectory.Path);
 
         await using var contender = Child.Start(fakeDirectory.Path, true);
         await contender.ExitAsync();

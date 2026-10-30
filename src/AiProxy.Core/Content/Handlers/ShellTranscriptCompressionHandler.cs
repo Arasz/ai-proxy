@@ -21,7 +21,6 @@ public sealed class ShellTranscriptCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         var kept = LogRules.Keep(part.Text, line => SignalPattern.IsMatch(line));
         var reduced = Reduction.DeduplicateLines(string.Join("\n", kept));

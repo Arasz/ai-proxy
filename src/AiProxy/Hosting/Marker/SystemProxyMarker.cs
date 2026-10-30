@@ -67,7 +67,6 @@ public sealed class SystemProxyMarker : IDisposable
     /// <summary>Replaces the file content with <paramref name="endPoint" /> as <c>host:port</c>.</summary>
     public void Write(IPEndPoint endPoint)
     {
-        ArgumentNullException.ThrowIfNull(endPoint);
         _stream.SetLength(0);
         _stream.Position = 0;
         _stream.Write(Encoding.UTF8.GetBytes($"{endPoint.Address}:{endPoint.Port}"));

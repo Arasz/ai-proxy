@@ -47,7 +47,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
         ILoggerFactory loggerFactory)
-        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3))
+        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3), TimeProvider.System)
     {
     }
 
@@ -59,8 +59,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ISystemProxyGuardLauncher guardLauncher,
         ILoggerFactory loggerFactory,
         TimeSpan markerWait,
+        TimeProvider timeProvider,
         Func<HttpWebClient, bool>? upstreamClosed = null,
-        TimeProvider? timeProvider = null,
         Func<CertificateManager, IRootCertificate>? rootCertificate = null)
     {
         Server = new ProxyServer(false);
@@ -73,7 +73,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
-        _timeProvider = timeProvider ?? TimeProvider.System;
+        _timeProvider = timeProvider;
         _rootCertificate = rootCertificate ?? (static certificates => new TitaniumRootCertificate(certificates));
     }
 

@@ -95,7 +95,6 @@ public static class ContentSchema
         /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
         public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-            ArgumentNullException.ThrowIfNull(connection);
 
             using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version;";

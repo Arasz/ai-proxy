@@ -26,8 +26,8 @@ public enum CcrAction
 /// <param name="ContinueFrom">The message a relayed <c>continue</c> follows; empty otherwise.</param>
 public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom)
 {
-    /// <summary>The path of the Messages API.</summary>
-    public const string MessagesPath = "/v1/messages";
+    /// <summary>The only path CCR acts on: the Anthropic Messages API, shared with <see cref="ProviderEndpoints.AnthropicMessagesPath" />.</summary>
+    public const string MessagesPath = ProviderEndpoints.AnthropicMessagesPath;
 
     /// <summary>The body a client gets when the thread ledger cannot be read: an overloaded error, which it retries.</summary>
     public const string LedgerUnavailable = """{"type":"error","error":{"type":"overloaded_error","message":"ai-proxy could not read its thread ledger; retry."}}""";

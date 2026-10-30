@@ -255,6 +255,7 @@ public sealed class RootCertificateStorageTests
             new ProcessSystemProxyGuardLauncher(),
             loggerFactory,
             TimeSpan.FromSeconds(3),
+            TimeProvider.System,
             rootCertificate: _ => rootTrust ?? throw new InvalidOperationException("This test never trusts a certificate."));
     }
 

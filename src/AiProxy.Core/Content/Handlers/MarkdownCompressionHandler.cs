@@ -26,7 +26,6 @@ public sealed class MarkdownCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         // The comment goes from the prose and not from the code, so the document is
         // taken apart at the fences first: a comment that opens in the prose and closes

@@ -155,7 +155,8 @@ public sealed class TitaniumProxyServiceTests
             new CanonicalProviderHosts(),
             new RecordingGuardLauncher(events),
             NullLoggerFactory.Instance,
-            TimeSpan.Zero);
+            TimeSpan.Zero,
+            TimeProvider.System);
 
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
@@ -280,7 +281,7 @@ public sealed class TitaniumProxyServiceTests
             launcher ?? new RecordingGuardLauncher([]),
             NullLoggerFactory.Instance,
             markerWait ?? TimeSpan.FromSeconds(1),
-            timeProvider: timeProvider);
+            timeProvider ?? TimeProvider.System);
     }
 
     private static int FreePort()

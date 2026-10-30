@@ -14,11 +14,14 @@ namespace AiProxy.Storage;
 ///     numbers; neither has a column for headers, the query string or the response body, so a
 ///     credential or a model's answer has nowhere to land.
 /// </remarks>
-public sealed partial class SqliteCaptureStore : IRequestCaptureStore
+/// <param name="databasePath">The path of the capture file; nothing is created until the first capture.</param>
+/// <param name="maxLiveBytes">The live bytes of the file above which capture stops.</param>
+/// <param name="time">Decides which rows are old enough to evict.</param>
+/// <param name="logger">Where the stop and the resume of capture are logged.</param>
+public sealed partial class SqliteCaptureStore(string databasePath, long maxLiveBytes, TimeProvider time, ILogger<SqliteCaptureStore> logger) : IRequestCaptureStore
 {
     /// <summary>The file name of the capture database inside the proxy's data directory.</summary>
     public const string FileName = "capture.db";
-
 
     private const UnixFileMode UserOnlyDirectory = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
     private const UnixFileMode UserOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
@@ -26,26 +29,15 @@ public sealed partial class SqliteCaptureStore : IRequestCaptureStore
     /// <summary>The live bytes above which capture stops, when the operator sets none: 1 GB.</summary>
     public const long DefaultMaxLiveBytes = 1L << 30;
 
-    private readonly string _databasePath;
-    private readonly long _maxLiveBytes;
-    private readonly TimeProvider _time;
-    private readonly ILogger<SqliteCaptureStore> _logger;
+    private readonly string _databasePath = RequirePath(databasePath);
     private readonly object _prepareGate = new();
     private volatile bool _prepared;
     private volatile bool _stopped;
 
-    /// <summary>Holds the path of the file the captures go to; nothing is created until the first capture.</summary>
-    /// <param name="databasePath">The path of the capture file.</param>
-    /// <param name="maxLiveBytes">The live bytes of the file above which capture stops.</param>
-    /// <param name="time">Decides which rows are old enough to evict.</param>
-    /// <param name="logger">Where the stop and the resume of capture are logged.</param>
-    public SqliteCaptureStore(string databasePath, long maxLiveBytes, TimeProvider time, ILogger<SqliteCaptureStore> logger)
+    private static string RequirePath(string value)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        _databasePath = databasePath;
-        _maxLiveBytes = maxLiveBytes;
-        _time = time;
-        _logger = logger;
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        return value;
     }
 
     /// <summary>Deletes the captured requests and responses older than <see cref="SqliteOriginalStore.Retention" />, and says how many went.</summary>
@@ -64,14 +56,12 @@ public sealed partial class SqliteCaptureStore : IRequestCaptureStore
         }
 
         await using var connection = ContentSchema.Open(_databasePath);
-        return await connection.EvictOlderThanAsync(RetentionRules.Capture, _time.GetUtcNow() - SqliteOriginalStore.Retention, cancellationToken).ConfigureAwait(false);
+        return await connection.EvictOlderThanAsync(RetentionRules.Capture, time.GetUtcNow() - SqliteOriginalStore.Retention, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
         if (!_prepared)
         {
             Prepare();
@@ -101,8 +91,6 @@ public sealed partial class SqliteCaptureStore : IRequestCaptureStore
     /// <inheritdoc />
     public async ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(response);
-
         if (!_prepared)
         {
             Prepare();
@@ -146,17 +134,17 @@ public sealed partial class SqliteCaptureStore : IRequestCaptureStore
         var pages = await connection.ExecuteScalarAsync<long>(new CommandDefinition("PRAGMA page_count;", cancellationToken: cancellationToken)).ConfigureAwait(false);
         var free = await connection.ExecuteScalarAsync<long>(new CommandDefinition("PRAGMA freelist_count;", cancellationToken: cancellationToken)).ConfigureAwait(false);
         var liveBytes = (pages - free) * pageSize;
-        var full = liveBytes > _maxLiveBytes;
+        var full = liveBytes > maxLiveBytes;
 
         if (full && !_stopped)
         {
             _stopped = true;
-            Log.Stopped(_logger, _databasePath, liveBytes, _maxLiveBytes);
+            Log.Stopped(logger, _databasePath, liveBytes, maxLiveBytes);
         }
         else if (!full && _stopped)
         {
             _stopped = false;
-            Log.Resumed(_logger, _databasePath, liveBytes);
+            Log.Resumed(logger, _databasePath, liveBytes);
         }
 
         return full;

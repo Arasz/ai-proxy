@@ -6,7 +6,7 @@ using AiProxy.Hosting.Marker;
 
 namespace AiProxy.Hosting.Proxy;
 
-internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicationBuilder Builder, ProxyProbe ProxyProbe, ProxySettings Settings, IMarkerOwnerSearch MarkerOwnerSearch) : IAsyncDisposable
+internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicationBuilder Builder, ProxyProbe ProxyProbe, ProxySettings Settings, IMarkerOwnerSearch MarkerOwnerSearch, ProxyLease Lease) : IAsyncDisposable
 {
 
     private const string ProxyName = "ai-proxy";
@@ -27,7 +27,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
 
         try
         {
-            _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
+            _runtimeLease = Lease.AcquireRuntimeLease(DataDirectory);
         }
         catch (IOException exception) when (!arguments.Contains(ProxyCommand.RestartFlag, StringComparer.Ordinal))
         {
@@ -59,7 +59,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
                 Builder.WebHost.UseUrls(previous.ApiUrls);
             }
 
-            _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
+            _runtimeLease = Lease.AcquireRuntimeLease(DataDirectory);
         }
 
         await ProxyProbe.ProbeSystemProxyAddresses();
@@ -92,7 +92,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
     {
         try
         {
-            return ProxyLease.AcquireStartupLease(DataDirectory);
+            return Lease.AcquireStartupLease(DataDirectory);
         }
         catch (IOException exception)
         {
