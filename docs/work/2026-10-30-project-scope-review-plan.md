@@ -322,10 +322,41 @@ Join defects found at merge:
 Added to WP7 for wave 2: evidence anchors carry the expected text (or a symbol name) and the check
 compares it, so a shifted line fails. Watch it red on a deliberately shifted anchor.
 
+## Waves 2 to 4 outcome (2026-10-30)
+
+Waves 1 and 2 and WP10 shipped as 0.18.0 (#90). The owner's ruling R5 added WP10 between waves 2
+and 3. Waves 3 and 4 shipped as separate releases, because 0.18.0 had merged before WP9 finished:
+
+- **WP9, 0.18.1 (#91).** The analyzer rule APGEN003 failed the build on 36 sites, and they are
+  now deleted. Re-adding `ThrowIfNull(part)` in `ContentRouter.Route` fails the build again.
+- **WP5, 0.19.0 (#92), stacked on #91.** With the name-constraint extension removed, 9 of the 19
+  certificate tests fail. ADR 0009 records the decision and what it supersedes in ADR 0003.
+
+Join defect at the WP5 × WP9 merge: WP9 made `TimeProvider` required, and WP5's new
+`RootCertificateStorageTests` helper did not pass one. It failed with CS7036 on the merged tree
+only.
+
+Deviations from the plan:
+
+- **WP5:** macOS reports `InvalidNameConstraints`, not `HasNotPermittedNameConstraint`, so the
+  negative test asserts the flag per OS.
+- **WP5:** an address family that the host source names permits exactly those addresses. Only
+  loopback test sources name addresses. Production excludes all IP space, as planned.
+- **WP5:** `IProviderHosts` gained `Hosts`, because the constraint needs the full host list.
+- **WP9:** the MCP inventory generator emits nothing for a project with no tools. Without this,
+  the analyzer reference caused CS0433.
+
 ## Still open
 
-- The 10-26 gain gap: WP8 checks it first.
+- F16 and D7: measure the organic retrieval rate and the log/shell classification on a normal
+  working week, excluding review traffic by date.
+- WP5 on Linux: the chain test's `HasNotPermittedNameConstraint` expectation runs first in CI.
+  NSS databases are not cleaned of the old root.
+- WP5: no macOS CI job runs the certificate tests. Proposed: an OS matrix in `build.yml` for those
+  classes.
+- WP5: a constrained root is not rotated when a new provider domain is added.
+- Test port race: five integration helpers release a probed port before Titanium binds it
+  (`ProxyHost.cs:68`). `GainTrafficTests` failed once in CI on #91 for this reason.
 - Titanium `ConnectionTimeOutSeconds` and long silent generations: not planned until measured.
-- Cross-OS unit runners for marker, registrar and guard: not planned beyond WP5's chain tests.
-- Agent worktrees: a hook refuses git commands there, which blocks implementation lanes from
-  committing. Needs an owner decision before wave 1.
+- Agent worktrees: a hook refuses git in subagents. The orchestrator commits for them (owner
+  ruling, 2026-10-30).
