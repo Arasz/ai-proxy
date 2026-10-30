@@ -23,7 +23,6 @@ public sealed class XmlCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         try
         {

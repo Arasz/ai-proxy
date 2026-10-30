@@ -127,6 +127,7 @@ public sealed class UpstreamDropTests
             new ProcessSystemProxyGuardLauncher(),
             loggerFactory,
             TimeSpan.Zero,
+            TimeProvider.System,
             static _ => throw new MissingMethodException("renamed"));
         await service.StartAsync(TestContext.Current.CancellationToken);
         using var client = new HttpClient(new SocketsHttpHandler { Proxy = new WebProxy(service.Address), UseProxy = true }) { Timeout = ClientTimeout };

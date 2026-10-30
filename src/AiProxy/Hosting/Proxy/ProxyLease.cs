@@ -1,10 +1,11 @@
 namespace AiProxy.Hosting.Proxy;
 
-public static class ProxyLease
+/// <summary>Takes the startup and runtime lock files that keep one proxy instance running per data directory.</summary>
+public sealed class ProxyLease
 {
     private const string StartupLeaseFileName = "startup.lock";
     private const string LeaseFileName = "process.lock";
-    public static StartupLease AcquireStartupLease(string dir)
+    public StartupLease AcquireStartupLease(string dir)
     {
         Directory.CreateDirectory(dir);
         var startupLeaseFileName = Path.Combine(dir, StartupLeaseFileName);
@@ -12,7 +13,7 @@ public static class ProxyLease
         return new StartupLease(startupLeaseFile);
     }
 
-    public static RuntimeLease AcquireRuntimeLease(string dir)
+    public RuntimeLease AcquireRuntimeLease(string dir)
     {
         Directory.CreateDirectory(dir);
         var runtimeLeaseFileName = Path.Combine(dir, LeaseFileName);

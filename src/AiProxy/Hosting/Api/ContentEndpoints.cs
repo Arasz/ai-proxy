@@ -12,7 +12,6 @@ public static class ContentEndpoints
     /// <param name="app">The host to map it on.</param>
     public static void MapContentEndpoints(this WebApplication app)
     {
-        ArgumentNullException.ThrowIfNull(app);
 
         app.MapGet(Route, static async (
             string requestId,

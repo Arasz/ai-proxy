@@ -19,7 +19,6 @@ public static class ContentRetention
         /// <param name="cancellationToken">The token that stops the pass between batches.</param>
         public async Task<int> EvictOlderThanAsync(IReadOnlyList<RetentionRule> rules, DateTimeOffset cutoff, CancellationToken cancellationToken)
         {
-            ArgumentNullException.ThrowIfNull(rules);
 
             var cutoffText = cutoff.ToString("O", CultureInfo.InvariantCulture);
             var total = 0;

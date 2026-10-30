@@ -9,4 +9,4 @@
         <PackageReference Include="TreeSitter.DotNet"/>
         <InternalsVisibleTo Include="AiProxy.Tests"/>
     </ItemGroup>
-</Project>
+<ItemGroup><ProjectReference Include="../AiProxy.Generators/AiProxy.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="RuntimeIdentifier" /></ItemGroup></Project>

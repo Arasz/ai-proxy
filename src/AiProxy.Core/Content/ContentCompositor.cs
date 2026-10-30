@@ -8,8 +8,6 @@ public sealed class ContentCompositor : ICompositor
     /// <inheritdoc />
     public string Compose(Decomposition decomposition, IReadOnlyList<CompressedPart> parts)
     {
-        ArgumentNullException.ThrowIfNull(decomposition);
-        ArgumentNullException.ThrowIfNull(parts);
 
         var reduced = parts.ToDictionary(part => part.ChunkId, part => part.Text);
         var placeholders = decomposition.Parts

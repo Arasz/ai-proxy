@@ -1,28 +1,15 @@
 namespace AiProxy.Core.Content;
 
 /// <summary>Asks each handler in turn and takes the first that claims the kind.</summary>
-public sealed class ContentRouter : IContentRouter
+/// <param name="handlers">The handlers to ask, most specific first.</param>
+/// <param name="fallback">The handler that runs when nobody claims the kind.</param>
+public sealed class ContentRouter(IEnumerable<ICompressionHandler> handlers, ICompressionHandler fallback) : IContentRouter
 {
-    private readonly ICompressionHandler _fallback;
-    private readonly IReadOnlyList<ICompressionHandler> _handlers;
-
-    /// <summary>Holds the handlers, in the order they are asked, and the fallback.</summary>
-    /// <param name="handlers">The handlers to ask, most specific first.</param>
-    /// <param name="fallback">The handler that runs when nobody claims the kind.</param>
-    public ContentRouter(IEnumerable<ICompressionHandler> handlers, ICompressionHandler fallback)
-    {
-        ArgumentNullException.ThrowIfNull(handlers);
-        ArgumentNullException.ThrowIfNull(fallback);
-
-        _handlers = [.. handlers];
-        _fallback = fallback;
-    }
+    private readonly IReadOnlyList<ICompressionHandler> _handlers = [.. handlers];
 
     /// <inheritdoc />
     public ContentRoute Route(ContentPart part)
     {
-        ArgumentNullException.ThrowIfNull(part);
-
         foreach (var handler in _handlers)
         {
             if (handler.CanHandle(part.Type))
@@ -31,6 +18,6 @@ public sealed class ContentRouter : IContentRouter
             }
         }
 
-        return new ContentRoute(part.Type, _fallback, $"no handler claims {part.Type}, so the fallback runs");
+        return new ContentRoute(part.Type, fallback, $"no handler claims {part.Type}, so the fallback runs");
     }
 }

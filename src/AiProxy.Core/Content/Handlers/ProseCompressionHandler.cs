@@ -15,7 +15,6 @@ public sealed class ProseCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         var reduced = Reduction.DeduplicateLines(part.Text);
         var overlaid = MustKeepOverlay.Apply(reduced, part.Text);

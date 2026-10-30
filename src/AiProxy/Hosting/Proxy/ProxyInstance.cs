@@ -18,7 +18,7 @@ internal static class ProxyInstance
             var proxyApiAddressResolver = new ProxyApiAddressResolver(builder.Configuration);
             var directory = EnsureDataDirectory(settings);
             var proxyProbe = new ProxyProbe(directory, markerOwnerSearch, proxyApiAddressResolver, settings, builder.Configuration);
-            await using var proxyInstanceLifetime = new ProxyInstanceLifetime(directory, builder, proxyProbe, settings, markerOwnerSearch);
+            await using var proxyInstanceLifetime = new ProxyInstanceLifetime(directory, builder, proxyProbe, settings, markerOwnerSearch, new ProxyLease());
 
             return await proxyInstanceLifetime.AcquireAndStartProxyInstance(arguments, cancellationToken);
         }

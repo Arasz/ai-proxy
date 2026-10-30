@@ -6,4 +6,4 @@
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
-</Project>
+<ItemGroup><ProjectReference Include="../AiProxy.Generators/AiProxy.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" GlobalPropertiesToRemove="RuntimeIdentifier" /></ItemGroup></Project>

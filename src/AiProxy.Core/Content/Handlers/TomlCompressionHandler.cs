@@ -15,7 +15,6 @@ public sealed class TomlCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         var kept = new List<string>();
         foreach (var segment in LiteralBlocks.TomlStrings(part.Text))

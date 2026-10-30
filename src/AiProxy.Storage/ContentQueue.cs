@@ -138,7 +138,6 @@ public sealed class ContentQueue(ContentStoreOptions options, TimeProvider time)
     /// <param name="cancellationToken">The token that stops the read.</param>
     public async Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(connection);
 
         return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             "PRAGMA data_version;",
@@ -150,7 +149,6 @@ public sealed class ContentQueue(ContentStoreOptions options, TimeProvider time)
     /// <param name="cancellationToken">The token that stops the writer.</param>
     public async ValueTask PublishAsync(ContentRecord record, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(record);
 
         await using var connection = ContentSchema.Open(_databasePath);
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);

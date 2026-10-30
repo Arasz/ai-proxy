@@ -5,25 +5,16 @@ using Titanium.Web.Proxy.Models;
 namespace AiProxy.Hosting.Integration;
 
 /// <summary>Uses Titanium's platform integrations to change and restore system proxy settings.</summary>
-public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
+/// <param name="server">The running proxy server whose system proxy settings are changed.</param>
+public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemProxyRegistrar
 {
-    private readonly ProxyServer _server;
-
-    /// <summary>Creates a registrar for one running proxy server.</summary>
-    public TitaniumSystemProxyRegistrar(ProxyServer server)
-    {
-        ArgumentNullException.ThrowIfNull(server);
-        _server = server;
-    }
-
     /// <inheritdoc />
     public void Set(ExplicitProxyEndPoint endPoint)
     {
-        ArgumentNullException.ThrowIfNull(endPoint);
-        var result = _server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp);
+        var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp);
         if (!result.Succeeded)
         {
-            _server.TryRestoreOriginalProxySettings();
+            server.TryRestoreOriginalProxySettings();
             throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
         }
     }
@@ -32,7 +23,7 @@ public sealed class TitaniumSystemProxyRegistrar : ISystemProxyRegistrar
     public void Restore()
     {
         // The macOS backend swallows some of its own errors, so a success result can still hide a partial restore.
-        var result = _server.TryRestoreOriginalProxySettings();
+        var result = server.TryRestoreOriginalProxySettings();
         if (!result.Succeeded)
         {
             throw new InvalidOperationException($"The system proxy could not be restored: {result.Message}");
