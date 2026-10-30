@@ -31,8 +31,7 @@ public static partial class ProxyServiceExtensions
         /// <param name="runtimeOptions">Runtime defaults used when the corresponding Proxy setting is unset.</param>
         public IServiceCollection AddProxy(IConfiguration configuration, ProxyRuntimeOptions? runtimeOptions = null)
         {
-            var settings = configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
-            Validator.ValidateObject(settings, new ValidationContext(settings), true);
+            var settings = ProxySettings.Load(configuration);
 
             var compression = settings.Compression;
             var defaults = runtimeOptions ?? ProxyRuntimeOptions.Default;

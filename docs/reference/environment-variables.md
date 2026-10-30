@@ -5,6 +5,10 @@ configuration sources. In the environment, a double underscore stands for the se
 `PROXY__COMPRESSION__ENABLED` is the setting `Proxy:Compression:Enabled`. A switch takes `true` or
 `false`; `on` is no longer accepted.
 
+An unknown `Proxy:*` key stops startup and the error names it, so a misspelled `PROXY__PROT` or
+`--Proxy:Prot=8090` can no longer pass silently. A stray `PROXY__*` environment variable that names
+no setting now stops the proxy too.
+
 Provider routing needs no environment configuration. ai-proxy recognizes these destination
 hosts and sends all other HTTP traffic through unchanged. HTTPS for other hosts remains an
 opaque tunnel.
@@ -147,7 +151,7 @@ PROXY__PORT=0 ASPNETCORE_URLS=http://127.0.0.1:0 ai-proxy
 ```
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:32 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
 `ai-proxy --restart` selects the same data directory as normal startup. It requests a graceful
 stop through a same-user control pipe, waits for that exact process to exit, acquires ownership,
 and starts the replacement. The replacement remains in the foreground. It inherits the actual
@@ -169,7 +173,7 @@ different UTC timestamps. macOS and Windows use the native process start time. T
 PID remain part of the identity check.
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:32 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between

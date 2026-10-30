@@ -8,6 +8,14 @@ public sealed record ProxySettings
     /// <summary>The configuration section the settings are read from.</summary>
     public const string SectionName = "Proxy";
 
+    /// <summary>Binds and validates the <c>Proxy</c> section; an unknown key or an out-of-range value throws.</summary>
+    public static ProxySettings Load(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        var settings = configuration.GetSection(SectionName).Get<ProxySettings>(static binder => binder.ErrorOnUnknownConfiguration = true) ?? new ProxySettings();
+        Validator.ValidateObject(settings, new ValidationContext(settings), true);
+        return settings;
+    }
+
     /// <summary>The loopback port the listener binds; unset keeps the default.</summary>
     [Range(0, 65535, ErrorMessage = "Proxy:Port must be a port number from 0 to 65535.")]
     public int? Port { get; init; }

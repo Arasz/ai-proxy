@@ -17,7 +17,7 @@ public sealed class CliApplication(GainRuntime runtime)
 
     private static readonly FrozenSet<string> Commands = new[]
     {
-        "-h", "-?", "--help", GainCommand.Command, McpServerProcess.Command, HarnessProcess.Command
+        "-h", "-?", "--help", "--version", GainCommand.Command, McpServerProcess.Command, HarnessProcess.Command
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static bool IsCommandInvocation(string[] args)
@@ -68,10 +68,15 @@ public sealed class CliApplication(GainRuntime runtime)
 
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
+        if (args is ["--version"])
+        {
+            await runtime.Output.WriteLineAsync(EntryPoint.ProductVersion).ConfigureAwait(false);
+            return 0;
+        }
+
         if (IsRootHelp(args))
         {
-            await runtime.Output.WriteLineAsync("Start: ai-proxy [--restart] [configuration options]").ConfigureAwait(false);
-            await runtime.Output.WriteLineAsync("  --restart  Gracefully replace the owned proxy instance, waiting for its exit.").ConfigureAwait(false);
+            await runtime.Output.WriteLineAsync(EntryPoint.StartUsage).ConfigureAwait(false);
             args = ["--help"];
         }
 

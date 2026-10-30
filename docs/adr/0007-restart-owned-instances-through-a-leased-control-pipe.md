@@ -10,7 +10,7 @@ cannot identify instances that disabled operating system proxy integration.
 
 ## Decision
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:32 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
 The executable acquires a nonwaiting, exclusive `startup.lock` before observing the process
 lease. Normal starts and restarts share this claim and release it after the host and pipe are
 ready. Concurrent contenders fail instead of discovering and stopping a new replacement.
