@@ -19,6 +19,9 @@ public sealed record CompressionSettings
     /// <summary>The smallest part that is compressed, when the operator set one.</summary>
     public int? Minimum { get; init; }
 
+    /// <summary>Reserved for the extractive model artifact, which this version does not include; accepted and ignored (environment form <c>PROXY__COMPRESSION__MODEL</c>).</summary>
+    public string? Model { get; init; }
+
     /// <summary>The store options the <see cref="Database" /> setting resolves to.</summary>
     public ContentStoreOptions Store => new(string.IsNullOrWhiteSpace(Database) ? ContentStoreOptions.DefaultDatabasePath : Database.Trim());
 }

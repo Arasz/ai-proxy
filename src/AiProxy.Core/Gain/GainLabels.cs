@@ -13,7 +13,13 @@ public static class GainLabels
     public static class Rules
     {
         public const string Unchanged = "unchanged";
+        /// <summary>The rule of a provider-host call that is not a model request.</summary>
+        public const string OtherTraffic = "other-traffic";
+
         public const string CcrPlanFailed = "ccr-plan-failed";
+
+        /// <summary>The rule of a request whose only change is the injected <c>proxy_retrieve</c> tool.</summary>
+        public const string CcrTool = "ccr.tool";
     }
 
     /// <summary>Where in a request the reduction applied.</summary>

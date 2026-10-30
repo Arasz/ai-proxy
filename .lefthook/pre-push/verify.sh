@@ -57,20 +57,12 @@ lane_docs_index() {
   # no README may name a file that does not exist. A README that lists a file
   # that was never written is a lie a reader will trust.
   python3 scripts/check-docs-index.py
+  # Every evidence=path:line anchor must name an existing line.
+  python3 scripts/check-evidence-anchors.py
 }
 
 lane_workflows() {
-  # Every third-party action must be pinned to a full commit SHA: a tag is
-  # remote code re-fetched on every run, not a fixed dependency.
-  local bad
-  bad="$(grep -rhoE 'uses: [^@[:space:]]+@[^[:space:]]+' .github/workflows/ \
-    | grep -vE '@[0-9a-f]{40}$' || true)"
-  if [ -n "$bad" ]; then
-    echo "unpinned action reference(s):" >&2
-    echo "$bad" >&2
-    return 1
-  fi
-  echo "every action reference is pinned to a full SHA"
+  bash scripts/check-action-pins.sh
 }
 
 lane_required_checks() {
@@ -104,7 +96,7 @@ select_lanes() {
       want_build=1; want_test=1 ;;
   esac
   case "$files" in
-    *docs/*) want_docs=1 ;;
+    *docs/*|README.md) want_docs=1 ;;
   esac
   case "$files" in
     *.github/workflows/*) want_workflows=1; want_checks=1 ;;

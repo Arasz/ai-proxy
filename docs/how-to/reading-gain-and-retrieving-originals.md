@@ -24,9 +24,33 @@ ai-proxy gain --watch         # live view, Ctrl+C exits
 ```
 
 Token counts are estimates at 2.89 characters per token, and they cover the first request only.
-What a retrieval later reads back is listed under `--recalls` and is not netted out of the savings.
-Character and byte counts are measured. A request the proxy inspected but left unchanged still counts,
-with zero saved (requests it does not inspect, such as a body over 8 MB or a chunked body, are not counted); one that grew (the `proxy_retrieve` tool definition adds a little) shows a negative number.
+Character and byte counts are measured. The summary, bucket and attribution tables show the gross
+figure and what it cost:
+
+| Column | Meaning |
+| --- | --- |
+| Saved tokens | Original minus forwarded, without the injected `proxy_retrieve` definition. |
+| Retrieved tokens | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
+| Tool tokens | The `proxy_retrieve` definition the proxy added to requests that carry tools. |
+| Net tokens | Saved minus retrieved minus tool. Negative when the cost is larger than the saving. |
+| Saved % and Net % | Saved and net as a share of the original tokens, to one decimal. |
+
+Numbers in the tables carry thousands separators; `--format csv` and `--format json` keep raw
+values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
+`netPercent`; the CSV adds `estimated_tool_tokens` and `estimated_net_tokens` as its last two columns.
+
+A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
+inspect, such as a body over 8 MB or a chunked body, are not counted). A request whose only change is
+the `proxy_retrieve` definition is recorded under the rule `ccr.tool`; its tool tokens appear in the
+Tool column and its net is negative. Only model calls count in the totals
+and percentages: `POST` to `/v1/messages` (Anthropic), the chat completions, completions, responses and
+messages endpoints (OpenAI-style hosts, OpenRouter) and `generateContent` / `streamGenerateContent` (Gemini).
+Other calls to a provider host, such as Claude Code telemetry, are recorded as **other traffic** and shown
+apart: a line `Other traffic: N requests, B bytes` under the table, an `other` row in CSV (the `bytes`
+column, appended last) and `otherTraffic` (`requests`, `bytes`) at the end of the JSON report. They follow the
+same project, date and provider filters and `--reset`. Rows recorded before this change cannot be sorted again
+because the path was not kept; telemetry recorded then stays in the totals as `unchanged`, and only new
+traffic is separated.
 
 `ai-proxy gain --reset` deletes the statistics that match the other filters, after a confirmation
 (`--yes` skips it). Kept originals and captures are not touched.
@@ -65,7 +89,9 @@ The header setting was verified with Codex CLI 0.164.0, a loopback HTTP server a
 Live provider authentication and ChatGPT sign-in were outside that check.
 
 Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
-another). Requests without the header have no project and show up only in unfiltered views.
+another). Requests without the header have no project and show up only in unfiltered views. When the
+project has no requests, `gain` prints a hint naming the header and `ai-proxy harness`, which launches
+an agent with it set.
 Statistics start with version 0.15.0; older requests are not backfilled.
 
 ## Let an agent read originals back

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
@@ -11,6 +12,7 @@ using AiProxy.Storage;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Xunit.Sdk;
 using static AiProxy.Tests.Unit.Content.Ccr.RetrievalLoopTests;
 
@@ -19,6 +21,8 @@ namespace AiProxy.Tests.Integration;
 /// <summary>CCR through the real proxy against a streaming upstream: previews go up, retrievals are answered inside the request, and the client gets one message.</summary>
 public sealed class CcrRelayTests : IDisposable
 {
+    private static readonly TimeSpan SafetyBound = TimeSpan.FromSeconds(30);
+
     private const string CodeFile =
         "using System;\nusing System.Collections.Generic;\n\n/// <summary>A type whose doc comment is long enough that the code view, hint included, is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 1; // the value the model reads back exactly\n\n    /// <summary>A second member, so the file is over the compression minimum for source code.</summary>\n    public int Other => 2; // another comment the view drops\n\n    /// <summary>A third member with its own doc comment, also dropped from the view.</summary>\n    public int Third => 3;\n}\n";
 
@@ -304,6 +308,27 @@ public sealed class CcrRelayTests : IDisposable
         Assert.DoesNotContain(CcrView.Marker, ToolResultOf(Assert.Single(upstream.Requests).Body), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_request_whose_only_change_is_the_injected_tool_is_recorded_as_ccr_tool()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Sse.Message("msg_1", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CodeRequest("notes.txt", "short result").ToJsonString()))
+        {
+        }
+
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+        var row = Assert.Single(gain!.History);
+        Assert.Equal("ccr.tool", row.Rule);
+        Assert.Equal(GainLabels.Unknown, row.Layer);
+        Assert.Equal(0, gain.Summary.EstimatedSavedTokens);
+        Assert.True(gain.Summary.EstimatedToolTokens > 0);
+        Assert.Equal(-gain.Summary.EstimatedToolTokens, gain.Summary.EstimatedNetTokens);
+    }
+
     private static string ToolResultOf(string body)
     {
         return Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? "";
@@ -367,6 +392,89 @@ public sealed class CcrRelayTests : IDisposable
         return JsonDocument.Parse(body).RootElement.Clone();
     }
 
+    [Fact]
+    public async Task An_upstream_that_never_sends_headers_is_answered_with_a_gateway_timeout_once_the_deadline_passes()
+    {
+        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = async (_, context) =>
+        {
+            arrived.TrySetResult();
+            await Task.Delay(Timeout.Infinite, context.RequestAborted);
+        };
+        var time = new FakeTimeProvider();
+        await using var proxy = await StartProxyAsync(time);
+
+        var sending = SendAsync(proxy, upstream, StatelessRequest());
+        await arrived.Task.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+        time.Advance(CcrRelay.HeadersDeadline + TimeSpan.FromSeconds(1));
+        using var response = await sending.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_redirect_from_the_upstream_reaches_the_client_and_is_not_followed()
+    {
+        await using var target = await FakeUpstream.StartAsync();
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = (_, context) =>
+        {
+            context.Response.StatusCode = StatusCodes.Status307TemporaryRedirect;
+            context.Response.Headers.Location = new Uri(target.BaseAddress, "/elsewhere").AbsoluteUri;
+            return Task.CompletedTask;
+        };
+        await using var proxy = await StartProxyAsync();
+
+        using var response = await SendAsync(proxy, upstream, StatelessRequest());
+
+        Assert.Equal(HttpStatusCode.TemporaryRedirect, response.StatusCode);
+        Assert.Equal("/elsewhere", response.Headers.Location?.AbsolutePath);
+        Assert.Empty(target.Requests);
+    }
+
+    [Fact]
+    public async Task A_retrieval_the_parser_refuses_is_recorded_without_the_id_or_mode_it_carried()
+    {
+        var refused = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3, unknown = 1 });
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, refused)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+        {
+        }
+
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+        var recall = Assert.Single(gain!.Recalls);
+        Assert.Equal("", recall.PreviewId);
+        Assert.Equal(GainLabels.Unknown, recall.Mode);
+        Assert.Equal(CcrRetrieval.BadInput, recall.Error);
+    }
+
+    [Fact]
+    public async Task A_retrieval_the_parser_accepts_is_recorded_with_its_id_and_mode()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+        {
+        }
+
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+        var recall = Assert.Single(gain!.Recalls);
+        Assert.Equal(Id, recall.PreviewId);
+        Assert.Equal("lines", recall.Mode);
+    }
+
     private static Func<FakeUpstream, HttpContext, Task> Script(params string[] streams)
     {
         var next = 0;
@@ -379,13 +487,19 @@ public sealed class CcrRelayTests : IDisposable
 
     private Task<ProxyHost> StartProxyAsync(params KeyValuePair<string, string>[] extra)
     {
+        return StartProxyAsync(null, extra);
+    }
+
+    private Task<ProxyHost> StartProxyAsync(TimeProvider? time, params KeyValuePair<string, string>[] extra)
+    {
         return ProxyHost.StartAsync(
             new Dictionary<string, string>(extra)
             {
                 ["Proxy:Compression:Enabled"] = "true",
                 ["Proxy:Compression:Database"] = _databasePath
             },
-            providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+            providerHosts: new LoopbackProviderHosts(Dialect.Anthropic),
+            time: time);
     }
 
     private static async Task<ResponseRow> ReadResponseRowAsync(string path)
@@ -410,7 +524,7 @@ public sealed class CcrRelayTests : IDisposable
 
     private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
-        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
+        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true, AllowAutoRedirect = false };
         using var client = new HttpClient(handler);
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, "/v1/messages?beta=true"))
         {

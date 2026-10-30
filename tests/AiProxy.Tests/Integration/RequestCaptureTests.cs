@@ -133,6 +133,8 @@ public sealed class RequestCaptureTests : IDisposable
         var received = Assert.Single(upstream.Requests);
         Assert.Equal($"Bearer {secrets[0]}", received.Headers["Authorization"]);
         Assert.Single(await ReadCapturesAsync(proxy));
+        // The response row is written after the client has the response; reading the files while that write is in flight races it.
+        Assert.Single(await ReadResponsesAsync(proxy));
         var stored = ReadCaptureFiles(proxy);
         Assert.True(Contains(stored, [.. "capture-body-marker"u8]), "the scan must see the body, or it proves nothing");
         foreach (var secret in secrets)

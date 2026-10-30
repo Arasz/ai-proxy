@@ -6,7 +6,9 @@ using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy.Network;
 
-if (GuardCommand.IsRequested(args))
+var route = EntryPoint.Route(args);
+
+if (route == EntryRoute.Guard)
 {
     // The guard outlives Ctrl-C and terminal hangups in the owner's process group; it ends when the owner's pipe does.
     using var interrupt = PosixSignalRegistration.Create(PosixSignal.SIGINT, static context => context.Cancel = true);

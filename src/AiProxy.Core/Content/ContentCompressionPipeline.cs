@@ -84,7 +84,7 @@ public sealed class ContentCompressionPipeline(
                 continue;
             }
 
-            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sent))));
+            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sent, MessagesApi.Json))));
         }
 
         if (replacements.Count == 0)

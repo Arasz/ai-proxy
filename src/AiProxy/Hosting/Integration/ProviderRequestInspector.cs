@@ -52,7 +52,12 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var started = time.GetTimestamp();
-        var exchange = new CapturedExchange { Dialect = dialect, GainProject = project };
+        var exchange = new CapturedExchange
+        {
+            Dialect = dialect,
+            GainProject = project,
+            IsModelCall = ProviderEndpoints.IsModelCall(dialect, request.Method, request.RequestUri.AbsolutePath)
+        };
         var captureId = Guid.CreateVersion7().ToString("N");
 
         var stage = time.GetTimestamp();
@@ -248,8 +253,10 @@ public sealed partial class ProviderRequestInspector(
             exchange.ContentId = summary.RequestId;
         }
 
+        var toolCharacters = 0;
         if (plan.Action == CcrAction.RelayWithTool && CcrRequest.AppendTool(forwarded) is { } withTool)
         {
+            toolCharacters = Encoding.UTF8.GetCharCount(withTool) - Encoding.UTF8.GetCharCount(forwarded);
             forwarded = withTool;
         }
 
@@ -259,7 +266,8 @@ public sealed partial class ProviderRequestInspector(
         }
 
         exchange.ForwardedBytes = forwarded.Length;
-        await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
+        var rule = compressed?.Summary?.Path ?? (toolCharacters > 0 ? GainLabels.Rules.CcrTool : GainLabels.Rules.Unchanged);
+        await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, rule, toolCharacters);
         e.UserData = exchange;
         await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
     }
@@ -321,18 +329,37 @@ public sealed partial class ProviderRequestInspector(
         }
     }
 
-    private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule)
+    private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule, int toolCharacters = 0)
     {
+        if (!exchange.IsModelCall)
+        {
+            await RecordOtherAsync(exchange, method, original.Length);
+            return;
+        }
+
         exchange.GainRule = rule;
         exchange.GainMethod = method;
-        exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
+        exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed or GainLabels.Rules.CcrTool ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
         exchange.GainPipeline = compression.Compresses ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
         try
         {
             await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,
                     exchange.Dialect.ToString().ToLowerInvariant(), method, rule, exchange.GainLayer, exchange.GainPipeline,
-                    GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length)),
+                    GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length, toolCharacters)),
                 exchange.GainFailures, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            Log.GainWriteFailed(logger, exchange.GainId, exception);
+        }
+    }
+
+    private async Task RecordOtherAsync(CapturedExchange exchange, string method, long bytes)
+    {
+        try
+        {
+            await gain.RecordOtherAsync(new GainOtherEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,
+                exchange.Dialect.ToString().ToLowerInvariant(), method, bytes), CancellationToken.None);
         }
         catch (Exception exception)
         {

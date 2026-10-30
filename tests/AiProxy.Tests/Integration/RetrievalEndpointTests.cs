@@ -87,6 +87,11 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
             throw new IOException("disk full");
         }
 
+        public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken)
+        {
+            throw new IOException("disk full");
+        }
+
         public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
         {
             throw new IOException("disk full");

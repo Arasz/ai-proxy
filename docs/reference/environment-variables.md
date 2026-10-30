@@ -5,6 +5,10 @@ configuration sources. In the environment, a double underscore stands for the se
 `PROXY__COMPRESSION__ENABLED` is the setting `Proxy:Compression:Enabled`. A switch takes `true` or
 `false`; `on` is no longer accepted.
 
+An unknown `Proxy:*` key stops startup and the error names it, so a misspelled `PROXY__PROT` or
+`--Proxy:Prot=8090` can no longer pass silently. A stray `PROXY__*` environment variable that names
+no setting now stops the proxy too.
+
 Provider routing needs no environment configuration. ai-proxy recognizes these destination
 hosts and sends all other HTTP traffic through unchanged. HTTPS for other hosts remains an
 opaque tunnel.
@@ -38,7 +42,9 @@ Compression stays off unless enabled, because it changes provider request bodies
 | `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
 
 The database contains the text tools returned to the agent. Keep it on the machine running
-ai-proxy and protect it like other local agent data.
+ai-proxy and protect it like other local agent data. On Linux and macOS the file is `0600`. Requests,
+their chunks, originals, thread rows and dead-lettered queue rows older than 14 days are deleted, once
+at start and then every hour.
 
 ## Request capture
 
@@ -48,6 +54,7 @@ is made up (system prompt, tool definitions, turns, tool results, thinking block
 | Variable | What it is |
 |---|---|
 | `PROXY__CAPTURE` | `true` keeps every provider request body the proxy reads, exactly as the client sent it. Anything else, or unset, keeps nothing. |
+| `PROXY__CAPTUREMAXBYTES` | The live bytes of `capture.db` above which capture stops. The default is `1073741824` (1 GB). Live bytes count the pages in use, `(page_count - freelist_count) x page_size`, not the size of the file, because a delete never shrinks the file. Capture resumes by itself once eviction frees pages. |
 
 Each request becomes one row of `capture_request` in `~/.ai-proxy/capture.db`: a request id, the
 time, the provider, the host, the path without its query string, and the body as bytes. The body
@@ -57,8 +64,9 @@ compression. Bodies over 8 MiB, or sent without a `Content-Length`, are not read
 Headers and the query string are not stored, so `Authorization`, `x-api-key`, cookies and a
 `?key=` parameter stay out of the file. The body itself is stored in full: prompts, source code,
 file contents and tool output the agent sent, and any secret that sits inside them. On Linux and
-macOS the file is `0600` and its directory `0700`. Nothing removes old rows; delete the file when the
-measurement is over. A failed write is logged as a warning and the request goes out regardless.
+macOS the file is `0600` and its directory `0700`. Rows older than 14 days are deleted, once at start and then every hour, and capture stops at the
+ceiling above (a warning is logged once when it stops and once when it resumes). Delete the file when the
+measurement is over to give the disk space back; a delete frees pages for reuse but does not shrink the file. A failed write is logged as a warning and the request goes out regardless.
 
 Each captured request also gets one row of `capture_response`, under the same `request_id`, once
 its response has passed through, whatever its status code. The row holds numbers only: the
@@ -115,7 +123,7 @@ give them `--endpoint` when you move it. See
 |---|---|
 | `PROXY__PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
 
-<!-- trust:trustchecked evidence=src/AiProxy/Configuration/ProxySettings.cs:12 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Configuration/ProxySettings.cs:12#Load -->
 A whole number from 0 to 65535 is valid. Zero asks the operating system to choose a free port;
 the listener address and system proxy marker report that actual bound port. An empty value
 counts as unset and keeps `8080`; an invalid value stops startup with an error naming `Proxy:Port`.
@@ -123,7 +131,7 @@ counts as unset and keeps `8080`; an invalid value stops startup with an error n
 
 ## Runtime isolation and restart
 
-<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31 -->
+<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31#runtimeOptions -->
 | Variable | What it is |
 |---|---|
 | `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
@@ -143,7 +151,7 @@ PROXY__PORT=0 ASPNETCORE_URLS=http://127.0.0.1:0 ai-proxy
 ```
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProxyInstance.cs:137 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 `ai-proxy --restart` selects the same data directory as normal startup. It requests a graceful
 stop through a same-user control pipe, waits for that exact process to exit, acquires ownership,
 and starts the replacement. The replacement remains in the foreground. It inherits the actual
@@ -158,14 +166,14 @@ absolute paths, but symlink aliases are not a supported way to select the same i
 
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProcessIdentity.cs:8 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProcessIdentity.cs:7#ProcessIdentity -->
 The owner also reports an exact process start token. Linux uses the kernel start ticks from
 `/proc/PID/stat`, because independently running .NET processes can convert boot time to slightly
 different UTC timestamps. macOS and Windows use the native process start time. The nonce and
 PID remain part of the identity check.
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/ProxyInstance.cs:137 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between
