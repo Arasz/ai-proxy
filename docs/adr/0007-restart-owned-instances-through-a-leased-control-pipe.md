@@ -10,7 +10,7 @@ cannot identify instances that disabled operating system proxy integration.
 
 ## Decision
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 The executable acquires a nonwaiting, exclusive `startup.lock` before observing the process
 lease. Normal starts and restarts share this claim and release it after the host and pipe are
 ready. Concurrent contenders fail instead of discovering and stopping a new replacement.
@@ -26,7 +26,7 @@ Absent explicit keys, inherit the actual proxy port and API URLs. The existing s
 marker and guard retain their restoration responsibilities.
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyControl.cs:11 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyControl.cs:11#ProxyControl -->
 The control transport is one reusable duplex byte-mode named pipe. Its short name uses BCL
 SHA-256 over the normalized absolute data directory. Both ends require `CurrentUserOnly`.
 The server reports product, protocol, nonce, PID, UTC start time, and actual listener URLs.

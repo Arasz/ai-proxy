@@ -28,6 +28,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private readonly IProviderHosts _providerHosts;
 
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
+    private readonly TimeProvider _timeProvider;
     private readonly Func<HttpWebClient, bool> _upstreamClosed;
     private ExplicitProxyEndPoint? _endPoint;
     private ISystemProxyGuardSession? _guard;
@@ -54,7 +55,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ISystemProxyGuardLauncher guardLauncher,
         ILoggerFactory loggerFactory,
         TimeSpan markerWait,
-        Func<HttpWebClient, bool>? upstreamClosed = null)
+        Func<HttpWebClient, bool>? upstreamClosed = null,
+        TimeProvider? timeProvider = null)
     {
         Server = new ProxyServer(false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
@@ -66,6 +68,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>The listener address used by system proxy settings and local clients.</summary>
@@ -113,7 +116,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
         {
-            _marker = await SystemProxyMarker.Acquire( _options.DataDirectory, _markerWait, TimeProvider.System);
+            _marker = await SystemProxyMarker.Acquire( _options.DataDirectory, _markerWait, _timeProvider);
         }
 
         _endPoint = new ExplicitProxyEndPoint(_options.ListenAddress, _options.Port);

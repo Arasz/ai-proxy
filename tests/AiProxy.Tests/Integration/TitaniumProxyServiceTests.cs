@@ -214,23 +214,23 @@ public sealed class TitaniumProxyServiceTests
         Assert.Equal(0, launcher.MarkerLengthWhenRestoredWasReported);
     }
 
-    [Fact(Skip = TimingDependent.Reason)]
+    [Fact]
     public async Task A_marker_held_briefly_by_a_dying_owner_does_not_fail_startup()
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
         var holder = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(300, TestContext.Current.CancellationToken);
-            await holder.DisposeAsync();
-        }, TestContext.Current.CancellationToken);
+        var clock = new TimerObservingTimeProvider();
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10));
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10), clock);
 
-        await service.StartAsync(TestContext.Current.CancellationToken);
+        var starting = service.StartAsync(TestContext.Current.CancellationToken);
+        await Task.WhenAny(clock.FirstTimerCreated, starting).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(starting.IsCompleted, "startup gave up instead of waiting for the marker");
+        await holder.DisposeAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(100));
+        await starting.WaitAsync(TestContext.Current.CancellationToken);
 
-        await release;
         Assert.Contains("set", events);
         await service.StopAsync(CancellationToken.None);
     }
@@ -269,7 +269,8 @@ public sealed class TitaniumProxyServiceTests
         int port,
         string dataDirectory,
         ISystemProxyGuardLauncher? launcher = null,
-        TimeSpan? markerWait = null)
+        TimeSpan? markerWait = null,
+        TimeProvider? timeProvider = null)
     {
         return new TitaniumProxyService(
             registrar,
@@ -278,7 +279,8 @@ public sealed class TitaniumProxyServiceTests
             new CanonicalProviderHosts(),
             launcher ?? new RecordingGuardLauncher([]),
             NullLoggerFactory.Instance,
-            markerWait ?? TimeSpan.FromSeconds(1));
+            markerWait ?? TimeSpan.FromSeconds(1),
+            timeProvider: timeProvider);
     }
 
     private static int FreePort()
