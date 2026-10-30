@@ -44,6 +44,7 @@ Rejected or not adopted:
 | R2 | Root CA (F8) | Name-constrained CA, `ai-proxy` CN, non-empty password, cleanup of the old root. One re-trust. |
 | R3 | ADR 0005 (F12) | Supersede: CCR on for every kind; the per-kind gate is withdrawn. |
 | R4 | Strictness (F2, F15) | Unknown command or bare flag exits 2 with usage; `--version`; unknown `Proxy:*` keys fail startup. |
+| R5 | Non-model traffic in gain (WP8 finding, 2026-10-30) | Savings totals count only model requests; telemetry and other provider-host calls are a separate "other traffic" count, so nothing disappears silently. Implemented as WP10, before WP9. |
 
 ## Decisions taken without the owner (reversible)
 
