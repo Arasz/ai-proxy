@@ -314,6 +314,45 @@ public sealed class GainStoreTests
         Assert.Equal(0, ccr.Totals.Requests);
     }
 
+    [Fact]
+    public async Task Other_traffic_is_counted_apart_filtered_and_reset_with_the_rest_and_never_enters_the_savings_totals()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        await store.RecordAsync(Entry("model-a", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("model-b", "2026-11-01T11:00Z", "/b", "unchanged", 578, 578), [], TestContext.Current.CancellationToken);
+        await store.RecordOtherAsync(new GainOtherEntry("other-a1", DateTimeOffset.Parse("2026-11-01T10:30Z"), "/a", "anthropic", "POST", 1_000), TestContext.Current.CancellationToken);
+        await store.RecordOtherAsync(new GainOtherEntry("other-a2", DateTimeOffset.Parse("2026-11-01T10:31Z"), "/a", "anthropic", "POST", 500), TestContext.Current.CancellationToken);
+        await store.RecordOtherAsync(new GainOtherEntry("other-b", DateTimeOffset.Parse("2026-11-01T11:30Z"), "/b", "anthropic", "POST", 70), TestContext.Current.CancellationToken);
+
+        var all = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+        var projectA = await store.QueryAsync(new GainQuery("/a"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, all.Summary.Requests);
+        Assert.Equal(new GainOtherTraffic(3, 1_570), all.OtherTraffic);
+        Assert.Equal(2, Assert.Single(all.Daily).Totals.Requests);
+        Assert.Equal(2, all.History.Count);
+        Assert.Equal(1, projectA.Summary.Requests);
+        Assert.Equal(new GainOtherTraffic(2, 1_500), projectA.OtherTraffic);
+
+        await store.ResetAsync(new GainQuery("/a"), TestContext.Current.CancellationToken);
+        var afterReset = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+        Assert.Equal(1, afterReset.Summary.Requests);
+        Assert.Equal(new GainOtherTraffic(1, 70), afterReset.OtherTraffic);
+    }
+
+    [Fact]
+    public async Task A_ledger_with_no_other_traffic_reports_zero_not_null()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z")));
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new GainOtherTraffic(), report.OtherTraffic);
+    }
+
     private static GainHistoryEntry Entry(string id, string at, string project, string rule, long original, long forwarded)
     {
         return new GainHistoryEntry(id, DateTimeOffset.Parse(at), project, "anthropic", "POST", rule, "tool_result", "content",

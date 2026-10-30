@@ -36,6 +36,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         }, WritePath.Request, cancellationToken);
     }
 
+    public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken)
+    {
+        return WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.Other, entry.Id, entry.At, entry.Project, entry.Provider,
+            entry.Method, GainLabels.Rules.OtherTraffic, GainLabels.Unknown, GainLabels.Pipelines.Passthrough, JsonSerializer.Serialize(entry)), null, cancellationToken),
+            WritePath.Request, cancellationToken);
+    }
+
     public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
     {
         return WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.Recall, Guid.CreateVersion7().ToString("N"), recall.At,
@@ -57,6 +64,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Sql.Events, cancellationToken);
         var recalls = await DetailsAsync<GainRecall>(connection, transaction, parameters, Kinds.Recall,
             Sql.Events, cancellationToken);
+        var other = await connection.QuerySingleAsync<GainOtherTraffic>(new CommandDefinition(
+            Sql.OtherTraffic, parameters, transaction, cancellationToken: cancellationToken));
         await transaction.CommitAsync(cancellationToken);
 
         var attributions = Attributions.SelectMany(dimension =>
@@ -73,7 +82,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Monthly = Buckets(rows, "monthly"),
             Attributions = attributions,
             Failures = failures,
-            Recalls = recalls
+            Recalls = recalls,
+            OtherTraffic = other
         };
     }
 
@@ -233,6 +243,11 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                       SELECT payload FROM gain_event WHERE kind = @Kind AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit
                                       """;
 
+        public const string OtherTraffic = $"""
+                                            SELECT COUNT(*) AS Requests,COALESCE(SUM(json_extract(payload,'$.Bytes')),0) AS Bytes
+                                            FROM gain_event WHERE kind = 'other' AND {Predicate}
+                                            """;
+
         public const string Predicate = """
                                         (@Project IS NULL OR project = @Project) AND (@From IS NULL OR at >= @From) AND (@To IS NULL OR at < @To)
                                         AND (@Provider IS NULL OR provider = @Provider) AND (@Method IS NULL OR method = @Method)
@@ -287,6 +302,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         public const string Request = "request";
         public const string Failure = "failure";
         public const string Recall = "recall";
+        public const string Other = "other";
     }
 }
 

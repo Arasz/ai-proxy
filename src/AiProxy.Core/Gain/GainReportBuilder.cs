@@ -25,7 +25,7 @@ public static class GainReportBuilder
     }
 
     public static GainReport Build(GainQuery query, DateTimeOffset now, IReadOnlyList<GainHistoryEntry> requests,
-        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents)
+        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents, GainOtherTraffic? otherTraffic = null)
     {
         var recalls = recallEvents.Select(static recallEvent => recallEvent.Recall).ToArray();
         var summary = Sum(requests.Select(static request => request.Totals));
@@ -60,7 +60,7 @@ public static class GainReportBuilder
                 new GainCapability("provider-usage", false, "Provider usage is available separately only when optional raw capture is enabled."),
                 new GainCapability("project", true, "Only traffic carrying X-Ai-Proxy-Project is attributed; absent values remain unknown."),
                 new GainCapability("recalls", true, "Caller-attributed retrieval cost; a preview hash does not identify its origin project.")
-            ]);
+            ], otherTraffic ?? new GainOtherTraffic());
     }
 
     public static GainTotals Sum(IEnumerable<GainTotals> rows)
