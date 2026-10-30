@@ -9,8 +9,13 @@ public sealed class GainCsv
 {
     public string Render(GainReport report, GainSettings settings)
     {
-        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens\r\n");
+        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes\r\n");
         Add(csv, "summary", Stamp(report.GeneratedAt), report.Measurement.Kind, "", "", report.Summary);
+        if (report.OtherTraffic is { } other)
+        {
+            Add(csv, "other", "", "other-traffic", "", "", new GainTotals(other.Requests), bytes: other.Bytes);
+        }
+
         if (settings.History)
         {
             foreach (var row in report.History)
@@ -72,13 +77,14 @@ public sealed class GainCsv
         }
     }
 
-    private static void Add(StringBuilder csv, string section, string at, string name, string? project, string? provider, GainTotals totals, string? error = null)
+    private static void Add(StringBuilder csv, string section, string at, string name, string? project, string? provider, GainTotals totals, string? error = null, long? bytes = null)
     {
         var fields = new[]
         {
             section, at, name, project ?? "", provider ?? "", totals.Requests.ToString(CultureInfo.InvariantCulture), totals.EstimatedSavedTokens.ToString(CultureInfo.InvariantCulture),
             totals.EstimatedRetrievedTokens.ToString(CultureInfo.InvariantCulture), error ?? "",
-            totals.EstimatedToolTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedNetTokens.ToString(CultureInfo.InvariantCulture)
+            totals.EstimatedToolTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedNetTokens.ToString(CultureInfo.InvariantCulture),
+            bytes?.ToString(CultureInfo.InvariantCulture) ?? ""
         };
         csv.AppendJoin(',', fields.Select(Escape)).Append("\r\n");
     }

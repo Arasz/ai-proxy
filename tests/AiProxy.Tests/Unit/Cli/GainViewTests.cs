@@ -32,6 +32,33 @@ public sealed class GainViewTests
     }
 
     [Fact]
+    public async Task Other_traffic_is_shown_apart_from_the_savings_row_in_the_table_and_appended_to_csv_and_json()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with { OtherTraffic = new GainOtherTraffic(179, 123_456) };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+        Assert.Contains("Other traffic: 179 requests, 123,456 bytes", fixture.Console.Output, StringComparison.Ordinal);
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "csv"], TestContext.Current.CancellationToken);
+        var csv = fixture.Output.ToString();
+        Assert.StartsWith("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes\r\n", csv, StringComparison.Ordinal);
+        Assert.Contains("other,,other-traffic,,,179,0,0,,0,0,123456", csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_report_from_an_older_proxy_shows_no_other_traffic_line()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("Other traffic", fixture.Console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_negative_net_is_printed_with_its_sign()
     {
         using var fixture = new GainCommandTests.Fixture();

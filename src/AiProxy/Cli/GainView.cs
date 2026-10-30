@@ -20,6 +20,11 @@ public sealed class GainView
             ]),
             new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
         };
+        if (report.OtherTraffic is { } other)
+        {
+            views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
+        }
+
         if ((settings.Project || settings.ProjectPath is not null) && report.Summary.Requests == 0)
         {
             views.Add(new Text($"No requests for this project. Traffic is attributed only when the client sends the {GainApi.ProjectHeader} header; launch the agent with `ai-proxy harness` to set it.\n"));

@@ -55,6 +55,12 @@ public sealed record GainTotals(
     }
 }
 
+/// <summary>Provider-host calls that are not model requests, such as telemetry; counted here and never in the savings totals.</summary>
+public sealed record GainOtherTraffic(long Requests = 0, long Bytes = 0);
+
+/// <summary>A provider-host call that is not a model request, as the ledger holds it.</summary>
+public sealed record GainOtherEntry(string Id, DateTimeOffset At, string? Project, string? Provider, string Method, long Bytes);
+
 /// <summary>A UTC calendar period and its matching totals.</summary>
 public sealed record GainBucket(DateTimeOffset Start, GainTotals Totals);
 
@@ -96,7 +102,7 @@ public sealed record GainRecall(
 /// <summary>Whether this release measures a requested feature.</summary>
 public sealed record GainCapability(string Name, bool Supported, string? Reason = null);
 
-/// <summary>The same filtered statistics consumed by every frontend.</summary>
+/// <summary>The same filtered statistics consumed by every frontend; <c>OtherTraffic</c> is null only in a report from a proxy that predates other-traffic counting.</summary>
 public sealed record GainReport(
     int SchemaVersion,
     DateTimeOffset GeneratedAt,
@@ -110,7 +116,8 @@ public sealed record GainReport(
     IReadOnlyList<GainAttribution> Attributions,
     IReadOnlyList<GainFailure> Failures,
     IReadOnlyList<GainRecall> Recalls,
-    IReadOnlyList<GainCapability> Capabilities);
+    IReadOnlyList<GainCapability> Capabilities,
+    GainOtherTraffic? OtherTraffic = null);
 
 /// <summary>The number of metadata rows reset through the server snapshot cutoff.</summary>
 public sealed record GainResetResult(long Removed, DateTimeOffset Cutoff);
@@ -119,6 +126,7 @@ public sealed record GainResetResult(long Removed, DateTimeOffset Cutoff);
 public interface IGainStore
 {
     ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken);
+    ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken);
     ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken);
     ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken);
     ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken);

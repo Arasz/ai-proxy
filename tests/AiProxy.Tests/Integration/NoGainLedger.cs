@@ -10,6 +10,11 @@ internal sealed class NoGainLedger : IGainStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken)
+    {
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
     {
         return ValueTask.CompletedTask;

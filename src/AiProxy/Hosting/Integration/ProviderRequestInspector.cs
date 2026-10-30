@@ -52,7 +52,12 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var started = time.GetTimestamp();
-        var exchange = new CapturedExchange { Dialect = dialect, GainProject = project };
+        var exchange = new CapturedExchange
+        {
+            Dialect = dialect,
+            GainProject = project,
+            IsModelCall = ProviderEndpoints.IsModelCall(dialect, request.Method, request.RequestUri.AbsolutePath)
+        };
         var captureId = Guid.CreateVersion7().ToString("N");
 
         var stage = time.GetTimestamp();
@@ -326,6 +331,12 @@ public sealed partial class ProviderRequestInspector(
 
     private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule, int toolCharacters = 0)
     {
+        if (!exchange.IsModelCall)
+        {
+            await RecordOtherAsync(exchange, method, original.Length);
+            return;
+        }
+
         exchange.GainRule = rule;
         exchange.GainMethod = method;
         exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed or GainLabels.Rules.CcrTool ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
@@ -336,6 +347,19 @@ public sealed partial class ProviderRequestInspector(
                     exchange.Dialect.ToString().ToLowerInvariant(), method, rule, exchange.GainLayer, exchange.GainPipeline,
                     GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length, toolCharacters)),
                 exchange.GainFailures, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            Log.GainWriteFailed(logger, exchange.GainId, exception);
+        }
+    }
+
+    private async Task RecordOtherAsync(CapturedExchange exchange, string method, long bytes)
+    {
+        try
+        {
+            await gain.RecordOtherAsync(new GainOtherEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,
+                exchange.Dialect.ToString().ToLowerInvariant(), method, bytes), CancellationToken.None);
         }
         catch (Exception exception)
         {

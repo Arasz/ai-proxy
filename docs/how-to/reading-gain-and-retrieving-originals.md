@@ -42,8 +42,15 @@ values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedP
 A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
 inspect, such as a body over 8 MB or a chunked body, are not counted). A request whose only change is
 the `proxy_retrieve` definition is recorded under the rule `ccr.tool`; its tool tokens appear in the
-Tool column and its net is negative. Non-message traffic to a provider host, such as telemetry
-batches, is also counted as unchanged and dilutes the percentages.
+Tool column and its net is negative. Only model calls count in the totals
+and percentages: `POST` to `/v1/messages` (Anthropic), the chat completions, completions, responses and
+messages endpoints (OpenAI-style hosts, OpenRouter) and `generateContent` / `streamGenerateContent` (Gemini).
+Other calls to a provider host, such as Claude Code telemetry, are recorded as **other traffic** and shown
+apart: a line `Other traffic: N requests, B bytes` under the table, an `other` row in CSV (the `bytes`
+column, appended last) and `otherTraffic` (`requests`, `bytes`) at the end of the JSON report. They follow the
+same project, date and provider filters and `--reset`. Rows recorded before this change cannot be sorted again
+because the path was not kept; telemetry recorded then stays in the totals as `unchanged`, and only new
+traffic is separated.
 
 `ai-proxy gain --reset` deletes the statistics that match the other filters, after a confirmation
 (`--yes` skips it). Kept originals and captures are not touched.
