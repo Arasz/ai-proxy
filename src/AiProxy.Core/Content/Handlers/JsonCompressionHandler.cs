@@ -42,7 +42,7 @@ public sealed class JsonCompressionHandler : ICompressionHandler
             // The writer still escapes characters outside the basic plane, so a compact document can come out longer.
             return ValueTask.FromResult(new HandledContent(compact.Length <= part.Text.Length ? compact : part.Text, CompactPath));
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {
             var reduced = Reduction.DeduplicateLines(part.Text);
             var overlaid = MustKeepOverlay.Apply(reduced, part.Text);

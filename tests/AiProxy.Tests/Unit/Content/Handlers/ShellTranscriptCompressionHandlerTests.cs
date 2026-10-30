@@ -65,4 +65,14 @@ public sealed class ShellTranscriptCompressionHandlerTests
             return Task.FromException(exception);
         }
     }
+
+    [Fact]
+    public async Task Only_a_line_that_repeats_the_line_before_it_is_dropped()
+    {
+        var text = string.Join("\n", "$ make", "error: boom", "error: boom", "warning: other", "error: boom", "  error: boom", "$ echo done");
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Equal(["error: boom", "warning: other", "error: boom", "  error: boom"], result.Text.Split('\n').Where(line => line.Contains("boom", StringComparison.Ordinal) || line.Contains("other", StringComparison.Ordinal)));
+    }
 }

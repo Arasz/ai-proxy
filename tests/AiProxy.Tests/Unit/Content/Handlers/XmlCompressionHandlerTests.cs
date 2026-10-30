@@ -103,4 +103,13 @@ public sealed class XmlCompressionHandlerTests
             return Task.FromException(exception);
         }
     }
+
+    [Fact]
+    public async Task The_fallback_drops_only_a_line_that_repeats_the_line_before_it()
+    {
+        var result = await Handler.HandleAsync(Part("<root\n  <a>1</a>\n  <a>1</a>\n  <b>2</b>\n  <a>1</a>\n<a>1</a>"), CancellationToken.None);
+
+        Assert.Equal("xml.dedupe", result.Path);
+        Assert.Equal(["<root", "  <a>1</a>", "  <b>2</b>", "  <a>1</a>", "<a>1</a>"], result.Text.Split('\n'));
+    }
 }

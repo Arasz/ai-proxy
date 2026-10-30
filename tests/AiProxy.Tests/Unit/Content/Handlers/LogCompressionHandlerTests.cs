@@ -217,4 +217,14 @@ public sealed class LogCompressionHandlerTests
             return Task.FromException(exception);
         }
     }
+
+    [Fact]
+    public async Task Only_a_line_that_repeats_the_line_before_it_is_dropped()
+    {
+        var text = string.Join("\n", "request failed status=503", "request failed status=503", "request failed status=504", "request failed status=503", "  request failed status=503");
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Equal(["request failed status=503", "request failed status=504", "request failed status=503", "  request failed status=503"], Lines(result.Text));
+    }
 }
