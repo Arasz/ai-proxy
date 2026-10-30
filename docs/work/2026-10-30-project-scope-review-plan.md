@@ -2,7 +2,7 @@
 
 Date: 2026-10-30. Source record: [2026-10-30-project-scope-review.md](2026-10-30-project-scope-review.md)
 (audited). Campaign branch `review/project-scope-2026-10-30`, draft PR #90. Base: main at
-`d6b79dd` (0.17.3). Status: revision 2, after an architect review and an adversarial gate audit.
+`d6b79dd` (0.17.3). Status: revision 2; wave 1 merged (0.18.0), waves 2 to 4 pending.
 
 F1 already shipped as hotfix 0.17.3 (#89). This plan covers the remaining 29 findings.
 
@@ -289,6 +289,37 @@ flowchart LR
   EW --> SCS
   EW --> CAP
 ```
+
+## Wave 1 outcome (2026-10-30)
+
+All five packages merged into the campaign branch as 0.18.0 (`be3621a`). Every gate was watched red
+before green. Where a lane wrote code before its test, the orchestrator watched the gate red by
+mutating the code back afterwards: WP2's second-instance message and MCP suffix, and WP1's
+no-write `Ensure`. The suite went from 920 to 974 passed, 0 failed, 7 skipped, and each merge
+re-ran the build and full suite on the merged tree.
+
+Deviations from the plan:
+
+- **WP3 gate (b) is not met.** Titanium 7.0.26 exposes no public client or session
+  cancellation token before `RespondStreaming` (CS1061 on `SessionEventArgs.CancellationToken`). A
+  client that disconnects while the upstream is silent holds the request until the 10-minute headers
+  deadline. Accepted as a limitation; no reflection on Titanium internals.
+- **WP2's MCP reachability check is a stderr warning, not a failure.** MCP clients spawn the server
+  before the proxy starts.
+- **WP6 was implemented by the orchestrator.** Its lane's auto-worktree was cleaned up before the
+  correction reached it.
+
+Join defects found at merge:
+
+- **WP2 × WP6.** WP2 moved the restart `catch` in `ProxyInstanceLifetime.cs` from line 32 to 40.
+  WP6's two `:32` evidence anchors then pointed at the wrong code, and
+  `check-evidence-anchors.py` stayed green, because it checks that the line exists, not what it
+  says. Re-pointed in the merge commit. The gate's weakness is carried into wave 2 (WP7).
+- **WP6 alone.** Inlining the action-pin grep in `build-bdd` made the pin gate match its own
+  pattern text. Fixed by one shared `scripts/check-action-pins.sh`.
+
+Added to WP7 for wave 2: evidence anchors carry the expected text (or a symbol name) and the check
+compares it, so a shifted line fails. Watch it red on a deliberately shifted anchor.
 
 ## Still open
 
