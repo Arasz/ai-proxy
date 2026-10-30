@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiProxy.Core.Content;
@@ -38,7 +39,7 @@ public sealed record ContentJob(long JobId, ContentRecord Record);
 ///     because the pragma that tells it whether anything changed does not move for a
 ///     connection's own commits.
 /// </remarks>
-public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
+public sealed class ContentQueue(ContentStoreOptions options, TimeProvider time) : IContentQueue
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -56,7 +57,7 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
         const string select = """
-                              SELECT job_id AS JobId, payload AS Payload
+                              SELECT job_id AS JobId, request_id AS RequestId, created_at AS CreatedAt, payload AS Payload
                               FROM content_queue
                               ORDER BY job_id
                               LIMIT @Limit;
@@ -68,11 +69,27 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
         var jobs = new List<ContentJob>(rows.Count);
         foreach (var jobPayload in rows)
         {
-            var record = JsonSerializer.Deserialize<ContentRecord>(jobPayload.Payload, SerializerOptions);
-            if (record is not null)
+            ContentRecord? record;
+            try
             {
-                jobs.Add(new ContentJob(jobPayload.JobId, record));
+                record = JsonSerializer.Deserialize<ContentRecord>(jobPayload.Payload, SerializerOptions);
             }
+            catch (JsonException exception)
+            {
+                await DeadLetterAsync(connection, jobPayload, exception.Message, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            if (record is null)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "DELETE FROM content_queue WHERE job_id = @JobId;",
+                    new { jobPayload.JobId },
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+                continue;
+            }
+
+            jobs.Add(new ContentJob(jobPayload.JobId, record));
         }
 
         return jobs;
@@ -81,6 +98,29 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
     /// <summary>Takes a job out of the queue, once it has been written.</summary>
     /// <param name="jobId">The queue row's number.</param>
     /// <param name="cancellationToken">The token that stops the deleted.</param>
+    /// <summary>Finds the record still waiting in the queue for a request, without taking it out.</summary>
+    /// <param name="requestId">The request's id.</param>
+    /// <param name="cancellationToken">The token that stops the read.</param>
+    public async Task<ContentRecord?> FindPendingAsync(string requestId, CancellationToken cancellationToken)
+    {
+        await using var connection = ContentSchema.Open(_databasePath);
+        connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
+
+        var payload = await connection.QueryFirstOrDefaultAsync<string>(new CommandDefinition(
+            "SELECT payload FROM content_queue WHERE request_id = @RequestId ORDER BY job_id LIMIT 1;",
+            new { RequestId = requestId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+        try
+        {
+            return payload is null ? null : JsonSerializer.Deserialize<ContentRecord>(payload, SerializerOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     public async ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(_databasePath);
@@ -132,5 +172,25 @@ public sealed class ContentQueue(ContentStoreOptions options) : IContentQueue
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
-    private sealed record JobPayload(long JobId, string Payload);
+    /// <summary>Moves a row that cannot be read out of the queue, keeping its payload and why it failed.</summary>
+    private async Task DeadLetterAsync(SqliteConnection connection, JobPayload job, string error, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT OR REPLACE INTO content_queue_dead (job_id, request_id, created_at, failed_at, payload, error)
+            VALUES (@JobId, @RequestId, @CreatedAt, @FailedAt, @Payload, @Error);
+            """,
+            new { job.JobId, job.RequestId, job.CreatedAt, FailedAt = time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture), job.Payload, Error = error },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM content_queue WHERE job_id = @JobId;",
+            new { job.JobId },
+            transaction,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed record JobPayload(long JobId, string RequestId, string CreatedAt, string Payload);
 }

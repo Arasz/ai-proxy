@@ -61,10 +61,9 @@ public sealed class SqliteContentStore : IContentStore, IContentWriter
 
         if (row is null)
         {
-            var pending = (await _queue.ReadAsync(64, cancellationToken).ConfigureAwait(false))
-                .FirstOrDefault(job => string.Equals(job.Record.RequestId, requestId, StringComparison.Ordinal));
+            var pending = await _queue.FindPendingAsync(requestId, cancellationToken).ConfigureAwait(false);
 
-            return pending?.Record;
+            return pending;
         }
 
         const string selectChunks = """
