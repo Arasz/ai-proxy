@@ -22,7 +22,9 @@ platform is a failed release, not a partial one.
 2. **Add the changelog entry.** Write `docs/changelog/{version}-{slug}.md` describing what changed.
    One file per version; this repository does not keep a single root `CHANGELOG.md`.
 3. **Merge to `main`.** The version bump and the changelog entry travel in the same merge as the
-   change they describe.
+   change they describe. That merge is itself the release: `release.yml` runs on any push to
+   `main` that changes `VERSION`, tags the commit `vX.Y.Z`, and creates the GitHub release with
+   generated notes. It refuses when `docs/changelog/{version}-*.md` is missing.
 4. **Dispatch `publish.yml`.** The workflow publishes to nuget.org and does nothing else.
 
 ## How the publish works

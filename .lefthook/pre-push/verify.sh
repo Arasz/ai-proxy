@@ -57,6 +57,8 @@ lane_docs_index() {
   # no README may name a file that does not exist. A README that lists a file
   # that was never written is a lie a reader will trust.
   python3 scripts/check-docs-index.py
+  # Every evidence=path:line anchor must name an existing line.
+  python3 scripts/check-evidence-anchors.py
 }
 
 lane_workflows() {
@@ -104,7 +106,7 @@ select_lanes() {
       want_build=1; want_test=1 ;;
   esac
   case "$files" in
-    *docs/*) want_docs=1 ;;
+    *docs/*|README.md) want_docs=1 ;;
   esac
   case "$files" in
     *.github/workflows/*) want_workflows=1; want_checks=1 ;;

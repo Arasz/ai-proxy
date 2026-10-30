@@ -50,6 +50,11 @@ jobs:
             echo "::error::VERSION must be a bare semver (e.g. 1.2.3); found '$VERSION'." >&2
             exit 1
           fi
+          # The version-changelog rule: a release without its entry ships unrecorded.
+          if ! ls docs/changelog/"${VERSION}"-*.md >/dev/null 2>&1; then
+            echo "::error::docs/changelog/${VERSION}-*.md is missing; add the release's entry before bumping VERSION." >&2
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 

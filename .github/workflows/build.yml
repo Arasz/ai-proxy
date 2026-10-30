@@ -58,13 +58,13 @@ jobs:
             HEAD="${{ github.sha }}"
           fi
 
-          # Mirrors the paths this workflow used to trigger on. Anything not
-          # matched here (docs/**, *.md, etc.) is treated as safe to skip.
-          # VERSION is included because it is the file release.yml triggers on: a
-          # release PR that changes only VERSION would otherwise take all three
-          # required checks green having built nothing, and the commit that cuts a
-          # public release is the last one that should reach main unbuilt.
-          CODE_REGEX='^src/.*\.cs$|^tests/.*\.cs$|\.csproj$|\.slnx$|(^|/)Directory\.Build\.props$|(^|/)Directory\.Packages\.props$|^nuget\.config$|^VERSION$|^docs/adr/|^docs/reference/|^docs/how-to/|^scripts/reducer_scoring/payloads/|^scripts/reducer_scoring/preregistration\.json$'
+          # Lists the paths that may skip the build: dated records, release notes,
+          # prose guides and agent instructions. Everything else is code, so a path
+          # nobody listed (global.json, Directory.Build.targets, a script the test
+          # project references) runs the tests instead of skipping them.
+          # docs/adr, docs/reference and docs/how-to are the specification and run
+          # the build. VERSION is code: release.yml triggers on it.
+          SKIP_REGEX='^docs/(work|changelog|tutorials|explanation|notes)/|^[^/]+\.md$|^\.ai-badger/|^\.claude/|^LICENSE$'
 
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
             echo "No usable base commit (new branch or force-push); treating as a code change."
@@ -76,7 +76,8 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          if echo "$CHANGED" | grep -qE "$CODE_REGEX"; then
+          # Code when any changed file is outside the skip list.
+          if echo "$CHANGED" | grep -qvE "$SKIP_REGEX"; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -186,30 +187,26 @@ jobs:
         run: dotnet test --configuration Release --no-build --nologo
 
   build-bdd:
-    # The behaviour-contract lane. It runs the same test suite through the
-    # Microsoft Testing Platform runner rather than the VSTest runner, which is
-    # the path the agent-facing suite actually uses. It is a separate required
-    # check because a runner-level failure (a test that the VSTest path never
-    # surfaces) is exactly the kind of defect that reaches a release.
-    needs: changes
+    # The documentation and release-contract lane. It keeps its name because it
+    # is a required check, and it runs on every change, docs-only included,
+    # because docs-only changes are what it checks: every docs index resolves,
+    # every evidence anchor names a real line, every action is pinned to a SHA,
+    # and the current VERSION has its changelog entry.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: true
-      MSBUILDDISABLENODEREUSE: 1
-      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    timeout-minutes: 5
     steps:
-      - name: Skip (doc-only change)
-        if: needs.changes.outputs.code != 'true'
-        run: echo "No code changed; skipping the build."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: needs.changes.outputs.code == 'true'
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        if: needs.changes.outputs.code == 'true'
-        with:
-          global-json-file: global.json
-      - name: Test through the Microsoft Testing Platform runner
-        if: needs.changes.outputs.code == 'true'
-        # nuget.config references the gitignored local feed .nupkg-local/; make it
-        # exist on the fresh runner or restore fails with NU1301.
-        run: mkdir -p .nupkg-local && dotnet test --configuration Release --nologo
+      - name: Docs index
+        run: python3 scripts/check-docs-index.py
+      - name: Evidence anchors
+        run: python3 scripts/check-evidence-anchors.py
+      - name: Actions pinned to a commit SHA
+        run: |
+          set -euo pipefail
+          bad="$(grep -rhoE 'uses: [^@[:space:]]+@[^[:space:]]+' .github/workflows/ | grep -vE '@[0-9a-f]{40}$' || true)"
+          if [ -n "$bad" ]; then echo "unpinned action reference(s):"; echo "$bad"; exit 1; fi
+      - name: Changelog entry for VERSION
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          ls docs/changelog/"${version}"-*.md >/dev/null 2>&1 || { echo "docs/changelog/${version}-*.md is missing"; exit 1; }

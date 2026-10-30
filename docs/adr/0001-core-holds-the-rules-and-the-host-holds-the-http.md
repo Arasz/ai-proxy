@@ -1,7 +1,7 @@
 # 0001 — The core holds the rules and the host holds the HTTP
 
 **Date:** 2026-10-21
-**Status:** Draft
+**Status:** Accepted (2026-10-30; amended to the shipped shape, see the last section)
 
 ## Context
 
@@ -23,8 +23,9 @@ phase makes the seam real, and the question this record answers is where the lin
 nothing but the base class library. It does not reference ASP.NET Core, `HttpClient`,
 persistence or any third-party package.
 
-`src/AiProxy` holds the host: the middleware, the HTTP forwarder, the configuration and the
-composition root. Everything that touches a socket lives there.
+`src/AiProxy` holds the host: the Titanium forward proxy and its request inspection
+([ADR 0003](0003-machine-wide-forward-proxy-and-provider-inspection.md)), the CCR relay, the
+configuration and the composition root. Everything that touches a socket lives there.
 
 The rule that decided it is the credential rule. It is the rule most likely to be got
 wrong, it is the rule the research record measured a leak with, and it is a rule about
@@ -35,7 +36,9 @@ The composition runs the other way: the host registers the implementations of th
 interfaces, and the core never learns who implements them. Stateless collaborators use
 singleton lifetimes. The CCR preview builder and its overlay hold operation state, so the
 host registers them as transients. Each instance serves one operation at a time; a future
-consumer must resolve a fresh builder per operation. These registrations do not activate CCR.
+consumer must resolve a fresh builder per operation. Whether CCR runs is decided by
+[ADR 0005](0005-tool-result-previews-with-in-request-retrieval.md) and
+[ADR 0008](0008-ccr-on-for-every-kind-and-content-retention.md), not by these registrations.
 
 ## Consequences
 
@@ -66,3 +69,17 @@ that grows its own request shape would earn its own project.
 cheap and would let the core log and describe requests without a project reference to
 ASP.NET. It was rejected for the same reason the rest: the rules should not be able to reach
 for a request at all.
+
+## Amendment (2026-10-30)
+
+The layering stands and is enforced: `AiProxy.Core` has no package reference and no I/O. Two
+parts of the original text did not survive the move to a machine-wide proxy:
+
+- The host no longer has an HTTP middleware forwarder. Titanium relays each request to the host
+  the client addressed, and the host inspects provider traffic in that path (ADR 0003).
+- The credential rule that decided this record does not exist in the code. The proxy never
+  rewrites the upstream or the credential, so no rule chooses which credential travels. The
+  layering now earns its keep through the rules that did survive: provider detection, content
+  classification, the reducers and CCR.
+
+Found by the project-scope review (`docs/work/2026-10-30-project-scope-review.md`, F14).

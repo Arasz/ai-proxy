@@ -1,7 +1,7 @@
 # 0002 — The store is an adapter, and SQLite is the queue
 
 **Date:** 2026-10-22
-**Status:** Draft
+**Status:** Accepted (2026-10-30; reflects shipped code)
 
 ## Context
 
