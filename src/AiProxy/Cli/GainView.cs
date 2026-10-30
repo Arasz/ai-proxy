@@ -13,12 +13,17 @@ public sealed class GainView
         var views = new List<IRenderable>
         {
             new Text("Estimated initial-request token reductions\n".ToLowerInvariant()),
-            Table(["Requests", "Original tokens", "Forwarded tokens", "Saved tokens", "Retrieved tokens"],
+            Table(["Requests", "Original tokens", "Forwarded tokens", "Saved tokens", "Retrieved tokens", "Tool tokens", "Net tokens", "Saved %", "Net %"],
             [
-                [Number(report.Summary.Requests), Number(report.Summary.EstimatedOriginalTokens), Number(report.Summary.EstimatedForwardedTokens), Number(report.Summary.EstimatedSavedTokens), Number(report.Summary.EstimatedRetrievedTokens)]
+                [Number(report.Summary.Requests), Number(report.Summary.EstimatedOriginalTokens), Number(report.Summary.EstimatedForwardedTokens), Number(report.Summary.EstimatedSavedTokens), Number(report.Summary.EstimatedRetrievedTokens),
+                    Number(report.Summary.EstimatedToolTokens), Number(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
             ]),
             new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
         };
+        if ((settings.Project || settings.ProjectPath is not null) && report.Summary.Requests == 0)
+        {
+            views.Add(new Text($"No requests for this project. Traffic is attributed only when the client sends the {GainApi.ProjectHeader} header; launch the agent with `ai-proxy harness` to set it.\n"));
+        }
         if (settings.History)
         {
             views.Add(new Text("History\n"));
@@ -82,8 +87,8 @@ public sealed class GainView
         foreach (var dimension in dimensions)
         {
             views.Add(new Text($"By {dimension}\n"));
-            views.Add(Table(["Name", "Requests", "Saved tokens", "Recalls"], report.Attributions.Where(row => row.Dimension == dimension)
-                .Select(static row => new[] { row.Name, Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.Recalls) })));
+            views.Add(Table(["Name", "Requests", "Saved tokens", "Net tokens", "Recalls"], report.Attributions.Where(row => row.Dimension == dimension)
+                .Select(static row => new[] { row.Name, Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedNetTokens), Number(row.Totals.Recalls) })));
         }
 
         if (settings.Failures)
@@ -105,8 +110,8 @@ public sealed class GainView
     private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
     {
         views.Add(new Text($"{title}\n"));
-        views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens"],
-            buckets.Select(static row => new[] { Stamp(row.Start), Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedRetrievedTokens) })));
+        views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens", "Net tokens"],
+            buckets.Select(static row => new[] { Stamp(row.Start), Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedRetrievedTokens), Number(row.Totals.EstimatedNetTokens) })));
     }
 
     private static Table Table(string[] columns, IEnumerable<string[]> rows)
@@ -134,7 +139,12 @@ public sealed class GainView
 
     private static string Number(long value)
     {
-        return value.ToString(CultureInfo.InvariantCulture);
+        return value.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    private static string Percent(decimal value)
+    {
+        return value.ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 
     private static string Stamp(DateTimeOffset value)

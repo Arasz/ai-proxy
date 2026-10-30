@@ -21,6 +21,7 @@ public sealed class GainSettings : CommandSettings
 
     [CommandOption("--endpoint <URL>")]
     [DefaultValue(GainApi.DefaultEndpoint)]
+    [Description("Base URL of the running proxy.")]
     public string Endpoint { get; init; } = GainApi.DefaultEndpoint;
 
     [CommandOption("-g|--graph")]
@@ -55,13 +56,21 @@ public sealed class GainSettings : CommandSettings
     [Description("Show retrieval cost and errors.")]
     public bool Recalls { get; init; }
 
-    [CommandOption("--by-method")] public bool ByMethod { get; init; }
+    [CommandOption("--by-method")]
+    [Description("Show totals by HTTP method.")]
+    public bool ByMethod { get; init; }
 
-    [CommandOption("--by-rule")] public bool ByRule { get; init; }
+    [CommandOption("--by-rule")]
+    [Description("Show totals by compression rule.")]
+    public bool ByRule { get; init; }
 
-    [CommandOption("--by-layer")] public bool ByLayer { get; init; }
+    [CommandOption("--by-layer")]
+    [Description("Show totals by request layer.")]
+    public bool ByLayer { get; init; }
 
-    [CommandOption("--by-pipeline")] public bool ByPipeline { get; init; }
+    [CommandOption("--by-pipeline")]
+    [Description("Show totals by pipeline.")]
+    public bool ByPipeline { get; init; }
 
     [CommandOption("--project-path <PATH>")]
     [Description("Filter to an explicit project identity.")]
@@ -75,13 +84,21 @@ public sealed class GainSettings : CommandSettings
     [Description("Exclusive ISO timestamp.")]
     public string? To { get; init; }
 
-    [CommandOption("--provider <NAME>")] public string? Provider { get; init; }
+    [CommandOption("--provider <NAME>")]
+    [Description("Filter to one provider, for example anthropic.")]
+    public string? Provider { get; init; }
 
-    [CommandOption("--method <NAME>")] public string? Method { get; init; }
+    [CommandOption("--method <NAME>")]
+    [Description("Filter to one HTTP method.")]
+    public string? Method { get; init; }
 
-    [CommandOption("--rule <NAME>")] public string? Rule { get; init; }
+    [CommandOption("--rule <NAME>")]
+    [Description("Filter to one compression rule.")]
+    public string? Rule { get; init; }
 
-    [CommandOption("--layer <NAME>")] public string? Layer { get; init; }
+    [CommandOption("--layer <NAME>")]
+    [Description("Filter to one request layer.")]
+    public string? Layer { get; init; }
 
     [CommandOption("--pipeline <NAME>")]
     [Description("Filter to one pipeline and show its attribution.")]
@@ -92,19 +109,19 @@ public sealed class GainSettings : CommandSettings
     [Description("Maximum recent history rows (1-1000).")]
     public int Limit { get; init; } = 50;
 
-    [CommandOption("-q|--quota")]
+    [CommandOption("-q|--quota", IsHidden = true)]
     [Description("Unavailable: subscription quotas are not measured.")]
     public bool Quota { get; init; }
 
-    [CommandOption("-t|--tier <TIER>")]
+    [CommandOption("-t|--tier <TIER>", IsHidden = true)]
     [Description("Unavailable: no verified subscription quota model.")]
     public string? Tier { get; init; }
 
-    [CommandOption("--shadow")]
+    [CommandOption("--shadow", IsHidden = true)]
     [Description("Unavailable: shadow rule executions are not recorded.")]
     public bool Shadow { get; init; }
 
-    [CommandOption("--skip-env")]
+    [CommandOption("--skip-env", IsHidden = true)]
     [Description("Unavailable: gain does not launch child processes.")]
     public bool SkipEnv { get; init; }
 

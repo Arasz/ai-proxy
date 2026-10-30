@@ -14,6 +14,9 @@ public static class GainLabels
     {
         public const string Unchanged = "unchanged";
         public const string CcrPlanFailed = "ccr-plan-failed";
+
+        /// <summary>The rule of a request whose only change is the injected <c>proxy_retrieve</c> tool.</summary>
+        public const string CcrTool = "ccr.tool";
     }
 
     /// <summary>Where in a request the reduction applied.</summary>

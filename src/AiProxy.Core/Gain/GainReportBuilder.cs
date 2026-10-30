@@ -16,10 +16,12 @@ public static class GainReportBuilder
         return (long)(characters / CharactersPerToken);
     }
 
-    public static GainTotals RequestTotals(long originalCharacters, long forwardedCharacters, long originalBytes, long forwardedBytes)
+    /// <summary>Totals of one request; <paramref name="toolCharacters"/> of the forwarded body are the injected tool definition, which is costed apart from what was saved.</summary>
+    public static GainTotals RequestTotals(long originalCharacters, long forwardedCharacters, long originalBytes, long forwardedBytes, long toolCharacters = 0)
     {
         return new GainTotals(1, originalCharacters, forwardedCharacters, originalBytes, forwardedBytes,
-            Tokens(originalCharacters), Tokens(forwardedCharacters), Tokens(originalCharacters) - Tokens(forwardedCharacters));
+            Tokens(originalCharacters), Tokens(forwardedCharacters), Tokens(originalCharacters) - Tokens(forwardedCharacters - toolCharacters),
+            EstimatedToolTokens: Tokens(toolCharacters));
     }
 
     public static GainReport Build(GainQuery query, DateTimeOffset now, IReadOnlyList<GainHistoryEntry> requests,
@@ -69,7 +71,7 @@ public static class GainReportBuilder
             sum.ForwardedBytes + row.ForwardedBytes, sum.EstimatedOriginalTokens + row.EstimatedOriginalTokens,
             sum.EstimatedForwardedTokens + row.EstimatedForwardedTokens, sum.EstimatedSavedTokens + row.EstimatedSavedTokens,
             sum.Recalls + row.Recalls, sum.RetrievedCharacters + row.RetrievedCharacters,
-            sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens));
+            sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens));
     }
 
     private static GainTotals RecallTotals(GainRecall recall)

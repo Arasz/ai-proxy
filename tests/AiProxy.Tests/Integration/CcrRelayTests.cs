@@ -308,6 +308,27 @@ public sealed class CcrRelayTests : IDisposable
         Assert.DoesNotContain(CcrView.Marker, ToolResultOf(Assert.Single(upstream.Requests).Body), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_request_whose_only_change_is_the_injected_tool_is_recorded_as_ccr_tool()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Sse.Message("msg_1", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CodeRequest("notes.txt", "short result").ToJsonString()))
+        {
+        }
+
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+        var row = Assert.Single(gain!.History);
+        Assert.Equal("ccr.tool", row.Rule);
+        Assert.Equal(GainLabels.Unknown, row.Layer);
+        Assert.Equal(0, gain.Summary.EstimatedSavedTokens);
+        Assert.True(gain.Summary.EstimatedToolTokens > 0);
+        Assert.Equal(-gain.Summary.EstimatedToolTokens, gain.Summary.EstimatedNetTokens);
+    }
+
     private static string ToolResultOf(string body)
     {
         return Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? "";

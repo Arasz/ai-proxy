@@ -9,7 +9,7 @@ public sealed class GainCsv
 {
     public string Render(GainReport report, GainSettings settings)
     {
-        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error\r\n");
+        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens\r\n");
         Add(csv, "summary", Stamp(report.GeneratedAt), report.Measurement.Kind, "", "", report.Summary);
         if (settings.History)
         {
@@ -77,7 +77,8 @@ public sealed class GainCsv
         var fields = new[]
         {
             section, at, name, project ?? "", provider ?? "", totals.Requests.ToString(CultureInfo.InvariantCulture), totals.EstimatedSavedTokens.ToString(CultureInfo.InvariantCulture),
-            totals.EstimatedRetrievedTokens.ToString(CultureInfo.InvariantCulture), error ?? ""
+            totals.EstimatedRetrievedTokens.ToString(CultureInfo.InvariantCulture), error ?? "",
+            totals.EstimatedToolTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedNetTokens.ToString(CultureInfo.InvariantCulture)
         };
         csv.AppendJoin(',', fields.Select(Escape)).Append("\r\n");
     }

@@ -37,7 +37,23 @@ public sealed record GainTotals(
     long EstimatedSavedTokens = 0,
     long Recalls = 0,
     long RetrievedCharacters = 0,
-    long EstimatedRetrievedTokens = 0);
+    long EstimatedRetrievedTokens = 0,
+    long EstimatedToolTokens = 0)
+{
+    /// <summary>Saved tokens less what retrievals read back and what the injected tool definition cost.</summary>
+    public long EstimatedNetTokens => EstimatedSavedTokens - EstimatedRetrievedTokens - EstimatedToolTokens;
+
+    /// <summary>Saved tokens as a percentage of the original, to one decimal; zero when there was no original.</summary>
+    public decimal SavedPercent => Percent(EstimatedSavedTokens);
+
+    /// <summary>Net tokens as a percentage of the original, to one decimal; zero when there was no original.</summary>
+    public decimal NetPercent => Percent(EstimatedNetTokens);
+
+    private decimal Percent(long tokens)
+    {
+        return EstimatedOriginalTokens == 0 ? 0m : Math.Round(tokens * 100m / EstimatedOriginalTokens, 1);
+    }
+}
 
 /// <summary>A UTC calendar period and its matching totals.</summary>
 public sealed record GainBucket(DateTimeOffset Start, GainTotals Totals);
