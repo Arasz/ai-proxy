@@ -36,21 +36,21 @@ public sealed class SystemProxyMarkerTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System));
     }
 
-    [Fact(Skip = TimingDependent.Reason)]
+    [Fact]
     public async Task Acquire_waits_for_a_holder_that_lets_go()
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
-        using var holder = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(300, TestContext.Current.CancellationToken);
-            holder.Dispose();
-        }, TestContext.Current.CancellationToken);
+        var holder = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        var clock = new TimerObservingTimeProvider();
 
-        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.FromSeconds(10), TimeProvider.System);
+        var acquiring = SystemProxyMarker.Acquire(directory.Path, TimeSpan.FromSeconds(10), clock);
+        await Task.WhenAny(clock.FirstTimerCreated, acquiring).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(acquiring.IsCompleted, "Acquire gave up instead of waiting for the holder");
+        holder.Dispose();
+        clock.Advance(TimeSpan.FromMilliseconds(100));
 
-        await release;
+        using var marker = await acquiring.WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(marker);
     }
 

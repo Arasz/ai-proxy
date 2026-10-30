@@ -326,7 +326,7 @@ public sealed class RestartTests : IDisposable
 
 
 
-    [Theory(Skip = "No proxy runtime leases public facing interface")]
+    [Theory]
     [InlineData("product")]
     [InlineData("protocol")]
     [InlineData("nonce")]

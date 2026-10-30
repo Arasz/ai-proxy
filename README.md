@@ -70,7 +70,7 @@ The forward proxy listens on `127.0.0.1:8080`. Its separate local API listens on
 curl http://127.0.0.1:17432/health
 ```
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 To replace the running instance gracefully, keep the same data directory and run:
 
 ```bash

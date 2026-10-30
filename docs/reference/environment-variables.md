@@ -123,7 +123,7 @@ give them `--endpoint` when you move it. See
 |---|---|
 | `PROXY__PORT` | The loopback port the proxy listener binds, and the port written into the system proxy setting. The default is `8080`. |
 
-<!-- trust:trustchecked evidence=src/AiProxy/Configuration/ProxySettings.cs:12 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Configuration/ProxySettings.cs:12#Load -->
 A whole number from 0 to 65535 is valid. Zero asks the operating system to choose a free port;
 the listener address and system proxy marker report that actual bound port. An empty value
 counts as unset and keeps `8080`; an invalid value stops startup with an error naming `Proxy:Port`.
@@ -131,7 +131,7 @@ counts as unset and keeps `8080`; an invalid value stops startup with an error n
 
 ## Runtime isolation and restart
 
-<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31 -->
+<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31#runtimeOptions -->
 | Variable | What it is |
 |---|---|
 | `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
@@ -151,7 +151,7 @@ PROXY__PORT=0 ASPNETCORE_URLS=http://127.0.0.1:0 ai-proxy
 ```
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 `ai-proxy --restart` selects the same data directory as normal startup. It requests a graceful
 stop through a same-user control pipe, waits for that exact process to exit, acquires ownership,
 and starts the replacement. The replacement remains in the foreground. It inherits the actual
@@ -166,14 +166,14 @@ absolute paths, but symlink aliases are not a supported way to select the same i
 
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProcessIdentity.cs:7 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProcessIdentity.cs:7#ProcessIdentity -->
 The owner also reports an exact process start token. Linux uses the kernel start ticks from
 `/proc/PID/stat`, because independently running .NET processes can convert boot time to slightly
 different UTC timestamps. macOS and Windows use the native process start time. The nonce and
 PID remain part of the identity check.
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40 -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between

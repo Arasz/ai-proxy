@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -20,10 +19,10 @@ namespace AiProxy.Tests.Integration;
 /// <summary>What a client sees when the upstream drops its connection partway through a response.</summary>
 public sealed class UpstreamDropTests
 {
-    private static readonly TimeSpan ClientTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ClientTimeout = TimeSpan.FromSeconds(5);
     private static readonly byte[] FirstEvent = "event: message_start\ndata: {\"type\":\"message_start\"}\n\n"u8.ToArray();
 
-    [Theory(Skip = TimingDependent.Reason)]
+    [Theory]
     [InlineData(true, false)]
     [InlineData(true, true)]
     [InlineData(false, false)]
@@ -51,15 +50,12 @@ public sealed class UpstreamDropTests
         // HttpClient.Timeout stops at the headers, so the body read needs its own deadline.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(ClientTimeout);
-        var elapsed = Stopwatch.StartNew();
         firstEventRead.SetResult();
         var failure = await Record.ExceptionAsync(() => body.CopyToAsync(Stream.Null, deadline.Token));
-        elapsed.Stop();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(FirstEvent, head);
         Assert.Equal(HttpRequestError.ResponseEnded, Assert.IsType<HttpIOException>(failure).HttpRequestError);
-        Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(5), $"the client waited {elapsed.Elapsed.TotalSeconds:F1} s for a stream the upstream had dropped");
         var warning = Assert.Single(logs.Entries, entry => entry.EventId == 1306);
         Assert.Equal((typeof(TitaniumProxyService).FullName, LogLevel.Warning), (warning.Category, warning.Level));
     }
