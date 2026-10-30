@@ -251,7 +251,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                            'EstimatedSavedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedSavedTokens')),0),
                                            'Recalls',COALESCE(SUM(json_extract(totals,'$.Recalls')),0),
                                            'RetrievedCharacters',COALESCE(SUM(json_extract(totals,'$.RetrievedCharacters')),0),
-                                           'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0))
+                                           'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0),
+                                           'EstimatedToolTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedToolTokens')),0))
                                        """;
 
         public const string Aggregate = $"""
