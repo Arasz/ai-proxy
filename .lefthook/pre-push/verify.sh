@@ -62,17 +62,7 @@ lane_docs_index() {
 }
 
 lane_workflows() {
-  # Every third-party action must be pinned to a full commit SHA: a tag is
-  # remote code re-fetched on every run, not a fixed dependency.
-  local bad
-  bad="$(grep -rhoE 'uses: [^@[:space:]]+@[^[:space:]]+' .github/workflows/ \
-    | grep -vE '@[0-9a-f]{40}$' || true)"
-  if [ -n "$bad" ]; then
-    echo "unpinned action reference(s):" >&2
-    echo "$bad" >&2
-    return 1
-  fi
-  echo "every action reference is pinned to a full SHA"
+  bash scripts/check-action-pins.sh
 }
 
 lane_required_checks() {

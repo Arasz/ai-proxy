@@ -201,10 +201,7 @@ jobs:
       - name: Evidence anchors
         run: python3 scripts/check-evidence-anchors.py
       - name: Actions pinned to a commit SHA
-        run: |
-          set -euo pipefail
-          bad="$(grep -rhoE 'uses: [^@[:space:]]+@[^[:space:]]+' .github/workflows/ | grep -vE '@[0-9a-f]{40}$' || true)"
-          if [ -n "$bad" ]; then echo "unpinned action reference(s):"; echo "$bad"; exit 1; fi
+        run: bash scripts/check-action-pins.sh
       - name: Changelog entry for VERSION
         run: |
           set -euo pipefail
