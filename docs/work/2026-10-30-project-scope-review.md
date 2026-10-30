@@ -1,7 +1,7 @@
 # Project-scope review of ai-proxy at 0.17.2
 
 Date: 2026-10-30. Base commit: `4f1363be94b9ce2a13689a27887a50feaf106349` (origin/main, VERSION 0.17.2).
-Every `path:line` below is against that commit. Status: integrated record, before the adversarial pass. Since written, main moved to `d6b79dd` (0.17.3), which changes only `Reduction.cs` and its tests (F1).
+Every `path:line` below is against that commit. Status: integrated record, audited. Since written, main moved to `d6b79dd` (0.17.3), which changes only `Reduction.cs` and its tests (F1).
 
 ## Executive summary
 
@@ -11,8 +11,8 @@ design. They filed 67 findings. After deduplication this record holds 29.
 
 One defect is live and damaging. `prose.dedupe` removes every repeated line anywhere in a Prose
 part, so source code read through a shell loses braces, namespaces and repeated statements before
-the model sees it (F1). It has fired on this machine's real traffic, and no test checks what the
-reducer keeps.
+the model sees it (F1). It fired on this machine's real traffic, and no test checked a non-adjacent
+repeat. It is fixed in 0.17.3.
 
 The rest are loaded, not fired, or slow-growing. `content.db` keeps every full request body with no
 retention on a default-on path (F3). An unknown first argument starts the proxy (F2). The
@@ -23,8 +23,12 @@ The core shape is sound. Core is BCL-only, references point the right way, crede
 sent to a different provider, the listener is hard-coded to loopback, every GitHub Action is
 SHA-pinned, and no SQL is built from input.
 
-Severity: 2 HIGH, 16 MEDIUM, 10 LOW, 1 NIT.
-Grade mix: 29 findings: 18 MEASURED, 9 READ, 2 INFERRED, 0 UNVERIFIED.
+Severity: 2 HIGH, 15 MEDIUM, 12 LOW, 1 NIT.
+Grade mix: 30 findings: 19 MEASURED, 9 READ, 2 INFERRED, 0 UNVERIFIED.
+
+An adversarial audit re-derived the record (see the audit section). Every core conclusion
+survived. It corrected four supporting numbers, most of them because the live databases mostly
+hold this review's own traffic, and it added F30.
 
 ## Scope & method
 
@@ -39,6 +43,7 @@ Phase 0 ground truth, measured in a pinned worktree at the base commit:
 | Test C# | 12,898 lines; test:prod about 1.03 |
 | Core package references | none |
 | Live install | ai-proxy 0.17.2; `~/.ai-proxy/` capture.db 986 MB, content.db 74 MB + WAL, gain.db 156 KB + WAL |
+| Live-data caveat | Snapshots. content.db holds 148 / 79 / 0 / 0 / 0 / 491 `content_request` rows on 10-25 to 10-30; gain.db holds requests on 10-26 (179), 10-27 (18) and 10-30 (1,776), and every recall is on 10-30. Most 10-30 rows are this review's own agents. |
 
 Hypothesis recorded before the lanes ran: a 1:1 test ratio and a 12.5k-line product did not
 suggest bloat, and the lanes found no dead production type (architecture lane scanned 300+ types).
@@ -58,7 +63,7 @@ F9, F10, F11, F13, F14 and parts of F12 and F21.
 
 ### F1 — `prose.dedupe` deletes every repeated line anywhere in a Prose part, corrupting code and logs sent to the model [MEASURED]
 **Severity:** HIGH. Loaded and fired. **Fixed in 0.17.3** (#89, `d6b79dd`): only an adjacent exact repeat is dropped; no marker, so the ordered-subsequence rule holds.
-**Evidence:** `src/AiProxy.Core/Content/Handlers/Reduction.cs:14-32` keeps one `HashSet` of trimmed lines for the whole part and drops any line already seen. Probe through the shipped handler set: two C# classes, 46 lines and 10 `{`, went out as 18 lines with one `{` and one `}`; class B's body was gone; nothing marked the removal. Live content.db: 1,569 chunks with path `prose.dedupe`, of which 434 originals contain both `{` and `}`; chunk `01a18c82…/1` is a 144-line C# `cat` sent as 90 lines. Tests reference `prose.dedupe` only as a routing path name (`TextCompressionHandlerTests.cs:155`); none asserts what the reducer keeps.
+**Evidence:** `src/AiProxy.Core/Content/Handlers/Reduction.cs:14-32` keeps one `HashSet` of trimmed lines for the whole part and drops any line already seen. Probe through the shipped handler set: two C# classes, 46 lines and 10 `{`, went out as 18 lines with one `{` and one `}`; class B's body was gone; nothing marked the removal. Live content.db: 1,569 chunk rows with path `prose.dedupe` (434 with both braces). Each turn resends history, so these are about 186 distinct originals, 140 of them changed, and about 109 code-like originals that lost a `}` (audit count). About 70% of the rows are this review's own traffic. Chunk `01a18c82…/1` is a 144-line C# `cat` sent as 90 lines. `TextCompressionHandlerTests.cs:76-80` asserts the kept text only for an adjacent repeat; no test covered a non-adjacent repeat or code.
 Unfenced code with no file path (Bash `cat`, `sed`, `git show`) classifies as Prose (`ContentDecompositor.cs` ~102-136). The model then edits from a wrong picture of the file, and build or test output loses repeated lines and their counts. The compression lane received brace-less C# from the live proxy during this review. Smallest fix: collapse only consecutive repeats into one line with a `[×N]` marker.
 *Sources: compression F1; orchestrator re-verification and live count.*
 
@@ -70,8 +75,8 @@ Unfenced code with no file path (Bash `cat`, `sed`, `git show`) classifies as Pr
 
 ### F3 — content.db keeps every full request body and its chunks with no retention, on a default-on path [MEASURED]
 **Severity:** HIGH. Fired: grows on every compressed request.
-**Evidence:** `src/AiProxy.Storage/SqliteContentStore.cs` contains no DELETE; only `ccr_original`/`ccr_thread` are evicted (`SqliteOriginalStore.cs:16,74`, 14 days). `ContentSchema.cs` stores `original` and `compressed` per request and `original_text`/`compressed_text` per chunk. Live read: 529 `content_request` rows, 139 MB of originals from 2026-10-25 to 2026-10-30, about 28 MB per day. `GET /content/{id}` serves originals (`Hosting/Api/ContentEndpoints.cs:17-30`). content.db is mode 0644 inside a 0700 directory.
-At that rate the file passes 10 GB in a year of daily use and keeps full prompts and file contents indefinitely. Fix: apply `OriginalEvictionWorker`'s cutoff to all four tables and create the file 0600 as `SqliteCaptureStore` does.
+**Evidence:** `src/AiProxy.Storage/SqliteContentStore.cs` contains no DELETE; only `ccr_original`/`ccr_thread` are evicted (`SqliteOriginalStore.cs:16,74`, 14 days). `ContentSchema.cs` stores `original` and `compressed` per request and `original_text`/`compressed_text` per chunk. Live read: originals of 14 MB on 10-25, 18 MB on 10-26, nothing 10-27 to 10-29, and 199 MB on 10-30 from one session of multi-agent review. The file grew from 74 MB to 302 MB during this review. `GET /content/{id}` serves originals (`Hosting/Api/ContentEndpoints.cs:17-30`). content.db is mode 0644 inside a 0700 directory.
+Growth tracks session intensity, not calendar days: each row is a full resend of the conversation. A heavy day costs about 200 MB, kept indefinitely with full prompts and file contents. Fix: apply `OriginalEvictionWorker`'s cutoff to all four tables and create the file 0600 as `SqliteCaptureStore` does.
 *Sources: csharp-sqlite F2, proxy-security F6.*
 
 ### F4 — capture.db has no retention, size cap or schema version and reached 986 MB in three days [MEASURED]
@@ -88,7 +93,7 @@ On Linux the start token is the only identity guard. Fix: remove the Skip.
 
 ### F6 — Timing skips hide the only coverage of upstream-drop termination and marker waiting [MEASURED]
 **Severity:** MEDIUM.
-**Evidence:** Mutant removing `e.TerminateSession()` (`TitaniumProxyService.cs:344`) survives 925/0; unskipped `UpstreamDropTests.cs:26` kills it through its exception-type assertion (line 61), not the Stopwatch assertion (line 62). Mutant making `SystemProxyMarker.Acquire` never wait survives; unskipped `SystemProxyMarkerTests.cs:39` and `TitaniumProxyServiceTests.cs:217` kill it, and use 300 ms against a 10 s budget with no duration assertion. `Acquire` already takes a `TimeProvider`.
+**Evidence:** Mutant removing `e.TerminateSession()` (`TitaniumProxyService.cs:345`) survives 925/0; unskipped `UpstreamDropTests.cs:26` kills it through its exception-type assertion (line 61), not the Stopwatch assertion (line 62). Mutant making `SystemProxyMarker.Acquire` never wait survives; unskipped `SystemProxyMarkerTests.cs:39` and `TitaniumProxyServiceTests.cs:217` kill it, and use 300 ms against a 10 s budget with no duration assertion. `Acquire` already takes a `TimeProvider`.
 Fix: delete the Stopwatch assertion and unskip; move the marker tests to `FakeTimeProvider`. `ContentDecompositorTests.cs:156` and `RequestCaptureTests.cs:555` skips are justified (real wall-clock assertions).
 *Sources: QA F2, F3, F7; proxy-security Healthy (UpstreamDrop passes 3/3 unskipped).*
 
@@ -146,10 +151,10 @@ No gate resolves evidence anchors, and the docs gates run only in the local pre-
 `PROXY__PROT=9090` or `PROXY__COMPRESSION__ENABLE=false` starts on defaults. Fix: bind with `ErrorOnUnknownConfiguration = true`.
 *Sources: surface F4.*
 
-### F16 — Live retrieval rate is about 36% of distinct previews, above ADR 0005's 25% gate [MEASURED]
-**Severity:** MEDIUM. Small sample: five days, one user; the denominator is previews, not reader calls.
-**Evidence:** 55 distinct `[proxy preview <id>` ids in `content_request.compressed`; 20 distinct recalled ids in `gain_event kind='recall'`. 28 recalls: 26 `lines`, 1 `pattern`, 1 `whole`; 72,265 estimated tokens retrieved; 2 `limit_reached`.
-Signals that the 1,500-token preview may be too thin. Needs the reader-call denominator before it justifies a change.
+### F16 — The retrieval rate on organic traffic is unmeasured; on this review's own traffic it is about 77% of the day's previews [MEASURED]
+**Severity:** LOW. Not organic usage; this cannot test ADR 0005's 25% gate.
+**Evidence:** Every `gain_event kind='recall'` is on 2026-10-30, first at 11:02, made by review agents. Gain recording began 10-26T09:30, after the last earlier preview (10-26T08:27), so previews before 10-30 cannot count in the denominator. About 20 of 26 previews from 10-30 were recalled. The lane's 36% (20 of 55) divided by previews whose recalls could not have been recorded.
+Review agents read whole files on purpose, so a high rate here says little about the preview size. Measure on a normal working week first.
 *Sources: compression F5.*
 
 ### F17 — The Log and ShellTranscript reducers never run on live traffic [MEASURED]
@@ -166,7 +171,7 @@ This is why the host references SQLite (and why F13's assembly check is blind). 
 
 ### F19 — Gain reports gross saved tokens and does not net retrievals or the injected tool [MEASURED]
 **Severity:** LOW. Honestly labelled (`net-billed-savings: false`, estimated at 2.89 chars/token, `GainReportBuilder.cs:6`).
-**Evidence:** gain.db: request rows `EstimatedSavedTokens` 416,163; CCR preview rows 419,595, so non-CCR rows net −3,432. Recalls 72,265 tokens, reported separately. 11 rows with rule `unchanged` differ by exactly +642 bytes, the length of `CcrRetrieval.Definition` plus a comma, about 222 estimated tokens against ADR 0005's 147. Headline seen by the design lane: 80,416 saved of 50,840,280, about 0.16%, with no percentage shown.
+**Evidence:** gain.db: request rows `EstimatedSavedTokens` 416,163; CCR preview rows 419,595, so non-CCR rows net −3,432. Recalls 72,265 tokens, reported separately. 11 rows with rule `unchanged` differ by exactly +642 bytes, the length of `CcrRetrieval.Definition` plus a comma, about 222 estimated tokens against ADR 0005's 147. The cumulative headline is diluted by 42.2M estimated tokens recorded on 10-26 with rule `unchanged` and 0 saved; on 10-30 traffic, 4.35M of 69.5M (about 6.3%). The design lane's 0.16% (80,416 of 50,840,280) was an observation of that diluted headline and was not re-measured. No percentage is shown.
 Fix: show saved − retrieved and a `ccr.tool` rule beside the gross figure; correct the ADR figure.
 *Sources: compression F6, F7; design F5.*
 
@@ -194,7 +199,7 @@ A test that covers code that does not ship lets the shipped copy drift.
 
 ### F24 — Project invariants are broken in a few dozen mechanical places [MEASURED]
 **Severity:** LOW.
-**Evidence:** 36 `ArgumentNullException.ThrowIfNull` on non-nullable parameters with `<Nullable>enable</Nullable>` (`Directory.Build.props:5`), for example `SqliteCaptureStore.cs:37`, `ContentRouter.cs:14-15`, `Reduction.cs:16`, `ContentEndpoints.cs`. Five classic constructors: `SqliteCaptureStore.cs:28`, `SqliteContentStore.cs:22`, `CompressionExecutor.cs:10`, `ContentRouter.cs:12`, `TitaniumSystemProxyRegistrar.cs:13`. Static classes with I/O: `ProxyLease`, `ProxyInstance`, `McpServerProcess`, `ProxyApplication`.
+**Evidence:** 35 `ArgumentNullException.ThrowIfNull` on non-nullable parameters (plus 2 on nullable fields used as state checks, `TitaniumProxyService.cs:168-169`) with `<Nullable>enable</Nullable>` (`Directory.Build.props:5`), for example `SqliteCaptureStore.cs:37`, `ContentRouter.cs:14-15`, `Reduction.cs:16`, `ContentEndpoints.cs`. Five classic constructors: `SqliteCaptureStore.cs:28`, `SqliteContentStore.cs:22`, `CompressionExecutor.cs:10`, `ContentRouter.cs:12`, `TitaniumSystemProxyRegistrar.cs:13`. Static classes with I/O: `ProxyLease`, `ProxyInstance`, `McpServerProcess`, `ProxyApplication`.
 *Sources: csharp-sqlite F7/F8, compression F8, architecture F10, surface F10.*
 
 ### F25 — `Hosting/` is a technical umbrella and `Integration/` a technical bucket [MEASURED]
@@ -221,6 +226,12 @@ A test that covers code that does not ship lets the shipped copy drift.
 **Severity:** NIT.
 **Evidence:** `ContentSchema.Open` does not dispose the connection if a pragma throws. `SqliteCaptureStore.cs` ~47 copies `Body.ToArray()` (up to 1.8 MB). Gain predicates `(@X IS NULL OR col = @X)` and no `(kind, at)` index; `gain_event` has no retention (423 rows live). `Cli/GainWatch.cs:13` blocks a pool thread, deliberately and bounded.
 *Sources: csharp-sqlite F6, F9, F10, F11.*
+
+### F30 — The JSON reducer throws `InvalidOperationException` on some tool results and records a failure on every resend [MEASURED]
+**Severity:** LOW. The pipeline still sends the original.
+**Evidence:** gain.db: 76 `kind='failure'` events, all stage `Json`, error `InvalidOperationException`, 2026-10-30 from 11:33. content.db: 33 chunk rows with path `compression.handler-failed`, all one distinct original, a JSON fixture holding the escape `x\ud800y` (a lone surrogate). `JsonCompressionHandler` catches only `JsonException`.
+The likely cause is the writer rejecting a lone surrogate (INFERRED). The cost is a lost reduction and a failure record on every turn that resends the part. Fix: catch the writer's exception and fall back to the line rule, as for a parse failure.
+*Source: adversarial audit M1; exception type from gain.db by the orchestrator.*
 
 ## Healthy
 
@@ -256,6 +267,35 @@ Recorded so a simplification pass does not remove them.
 - `content_request` row counts 348 / 426 / 529: same table read at different times and with `immutable=1` (WAL ignored) vs `mode=ro`. Not a disagreement about the defect.
 - Dead code: architecture found no dead type; proxy-security found a dead method pair (F23). Both are right: the scan was per type.
 
+## Adversarial audit
+
+An independent Opus reviewer was given this record and the sources, not the integration
+reasoning, and told to falsify it. It re-ran the baseline (925/0/7, reproduced), a probe through
+the real decompositor and handler for F1 (51 lines in, 24 out, class B's body gone), the F5
+unskip and mutation, and live queries. A hook blocked its git commands, so it worked by
+comparing trees with `diff -rq`. It changed nothing tracked and reverted every probe.
+
+Every core conclusion survived. Where it found errors, they were in supporting numbers. They all
+ran one way: live figures read as organic multi-day usage were mostly this review's own traffic
+on 10-30. One finding was added.
+
+| Finding | Verdict | What changed |
+|---|---|---|
+| F1 | Corrected | Row counts restated as distinct originals (about 186, about 109 code-like ones lost a `}`); about 70% of rows are review traffic. "No test asserts what it keeps" was false: an adjacent-repeat test existed. |
+| F3 | Corrected | "28 MB/day, 10 GB/year" withdrawn. Growth is per session (199 MB on one review day, none on three idle days). The defect is stronger than stated, the projection unsupported. |
+| F16 | Corrected, downgraded MEDIUM to LOW | 36% divided by previews whose recalls could not have been recorded. On 10-30 traffic it is about 77%, all review agents. Organic rate unmeasured. |
+| F19 | Softened | 0.16% is a headline diluted by 42.2M `unchanged` tokens on 10-26; about 6.3% on 10-30. Net-negative non-CCR rows reproduced. |
+| F6 | Corrected | Line 344 is 345. |
+| F24 | Corrected | 36 is 35 on non-nullable parameters plus 2 on nullable fields. |
+| F2, F4, F5, F7, F9-F15, F17, F18, F20, F22, F25 | Reproduced | F2, F10, F11, F13, F18, F20 by reading (starting the proxy was out of bounds). F9 confirmed live: 431 of 468 forwarded bodies on 10-30 contain `\u003C`, where only 72 originals contain `<`. |
+| F8, F21, F23, F26-F29 | Not re-run or partly checked | Needed the certificate, a running proxy or repeated full runs. F29's gain row count drifted (423 to 1,272+). |
+| Baseline, Healthy | Reproduced | Grep counts and file modes. |
+| F30 (new) | Added | The JSON reducer throws on a lone-surrogate fixture. |
+
+Method lesson: a review that reads its own machine's databases while running seven agents
+through the same proxy measures itself. Any live figure from a review window needs a per-day
+split before it is quoted.
+
 ## Still open
 
 - Whether a rewritten thread `previous_message_id` continuation succeeds upstream; capture stops 2026-10-26.
@@ -266,6 +306,9 @@ Recorded so a simplification pass does not remove them.
 - First-run start output, CA-untrusted client experience, Windows and Linux flows, Windows ACLs.
 - F10 poison row not reproduced by test; F28 flake cause not isolated.
 - CCR fallback path (ADR 0005 F13) not mutated.
+- Why gain.db recorded only `unchanged` (0 saved) on 10-26 while content.db shows compression that day until 08:27: possibly a recording gap that also skews F19.
+- Organic retrieval rate (F16): needs a normal working week of traffic outside a review.
+- Shared reducer callers (log, shell transcript, JSON/XML fallback) have no test of their own pinning the 0.17.3 rule; only the prose tests kill its mutants.
 
 ## Owner questions
 
