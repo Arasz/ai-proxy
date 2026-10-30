@@ -23,24 +23,13 @@ public static class ProviderHostCatalog
         ["eu.openrouter.ai"] = Dialect.OpenAi
     };
 
+    /// <summary>Every canonical provider host.</summary>
+    public static IReadOnlyCollection<string> Hosts { get; } = [.. Providers.Keys];
+
     /// <summary>Returns the provider dialect for a canonical host, or null for default pass-through.</summary>
     public static Dialect? Find(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         return Providers.TryGetValue(host.TrimEnd('.'), out var dialect) ? dialect : null;
-    }
-
-    /// <summary>Whether HTTPS for a host should be terminated for provider inspection.</summary>
-    public static bool ShouldInspectHttps(string host)
-    {
-        return !string.IsNullOrWhiteSpace(host) && Find(host) is not null;
-    }
-
-    /// <summary>Tests a CONNECT authority such as <c>api.openai.com:443</c>.</summary>
-    public static bool ShouldInspectHttpsAuthority(string authority)
-    {
-        return !string.IsNullOrWhiteSpace(authority) &&
-               Uri.TryCreate($"https://{authority}", UriKind.Absolute, out var address) &&
-               ShouldInspectHttps(address.Host);
     }
 }

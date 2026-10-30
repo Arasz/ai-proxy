@@ -861,6 +861,8 @@ public sealed class RequestCaptureTests : IDisposable
         {
             return string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? dialect : null;
         }
+
+        public IReadOnlyCollection<string> Hosts { get; } = [host];
     }
 
     private sealed class ThrowingCaptureStore : IRequestCaptureStore

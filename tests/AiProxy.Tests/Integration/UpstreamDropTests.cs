@@ -166,6 +166,8 @@ public sealed class UpstreamDropTests
         {
             return null;
         }
+
+        public IReadOnlyCollection<string> Hosts { get; } = [];
     }
 
     /// <summary>An upstream that answers with neither a length nor chunking, so its close ends the body.</summary>

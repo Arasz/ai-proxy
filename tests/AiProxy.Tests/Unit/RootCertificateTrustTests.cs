@@ -65,5 +65,10 @@ public sealed class RootCertificateTrustTests
             Calls.Add("trust");
             _state = trustTakes;
         }
+
+        public void Untrust(string thumbprint)
+        {
+            Calls.Add($"untrust {thumbprint}");
+        }
     }
 }

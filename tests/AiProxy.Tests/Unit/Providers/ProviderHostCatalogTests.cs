@@ -42,29 +42,4 @@ public sealed class ProviderHostCatalogTests
     {
         Assert.Null(ProviderHostCatalog.Find(host));
     }
-
-    [Theory]
-    [InlineData("api.openai.com", true)]
-    [InlineData("api.anthropic.com", true)]
-    [InlineData("generativelanguage.googleapis.com", true)]
-    [InlineData("openrouter.ai", true)]
-    [InlineData("mcp.example.test", false)]
-    [InlineData("api.openai.com.attacker.test", false)]
-    public void Https_is_decrypted_only_for_a_canonical_provider_host(string host, bool expected)
-    {
-        Assert.Equal(expected, ProviderHostCatalog.ShouldInspectHttps(host));
-    }
-
-    [Theory]
-    [InlineData("api.openai.com:443", true)]
-    [InlineData("api.anthropic.com:8443", true)]
-    [InlineData("eu.api.openai.com:443", true)]
-    [InlineData("eu.openrouter.ai:443", true)]
-    [InlineData("mcp.openrouter.ai:443", false)]
-    [InlineData("mcp.example.test:443", false)]
-    [InlineData("api.openai.com.attacker.test:443", false)]
-    public void A_connect_authority_decrypts_only_canonical_provider_hosts(string authority, bool expected)
-    {
-        Assert.Equal(expected, ProviderHostCatalog.ShouldInspectHttpsAuthority(authority));
-    }
 }
