@@ -21,7 +21,7 @@ public sealed class ContentStoreTests : IDisposable
     public ContentStoreTests()
     {
         var options = new ContentStoreOptions(_databasePath);
-        _queue = new ContentQueue(options);
+        _queue = new ContentQueue(options, TimeProvider.System);
         _store = new SqliteContentStore(options, _queue);
     }
 

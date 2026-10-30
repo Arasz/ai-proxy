@@ -64,16 +64,13 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
             cancellationToken)).ConfigureAwait(false);
     }
 
-    /// <summary>Deletes the originals and ledger rows older than <see cref="Retention" />, and says how many went.</summary>
+    /// <summary>Deletes every row of the content file that is older than <see cref="Retention" />, and says how many went.</summary>
+    /// <remarks>That is the originals, the ledger, the compressed requests with their chunks, and the dead letters.</remarks>
     public async Task<int> EvictAsync(CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(options.ResolvedDatabasePath);
         connection.Ensure();
-        var cutoff = (time.GetUtcNow() - Retention).ToString("O", CultureInfo.InvariantCulture);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM ccr_original WHERE created_at < @Cutoff; DELETE FROM ccr_thread WHERE created_at < @Cutoff;",
-            new { Cutoff = cutoff },
-            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return await connection.EvictOlderThanAsync(RetentionRules.Content, time.GetUtcNow() - Retention, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Keeps a ledger row that was just read past its retention; a busy database only costs the refresh.</summary>

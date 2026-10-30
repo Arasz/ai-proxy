@@ -13,6 +13,7 @@ using AiProxy.Hosting;
 using AiProxy.Hosting.Api;
 using AiProxy.Hosting.Proxy;
 using AiProxy.Storage;
+using CaptureEvictionWorker = AiProxy.Hosting.Integration.CaptureEvictionWorker;
 using ContentStoreWorker = AiProxy.Hosting.Integration.ContentStoreWorker;
 using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
 using RequestLoggingMiddleware = AiProxy.Hosting.Api.RequestLoggingMiddleware;
@@ -61,7 +62,20 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton(new GainStoreOptions(Path.Combine(options.DataDirectory, "gain.db")));
             services.AddSingleton<IGainStore, SqliteGainStore>();
 
-            services.AddSingleton<IRequestCaptureStore>(capturePath is null ? new NoRequestCapture() : new SqliteCaptureStore(capturePath));
+            if (capturePath is null)
+            {
+                services.AddSingleton<IRequestCaptureStore>(new NoRequestCapture());
+            }
+            else
+            {
+                services.AddSingleton(provider => new SqliteCaptureStore(
+                    capturePath,
+                    settings.CaptureMaxBytes ?? SqliteCaptureStore.DefaultMaxLiveBytes,
+                    provider.GetRequiredService<TimeProvider>(),
+                    provider.GetRequiredService<ILogger<SqliteCaptureStore>>()));
+                services.AddSingleton<IRequestCaptureStore>(provider => provider.GetRequiredService<SqliteCaptureStore>());
+                services.AddHostedService<CaptureEvictionWorker>();
+            }
 
             if (compression.Enabled)
             {

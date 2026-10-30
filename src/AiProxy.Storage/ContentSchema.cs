@@ -17,7 +17,7 @@ public static class ContentSchema
     public const int RequestCommandTimeoutSeconds = 1;
 
     /// <summary>The version of the schema this build writes.</summary>
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     /// <summary>Opens a connection with the settings the store needs.</summary>
     /// <param name="path">The path of the database file.</param>
@@ -40,6 +40,8 @@ public static class ContentSchema
             Cache = SqliteCacheMode.Default
         };
 
+        KeepUserOnly(path);
+
         var connection = new SqliteConnection(builder.ToString());
         connection.Open();
 
@@ -52,6 +54,32 @@ public static class ContentSchema
         }
 
         return connection;
+    }
+
+    /// <summary>Creates the file readable by the user only, and takes the other bits off one that is not.</summary>
+    /// <remarks>SQLite gives the journal and WAL files the mode of the database file.</remarks>
+    private static void KeepUserOnly(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const UnixFileMode UserOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        if (!File.Exists(path))
+        {
+            using var created = new FileStream(path, new FileStreamOptions
+            {
+                Mode = FileMode.OpenOrCreate,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.ReadWrite,
+                UnixCreateMode = UserOnly
+            });
+        }
+        else if (File.GetUnixFileMode(path) != UserOnly)
+        {
+            File.SetUnixFileMode(path, UserOnly);
+        }
     }
 
     /// <param name="connection">The connection to prepare.</param>
@@ -141,6 +169,19 @@ public static class ContentSchema
                                          );
 
                                          CREATE INDEX IF NOT EXISTS ccr_thread_created ON ccr_thread (created_at);
+
+                                         CREATE INDEX IF NOT EXISTS content_request_created ON content_request (created_at);
+
+                                         CREATE TABLE IF NOT EXISTS content_queue_dead (
+                                             job_id     INTEGER PRIMARY KEY,
+                                             request_id TEXT NOT NULL,
+                                             created_at TEXT NOT NULL,
+                                             failed_at  TEXT NOT NULL,
+                                             payload    TEXT NOT NULL,
+                                             error      TEXT NOT NULL
+                                         );
+
+                                         CREATE INDEX IF NOT EXISTS content_queue_dead_failed ON content_queue_dead (failed_at);
                                          """;
     }
 }

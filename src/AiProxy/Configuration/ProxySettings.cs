@@ -27,6 +27,10 @@ public sealed record ProxySettings
     /// <summary>Whether every provider request body is stored.</summary>
     public bool Capture { get; init; }
 
+    /// <summary>The live bytes of the capture file above which capture stops; unset keeps 1 GB.</summary>
+    [Range(1, long.MaxValue, ErrorMessage = "Proxy:CaptureMaxBytes must be a positive number of bytes.")]
+    public long? CaptureMaxBytes { get; init; }
+
     /// <summary>The compression stage settings.</summary>
     public CompressionSettings Compression { get; init; } = new();
 

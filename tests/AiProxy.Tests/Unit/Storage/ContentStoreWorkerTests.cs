@@ -23,7 +23,7 @@ public sealed class ContentStoreWorkerTests : IDisposable
     public ContentStoreWorkerTests()
     {
         _options = new ContentStoreOptions(_databasePath);
-        _queue = new ContentQueue(_options);
+        _queue = new ContentQueue(_options, _time);
         _store = new SqliteContentStore(_options, _queue);
     }
 

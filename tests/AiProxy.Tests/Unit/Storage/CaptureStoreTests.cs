@@ -5,6 +5,7 @@ using AiProxy.Core.Timing;
 using AiProxy.Storage;
 using Dapper;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiProxy.Tests.Unit.Storage;
 
@@ -18,7 +19,7 @@ public sealed class CaptureStoreTests : IDisposable
     public CaptureStoreTests()
     {
         _databasePath = Path.Combine(_directory, "data", SqliteCaptureStore.FileName);
-        _store = new SqliteCaptureStore(_databasePath);
+        _store = new SqliteCaptureStore(_databasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
     }
 
     public void Dispose()
@@ -177,7 +178,7 @@ public sealed class CaptureStoreTests : IDisposable
                                    """);
         }
 
-        var store = new SqliteCaptureStore(_databasePath);
+        var store = new SqliteCaptureStore(_databasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
         await store.StoreAsync(Capture("new"), TestContext.Current.CancellationToken);
         await store.StoreResponseAsync(
             new CapturedResponse("new", DateTimeOffset.UnixEpoch, 200, 2, 2, 5, new ResponseUsage(1, 2, null, null), null, []),
