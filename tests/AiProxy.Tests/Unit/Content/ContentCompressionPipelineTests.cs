@@ -218,7 +218,7 @@ public sealed class ContentCompressionPipelineTests
         Assert.True(result.Changed);
         var text = Encoding.UTF8.GetString(result.Body.ToArray());
         Assert.Contains("nothing to see", text, StringComparison.Ordinal);
-        Assert.Contains("""\u0022a\u0022:1,\u0022b\u0022:[1,2,3]""", text, StringComparison.Ordinal);
+        Assert.Contains("""\"a\":1,\"b\":[1,2,3]""", text, StringComparison.Ordinal);
         var failed = Assert.Single(Assert.Single(store.Records).Parts, part => part.Path == ContentCompressionPipeline.HandlerFailedPath);
         Assert.Equal(ContentType.Log, failed.Type);
         Assert.Equal(failed.OriginalText, failed.Text);
@@ -337,5 +337,23 @@ public sealed class ContentCompressionPipelineTests
         {
             return ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
         }
+    }
+
+    [Theory]
+    [InlineData("a < b")]
+    [InlineData("fish & chips")]
+    [InlineData("it's done")]
+    [InlineData("café é")]
+    public async Task Characters_JSON_does_not_require_escaping_are_forwarded_as_they_are(string fragment)
+    {
+        var (pipeline, _) = Build();
+        var body = Encoding.UTF8.GetBytes(Body(ToolOutput + $"\n2026-03-12 10:00:06 INFO worker=api-1 {fragment}"));
+
+        var result = await pipeline.CompressAsync(
+            new CompressionRequest(body, "application/json", Dialect.OpenAi),
+            CancellationToken.None);
+
+        Assert.True(result.Changed);
+        Assert.Contains(fragment, Encoding.UTF8.GetString(result.Body.ToArray()), StringComparison.Ordinal);
     }
 }

@@ -91,4 +91,22 @@ public sealed class JsonCompressionHandlerTests
             return Task.FromException(exception);
         }
     }
+
+    [Fact]
+    public async Task A_lone_surrogate_escape_falls_back_to_the_line_rule()
+    {
+        var result = await Handler.HandleAsync(Part("{\"a\":\"x\\ud800y\"}"), CancellationToken.None);
+
+        Assert.Equal("json.dedupe", result.Path);
+        Assert.Equal("{\"a\":\"x\\ud800y\"}", result.Text);
+    }
+
+    [Fact]
+    public async Task The_fallback_drops_only_a_line_that_repeats_the_line_before_it()
+    {
+        var result = await Handler.HandleAsync(Part("{ broken\n  \"a\": 1,\n  \"a\": 1,\n  \"b\": 2,\n  \"a\": 1,\n\"a\": 1,"), CancellationToken.None);
+
+        Assert.Equal("json.dedupe", result.Path);
+        Assert.Equal(["{ broken", "  \"a\": 1,", "  \"b\": 2,", "  \"a\": 1,", "\"a\": 1,"], result.Text.Split('\n'));
+    }
 }
