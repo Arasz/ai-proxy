@@ -164,6 +164,7 @@ public sealed class RestartTests : IDisposable
         await using var contender = Child.Start(directory.Path, false);
         await contender.ExitAsync();
         Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.Contains($"ai-proxy is already running (pid {owner.Process.Id}, port {new Uri(before.ProxyUrl).Port}). Use `ai-proxy --restart` to replace it.", contender.Output);
         Assert.Equal(before.Nonce, (await ReadInfoAsync(directory.Path)).Nonce);
         Assert.False(owner.Process.HasExited);
     }

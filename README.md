@@ -80,6 +80,9 @@ ai-proxy --restart
 The command waits for the owned process to exit, then runs the replacement in the foreground.
 It preserves the actual proxy and local API ports unless configuration explicitly overrides them.
 With no owner, it starts normally. Competing starts fail while a restart is in progress.
+A plain start while another instance runs exits with `ai-proxy is already running (pid N, port P). Use `ai-proxy --restart` to replace it.`
+An unknown command or a bare flag exits with code 2 and the usage text; `ai-proxy --version` prints the product version.
+Configuration options take `--key=value` or `--key value`; an unknown `Proxy:*` key stops startup and names the key.
 If an older installation holds the system proxy marker, stop it manually before restarting. The error includes its PID when the operating system identifies one process with the marker open.
 See [runtime isolation and restart limits](docs/reference/environment-variables.md#runtime-isolation-and-restart).
 <!-- /trust:trustchecked -->

@@ -13,9 +13,7 @@ internal static class ProxyInstance
         {
             string[] noRestartArgs = [.. arguments.Where(static argument => argument != ProxyCommand.RestartFlag)];
             var builder = WebApplication.CreateBuilder(noRestartArgs);
-            var settings = builder.Configuration.GetSection(ProxySettings.SectionName).Get<ProxySettings>() ?? new ProxySettings();
-
-            Validator.ValidateObject(settings, new ValidationContext(settings), true);
+            var settings = ProxySettings.Load(builder.Configuration);
 
             var proxyApiAddressResolver = new ProxyApiAddressResolver(builder.Configuration);
             var directory = EnsureDataDirectory(settings);

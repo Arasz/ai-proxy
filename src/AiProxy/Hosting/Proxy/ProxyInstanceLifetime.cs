@@ -29,6 +29,14 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
         {
             _runtimeLease = ProxyLease.AcquireRuntimeLease(DataDirectory);
         }
+        catch (IOException exception) when (!arguments.Contains(ProxyCommand.RestartFlag, StringComparer.Ordinal))
+        {
+            var owner = await ProxyControl.TryReadOwnerAsync(DataDirectory, cancellationToken);
+            var running = owner is null
+                ? "ai-proxy is already running"
+                : $"ai-proxy is already running (pid {owner.Pid}, port {new Uri(owner.ProxyUrl).Port})";
+            throw new IOException($"{running}. Use `ai-proxy {ProxyCommand.RestartFlag}` to replace it.", exception);
+        }
         catch (IOException) when (arguments.Contains(ProxyCommand.RestartFlag, StringComparer.Ordinal))
         {
             ProxyControl.ProxyInfo previous;

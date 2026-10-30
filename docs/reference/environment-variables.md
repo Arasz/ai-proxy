@@ -5,6 +5,10 @@ configuration sources. In the environment, a double underscore stands for the se
 `PROXY__COMPRESSION__ENABLED` is the setting `Proxy:Compression:Enabled`. A switch takes `true` or
 `false`; `on` is no longer accepted.
 
+An unknown `Proxy:*` key stops startup and the error names it, so a misspelled `PROXY__PROT` or
+`--Proxy:Prot=8090` can no longer pass silently. A stray `PROXY__*` environment variable that names
+no setting now stops the proxy too.
+
 Provider routing needs no environment configuration. ai-proxy recognizes these destination
 hosts and sends all other HTTP traffic through unchanged. HTTPS for other hosts remains an
 opaque tunnel.

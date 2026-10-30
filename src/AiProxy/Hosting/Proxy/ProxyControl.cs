@@ -96,6 +96,27 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
         }
     }
 
+    /// <summary>Reads the running owner's identity without stopping it; null when no compatible owner answers within the deadline.</summary>
+    internal static async Task<ProxyInfo?> TryReadOwnerAsync(string directory, CancellationToken token)
+    {
+        try
+        {
+            await using var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+            deadline.CancelAfter(ConnectionDeadline);
+            await pipe.ConnectAsync(deadline.Token);
+            await pipe.WriteAsync(new Request("info", DefaultProtocol), deadline.Token);
+            var owner = await pipe.ReadAsync<ProxyInfo>(deadline.Token);
+            EnsureProxyOwnerIsCompatible(owner);
+            return owner;
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or OperationCanceledException or TimeoutException)
+        {
+            token.ThrowIfCancellationRequested();
+            return null;
+        }
+    }
+
     internal static async Task<ProxyInfo> StopOwnedAsync(string directory, CancellationToken token, Action<ProxyInfo>? beforeStop = null)
     {
         await using var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
