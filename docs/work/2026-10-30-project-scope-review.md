@@ -1,7 +1,7 @@
 # Project-scope review of ai-proxy at 0.17.2
 
 Date: 2026-10-30. Base commit: `4f1363be94b9ce2a13689a27887a50feaf106349` (origin/main, VERSION 0.17.2).
-Every `path:line` below is against that commit. Status: integrated record, before the adversarial pass.
+Every `path:line` below is against that commit. Status: integrated record, before the adversarial pass. Since written, main moved to `d6b79dd` (0.17.3), which changes only `Reduction.cs` and its tests (F1).
 
 ## Executive summary
 
@@ -57,7 +57,7 @@ F9, F10, F11, F13, F14 and parts of F12 and F21.
 ## Findings
 
 ### F1 — `prose.dedupe` deletes every repeated line anywhere in a Prose part, corrupting code and logs sent to the model [MEASURED]
-**Severity:** HIGH. Loaded and fired.
+**Severity:** HIGH. Loaded and fired. **Fixed in 0.17.3** (#89, `d6b79dd`): only an adjacent exact repeat is dropped; no marker, so the ordered-subsequence rule holds.
 **Evidence:** `src/AiProxy.Core/Content/Handlers/Reduction.cs:14-32` keeps one `HashSet` of trimmed lines for the whole part and drops any line already seen. Probe through the shipped handler set: two C# classes, 46 lines and 10 `{`, went out as 18 lines with one `{` and one `}`; class B's body was gone; nothing marked the removal. Live content.db: 1,569 chunks with path `prose.dedupe`, of which 434 originals contain both `{` and `}`; chunk `01a18c82…/1` is a 144-line C# `cat` sent as 90 lines. Tests reference `prose.dedupe` only as a routing path name (`TextCompressionHandlerTests.cs:155`); none asserts what the reducer keeps.
 Unfenced code with no file path (Bash `cat`, `sed`, `git show`) classifies as Prose (`ContentDecompositor.cs` ~102-136). The model then edits from a wrong picture of the file, and build or test output loses repeated lines and their counts. The compression lane received brace-less C# from the live proxy during this review. Smallest fix: collapse only consecutive repeats into one line with a `[×N]` marker.
 *Sources: compression F1; orchestrator re-verification and live count.*
