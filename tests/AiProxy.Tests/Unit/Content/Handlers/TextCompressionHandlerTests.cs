@@ -81,6 +81,28 @@ public sealed class TextCompressionHandlerTests
     }
 
     [Fact]
+    public async Task A_line_repeated_further_down_in_prose_stays()
+    {
+        // Source code read through a shell arrives as prose, and its braces, returns and
+        // namespaces repeat. Dropping a repeat that is not adjacent rewrites the code.
+        var code = "public sealed class A\n{\n    public int X() { return 0; }\n}\n\npublic sealed class B\n{\n    public int X() { return 0; }\n}";
+
+        var result = await Prose.HandleAsync(Part(ContentType.Prose, code), CancellationToken.None);
+
+        Assert.Equal(code, result.Text);
+    }
+
+    [Fact]
+    public async Task Adjacent_lines_that_differ_only_in_indentation_both_stay()
+    {
+        var nested = "        }\n    }\n}";
+
+        var result = await Prose.HandleAsync(Part(ContentType.Prose, nested), CancellationToken.None);
+
+        Assert.Equal(nested, result.Text);
+    }
+
+    [Fact]
     public async Task A_directory_listing_comes_back_unchanged()
     {
         // The measurement says nothing compresses a listing without losing file names.
