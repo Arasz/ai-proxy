@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.17.3](0.17.3-adjacent-line-dedupe.md) | Drop only adjacent exact repeats, so source code read through a shell keeps its braces and repeated lines. | Pending |
 | [0.17.2](0.17.2-marker-owner-pid.md) | Report an unambiguous marker-holder PID when an older proxy needs a manual stop. | Pending |
 | [0.17.1](0.17.1-control-pipe-and-port-binding-fixes.md) | Disconnect server control pipe unconditionally to tolerate broken client pipes, normalize empty proxy port before binding, and set persist-credentials false in lifecycle CI. | [#86](https://github.com/Arasz/ai-proxy/pull/86) |
 | [0.17.0](0.17.0-owned-instance-restart.md) | Gracefully restart an owned instance, retain its ports, serialize competing starts, and configure isolated runtime state. | [#85](https://github.com/Arasz/ai-proxy/pull/85) |
