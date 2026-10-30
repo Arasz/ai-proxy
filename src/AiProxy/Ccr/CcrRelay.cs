@@ -24,10 +24,16 @@ namespace AiProxy.Ccr;
 /// <param name="retrievers">Makes a retriever for one answer.</param>
 /// <param name="options">The CCR numbers.</param>
 /// <param name="logger">Where each retrieval and failure is logged.</param>
-public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore gain, TimeProvider time) : IDisposable
+/// <param name="gain">Where each retrieval is recorded.</param>
+/// <param name="time">The clock of the headers deadline and of the recall records.</param>
+/// <param name="parser">Reads the arguments of each <c>proxy_retrieve</c> call.</param>
+public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore gain, TimeProvider time, CcrRetrievalParser parser) : IDisposable
 {
     /// <summary>The header naming the id the original request is kept under.</summary>
     public const string ContentIdHeader = "x-ai-proxy-content-id";
+
+    /// <summary>How long the upstream may take to send response headers.</summary>
+    public static readonly TimeSpan HeadersDeadline = TimeSpan.FromMinutes(10);
 
     private const string EventStream = "text/event-stream";
     private const string Chunked = "chunked";
@@ -45,6 +51,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private readonly HttpClient _http = new(new SocketsHttpHandler
     {
         UseProxy = false,
+        AllowAutoRedirect = false,
         AutomaticDecompression = DecompressionMethods.All,
         PooledConnectionLifetime = TimeSpan.FromMinutes(5)
     })
@@ -75,10 +82,18 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             exchange.Response = ResponseBuffer.For(EventStream, null);
         }
 
+        using var deadline = new CancellationTokenSource(HeadersDeadline, time);
         HttpResponseMessage response;
         try
         {
-            response = await _http.SendAsync(Message(request.RequestUri, headers, body), HttpCompletionOption.ResponseHeadersRead, CancellationToken.None);
+            response = await _http.SendAsync(Message(request.RequestUri, headers, body), HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            Log.UpstreamSilent(logger, request.RequestUri.Host);
+            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, Messages.UpstreamSilent).Data);
+            e.GenericResponse(error, HttpStatusCode.GatewayTimeout, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
+            return;
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
@@ -90,7 +105,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         var answer = ClientResponse(response, exchange.ContentId);
         var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
-        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time), exchange, headers, request.RequestUri, body, plan, originals);
+        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time, parser), exchange, headers, request.RequestUri, body, plan, originals);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), true);
     }
 
@@ -141,7 +156,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private sealed record ForwardedHeader(string Name, string Value);
 
     /// <summary>What a conversation reads and writes through.</summary>
-    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore Gain, TimeProvider Time);
+    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore Gain, TimeProvider Time, CcrRetrievalParser Parser);
 
     /// <summary>One client response across its upstream rounds.</summary>
     private sealed class Conversation(
@@ -325,41 +340,24 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             var answers = new Dictionary<string, CcrRetrieval>(StringComparer.Ordinal);
             foreach (var call in loop.Round.ToolCalls.Where(static call => call.IsRetrieval))
             {
-                var answer = loop.AtLimit ? CcrRetrieval.Limit() : relay.Retrievers().Answer(call.Input, await OriginalAsync(call.Input).ConfigureAwait(false), relay.Options);
+                var request = relay.Parser.Parse(call.Input, relay.Options).Request;
+                var answer = loop.AtLimit
+                    ? CcrRetrieval.Limit()
+                    : relay.Retrievers().Answer(call.Input, request is null ? null : await OriginalAsync(request.Id).ConfigureAwait(false), relay.Options);
                 answers[call.Id] = answer;
                 Log.Retrieved(relay.Logger, call.Input, answer.Error ?? Labels.Success, answer.Text.Length, loop.Answered);
-                await RecordRecallAsync(call.Input, answer);
+                await RecordRecallAsync(request, answer);
             }
 
             return answers;
         }
 
-        private async Task RecordRecallAsync(string input, CcrRetrieval answer)
+        private async Task RecordRecallAsync(CcrRetrievalRequest? request, CcrRetrieval answer)
         {
             try
             {
-                var id = "";
-                var mode = GainLabels.Unknown;
-                try
-                {
-                    using var arguments = JsonDocument.Parse(input);
-                    if (arguments.RootElement.ValueKind == JsonValueKind.Object)
-                    {
-                        if (arguments.RootElement.TryGetProperty("id", out var identifier) && identifier.ValueKind == JsonValueKind.String)
-                        {
-                            id = identifier.GetString() ?? "";
-                        }
-
-                        if (arguments.RootElement.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String)
-                        {
-                            mode = selected.GetString() ?? GainLabels.Unknown;
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                }
-
+                var id = request?.Id ?? "";
+                var mode = request?.Mode ?? GainLabels.Unknown;
                 await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
                         exchange.GainProject is null ? GainLabels.Unknown : GainLabels.Attributions.Caller, mode, answer.Text.Length,
                         GainReportBuilder.Tokens(answer.Text.Length), answer.Error), exchange.Dialect.ToString().ToLowerInvariant(),
@@ -371,26 +369,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             }
         }
 
-        private async Task<string?> OriginalAsync(string input)
+        private async Task<string?> OriginalAsync(string id)
         {
-            string? id;
-            try
-            {
-                using var arguments = JsonDocument.Parse(input);
-                id = arguments.RootElement.ValueKind == JsonValueKind.Object && arguments.RootElement.TryGetProperty(MessagesApi.Fields.Id, out var value) && value.ValueKind == JsonValueKind.String
-                    ? value.GetString()
-                    : null;
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
-
-            if (id is null)
-            {
-                return null;
-            }
-
             if (originals.TryGetValue(id, out var original))
             {
                 return original;
@@ -443,6 +423,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private static class Messages
     {
         public const string UpstreamUnreachable = "ai-proxy could not reach the provider.";
+        public const string UpstreamSilent = "The provider did not answer in time.";
         public const string ResponseLost = "ai-proxy lost the provider response.";
         public const string StreamCutOff = "The provider stream ended before the message did; retry the turn.";
         public const string LimitExceeded = "The model kept calling proxy_retrieve after its limit; retry the turn.";
@@ -460,6 +441,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
     private static partial class Log
     {
+        [LoggerMessage(EventId = 1610, Level = LogLevel.Warning, Message = "The provider {ProviderHost} sent no response headers before the deadline for a CCR request")]
+        public static partial void UpstreamSilent(ILogger logger, string providerHost);
+
         [LoggerMessage(EventId = 1609, Level = LogLevel.Warning, Message = "Recall metadata for request {RequestId} could not be recorded")]
         public static partial void RecallWriteFailed(ILogger logger, string requestId, Exception exception);
 
