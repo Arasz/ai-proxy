@@ -18,7 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.18.1](0.18.1-null-check-analyzer.md) | Build rejects `ThrowIfNull` on non-nullable values (APGEN003); primary constructors; injectable `ProxyLease`. | Pending |
+| [0.18.1](0.18.1-null-check-analyzer.md) | Build rejects `ThrowIfNull` on non-nullable values (APGEN003); primary constructors; injectable `ProxyLease`. | [#91](https://github.com/Arasz/ai-proxy/pull/91) |
 | [0.18.0](0.18.0-review-campaign.md) | Strict startup and `--version`; 14-day retention for content and capture with a capture ceiling; unescaped compressed output; relay headers deadline and no redirects; ADR 0008. | [#90](https://github.com/Arasz/ai-proxy/pull/90) |
 | [0.17.3](0.17.3-adjacent-line-dedupe.md) | Drop only adjacent exact repeats, so source code read through a shell keeps its braces and repeated lines. | Pending |
 | [0.17.2](0.17.2-marker-owner-pid.md) | Report an unambiguous marker-holder PID when an older proxy needs a manual stop. | Pending |
