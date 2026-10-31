@@ -19,6 +19,7 @@ public static class ContentTypeExtensions
                 ContentType.SourceCode => "code",
                 ContentType.DirectoryListing => "listing",
                 ContentType.ShellTranscript => "shell",
+                ContentType.BuildOutput => "build",
                 _ => "unknown"
             };
 

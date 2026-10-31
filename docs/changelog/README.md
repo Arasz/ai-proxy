@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.21.0](0.21.0-build-output-kind.md) | Build logs are their own content kind: every error and warning kept whole, repeats dropped, compiler command lines cut to a marked head; the verbose failure log goes from 60,672 to 5,367 characters. | Pending |
 | [0.19.2](0.19.2-compact-gain-numbers.md) | `ai-proxy gain` shows large counts as 261.2M or 523.8K and shortens the summary headers, so numbers no longer split across lines in narrow terminals. | [#98](https://github.com/Arasz/ai-proxy/pull/98) |
 | [0.19.1](0.19.1-root-rotation.md) | Adding a provider domain rotates the name-constrained root automatically: one trust prompt, then restart harness sessions. | [#96](https://github.com/Arasz/ai-proxy/pull/96) |
 | [0.19.0](0.19.0-name-constrained-root-ca.md) | Name-constrained `ai-proxy` root CA with a stored random password; one-time migration untrusts only the old root. Restart harness sessions after upgrading. | [#93](https://github.com/Arasz/ai-proxy/pull/93) |

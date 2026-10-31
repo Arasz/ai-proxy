@@ -161,6 +161,7 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton<ICompressionHandler, ProseCompressionHandler>();
             services.AddSingleton<ICompressionHandler, DirectoryListingCompressionHandler>();
             services.AddSingleton<ICompressionHandler, ShellTranscriptCompressionHandler>();
+            services.AddSingleton<ICompressionHandler, BuildOutputCompressionHandler>();
             services.AddSingleton<PassThroughCompressionHandler>();
             services.AddSingleton<IContentRouter>(provider => new ContentRouter(
                 provider.GetServices<ICompressionHandler>(),

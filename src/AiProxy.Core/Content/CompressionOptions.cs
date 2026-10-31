@@ -18,7 +18,8 @@ public sealed record CompressionOptions(IReadOnlyDictionary<ContentType, int> Mi
         [ContentType.SourceCode] = 500,
         [ContentType.Prose] = DefaultMinimum,
         [ContentType.DirectoryListing] = int.MaxValue,
-        [ContentType.ShellTranscript] = 200
+        [ContentType.ShellTranscript] = 200,
+        [ContentType.BuildOutput] = 200
     });
 
     /// <summary>The options that use one minimum for every kind.</summary>
