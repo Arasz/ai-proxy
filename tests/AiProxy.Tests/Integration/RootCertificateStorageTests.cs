@@ -238,15 +238,11 @@ public sealed class RootCertificateStorageTests
         RecordingTrust? rootTrust = null,
         RecordingLoggerProvider? log = null)
     {
-        var portListener = new TcpListener(IPAddress.Loopback, 0);
-        portListener.Start();
-        var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
-        portListener.Stop();
 
         ILoggerFactory loggerFactory = log is null ? NullLoggerFactory.Instance : new LoggerFactory([log]);
         return new TitaniumProxyService(
             null,
-            new ProxyRuntimeOptions(IPAddress.Loopback, port, false, trust, dataDirectory)
+            new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, trust, dataDirectory)
             {
                 RootCertificatePassword = password
             },
