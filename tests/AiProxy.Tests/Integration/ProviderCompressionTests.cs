@@ -148,4 +148,6 @@ internal sealed class LoopbackProviderHosts(Dialect dialect) : IProviderHosts
     {
         return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? dialect : null;
     }
+
+    public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 }

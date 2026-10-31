@@ -19,6 +19,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// <summary>The public root certificate as PEM, for clients that trust a CA file (such as <c>NODE_EXTRA_CA_CERTS</c>).</summary>
     public const string RootCertificatePemFileName = "root-ca.pem";
 
+    /// <summary>File name of the generated pfx password, used when <c>Proxy:RootCertificatePassword</c> is not set.</summary>
+    public const string RootCertificatePasswordFileName = "root-ca.password";
+
     private readonly ISystemProxyGuardLauncher _guardLauncher;
     private readonly ProviderRequestInspector _inspector;
     private readonly ILogger<TitaniumProxyService> _logger;
@@ -26,6 +29,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private readonly TimeSpan _markerWait;
     private readonly ProxyRuntimeOptions _options;
     private readonly IProviderHosts _providerHosts;
+    private readonly Func<CertificateManager, IRootCertificate> _rootCertificate;
 
     private readonly ISystemProxyRegistrar _systemProxyRegistrar;
     private readonly TimeProvider _timeProvider;
@@ -56,7 +60,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ILoggerFactory loggerFactory,
         TimeSpan markerWait,
         TimeProvider timeProvider,
-        Func<HttpWebClient, bool>? upstreamClosed = null)
+        Func<HttpWebClient, bool>? upstreamClosed = null,
+        Func<CertificateManager, IRootCertificate>? rootCertificate = null)
     {
         Server = new ProxyServer(false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
@@ -69,6 +74,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
         _timeProvider = timeProvider;
+        _rootCertificate = rootCertificate ?? (static certificates => new TitaniumRootCertificate(certificates));
     }
 
     /// <summary>The listener address used by system proxy settings and local clients.</summary>
@@ -113,7 +119,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         Server.AfterResponse += AfterResponseAsync;
         Server.EnableRequestTimingCapture = _inspector.CapturesResponses;
 
-        PrepareRootCertificate();
+        var root = PrepareRootCertificate();
         if (_options.ConfigureSystemProxy)
         {
             _marker = await SystemProxyMarker.Acquire( _options.DataDirectory, _markerWait, _timeProvider);
@@ -124,7 +130,17 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         Server.AddEndPoint(_endPoint);
         if (_options.TrustRootCertificate)
         {
-            new TitaniumRootCertificate(Server.CertificateManager).EnsureTrusted();
+            var trust = _rootCertificate(Server.CertificateManager);
+            trust.EnsureTrusted();
+            if (root.ReplacedThumbprint is { } old)
+            {
+                trust.Untrust(old);
+            }
+        }
+
+        if (root.ReplacedThumbprint is { } replaced)
+        {
+            Log.RootReplaced(_logger, replaced);
         }
 
         try
@@ -256,27 +272,21 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         }
     }
 
-    private void PrepareRootCertificate()
+    /// <summary>Loads or creates the constrained root and hands it to Titanium before Titanium can create or save one of its own.</summary>
+    /// <remarks>Titanium 7.0.26's <c>CertificateManager.CreateRootCertificate</c> returns at once when <c>RootCertificate</c> is set,
+    /// and <c>EnsureRootCertificate</c> calls it only while no root is set, so its overwrite-on-load-failure path never runs.
+    /// Titanium is never given the password: it has no reason to open the pfx. The path stays set so that no Titanium fallback
+    /// writes to its shared per-user directory.</remarks>
+    private RootCertificateLoad PrepareRootCertificate()
     {
         CreatePrivateDirectory(_options.DataDirectory);
+        var load = new RootCertificateFiles(_options.DataDirectory, _options.RootCertificatePassword, _providerHosts.Hosts, _timeProvider).Load();
         var certificates = Server.CertificateManager;
+        certificates.RootCertificate = load.Root;
         certificates.PfxFilePath = Path.GetFullPath(Path.Combine(_options.DataDirectory, RootCertificateFileName));
-        certificates.PfxPassword = _options.RootCertificatePassword ?? "";
         certificates.SaveFakeCertificates = false;
-        if (!certificates.CreateRootCertificate())
-        {
-            throw new InvalidOperationException($"The ai-proxy root certificate could not be loaded or created in {_options.DataDirectory}.");
-        }
-
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(certificates.PfxFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-
-        if (certificates.RootCertificate is { } root)
-        {
-            File.WriteAllText(Path.Combine(_options.DataDirectory, RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
-        }
+        certificates.DisableWildCardCertificates = true;
+        return load;
     }
 
     private static void CreatePrivateDirectory(string path)
@@ -379,5 +389,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         [LoggerMessage(EventId = 1307, Level = LogLevel.Error, Message = "Titanium's upstream connection state could not be read; a client whose upstream drops a chunked response now waits until its own timeout")]
         public static partial void UpstreamStateUnreadable(ILogger logger, Exception exception);
+
+        [LoggerMessage(EventId = 1308, Level = LogLevel.Warning, Message = "Replaced the ai-proxy root certificate {OldThumbprint} with a name-constrained one; restart every ai-proxy harness session so it reads the new root-ca.pem")]
+        public static partial void RootReplaced(ILogger logger, string oldThumbprint);
     }
 }

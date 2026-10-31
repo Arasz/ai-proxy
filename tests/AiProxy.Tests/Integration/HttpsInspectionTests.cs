@@ -77,7 +77,7 @@ public sealed class HttpsInspectionTests
     {
         using var withKey = X509CertificateLoader.LoadPkcs12FromFile(
             Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName),
-            null);
+            File.ReadAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName)));
         return X509CertificateLoader.LoadCertificate(withKey.RawData);
     }
 
