@@ -14,6 +14,7 @@ output are what the client sent, byte for byte.
 | a log | the lines that carry a signal, the failure, the timeout or the refusal, plus two lines at each end as anchors |
 | a JSON document | compacted, and every value in it survives, down to the scale of a number |
 | an XML document | compacted, and the whitespace that is content rather than formatting survives |
+| a build log (`dotnet build`, `msbuild`) | every error and warning kept whole, repeats dropped, and the compiler command lines cut to their first 200 characters with a marker saying how much was dropped |
 | a directory listing | left alone, because nothing compresses a listing without losing file names |
 | a mixed payload | split by structure, and each part reduced by the rule that fits it |
 

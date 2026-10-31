@@ -125,6 +125,7 @@ never has to know how the compression was decided.
 public enum ContentType
 {
     Unknown, Prose, Log, Json, Xml, Toml, Markdown, SourceCode, DirectoryListing, ShellTranscript,
+    BuildOutput,
 }
 
 public sealed record ContentPart(string RequestId, int ChunkId, ContentType Type, string Text);
@@ -166,6 +167,7 @@ imply. The path string is what the store keeps next to the content.
 | Prose, with a model | the extractive model, then the overlay, falling back to the rule path when no model is configured | `prose.model` / `prose.dedupe` | the model is 0.36 s a call and is a no-op on everything that is not prose |
 | DirectoryListing | nothing | `listing.pass-through` | measured, 1.0 size, and nothing compresses it without losing file names |
 | ShellTranscript | the log rule over the output part | `shell.log-rules` | the log rule, applied to the transcript |
+| BuildOutput | keep every MSBuild error and warning whole, drop exact repeats, cut a tool invocation (a line over 500 characters made mostly of paths and switches) to its first 200 plus a marker naming what was dropped; output it cannot shorten goes to the log rule | `build.msbuild` / `log.signal-filter` | measured, 60,672 to 5,367 characters on the verbose build failure |
 | Unknown | nothing | `unknown.pass-through` | the safe default |
 
 The must-keep overlay is the same code in every handler that reduces. It re-attaches the

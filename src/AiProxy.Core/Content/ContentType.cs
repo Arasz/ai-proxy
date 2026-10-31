@@ -31,5 +31,8 @@ public enum ContentType
     DirectoryListing,
 
     /// <summary>The output of a shell command.</summary>
-    ShellTranscript
+    ShellTranscript,
+
+    /// <summary>The output of an MSBuild or <c>dotnet build</c> run.</summary>
+    BuildOutput
 }

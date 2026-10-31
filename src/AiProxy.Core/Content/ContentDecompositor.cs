@@ -86,9 +86,9 @@ public sealed partial class ContentDecompositor : IDecompositor
                 var previous = merged[^1];
                 var gap = content.AsSpan(previous.Start + previous.Length, span.Start - previous.Start - previous.Length);
 
-                if (!previous.Structural && !span.Structural && previous.Type == span.Type && gap.IsWhiteSpace())
+                if (!previous.Structural && !span.Structural && gap.IsWhiteSpace() && MergedType(previous.Type, span.Type) is { } type)
                 {
-                    merged[^1] = previous with { Length = span.Start + span.Length - previous.Start, Structural = false };
+                    merged[^1] = previous with { Length = span.Start + span.Length - previous.Start, Type = type, Structural = false };
                     continue;
                 }
             }
@@ -97,6 +97,19 @@ public sealed partial class ContentDecompositor : IDecompositor
         }
 
         return merged;
+    }
+
+    // Build output takes the plain blocks beside it: the restore and progress lines carry no marker of their own.
+    private static ContentType? MergedType(ContentType previous, ContentType next)
+    {
+        if (previous == next)
+        {
+            return previous;
+        }
+
+        return (previous, next) is (ContentType.BuildOutput, ContentType.Prose) or (ContentType.Prose, ContentType.BuildOutput)
+            ? ContentType.BuildOutput
+            : null;
     }
 
     private static ContentType Classify(string text)
@@ -115,6 +128,11 @@ public sealed partial class ContentDecompositor : IDecompositor
         if (lines.Count(static line => LogLinePattern.IsMatch(line)) >= MinimumMatchingLines)
         {
             return ContentType.Log;
+        }
+
+        if (lines.Any(static line => MsBuildLines.IsDiagnostic(line) || MsBuildLines.IsSummary(line)))
+        {
+            return ContentType.BuildOutput;
         }
 
         if (lines.Count(static line => SearchResultPattern.IsMatch(line)) >= MinimumMatchingLines)

@@ -17,6 +17,7 @@ public sealed class ContentRoutingTableTests
         new ProseCompressionHandler(),
         new DirectoryListingCompressionHandler(),
         new ShellTranscriptCompressionHandler(),
+        new BuildOutputCompressionHandler(),
         new PassThroughCompressionHandler()
     ];
 
@@ -45,6 +46,7 @@ public sealed class ContentRoutingTableTests
             [ContentType.Prose] = typeof(ProseCompressionHandler),
             [ContentType.DirectoryListing] = typeof(DirectoryListingCompressionHandler),
             [ContentType.ShellTranscript] = typeof(ShellTranscriptCompressionHandler),
+            [ContentType.BuildOutput] = typeof(BuildOutputCompressionHandler),
             [ContentType.Unknown] = typeof(PassThroughCompressionHandler)
         };
 

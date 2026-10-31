@@ -177,6 +177,7 @@ public sealed class TextCompressionHandlerTests
             (ContentType.Prose, new ProseCompressionHandler(), "a line", "prose.dedupe"),
             (ContentType.Log, new LogCompressionHandler(), "2026-03-12 10:00:00 INFO a", "log.signal-filter"),
             (ContentType.ShellTranscript, new ShellTranscriptCompressionHandler(), "$ echo hi", "shell.log-rules"),
+            (ContentType.BuildOutput, new BuildOutputCompressionHandler(), "Build FAILED.\nBuild FAILED.", "build.msbuild"),
             (ContentType.DirectoryListing, new DirectoryListingCompressionHandler(), "a.cs", "listing.pass-through")
         };
 
