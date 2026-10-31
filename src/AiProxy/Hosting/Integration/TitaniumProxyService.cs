@@ -43,7 +43,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
         ILoggerFactory loggerFactory)
-        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3))
+        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3), TimeProvider.System)
     {
     }
 
@@ -55,8 +55,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ISystemProxyGuardLauncher guardLauncher,
         ILoggerFactory loggerFactory,
         TimeSpan markerWait,
-        Func<HttpWebClient, bool>? upstreamClosed = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider timeProvider,
+        Func<HttpWebClient, bool>? upstreamClosed = null)
     {
         Server = new ProxyServer(false);
         _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
@@ -68,7 +68,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
         _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
-        _timeProvider = timeProvider ?? TimeProvider.System;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>The listener address used by system proxy settings and local clients.</summary>

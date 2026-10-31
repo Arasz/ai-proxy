@@ -25,7 +25,6 @@ public sealed class LogCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(part);
 
         var unique = Reduction.DeduplicateLines(part.Text);
         var reduced = string.Join("\n", LineShapes.Collapse(unique, CarriesSignal));

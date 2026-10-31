@@ -20,7 +20,6 @@ public static class LiteralBlocks
     /// <param name="text">The document to scan.</param>
     public static IReadOnlyList<LiteralSegment> MarkdownFences(string text)
     {
-        ArgumentNullException.ThrowIfNull(text);
 
         var segments = new List<LiteralSegment>();
         var literal = false;
@@ -43,7 +42,6 @@ public static class LiteralBlocks
     /// <param name="text">The file to scan.</param>
     public static IReadOnlyList<LiteralSegment> TomlStrings(string text)
     {
-        ArgumentNullException.ThrowIfNull(text);
 
         var segments = new List<LiteralSegment>();
         var inString = false;
@@ -89,7 +87,6 @@ public static class LiteralBlocks
     /// <param name="text">The file to scan.</param>
     internal static IReadOnlyList<LiteralSegment> SourceCodeLiterals(string text)
     {
-        ArgumentNullException.ThrowIfNull(text);
 
         var segments = new List<LiteralSegment>();
         var inRawString = false;

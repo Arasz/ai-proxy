@@ -14,8 +14,6 @@ public static class LogRules
     /// <param name="carriesSignal">Whether a line carries a signal.</param>
     public static IReadOnlyList<string> Keep(string text, Func<string, bool> carriesSignal)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(carriesSignal);
 
         var lines = text.Split('\n');
         var kept = new List<string>(lines.Length);
