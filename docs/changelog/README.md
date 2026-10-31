@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.19.1](0.19.1-root-rotation.md) | Adding a provider domain rotates the name-constrained root automatically: one trust prompt, then restart harness sessions. | Pending |
 | [0.19.0](0.19.0-name-constrained-root-ca.md) | Name-constrained `ai-proxy` root CA with a stored random password; one-time migration untrusts only the old root. Restart harness sessions after upgrading. | [#93](https://github.com/Arasz/ai-proxy/pull/93) |
 | [0.18.1](0.18.1-null-check-analyzer.md) | Build rejects `ThrowIfNull` on non-nullable values (APGEN003); primary constructors; injectable `ProxyLease`. | [#91](https://github.com/Arasz/ai-proxy/pull/91) |
 | [0.18.0](0.18.0-review-campaign.md) | Strict startup and `--version`; 14-day retention for content and capture with a capture ceiling; unescaped compressed output; relay headers deadline and no redirects; ADR 0008. | [#90](https://github.com/Arasz/ai-proxy/pull/90) |
