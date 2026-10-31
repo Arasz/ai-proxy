@@ -329,7 +329,7 @@ and 3. Waves 3 and 4 shipped as separate releases, because 0.18.0 had merged bef
 
 - **WP9, 0.18.1 (#91).** The analyzer rule APGEN003 failed the build on 36 sites, and they are
   now deleted. Re-adding `ThrowIfNull(part)` in `ContentRouter.Route` fails the build again.
-- **WP5, 0.19.0 (#92), stacked on #91.** With the name-constraint extension removed, 9 of the 19
+- **WP5, 0.19.0 (#93; #92 was its stacked predecessor).** With the name-constraint extension removed, 9 of the 19
   certificate tests fail. ADR 0009 records the decision and what it supersedes in ADR 0003.
 
 Join defect at the WP5 × WP9 merge: WP9 made `TimeProvider` required, and WP5's new
