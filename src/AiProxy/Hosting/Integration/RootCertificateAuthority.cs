@@ -36,6 +36,30 @@ internal static class RootCertificateAuthority
         return root.Extensions[NameConstraintsOid] is not null;
     }
 
+    /// <summary>Whether a root carries the same permitted and excluded subtrees that <paramref name="hosts" /> would give a new root, in any order.</summary>
+    /// <remarks>Compares subtrees as sets, so a root encoded in another host order (0.19.0 wrote catalog order) is kept.</remarks>
+    public static bool PermitsExactly(X509Certificate2 root, IReadOnlyCollection<string> hosts)
+    {
+        return root.Extensions[NameConstraintsOid] is { } stored && Subtrees(stored.RawData).SetEquals(Subtrees(NameConstraints(hosts).RawData));
+    }
+
+    private static HashSet<string> Subtrees(byte[] nameConstraints)
+    {
+        var outer = new AsnReader(nameConstraints, AsnEncodingRules.DER).ReadSequence();
+        var subtrees = new HashSet<string>(StringComparer.Ordinal);
+        while (outer.HasData)
+        {
+            var list = outer.PeekTag();
+            var entries = outer.ReadSequence(list);
+            while (entries.HasData)
+            {
+                subtrees.Add($"{list.TagValue}:{Convert.ToHexString(entries.ReadEncodedValue().Span)}");
+            }
+        }
+
+        return subtrees;
+    }
+
     /// <summary>Encodes RFC 5280 4.2.1.10 NameConstraints: permitted DNS domains and IP addresses the hosts name, excluded the rest of each address family.</summary>
     /// <remarks>An address family no host names is excluded whole (0.0.0.0/0 or ::/0); one that a host names permits that address alone.</remarks>
     private static X509Extension NameConstraints(IReadOnlyCollection<string> hosts)

@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using AiProxy.Ccr;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
+using AiProxy.Core.Providers;
 using AiProxy.Hosting;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Integration;
@@ -103,6 +104,60 @@ public sealed class RootCertificateStorageTests
         await StartAndStopAsync(directory.Path, null, log);
 
         Assert.Equal(password, StoredPassword(directory.Path));
+        using var second = LoadRoot(directory.Path, password);
+        Assert.Equal(first, second.Thumbprint);
+        Assert.DoesNotContain(log.Entries, entry => entry.EventId == 1308);
+    }
+
+    [Fact]
+    public async Task A_constrained_root_made_for_fewer_hosts_is_rotated_when_a_host_is_added()
+    {
+        using var directory = new TemporaryDirectory();
+        await StartAndStopAsync(directory.Path, null, hosts: ["api.alpha.test"]);
+        var password = StoredPassword(directory.Path);
+        string oldThumbprint;
+        using (var before = LoadRoot(directory.Path, password))
+        {
+            oldThumbprint = before.Thumbprint;
+        }
+
+        var trust = new RecordingTrust();
+        var log = new RecordingLoggerProvider();
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using var service = CreateService(directory.Path, null, true, trust, log, ["api.alpha.test", "api.beta.test"]);
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+
+        Assert.Equal(password, StoredPassword(directory.Path));
+        using var after = LoadRoot(directory.Path, password);
+        Assert.NotEqual(oldThumbprint, after.Thumbprint);
+        Assert.True(RootCertificateAuthority.PermitsExactly(after, ["api.alpha.test", "api.beta.test"]));
+        Assert.Equal(["load", "check", "trust", "check", $"untrust {oldThumbprint}"], trust.Calls);
+        Assert.Single(log.Entries, entry => entry.EventId == 1308);
+    }
+
+    [Fact]
+    public async Task The_same_hosts_in_another_order_keep_the_root_and_untrust_nothing()
+    {
+        using var directory = new TemporaryDirectory();
+        await StartAndStopAsync(directory.Path, null, hosts: ["api.alpha.test", "api.beta.test", "10.0.0.2", "10.0.0.1"]);
+        var password = StoredPassword(directory.Path);
+        string first;
+        using (var root = LoadRoot(directory.Path, password))
+        {
+            first = root.Thumbprint;
+        }
+
+        var log = new RecordingLoggerProvider();
+        await StartAndStopAsync(directory.Path, null, log, ["10.0.0.1", "api.beta.test", "10.0.0.2", "api.alpha.test"]);
+
         using var second = LoadRoot(directory.Path, password);
         Assert.Equal(first, second.Thumbprint);
         Assert.DoesNotContain(log.Entries, entry => entry.EventId == 1308);
@@ -224,9 +279,9 @@ public sealed class RootCertificateStorageTests
         return old.Thumbprint;
     }
 
-    private static async Task StartAndStopAsync(string dataDirectory, string? password, RecordingLoggerProvider? log = null)
+    private static async Task StartAndStopAsync(string dataDirectory, string? password, RecordingLoggerProvider? log = null, string[]? hosts = null)
     {
-        await using var service = CreateService(dataDirectory, password, false, log: log);
+        await using var service = CreateService(dataDirectory, password, false, log: log, hosts: hosts);
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
     }
@@ -236,9 +291,10 @@ public sealed class RootCertificateStorageTests
         string? password,
         bool trust,
         RecordingTrust? rootTrust = null,
-        RecordingLoggerProvider? log = null)
+        RecordingLoggerProvider? log = null,
+        string[]? hosts = null)
     {
-
+        IProviderHosts providerHosts = hosts is null ? new CanonicalProviderHosts() : new FixedHosts(hosts);
         ILoggerFactory loggerFactory = log is null ? NullLoggerFactory.Instance : new LoggerFactory([log]);
         return new TitaniumProxyService(
             null,
@@ -247,12 +303,19 @@ public sealed class RootCertificateStorageTests
                 RootCertificatePassword = password
             },
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
-            new CanonicalProviderHosts(),
+            providerHosts,
             new ProcessSystemProxyGuardLauncher(),
             loggerFactory,
             TimeSpan.FromSeconds(3),
             TimeProvider.System,
             rootCertificate: _ => rootTrust ?? throw new InvalidOperationException("This test never trusts a certificate."));
+    }
+
+    private sealed class FixedHosts(string[] hosts) : IProviderHosts
+    {
+        public IReadOnlyCollection<string> Hosts => hosts;
+
+        public Dialect? Find(string host) => null;
     }
 
     /// <summary>Records trust calls instead of touching a certificate store.</summary>

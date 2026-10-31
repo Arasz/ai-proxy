@@ -21,7 +21,7 @@ internal sealed class RootCertificateFiles(string dataDirectory, string? configu
 
     private string PasswordPath => Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName);
 
-    /// <summary>Keeps a constrained root already on disk; otherwise creates one, replacing an old root only once its thumbprint is read.</summary>
+    /// <summary>Keeps a root already on disk that is constrained to exactly <c>hosts</c>; otherwise creates one, replacing an old root only once its thumbprint is read.</summary>
     /// <exception cref="InvalidOperationException">The pfx on disk opens with no password ai-proxy knows; it is left untouched.</exception>
     public RootCertificateLoad Load()
     {
@@ -31,7 +31,7 @@ internal sealed class RootCertificateFiles(string dataDirectory, string? configu
         {
             var bytes = File.ReadAllBytes(PfxPath);
             var current = TryOpen(bytes, password);
-            if (current is not null && RootCertificateAuthority.IsConstrained(current) && current.NotAfter > time.GetLocalNow())
+            if (current is not null && RootCertificateAuthority.IsConstrained(current) && RootCertificateAuthority.PermitsExactly(current, hosts) && current.NotAfter > time.GetLocalNow())
             {
                 WritePem(current);
                 return new RootCertificateLoad(current, null);

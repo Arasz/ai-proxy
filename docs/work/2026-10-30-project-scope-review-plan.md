@@ -352,9 +352,9 @@ Deviations from the plan:
   working week, excluding review traffic by date.
 - WP5 on Linux: the chain test's `HasNotPermittedNameConstraint` expectation runs first in CI.
   NSS databases are not cleaned of the old root.
-- WP5: no macOS CI job runs the certificate tests. Proposed: an OS matrix in `build.yml` for those
-  classes.
-- WP5: a constrained root is not rotated when a new provider domain is added.
+- WP5 macOS CI: resolved 2026-10-31. The `certificates-macos` job runs the certificate classes.
+- WP5 root rotation: resolved 2026-10-31 (0.19.1). A root whose constraint subtrees differ from the
+  current hosts' is replaced through the migration path.
 - Test port race: resolved 2026-10-31. The integration helpers bind port 0 and read the bound port
   from `TitaniumProxyService.Address`.
 - Titanium `ConnectionTimeOutSeconds` and long silent generations: not planned until measured.
