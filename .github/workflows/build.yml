@@ -186,6 +186,37 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo
 
+  certificates-macos:
+    # The root CA's name-constraint tests on the macOS chain engine. macOS
+    # reports a refused name with a different flag from Linux (OpenSSL), so the
+    # Linux run in build-fast cannot speak for it. Only the certificate classes
+    # run here, to keep macOS runner time small. Not a required check.
+    needs: changes
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      MSBUILDDISABLENODEREUSE: 1
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: true
+    steps:
+      - name: Skip (doc-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changed; skipping the certificate tests."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.code == 'true'
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        if: needs.changes.outputs.code == 'true'
+        with:
+          global-json-file: global.json
+      - name: Certificate tests
+        if: needs.changes.outputs.code == 'true'
+        run: >-
+          mkdir -p .nupkg-local &&
+          dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --
+          --filter-class "*RootCertificateAuthorityTests"
+          --filter-class "*RootCertificateStorageTests"
+          --filter-class "*HttpsInspectionTests"
+
   build-bdd:
     # The documentation and release-contract lane. It keeps its name because it
     # is a required check, and it runs on every change, docs-only included,
