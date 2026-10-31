@@ -12,7 +12,7 @@ public sealed class BuildOutputCompressionHandler : ICompressionHandler
     /// <summary>How many characters of a shortened line survive.</summary>
     public const int HeadLength = 200;
 
-    /// <summary>The length above which a line that is not a diagnostic is shortened.</summary>
+    /// <summary>The length above which a tool invocation is shortened.</summary>
     public const int LongLine = 500;
 
     private static readonly LogCompressionHandler Fallback = new();
@@ -26,18 +26,14 @@ public sealed class BuildOutputCompressionHandler : ICompressionHandler
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
     {
-        var lines = part.Text.Split('\n').Select(static line => MsBuildLines.IsDiagnostic(line) || line.Length <= LongLine ? line : Shorten(line)).ToArray();
+        var lines = part.Text.Split('\n').Select(static line => IsInvocation(line) ? Shorten(line) : line).ToArray();
         var reduced = string.Join("\n", DropRepeats(lines));
         if (reduced.Length == part.Text.Length)
         {
             return Fallback.HandleAsync(part, cancellationToken);
         }
 
-        // The overlay guards the repeat drop only: a shortened tail is dropped on purpose, named by its marker,
-        // and kept by retrieval, and re-attaching its paths would undo the shortening.
-        var overlaid = MustKeepOverlay.Apply(reduced, string.Join("\n", lines));
-
-        return ValueTask.FromResult(new HandledContent(overlaid.Text, HandlerPath));
+        return ValueTask.FromResult(new HandledContent(reduced, HandlerPath));
     }
 
     private static List<string> DropRepeats(string[] lines)
@@ -54,6 +50,18 @@ public sealed class BuildOutputCompressionHandler : ICompressionHandler
         }
 
         return kept;
+    }
+
+    // A compiler command line or response-file dump: long, and mostly paths and switches rather than words.
+    private static bool IsInvocation(string line)
+    {
+        if (line.Length <= LongLine || MsBuildLines.IsDiagnostic(line))
+        {
+            return false;
+        }
+
+        var tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return tokens.Count(static token => token.StartsWith('-') || token.Contains('/') || token.Contains('\\')) * 2 >= tokens.Length;
     }
 
     private static string Shorten(string line)

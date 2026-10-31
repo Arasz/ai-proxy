@@ -85,6 +85,17 @@ public sealed class BuildOutputCompressionHandlerTests
     }
 
     [Fact]
+    public async Task A_long_line_of_prose_beside_build_output_is_kept_whole()
+    {
+        var paragraph = string.Join(" ", Enumerable.Repeat("The release notes explain why the build was changed and what the team decided about the warnings.", 8));
+        var text = string.Join("\n", paragraph, "/src/App/Program.cs(3,5): error CS0029: Cannot implicitly convert type 'string' to 'int' [/src/App/App.csproj]", "Build FAILED.");
+
+        var result = await Handler.HandleAsync(Part(text), CancellationToken.None);
+
+        Assert.Contains(paragraph, result.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_exact_repeat_of_a_diagnostic_is_kept_once()
     {
         var text = Payload("dotnet_build_failure");
