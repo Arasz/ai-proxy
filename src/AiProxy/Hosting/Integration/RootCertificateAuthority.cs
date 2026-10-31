@@ -61,6 +61,14 @@ internal static class RootCertificateAuthority
                 foreach (var address in addresses)
                 {
                     WriteAddressSubtree(writer, address.GetAddressBytes(), true);
+                    if (address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        // OpenSSL checks a hostname-like subject CN as a DNS name when a leaf has no DNS SAN.
+                        using (writer.PushSequence())
+                        {
+                            writer.WriteCharacterString(UniversalTagNumber.IA5String, address.ToString(), new Asn1Tag(TagClass.ContextSpecific, 2));
+                        }
+                    }
                 }
             }
 

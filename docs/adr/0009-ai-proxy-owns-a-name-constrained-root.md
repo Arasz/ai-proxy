@@ -37,8 +37,12 @@ loading the pfx failed, Titanium silently made a new root and saved it over the 
 
 - Measured on macOS: a leaf for a provider host chain-builds; a leaf for `evil.example` or for an
   IP address fails. macOS reports `InvalidNameConstraints` for both.
-- Not measured: the Linux chain engine. The test expects `HasNotPermittedNameConstraint` there,
-  and CI on `ubuntu-latest` is the first run. Windows is not tested.
+- Measured on Linux in CI (OpenSSL): a leaf for a non-provider host reports
+  `HasNotPermittedNameConstraint`, and a leaf for an IP address reports `HasExcludedNameConstraint`.
+  OpenSSL also checks a hostname-like subject CN as a DNS name when a leaf has no DNS SAN.
+  An IPv4 address that the host source names is therefore also permitted as a DNS name.
+  Production names no addresses.
+- Not measured: Windows.
 - The migration was tested against a recording trust fake. No test touched a real store, so the
   real keychain prompt and `security delete-certificate` run first on the owner's machine.
 

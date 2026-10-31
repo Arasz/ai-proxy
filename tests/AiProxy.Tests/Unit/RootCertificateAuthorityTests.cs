@@ -71,7 +71,7 @@ public sealed class RootCertificateAuthorityTests
         var built = chain.Build(leaf);
 
         Assert.False(built);
-        Assert.Contains(ExpectedNameConstraintFailure(), chain.ChainStatus.Select(status => status.Status));
+        Assert.Contains(ExpectedExcludedAddressFailure(), chain.ChainStatus.Select(status => status.Status));
     }
 
     [Fact]
@@ -111,6 +111,14 @@ public sealed class RootCertificateAuthorityTests
         using var titanium = request.CreateSelfSigned(Now.AddDays(-1), Now.AddYears(1));
 
         Assert.False(RootCertificateAuthority.IsConstrained(titanium));
+    }
+
+    /// <summary>The flag a chain reports for an address inside an excluded subtree.</summary>
+    /// <remarks>Measured: Linux (OpenSSL) reports <see cref="X509ChainStatusFlags.HasExcludedNameConstraint" />, macOS
+    /// <see cref="X509ChainStatusFlags.InvalidNameConstraints" />.</remarks>
+    private static X509ChainStatusFlags ExpectedExcludedAddressFailure()
+    {
+        return OperatingSystem.IsMacOS() ? X509ChainStatusFlags.InvalidNameConstraints : X509ChainStatusFlags.HasExcludedNameConstraint;
     }
 
     /// <summary>The flag each chain engine reports for a name outside the constraint.</summary>
