@@ -23,7 +23,7 @@ public sealed class GainViewTests
 
         Assert.Equal(0, exit);
         var output = fixture.Console.Output;
-        Assert.Contains("Net tokens", output, StringComparison.Ordinal);
+        Assert.Contains("(tokens)", output, StringComparison.Ordinal);
         Assert.Contains("Saved %", output, StringComparison.Ordinal);
         Assert.Contains("Net %", output, StringComparison.Ordinal);
         Assert.Contains("650", output, StringComparison.Ordinal);
@@ -74,22 +74,55 @@ public sealed class GainViewTests
         Assert.Contains("-3.0%", fixture.Console.Output, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Table_numbers_carry_thousands_separators()
+    [Theory]
+    [InlineData(0, "0")]
+    [InlineData(9_999, "9,999")]
+    [InlineData(10_000, "10.0K")]
+    [InlineData(523_811, "523.8K")]
+    [InlineData(999_949, "999.9K")]
+    [InlineData(999_950, "1.0M")]
+    [InlineData(261_175_524, "261.2M")]
+    [InlineData(999_950_000, "1.0B")]
+    [InlineData(2_500_000_000, "2.5B")]
+    [InlineData(-30, "-30")]
+    [InlineData(-12_345, "-12.3K")]
+    public void Table_numbers_are_exact_below_ten_thousand_and_compact_above(long value, string expected)
+    {
+        Assert.Equal(expected, GainView.Compact(value));
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(100)]
+    public async Task The_summary_keeps_every_number_on_one_line_at_common_terminal_widths(int width)
     {
         using var fixture = new GainCommandTests.Fixture();
-        fixture.Console.Profile.Width = 240;
-        fixture.Handler.Report = fixture.Handler.Report with
-        {
-            Summary = new GainTotals(12_345, EstimatedOriginalTokens: 9_876_543, EstimatedSavedTokens: 1_234_567)
-        };
+        fixture.Console.Profile.Width = width;
+        fixture.Handler.Report = fixture.Handler.Report with { Summary = LiveSummary };
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
-        Assert.Contains("1,234,567", fixture.Console.Output, StringComparison.Ordinal);
-        Assert.Contains("9,876,543", fixture.Console.Output, StringComparison.Ordinal);
-        Assert.Contains("12,345", fixture.Console.Output, StringComparison.Ordinal);
+        var output = fixture.Console.Output;
+        foreach (var value in new[] { "4,593", "261.2M", "250.4M", "10.8M", "523.8K", "24.0K", "10.2M", "4.1%", "3.9%" })
+        {
+            Assert.Contains(value, output, StringComparison.Ordinal);
+        }
     }
+
+    [Fact]
+    public async Task The_summary_fits_a_hundred_column_terminal_with_one_line_per_row()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 100;
+        fixture.Handler.Report = fixture.Handler.Report with { Summary = LiveSummary };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        var table = fixture.Console.Output.Split('\n').SkipWhile(line => !line.StartsWith('╭')).TakeWhile(line => !line.StartsWith("Method", StringComparison.Ordinal)).Where(line => line.Length > 0).ToList();
+        Assert.Equal(5, table.Count);
+    }
+
+    private static readonly GainTotals LiveSummary = new(4_593, EstimatedOriginalTokens: 261_175_524, EstimatedForwardedTokens: 250_443_158, EstimatedSavedTokens: 10_756_350, EstimatedRetrievedTokens: 523_811, EstimatedToolTokens: 23_976);
 
     [Fact]
     public async Task Csv_and_json_keep_raw_numbers_and_add_the_net_columns()

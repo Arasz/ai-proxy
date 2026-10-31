@@ -29,14 +29,16 @@ figure and what it cost:
 
 | Column | Meaning |
 | --- | --- |
-| Saved tokens | Original minus forwarded, without the injected `proxy_retrieve` definition. |
-| Retrieved tokens | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
-| Tool tokens | The `proxy_retrieve` definition the proxy added to requests that carry tools. |
-| Net tokens | Saved minus retrieved minus tool. Negative when the cost is larger than the saving. |
+| Saved | Original minus forwarded, without the injected `proxy_retrieve` definition. |
+| Retrieved | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
+| Tool | The `proxy_retrieve` definition the proxy added to requests that carry tools. |
+| Net | Saved minus retrieved minus tool. Negative when the cost is larger than the saving. |
 | Saved % and Net % | Saved and net as a share of the original tokens, to one decimal. |
 
-Numbers in the tables carry thousands separators; `--format csv` and `--format json` keep raw
-values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
+The summary headers drop the word "tokens"; the bucket and attribution tables still spell it out.
+Table numbers under 10,000 are exact, with thousands separators. Larger ones show one decimal of K,
+M or B (`523.8K`, `261.2M`), so the summary fits a 100-column terminal and no number splits across
+lines. `--format csv` and `--format json` keep exact raw values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
 `netPercent`; the CSV adds `estimated_tool_tokens` and `estimated_net_tokens` as its last two columns.
 
 A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
