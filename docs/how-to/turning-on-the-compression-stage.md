@@ -60,9 +60,11 @@ problem details response and a 404, not with an empty body.
 
 ## The thresholds
 
-Each kind has its own smallest part worth compressing: 200 characters for a log, 100 for JSON,
-512 for prose. A part under its threshold is left alone, because compressing a small part
-costs more than it saves. `PROXY__COMPRESSION__MINIMUM` sets one threshold for every kind and
+Each kind has its own smallest region worth compressing: 200 characters for a log, 100 for JSON,
+512 for prose. The threshold is checked against the whole tool result, using the kind that holds
+most of its characters, and not against each fragment. A result under it is left alone, because
+compressing a small result costs more than it saves. Once a result passes, every fragment is
+reduced, except fragments of a kind that is switched off, such as directory listings. `PROXY__COMPRESSION__MINIMUM` sets one threshold for every kind and
 overrides them all.
 
 ## The model
