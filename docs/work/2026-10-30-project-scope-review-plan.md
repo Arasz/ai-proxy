@@ -355,8 +355,8 @@ Deviations from the plan:
 - WP5: no macOS CI job runs the certificate tests. Proposed: an OS matrix in `build.yml` for those
   classes.
 - WP5: a constrained root is not rotated when a new provider domain is added.
-- Test port race: five integration helpers release a probed port before Titanium binds it
-  (`ProxyHost.cs:68`). `GainTrafficTests` failed once in CI on #91 for this reason.
+- Test port race: resolved 2026-10-31. The integration helpers bind port 0 and read the bound port
+  from `TitaniumProxyService.Address`.
 - Titanium `ConnectionTimeOutSeconds` and long silent generations: not planned until measured.
 - Agent worktrees: a hook refuses git in subagents. The orchestrator commits for them (owner
   ruling, 2026-10-30).
