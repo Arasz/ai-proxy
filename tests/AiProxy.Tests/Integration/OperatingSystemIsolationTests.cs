@@ -22,13 +22,9 @@ public sealed class OperatingSystemIsolationTests
     {
         using var directory = new TemporaryDirectory();
         var before = CountRootCertificates();
-        var portListener = new TcpListener(IPAddress.Loopback, 0);
-        portListener.Start();
-        var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
-        portListener.Stop();
 
         await using (var service = new TitaniumProxyService(
-                         new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, directory.Path),
+                         new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, false, directory.Path),
                          new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System,
                              new NoGainLedger()),
                          new CanonicalProviderHosts(),

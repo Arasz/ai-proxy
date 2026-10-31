@@ -20,13 +20,13 @@ public sealed class TitaniumProxyServiceTests
     public async Task System_proxy_registration_is_reversed_when_the_proxy_stops()
     {
         using var directory = new TemporaryDirectory();
-        var port = FreePort();
         var registrar = new RecordingSystemProxyRegistrar();
-        await using var service = CreateService(registrar, port, directory.Path);
+        await using var service = CreateService(registrar, 0, directory.Path);
 
         await service.StartAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(registrar.EndPoint);
-        Assert.Equal(port, registrar.EndPoint.Port);
+        Assert.NotEqual(0, registrar.EndPoint.Port);
+        Assert.Equal(service.Address.Port, registrar.EndPoint.Port);
         Assert.Equal(IPAddress.Loopback, registrar.EndPoint.IpAddress);
 
         await service.StopAsync(CancellationToken.None);
@@ -39,7 +39,7 @@ public sealed class TitaniumProxyServiceTests
     {
         using var directory = new TemporaryDirectory();
         var registrar = new RecordingSystemProxyRegistrar();
-        await using var service = CreateService(registrar, FreePort(), directory.Path);
+        await using var service = CreateService(registrar, 0, directory.Path);
 
         await service.StartAsync(TestContext.Current.CancellationToken);
 
@@ -51,12 +51,13 @@ public sealed class TitaniumProxyServiceTests
     public async Task A_failed_system_proxy_set_is_not_restored_and_stops_the_listener()
     {
         using var directory = new TemporaryDirectory();
-        var port = FreePort();
         var registrar = new RecordingSystemProxyRegistrar { FailSet = true };
-        await using var service = CreateService(registrar, port, directory.Path);
+        await using var service = CreateService(registrar, 0, directory.Path);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(TestContext.Current.CancellationToken));
         await service.StopAsync(CancellationToken.None);
+        var port = service.Address.Port;
+        Assert.NotEqual(0, port);
 
         Assert.Equal(0, registrar.RestoreCount);
         var listener = new TcpListener(IPAddress.Loopback, port);
@@ -71,7 +72,7 @@ public sealed class TitaniumProxyServiceTests
         Directory.CreateDirectory(directory.Path);
         await File.WriteAllTextAsync(MarkerPath(directory), "127.0.0.1:9", TestContext.Current.CancellationToken);
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events));
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events));
 
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
@@ -84,7 +85,7 @@ public sealed class TitaniumProxyServiceTests
     {
         using var directory = new TemporaryDirectory();
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events));
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events));
 
         await service.StartAsync(TestContext.Current.CancellationToken);
 
@@ -101,7 +102,7 @@ public sealed class TitaniumProxyServiceTests
         Directory.CreateDirectory(directory.Path);
         using var holder = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.Zero);
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events), TimeSpan.Zero);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(TestContext.Current.CancellationToken));
 
@@ -113,7 +114,7 @@ public sealed class TitaniumProxyServiceTests
     {
         using var directory = new TemporaryDirectory();
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events));
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events));
         await service.StartAsync(TestContext.Current.CancellationToken);
         Assert.True(File.Exists(MarkerPath(directory)));
 
@@ -127,15 +128,16 @@ public sealed class TitaniumProxyServiceTests
     public async Task A_guard_that_cannot_start_restores_the_proxy_releases_the_marker_and_fails_startup()
     {
         using var directory = new TemporaryDirectory();
-        var port = FreePort();
         var events = new List<string>();
         await using var service = CreateService(
             new RecordingSystemProxyRegistrar(events),
-            port,
+            0,
             directory.Path,
             new RecordingGuardLauncher(events) { Fail = true });
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(TestContext.Current.CancellationToken));
+        var port = service.Address.Port;
+        Assert.NotEqual(0, port);
 
         Assert.Equal(["set", "launch", "restore"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
@@ -150,7 +152,7 @@ public sealed class TitaniumProxyServiceTests
         var events = new List<string>();
         await using var service = new TitaniumProxyService(
             new RecordingSystemProxyRegistrar(events),
-            new ProxyRuntimeOptions(IPAddress.Loopback, FreePort(), false, false, directory.Path),
+            new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             new RecordingGuardLauncher(events),
@@ -169,11 +171,12 @@ public sealed class TitaniumProxyServiceTests
     public async Task A_guard_that_died_early_does_not_stop_a_clean_stop()
     {
         using var directory = new TemporaryDirectory();
-        var port = FreePort();
         var events = new List<string>();
         var launcher = new RecordingGuardLauncher(events) { ReportThrows = true };
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), port, directory.Path, launcher);
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, launcher);
         await service.StartAsync(TestContext.Current.CancellationToken);
+        var port = service.Address.Port;
+        Assert.NotEqual(0, port);
 
         await service.StopAsync(CancellationToken.None);
 
@@ -187,11 +190,12 @@ public sealed class TitaniumProxyServiceTests
     public async Task A_restore_that_fails_keeps_the_marker_and_does_not_tell_the_guard()
     {
         using var directory = new TemporaryDirectory();
-        var port = FreePort();
         var events = new List<string>();
         var launcher = new RecordingGuardLauncher(events);
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events) { FailRestore = true }, port, directory.Path, launcher);
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events) { FailRestore = true }, 0, directory.Path, launcher);
         await service.StartAsync(TestContext.Current.CancellationToken);
+        var port = service.Address.Port;
+        Assert.NotEqual(0, port);
 
         await service.StopAsync(CancellationToken.None);
 
@@ -207,7 +211,7 @@ public sealed class TitaniumProxyServiceTests
         using var directory = new TemporaryDirectory();
         var events = new List<string>();
         var launcher = new RecordingGuardLauncher(events);
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, launcher);
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, launcher);
         await service.StartAsync(TestContext.Current.CancellationToken);
 
         await service.StopAsync(CancellationToken.None);
@@ -223,7 +227,7 @@ public sealed class TitaniumProxyServiceTests
         var holder = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var clock = new TimerObservingTimeProvider();
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), FreePort(), directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10), clock);
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events), TimeSpan.FromSeconds(10), clock);
 
         var starting = service.StartAsync(TestContext.Current.CancellationToken);
         await Task.WhenAny(clock.FirstTimerCreated, starting).WaitAsync(TestContext.Current.CancellationToken);
@@ -282,15 +286,6 @@ public sealed class TitaniumProxyServiceTests
             NullLoggerFactory.Instance,
             markerWait ?? TimeSpan.FromSeconds(1),
             timeProvider ?? TimeProvider.System);
-    }
-
-    private static int FreePort()
-    {
-        var portListener = new TcpListener(IPAddress.Loopback, 0);
-        portListener.Start();
-        var port = ((IPEndPoint)portListener.LocalEndpoint).Port;
-        portListener.Stop();
-        return port;
     }
 
     private sealed class RecordingSystemProxyRegistrar(List<string>? events = null) : ISystemProxyRegistrar

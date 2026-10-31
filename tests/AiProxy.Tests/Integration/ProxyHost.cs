@@ -65,10 +65,6 @@ internal sealed class ProxyHost : IAsyncDisposable
 
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
-        var portListener = new TcpListener(IPAddress.Loopback, 0);
-        portListener.Start();
-        var proxyPort = ((IPEndPoint)portListener.LocalEndpoint).Port;
-        portListener.Stop();
 
         // Compression is on by default for a person; a test turns it on and names its own database.
         builder.Configuration["Proxy:Compression:Enabled"] = "false";
@@ -104,7 +100,7 @@ internal sealed class ProxyHost : IAsyncDisposable
 
                 configure?.Invoke(services);
             },
-            new ProxyRuntimeOptions(IPAddress.Loopback, proxyPort, false, false, directory.Path));
+            new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, false, directory.Path));
 
         await app.StartAsync();
 
