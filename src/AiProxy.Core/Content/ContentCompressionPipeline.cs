@@ -250,9 +250,11 @@ public sealed class ContentCompressionPipeline(
         var reduced = new List<CompressedPart>(decomposition.Parts.Count);
         var changed = false;
 
+        var regionWorthReducing = IsWorthReducing(decomposition.Parts);
+
         foreach (var part in decomposition.Parts)
         {
-            if (part.Text.Length < options.MinimumFor(part.Type))
+            if (!regionWorthReducing || options.MinimumFor(part.Type) == int.MaxValue)
             {
                 reduced.Add(new CompressedPart(part.ChunkId, part.Type, part.Text, part.Text, "below-minimum", 1.0));
                 continue;
@@ -285,5 +287,16 @@ public sealed class ContentCompressionPipeline(
         var composed = compositor.Compose(decomposition, reduced);
         stages.Add("compose", time.GetElapsedTime(started));
         return composed;
+    }
+
+    /// <summary>True when the region's total length reaches the minimum of the kind holding most of its characters.</summary>
+    private bool IsWorthReducing(IReadOnlyList<ContentPart> parts)
+    {
+        var dominant = parts
+            .GroupBy(part => part.Type)
+            .MaxBy(group => group.Sum(part => part.Text.Length))!
+            .Key;
+
+        return parts.Sum(part => part.Text.Length) >= options.MinimumFor(dominant);
     }
 }

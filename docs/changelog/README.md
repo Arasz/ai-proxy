@@ -18,13 +18,14 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.20.0](0.20.0-region-size-minimum.md) | The size minimum is judged on a whole tool result, then every fragment is reduced, instead of skipping each short fragment. | [#99](https://github.com/Arasz/ai-proxy/pull/99) |
 | [0.19.2](0.19.2-compact-gain-numbers.md) | `ai-proxy gain` shows large counts as 261.2M or 523.8K and shortens the summary headers, so numbers no longer split across lines in narrow terminals. | [#98](https://github.com/Arasz/ai-proxy/pull/98) |
 | [0.19.1](0.19.1-root-rotation.md) | Adding a provider domain rotates the name-constrained root automatically: one trust prompt, then restart harness sessions. | [#96](https://github.com/Arasz/ai-proxy/pull/96) |
 | [0.19.0](0.19.0-name-constrained-root-ca.md) | Name-constrained `ai-proxy` root CA with a stored random password; one-time migration untrusts only the old root. Restart harness sessions after upgrading. | [#93](https://github.com/Arasz/ai-proxy/pull/93) |
 | [0.18.1](0.18.1-null-check-analyzer.md) | Build rejects `ThrowIfNull` on non-nullable values (APGEN003); primary constructors; injectable `ProxyLease`. | [#91](https://github.com/Arasz/ai-proxy/pull/91) |
 | [0.18.0](0.18.0-review-campaign.md) | Strict startup and `--version`; 14-day retention for content and capture with a capture ceiling; unescaped compressed output; relay headers deadline and no redirects; ADR 0008. | [#90](https://github.com/Arasz/ai-proxy/pull/90) |
-| [0.17.3](0.17.3-adjacent-line-dedupe.md) | Drop only adjacent exact repeats, so source code read through a shell keeps its braces and repeated lines. | Pending |
-| [0.17.2](0.17.2-marker-owner-pid.md) | Report an unambiguous marker-holder PID when an older proxy needs a manual stop. | Pending |
+| [0.17.3](0.17.3-adjacent-line-dedupe.md) | Drop only adjacent exact repeats, so source code read through a shell keeps its braces and repeated lines. | [#99](https://github.com/Arasz/ai-proxy/pull/99) |
+| [0.17.2](0.17.2-marker-owner-pid.md) | Report an unambiguous marker-holder PID when an older proxy needs a manual stop. | [#99](https://github.com/Arasz/ai-proxy/pull/99) |
 | [0.17.1](0.17.1-control-pipe-and-port-binding-fixes.md) | Disconnect server control pipe unconditionally to tolerate broken client pipes, normalize empty proxy port before binding, and set persist-credentials false in lifecycle CI. | [#86](https://github.com/Arasz/ai-proxy/pull/86) |
 | [0.17.0](0.17.0-owned-instance-restart.md) | Gracefully restart an owned instance, retain its ports, serialize competing starts, and configure isolated runtime state. | [#85](https://github.com/Arasz/ai-proxy/pull/85) |
 | [0.16.1](0.16.1-harness-arguments.md) | Preserve empty harness arguments and pass child options literally after the launcher separator. | [#84](https://github.com/Arasz/ai-proxy/pull/84) |

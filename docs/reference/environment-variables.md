@@ -38,7 +38,7 @@ Compression stays off unless enabled, because it changes provider request bodies
 |---|---|
 | `PROXY__COMPRESSION__ENABLED` | `true` turns request compression on. Anything else, or unset, leaves it off. |
 | `PROXY__COMPRESSION__DATABASE` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
-| `PROXY__COMPRESSION__MINIMUM` | A minimum size applied to every content kind. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
+| `PROXY__COMPRESSION__MINIMUM` | A minimum size applied to every content kind, checked against the whole tool result. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
 | `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
 
 The database contains the text tools returned to the agent. Keep it on the machine running
