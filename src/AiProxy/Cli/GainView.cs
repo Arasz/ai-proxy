@@ -8,15 +8,17 @@ namespace AiProxy.Cli;
 /// <summary>Renders server-computed statistics without recomputing accounting.</summary>
 public sealed class GainView
 {
+    private static readonly (decimal Unit, string Name)[] Units = [(1_000m, "K"), (1_000_000m, "M"), (1_000_000_000m, "B")];
+
     public IRenderable Render(GainReport report, GainSettings settings)
     {
         var views = new List<IRenderable>
         {
-            new Text("Estimated initial-request token reductions\n".ToLowerInvariant()),
-            Table(["Requests", "Original tokens", "Forwarded tokens", "Saved tokens", "Retrieved tokens", "Tool tokens", "Net tokens", "Saved %", "Net %"],
+            new Text("estimated initial-request token reductions (tokens)\n"),
+            Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Net", "Saved %", "Net %"],
             [
-                [Number(report.Summary.Requests), Number(report.Summary.EstimatedOriginalTokens), Number(report.Summary.EstimatedForwardedTokens), Number(report.Summary.EstimatedSavedTokens), Number(report.Summary.EstimatedRetrievedTokens),
-                    Number(report.Summary.EstimatedToolTokens), Number(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
+                [Compact(report.Summary.Requests), Compact(report.Summary.EstimatedOriginalTokens), Compact(report.Summary.EstimatedForwardedTokens), Compact(report.Summary.EstimatedSavedTokens), Compact(report.Summary.EstimatedRetrievedTokens),
+                    Compact(report.Summary.EstimatedToolTokens), Compact(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
             ]),
             new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
         };
@@ -33,7 +35,7 @@ public sealed class GainView
         {
             views.Add(new Text("History\n"));
             views.Add(Table(["UTC", "Request", "Project", "Provider", "Pipeline", "Saved tokens"],
-                report.History.Select(static row => new[] { Stamp(row.At), row.Id, row.Project ?? GainLabels.Unknown, row.Provider ?? GainLabels.Unknown, row.Pipeline, Number(row.Totals.EstimatedSavedTokens) })));
+                report.History.Select(static row => new[] { Stamp(row.At), row.Id, row.Project ?? GainLabels.Unknown, row.Provider ?? GainLabels.Unknown, row.Pipeline, Compact(row.Totals.EstimatedSavedTokens) })));
         }
 
         if (settings.All || settings.Daily)
@@ -59,7 +61,7 @@ public sealed class GainView
             {
                 var value = row.Totals.EstimatedSavedTokens;
                 var length = (int)(Math.Abs((decimal)value) / maximum * 30);
-                views.Add(new Text($"{row.Start:yyyy-MM-dd} {Number(value),10} {new string(value < 0 ? '<' : '#', length)}\n"));
+                views.Add(new Text($"{row.Start:yyyy-MM-dd} {Compact(value),10} {new string(value < 0 ? '<' : '#', length)}\n"));
             }
 
             if (report.Daily.Count == 0)
@@ -93,7 +95,7 @@ public sealed class GainView
         {
             views.Add(new Text($"By {dimension}\n"));
             views.Add(Table(["Name", "Requests", "Saved tokens", "Net tokens", "Recalls"], report.Attributions.Where(row => row.Dimension == dimension)
-                .Select(static row => new[] { row.Name, Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedNetTokens), Number(row.Totals.Recalls) })));
+                .Select(static row => new[] { row.Name, Compact(row.Totals.Requests), Compact(row.Totals.EstimatedSavedTokens), Compact(row.Totals.EstimatedNetTokens), Compact(row.Totals.Recalls) })));
         }
 
         if (settings.Failures)
@@ -106,7 +108,7 @@ public sealed class GainView
         {
             views.Add(new Text("Recalls (caller attribution; origins may be unknown)\n"));
             views.Add(Table(["UTC", "Preview", "Project", "Mode", "Tokens", "Error"],
-                report.Recalls.Select(static row => new[] { Stamp(row.At), row.PreviewId, row.Project ?? GainLabels.Unknown, row.Mode, Number(row.EstimatedTokens), row.Error ?? "" })));
+                report.Recalls.Select(static row => new[] { Stamp(row.At), row.PreviewId, row.Project ?? GainLabels.Unknown, row.Mode, Compact(row.EstimatedTokens), row.Error ?? "" })));
         }
 
         return new Rows(views);
@@ -116,7 +118,7 @@ public sealed class GainView
     {
         views.Add(new Text($"{title}\n"));
         views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens", "Net tokens"],
-            buckets.Select(static row => new[] { Stamp(row.Start), Number(row.Totals.Requests), Number(row.Totals.EstimatedSavedTokens), Number(row.Totals.EstimatedRetrievedTokens), Number(row.Totals.EstimatedNetTokens) })));
+            buckets.Select(static row => new[] { Stamp(row.Start), Compact(row.Totals.Requests), Compact(row.Totals.EstimatedSavedTokens), Compact(row.Totals.EstimatedRetrievedTokens), Compact(row.Totals.EstimatedNetTokens) })));
     }
 
     private static Table Table(string[] columns, IEnumerable<string[]> rows)
@@ -140,6 +142,29 @@ public sealed class GainView
         }
 
         return table;
+    }
+
+    /// <summary>A table cell: exact below ten thousand, otherwise one decimal of K, M or B so wide counts never wrap.</summary>
+    internal static string Compact(long value)
+    {
+        if (Math.Abs(value) < 10_000)
+        {
+            return Number(value);
+        }
+
+        var scaled = 0m;
+        var suffix = "";
+        foreach (var (unit, name) in Units)
+        {
+            scaled = Math.Round(value / unit, 1, MidpointRounding.AwayFromZero);
+            suffix = name;
+            if (Math.Abs(scaled) < 1_000m)
+            {
+                break;
+            }
+        }
+
+        return scaled.ToString("0.0", CultureInfo.InvariantCulture) + suffix;
     }
 
     private static string Number(long value)
