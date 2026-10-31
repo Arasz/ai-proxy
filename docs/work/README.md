@@ -10,6 +10,7 @@ Active records:
 
 | File | What it is |
 |---|---|
+| [2026-10-31-planned-features-and-gain-table-width.md](2026-10-31-planned-features-and-gain-table-width.md) | Research at 0.19.1: planned features still missing from src (D5 build kind, D6 region minimum, CSS and HTML views, NSS cleanup) and measured gain table widths with a compact-number recommendation. |
 | [2026-10-30-project-scope-review-plan.md](2026-10-30-project-scope-review-plan.md) | Plan for the project-scope review: owner rulings, nine work packages with red-first gates, waves and serialisation points. |
 | [2026-10-30-project-scope-review.md](2026-10-30-project-scope-review.md) | Project-scope review at 0.17.2: seven expert lanes, 29 graded findings, healthy register, owner questions. |
 | [2026-10-26-mcp-directory-listings.md](2026-10-26-mcp-directory-listings.md) | Research record: how to list the ai-proxy MCP server across Smithery, npm, PyPI, Claude Directory, and ChatGPT/OpenAI, and their requirements. |
