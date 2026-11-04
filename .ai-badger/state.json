@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-04T15:52:51.245120+00:00",
-  "next": "installed-tool CI + mcp EOF fix (plan ready; try ModelContextProtocol 2.3.1 first); then Codex launcher, musl grammars, compression reporting, lifecycle status/stop, #24, NSS cleanup, capture message id.",
+  "lastUpdated": "2026-11-04T20:40:16.281797+00:00",
+  "next": "installed-tool CI + mcp EOF drain fix (plan ready; MCP SDK 2.3.1 does not fix EOF); then Codex launcher, musl grammars, compression reporting, lifecycle status/stop, #24, NSS cleanup, capture message id. Owner gate pending: quoted-echo build/park (PR #106).",
   "completedTasks": [
+    {
+      "taskId": "aip-replace-quoted-echoes-with-references",
+      "date": "2026-11-04",
+      "title": "Research: replace quoted echoes with references",
+      "pr": 106,
+      "version": null,
+      "summary": "Research only. 0.9% of typed messages echo >=80 chars; re-sent echoes ~0.06% of prompt tokens. Hooks cannot rewrite prompts. Recommend park; owner gate pending (build/park, format, default, min span).",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-read-only-doctor-setup-check",
       "date": "2026-11-04",
