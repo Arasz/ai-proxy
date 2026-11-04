@@ -58,7 +58,9 @@ public sealed class DoctorCommandTests
         var names = json.RootElement.GetProperty("checks").EnumerateArray().Select(static check => check.GetProperty("name").GetString()).ToArray();
         Assert.Equal(["api", "inspection", "root", "environment"], names);
         Assert.Equal(outcome.Exit, json.RootElement.GetProperty("exitCode").GetInt32());
-        Assert.Equal("pass", json.RootElement.GetProperty("checks")[0].GetProperty("status").GetString());
+        var statuses = json.RootElement.GetProperty("checks").EnumerateArray().Select(static check => check.GetProperty("status").GetString()).ToArray();
+        Assert.Equal(["pass", "pass", "warn", "pass"], statuses);
+        Assert.Equal(2, outcome.Exit);
         Assert.Equal("", outcome.Error);
     }
 
@@ -118,7 +120,7 @@ public sealed class DoctorCommandTests
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new NamedHosts());
         var outcome = await RunAsync([], [.. Options(proxy), "--format", "json"]);
         using var json = JsonDocument.Parse(outcome.Json);
-        Assert.NotEqual("fail", json.RootElement.GetProperty("checks")[1].GetProperty("status").GetString());
+        Assert.Equal("pass", json.RootElement.GetProperty("checks")[1].GetProperty("status").GetString());
     }
 
     [Theory]

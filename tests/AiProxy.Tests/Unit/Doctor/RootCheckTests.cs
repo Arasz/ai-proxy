@@ -102,10 +102,22 @@ public sealed class RootCheckTests : IDisposable
     }
 
     [Fact]
-    public async Task An_oversized_file_fails_without_being_parsed()
+    public async Task A_valid_root_followed_by_more_than_64_KiB_of_padding_fails_as_too_large()
     {
-        WritePem(new string('A', 70 * 1024));
-        Assert.Equal(CheckStatus.Fail, (await Run()).Status);
+        using var root = Root(Now);
+        WritePem(root.ExportCertificatePem() + "\n" + new string(' ', 65 * 1024));
+        var result = await Run();
+        Assert.Equal(CheckStatus.Fail, result.Status);
+        Assert.Contains("larger than 64 KiB", result.Detail);
+    }
+
+    [Fact]
+    public async Task A_valid_root_with_padding_just_under_the_bound_passes()
+    {
+        using var root = Root(Now);
+        var pem = root.ExportCertificatePem() + "\n";
+        WritePem(pem + new string(' ', 64 * 1024 - pem.Length - 10));
+        Assert.Equal(CheckStatus.Pass, (await Run()).Status);
     }
 
     [Fact]
@@ -121,6 +133,7 @@ public sealed class RootCheckTests : IDisposable
     {
         using var root = Root(Now);
         WritePem(root.ExportCertificatePem());
+        File.SetLastWriteTimeUtc(Path.Combine(_directory, "root-ca.pem"), new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         var before = Snapshot();
         await Run();
         Assert.Equal(before, Snapshot());
@@ -130,6 +143,6 @@ public sealed class RootCheckTests : IDisposable
     {
         return [.. Directory.EnumerateFileSystemEntries(_directory, "*", SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal)
-            .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}")];
+            .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}:{File.GetLastWriteTimeUtc(path).Ticks}")];
     }
 }

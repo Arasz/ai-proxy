@@ -16,17 +16,22 @@ internal sealed class InspectionCheck(Uri proxy, string host, string dataDirecto
 
     private const int HttpsPort = 443;
     private const int MaxHeaderBytes = 8 * 1024;
+    private const uint EndOfHeaders = 0x0D0A0D0A;
 
     public async Task<CheckResult> RunAsync(CancellationToken cancellationToken)
     {
-        X509Certificate2 root;
+        X509Certificate2? root;
         try
         {
-            root = X509CertificateLoader.LoadCertificate(Convert.FromBase64String(
-                (await File.ReadAllTextAsync(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePemFileName), cancellationToken).ConfigureAwait(false))
-                .Replace("-----BEGIN CERTIFICATE-----", "", StringComparison.Ordinal).Replace("-----END CERTIFICATE-----", "", StringComparison.Ordinal).Trim()));
+            var text = await new RootPemFile(dataDirectory).ReadAsync(cancellationToken).ConfigureAwait(false);
+            root = text is null ? null : RootPemFile.Parse(text);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or CryptographicException)
+        {
+            root = null;
+        }
+
+        if (root is null)
         {
             return Unknown("the published root could not be read; see the root check.");
         }
@@ -53,10 +58,10 @@ internal sealed class InspectionCheck(Uri proxy, string host, string dataDirecto
         var stream = socket.GetStream();
         var request = Encoding.ASCII.GetBytes($"CONNECT {host}:{HttpsPort} HTTP/1.1\r\nHost: {host}:{HttpsPort}\r\n\r\n");
         await stream.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-        var status = await ReadStatusLineAsync(stream, cancellationToken).ConfigureAwait(false);
-        if (!status.Contains(" 200", StringComparison.Ordinal))
+        var code = await ReadStatusCodeAsync(stream, cancellationToken).ConfigureAwait(false);
+        if (code != "200")
         {
-            return Unknown($"the proxy answered the tunnel request for {host} with '{status}'.");
+            return Unknown($"the proxy answered the tunnel request for {host} with status {code ?? "(none)"}.");
         }
 
         var chained = false;
@@ -84,21 +89,24 @@ internal sealed class InspectionCheck(Uri proxy, string host, string dataDirecto
         return chain.Build(leaf);
     }
 
-    private static async Task<string> ReadStatusLineAsync(Stream stream, CancellationToken cancellationToken)
+    private static async Task<string?> ReadStatusCodeAsync(Stream stream, CancellationToken cancellationToken)
     {
-        var head = new StringBuilder();
+        var head = new List<byte>();
         var one = new byte[1];
-        while (head.Length < MaxHeaderBytes && !head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+        var lastFour = 0u;
+        while (head.Count < MaxHeaderBytes && lastFour != EndOfHeaders)
         {
             if (await stream.ReadAsync(one, cancellationToken).ConfigureAwait(false) == 0)
             {
                 break;
             }
 
-            head.Append((char)one[0]);
+            head.Add(one[0]);
+            lastFour = (lastFour << 8) | one[0];
         }
 
-        return head.ToString().Split("\r\n")[0];
+        var parts = Encoding.ASCII.GetString([.. head]).Split("\r\n")[0].Split(' ', 3);
+        return parts.Length >= 2 && parts[0].StartsWith("HTTP/", StringComparison.Ordinal) && parts[1].Length == 3 && parts[1].All(char.IsAsciiDigit) ? parts[1] : null;
     }
 
     private static CheckResult Unknown(string reason)

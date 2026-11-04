@@ -20,6 +20,7 @@ internal sealed class EnvironmentCheck(Uri proxy, Func<string, string?> variable
             .Select(name => (Name: name, Value: variable(name)))
             .Where(static pair => !string.IsNullOrWhiteSpace(pair.Value))
             .Select(pair => new Setting(pair.Name, EndpointText.Safe(pair.Value!)))
+            .DistinctBy(static setting => (setting.Name.ToUpperInvariant(), setting.Shown))
             .ToList();
 
         CheckResult result;
@@ -51,7 +52,7 @@ internal sealed class EnvironmentCheck(Uri proxy, Func<string, string?> variable
 
     private static string Canonical(string host)
     {
-        return host is "localhost" or "[::1]" ? "127.0.0.1" : host;
+        return host == "localhost" ? "127.0.0.1" : host;
     }
 
     private sealed record Setting(string Name, string Shown);

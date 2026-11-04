@@ -1,21 +1,25 @@
+using System.Globalization;
 using System.Net.Sockets;
 using AiProxy.Cli;
 using AiProxy.Core.Doctor;
 using AiProxy.Hosting.Proxy;
-using Microsoft.Extensions.Configuration;
 
 namespace AiProxy.Doctor;
 
 /// <summary>Runs every setup check against one proxy and gathers the report.</summary>
 internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func<string, string?> variable)
 {
+    private const string ProxyPortVariable = "Proxy__Port";
+    private const string LegacyProxyPortVariable = "PROXY__PORT";
+
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     public async Task<DoctorReport> RunAsync(CancellationToken cancellationToken)
     {
         var proxy = ProxyAddress();
         var dataDirectory = Path.GetFullPath(settings.DataDirectory ?? ProxyRuntimeOptions.DefaultDataDirectory);
-        using var http = new HttpClient { Timeout = Timeout };
+        using var handler = new HttpClientHandler { UseProxy = false };
+        using var http = new HttpClient(handler) { Timeout = Timeout };
         var api = await new ApiCheck(http, new Uri(settings.Endpoint), EntryPoint.ProductVersion).ProbeAsync(cancellationToken).ConfigureAwait(false);
 
         CheckResult first = api.Result;
@@ -42,9 +46,10 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
             return new Uri(settings.Proxy);
         }
 
-        var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
-        var port = configuration.GetValue<int?>(KnownNames.Configuration.ProxyPort) ?? ProxyRuntimeOptions.Default.Port;
-        return new Uri(string.Format(System.Globalization.CultureInfo.InvariantCulture, KnownNames.Network.ProxyUrlFormat, port));
+        var port = int.TryParse(variable(ProxyPortVariable) ?? variable(LegacyProxyPortVariable), NumberStyles.None, CultureInfo.InvariantCulture, out var configured)
+            ? configured
+            : ProxyRuntimeOptions.Default.Port;
+        return new Uri(string.Format(CultureInfo.InvariantCulture, KnownNames.Network.ProxyUrlFormat, port));
     }
 
     private static async Task<bool> IsListeningAsync(Uri proxy, CancellationToken cancellationToken)

@@ -53,15 +53,47 @@ public sealed class InspectionCheckTests
     }
 
     [Fact]
+    public async Task A_non_200_answer_to_the_tunnel_request_is_unknown_and_names_the_code()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var server = Task.Run(async () =>
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            var stream = client.GetStream();
+            var buffer = new byte[1024];
+            _ = await stream.ReadAsync(buffer);
+            await stream.WriteAsync("HTTP/1.1 502 Bad Gateway\r\n\r\n"u8.ToArray());
+        }, TestContext.Current.CancellationToken);
+        using var directory = WithRoot();
+        var result = await Check(new Uri($"http://127.0.0.1:{port}"), Host, directory.Path).RunAsync(TestContext.Current.CancellationToken);
+        await server;
+        Assert.Equal(CheckStatus.Unknown, result.Status);
+        Assert.Contains("502", result.Detail);
+        Assert.DoesNotContain("Bad Gateway", result.Detail);
+    }
+
+    private static TemporaryDirectory WithRoot()
+    {
+        var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using var root = RootCertificateAuthority.Create([Host], DateTimeOffset.UtcNow);
+        File.WriteAllText(Path.Combine(directory.Path, "root-ca.pem"), root.ExportCertificatePem());
+        return directory;
+    }
+
+    [Fact]
     public async Task A_closed_proxy_port_is_unknown()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
-        using var directory = new TemporaryDirectory();
+        using var directory = WithRoot();
         var result = await Check(new Uri($"http://127.0.0.1:{port}"), Host, directory.Path).RunAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CheckStatus.Unknown, result.Status);
+        Assert.Contains("did not finish", result.Detail);
     }
 
     [Fact]

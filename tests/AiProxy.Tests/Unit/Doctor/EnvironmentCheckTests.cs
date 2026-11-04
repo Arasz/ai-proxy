@@ -42,6 +42,23 @@ public sealed class EnvironmentCheckTests
     }
 
     [Fact]
+    public async Task An_ipv6_loopback_is_not_the_ipv4_proxy()
+    {
+        var result = await Run(new() { ["HTTPS_PROXY"] = "http://[::1]:8080" });
+        Assert.NotEqual(CheckStatus.Pass, result.Status);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task An_empty_value_counts_as_unset(string value)
+    {
+        var result = await Run(new() { ["HTTPS_PROXY"] = value });
+        Assert.Equal(CheckStatus.Pass, result.Status);
+        Assert.Contains("not set", result.Detail);
+    }
+
+    [Fact]
     public async Task Credentials_and_query_never_reach_the_result()
     {
         var result = await Run(new() { ["HTTPS_PROXY"] = "http://u:SENTINEL@127.0.0.1:9999/?k=SENTINEL2", ["http_proxy"] = "http://u:SENTINEL@127.0.0.1:8080/?k=SENTINEL2" });

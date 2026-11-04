@@ -13,18 +13,17 @@ internal sealed class RootCheck(string dataDirectory, TimeProvider time, IRootTr
 {
     public const string Name = "root";
 
-    private const int MaxBytes = 64 * 1024;
     private const int WarnDays = 30;
 
     public async Task<CheckResult> RunAsync(CancellationToken cancellationToken)
     {
-        var path = Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePemFileName);
-        var where = $"{path} (assumed from --data-directory)";
+        var file = new RootPemFile(dataDirectory);
+        var where = $"{file.Path} (assumed from --data-directory)";
         try
         {
-            var text = await ReadBoundedAsync(path, cancellationToken).ConfigureAwait(false);
+            var text = await file.ReadAsync(cancellationToken).ConfigureAwait(false);
             return text is null
-                ? new CheckResult(Name, CheckStatus.Fail, $"{where} is larger than {MaxBytes / 1024} KiB.", "Delete it and restart ai-proxy to publish a new root.")
+                ? new CheckResult(Name, CheckStatus.Fail, $"{where} is larger than {RootPemFile.MaxBytes / 1024} KiB.", "Delete it and restart ai-proxy to publish a new root.")
                 : Judge(text, where);
         }
         catch (FileNotFoundException)
@@ -41,25 +40,6 @@ internal sealed class RootCheck(string dataDirectory, TimeProvider time, IRootTr
         }
     }
 
-    private static async Task<string?> ReadBoundedAsync(string path, CancellationToken cancellationToken)
-    {
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        var buffer = new byte[MaxBytes + 1];
-        var length = 0;
-        while (length < buffer.Length)
-        {
-            var read = await stream.ReadAsync(buffer.AsMemory(length), cancellationToken).ConfigureAwait(false);
-            if (read == 0)
-            {
-                break;
-            }
-
-            length += read;
-        }
-
-        return length > MaxBytes ? null : Encoding.UTF8.GetString(buffer, 0, length);
-    }
-
     private CheckResult Judge(string text, string where)
     {
         if (text.Contains("PRIVATE KEY", StringComparison.Ordinal))
@@ -67,12 +47,12 @@ internal sealed class RootCheck(string dataDirectory, TimeProvider time, IRootTr
             return new CheckResult(Name, CheckStatus.Fail, $"{where} holds a private key; the published root must be the certificate alone.", "Delete the file and restart ai-proxy, then treat the old key as exposed.");
         }
 
-        if (!PemEncoding.TryFind(text, out var fields) || !text.AsSpan(fields.Label).SequenceEqual("CERTIFICATE"))
+        using var root = RootPemFile.Parse(text);
+        if (root is null)
         {
             return new CheckResult(Name, CheckStatus.Fail, $"{where} holds no certificate.", "Delete the file and restart ai-proxy to publish a new root.");
         }
 
-        using var root = X509CertificateLoader.LoadCertificate(Convert.FromBase64String(text[fields.Base64Data].ToString()));
         if (!RootCertificateAuthority.IsConstrained(root) || !RootCertificateAuthority.PermitsExactly(root, [.. ProviderHostCatalog.Hosts]))
         {
             return new CheckResult(Name, CheckStatus.Fail, $"The root at {where} is not limited to the provider hosts.", "Delete the root files in the data directory and restart ai-proxy to create a constrained root.");

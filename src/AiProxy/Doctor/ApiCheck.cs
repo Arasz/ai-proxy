@@ -11,11 +11,6 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version)
 {
     public const string Name = "api";
 
-    public async Task<CheckResult> RunAsync(CancellationToken cancellationToken)
-    {
-        return (await ProbeAsync(cancellationToken).ConfigureAwait(false)).Result;
-    }
-
     public async Task<ApiProbe> ProbeAsync(CancellationToken cancellationToken)
     {
         var shown = EndpointText.Safe(endpoint.ToString());
@@ -53,12 +48,12 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version)
                     : Foreign(shown);
             }
 
-            if (product.GetString() != HealthApi.Product)
+            if (product.ValueKind != JsonValueKind.String || product.GetString() != HealthApi.Product)
             {
                 return Foreign(shown);
             }
 
-            var running = root.TryGetProperty("version", out var value) ? value.GetString() : null;
+            var running = root.TryGetProperty("version", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             return running == version
                 ? new CheckResult(Name, CheckStatus.Pass, $"ai-proxy {running} answers at {shown}.")
                 : new CheckResult(Name, CheckStatus.Warn, $"ai-proxy {running ?? "(unknown version)"} answers at {shown}, but this command is {version}.", "Restart ai-proxy so the running proxy and the command match.");

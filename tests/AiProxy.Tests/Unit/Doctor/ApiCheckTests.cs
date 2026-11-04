@@ -67,6 +67,22 @@ public sealed class ApiCheckTests
         Assert.True(probe.Reachable);
     }
 
+    [Theory]
+    [InlineData("""{"status":"ok","product":1}""")]
+    [InlineData("""{"status":"ok","product":["ai-proxy"]}""")]
+    public async Task A_non_string_product_fails_without_crashing(string body)
+    {
+        var probe = await Probe(new StubHandler(() => Json(body)));
+        Assert.Equal(CheckStatus.Fail, probe.Result.Status);
+    }
+
+    [Fact]
+    public async Task A_non_string_version_is_treated_as_missing()
+    {
+        var probe = await Probe(new StubHandler(() => Json("""{"status":"ok","product":"ai-proxy","version":2}""")));
+        Assert.Equal(CheckStatus.Warn, probe.Result.Status);
+    }
+
     [Fact]
     public async Task An_unreachable_endpoint_fails_and_is_not_reachable()
     {
