@@ -1,7 +1,7 @@
 # Next task: activate the C# reducer with exact-file retrieval
 
 Date: 2026-10-24
-Status: next after the [inactive C# core build](2026-10-24-csharp-reducer-build.md); runtime activation blocked on CCR design and implementation.
+Status: shipped. CCR landed in 0.10.0 and the C# code view went on by default in 0.11.0 (status note added 2026-11-04). The text below is the plan as written on 2026-10-24.
 Task: `aip-activate-csharp-reducer-with-retrieval`
 
 The owner explicitly asked to retain these findings as the next step. They are release requirements, not optional cleanup.

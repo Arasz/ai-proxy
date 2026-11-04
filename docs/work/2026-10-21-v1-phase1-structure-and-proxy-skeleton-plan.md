@@ -1,7 +1,7 @@
 # v1 phase 1 — the structure and the proxy skeleton
 
 **Date:** 2026-10-21
-**Status:** planned. This is the first implementation phase of the v1 plan in
+**Status:** shipped in 0.2.0 (status note added 2026-11-04). This is the first implementation phase of the v1 plan in
 [2026-10-21-ai-proxy-v1-implementation-plan.md](2026-10-21-ai-proxy-v1-implementation-plan.md).
 
 **The basis is the research record**

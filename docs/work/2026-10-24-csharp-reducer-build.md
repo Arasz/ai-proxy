@@ -2,6 +2,8 @@
 
 Date: 2026-10-24
 
+Status note (2026-11-04): the core built here was activated in 0.11.0. Python followed in 0.12.0, and JavaScript and TypeScript in 0.14.0. The open items listed below are history, not pending work.
+
 The owner approved [the design](2026-10-24-code-reducer-design.md) and selected the high task loop. After checking the retrieval prerequisite, the owner chose to build the C# core now and keep activation blocked on CCR. This PR builds that inactive core. It does not satisfy the full design's runtime acceptance or release the replacement handler.
 
 ## Research checked against the checkout
