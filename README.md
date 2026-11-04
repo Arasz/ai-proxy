@@ -126,6 +126,20 @@ directory; ai-proxy removes that header before forwarding. See the
 for the verified Codex project-header configuration. Keep each provider's upstream base URL;
 port 8080 is a forward proxy, not an API base URL.
 
+## Check the setup
+
+If an agent does not seem to go through the proxy, ask it:
+
+```bash
+ai-proxy doctor
+```
+
+Doctor changes nothing. It asks the running proxy who it is, opens a TLS handshake through it
+to see that provider traffic is really decrypted, reads the published root certificate, and
+looks at the proxy variables in your shell. Exit code 0 means every check passed, 1 means
+something is broken and 2 means only warnings or unknowns. Add `--format json` for scripts.
+See the [reference](docs/reference/doctor.md).
+
 ## Read gain and retrieve originals
 
 ```bash

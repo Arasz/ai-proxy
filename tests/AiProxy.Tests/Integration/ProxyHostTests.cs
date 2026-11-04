@@ -15,4 +15,17 @@ public sealed class ProxyHostTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Health_names_the_product_and_version_and_keeps_status()
+    {
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+
+        using var json = System.Text.Json.JsonDocument.Parse(await client.GetStringAsync("/health", TestContext.Current.CancellationToken));
+
+        Assert.Equal("ok", json.RootElement.GetProperty("status").GetString());
+        Assert.Equal("ai-proxy", json.RootElement.GetProperty("product").GetString());
+        Assert.Equal(AiProxy.Cli.EntryPoint.ProductVersion, json.RootElement.GetProperty("version").GetString());
+    }
 }
