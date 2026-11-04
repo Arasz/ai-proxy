@@ -233,9 +233,8 @@ public sealed class ContentStoreTests : IDisposable
         // second and not the half minute a command waits by default. A request must not
         // hang on a locked database: the record is lost, the request goes out, and the
         // pipeline logs that the store failed.
-        // The schema exists before the lock is taken, as it does in the host: a schema
-        // change cannot wait for the write lock, so creating the tables under a held
-        // lock is a different thing from writing a row under one.
+        // The schema exists before the lock is taken, as it does in the host, so this
+        // covers writing a row under a held lock and not creating the tables under one.
         using (var setup = ContentSchema.Open(_databasePath))
         {
             setup.Ensure();

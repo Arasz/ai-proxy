@@ -210,7 +210,7 @@ public sealed class ContentSchemaTests : IDisposable
     }
 
     [Fact]
-    public void A_first_use_that_cannot_get_the_lock_gives_up_within_its_bound_and_leaves_nothing()
+    public void A_first_use_that_cannot_get_the_lock_gives_up_within_its_bound()
     {
         Directory.CreateDirectory(_directory);
         using var holder = ContentSchema.Open(DatabasePath);
@@ -225,6 +225,22 @@ public sealed class ContentSchemaTests : IDisposable
 
         Assert.True(watch.Elapsed < SafetyBound, $"gave up after {watch.Elapsed}");
         Assert.Equal(3L, user.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    [Fact]
+    public void A_creation_that_fails_inside_its_transaction_leaves_nothing_and_can_be_run_again()
+    {
+        Directory.CreateDirectory(_directory);
+        using var connection = ContentSchema.Open(DatabasePath);
+        connection.Execute("CREATE TABLE content_request_created (x INTEGER);");
+
+        Assert.Throws<SqliteException>(() => connection.Ensure());
+        Assert.Equal(0, connection.ExecuteScalar<int>(CountTables));
+        connection.Execute("DROP TABLE content_request_created;");
+        connection.Ensure();
+
+        Assert.Equal(6, connection.ExecuteScalar<int>(CountTables));
+        Assert.Equal(3L, connection.ExecuteScalar<long>("PRAGMA user_version;"));
     }
 
     private static void Hold(ManualResetEventSlim release)
