@@ -102,6 +102,50 @@ public sealed class McpWireTests
         Assert.Contains("proxy", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("503", text);
     }
+
+    [Fact]
+    public async Task Requests_in_flight_when_stdin_closes_are_still_answered()
+    {
+        await using var server = new McpProcess("http://127.0.0.1:1");
+        var (output, exit) = await server.SendAndCloseAsync(
+            McpProcess.Initialize(1), McpProcess.Initialized, McpProcess.Request(2, "tools/list", new { }));
+        Assert.Equal(0, exit);
+        Assert.Equal([1, 2], McpProcess.ReplyIds(output).Order());
+    }
+
+    [Fact]
+    public async Task A_slow_tool_call_is_answered_after_stdin_closes()
+    {
+        await using var proxy = await ProxyStub.StartAsync(new RetrievalResponse("slow original", null), delay: TimeSpan.FromSeconds(1.5));
+        await using var server = new McpProcess(proxy.Endpoint);
+        var call = McpProcess.Request(2, "tools/call", new { name = "retrieve_original", arguments = new { id = "0123456789abcdef", mode = "whole" } });
+        var (output, exit) = await server.SendAndCloseAsync(McpProcess.Initialize(1), McpProcess.Initialized, call);
+        Assert.Equal(0, exit);
+        Assert.Contains("slow original", output);
+        Assert.Equal([1, 2], McpProcess.ReplyIds(output).Order());
+    }
+
+    [Fact]
+    public async Task An_unknown_method_is_answered_with_an_error_and_end_of_input_does_not_wait()
+    {
+        await using var server = new McpProcess("http://127.0.0.1:1");
+        var watch = Stopwatch.StartNew();
+        var (output, exit) = await server.SendAndCloseAsync(
+            McpProcess.Initialize(1), McpProcess.Initialized, McpProcess.Request(2, "no/such/method", new { }));
+        Assert.Equal(0, exit);
+        Assert.Equal([1, 2], McpProcess.ReplyIds(output).Order());
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(15), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
+    public async Task A_stream_of_only_notifications_exits_promptly_at_end_of_input()
+    {
+        await using var server = new McpProcess("http://127.0.0.1:1");
+        var watch = Stopwatch.StartNew();
+        var (_, exit) = await server.SendAndCloseAsync(McpProcess.Initialized);
+        Assert.Equal(0, exit);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(15), $"took {watch.Elapsed}");
+    }
 }
 
 internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDisposable
@@ -115,7 +159,7 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
         await app.DisposeAsync();
     }
 
-    public static async Task<ProxyStub> StartAsync(RetrievalResponse response, int status = 200)
+    public static async Task<ProxyStub> StartAsync(RetrievalResponse response, int status = 200, TimeSpan delay = default)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -126,6 +170,7 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
         {
             using var body = await JsonDocument.ParseAsync(context.Request.Body);
             stub!.Requests.Add(body.RootElement.Clone());
+            await Task.Delay(delay);
             context.Response.StatusCode = status;
             await context.Response.WriteAsJsonAsync(response);
         });
@@ -166,6 +211,33 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
         start.ArgumentList.Add(endpoint);
         var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start the MCP server.");
         return new Launched(process, process.StandardError.ReadToEndAsync());
+    }
+
+    public static string Initialize(int id) => Request(id, "initialize", new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "wire-test", version = "1" } });
+
+    public static string Initialized { get; } = JsonSerializer.Serialize(new { jsonrpc = "2.0", method = "notifications/initialized" });
+
+    public static string Request(int id, string method, object parameters) => JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters });
+
+    public static IEnumerable<int> ReplyIds(string output) =>
+        output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(static line => JsonDocument.Parse(line).RootElement)
+            .Where(static message => message.TryGetProperty("id", out _) && !message.TryGetProperty("method", out _))
+            .Select(static message => message.GetProperty("id").GetInt32());
+
+    /// <summary>Writes the lines, closes stdin at once, and returns everything the server printed plus its exit code.</summary>
+    public async Task<(string Output, int Exit)> SendAndCloseAsync(params string[] lines)
+    {
+        foreach (var line in lines)
+        {
+            await Server.StandardInput.WriteLineAsync(line);
+        }
+
+        await Server.StandardInput.FlushAsync();
+        Server.StandardInput.Close();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var output = await Server.StandardOutput.ReadToEndAsync(timeout.Token);
+        await Server.WaitForExitAsync(timeout.Token);
+        return (output, Server.ExitCode);
     }
 
     public async Task InitializeAsync()

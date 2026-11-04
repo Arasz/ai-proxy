@@ -1,4 +1,5 @@
 using AiProxy.Client;
+using ModelContextProtocol.Protocol;
 
 namespace AiProxy.Mcp;
 
@@ -7,10 +8,11 @@ public sealed record McpServerOptions(string Endpoint);
 /// <summary>Runs <c>ai-proxy mcp</c>: the retrieval MCP server on stdio, logging to stderr only.</summary>
 public static class McpServerProcess
 {
+    private static readonly TimeSpan DrainBound = TimeSpan.FromSeconds(30);
+
     /// <summary>The first argument that selects the MCP server.</summary>
     public const string Command = "mcp";
 
-    /// <summary>Runs the stdio server against the configured proxy endpoint.</summary>
     /// <summary>True when <c>GET {endpoint}/health</c> answers success within two seconds; never throws for an unreachable proxy.</summary>
     public static async Task<bool> IsReachableAsync(string endpoint, HttpMessageHandler handler, CancellationToken cancellationToken)
     {
@@ -28,6 +30,7 @@ public static class McpServerProcess
         }
     }
 
+    /// <summary>Runs the stdio server against the configured proxy endpoint; at end of input it still answers requests in flight.</summary>
     public static async Task<int> RunAsync(string endpoint, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
@@ -46,7 +49,15 @@ public static class McpServerProcess
         builder.Logging.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddProxyHttpClient();
         builder.Services.AddSingleton(new McpServerOptions(endpoint));
-        builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<RetrievalTools>();
+        using var drainLog = LoggerFactory.Create(static log => log.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace));
+        var pending = new PendingRequests();
+        var input = new DrainOnEofStream(Console.OpenStandardInput(), pending, TimeProvider.System, DrainBound, drainLog.CreateLogger<DrainOnEofStream>());
+        builder.Services.AddMcpServer(options => options.Filters.Message.OutgoingFilters.Add(next => async (context, token) =>
+            {
+                await pending.ReleaseAfterAsync(context.JsonRpcMessage, () => next(context, token)).ConfigureAwait(false);
+            }))
+            .WithStreamServerTransport(input, new BufferedStream(Console.OpenStandardOutput()))
+            .WithTools<RetrievalTools>();
         using var host = builder.Build();
         await host.RunAsync(cancellationToken).ConfigureAwait(false);
         return 0;

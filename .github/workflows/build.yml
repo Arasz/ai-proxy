@@ -186,6 +186,80 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo
 
+  installed-tool:
+    # Installs the packed tool from a local feed on each OS and runs the real
+    # shim, which no in-process test can do: it proves the shell/payload
+    # packages resolve for that platform and the installed binary answers.
+    # Skipped on doc-only changes; not a required check.
+    needs: [changes, build-slow]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      # Checkout supplies only scripts/, VERSION and global.json.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nupkg-all-rids
+          path: artifacts
+      - name: Install the tool from a local feed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = (Get-Content -Raw VERSION).Trim()
+          if (-not $ver) { throw 'VERSION at the repo root is empty or missing.' }
+          $rids = 'win-x64', 'win-arm64', 'osx-arm64', 'linux-x64', 'linux-arm64', 'linux-musl-x64'
+          $feed = Join-Path $env:RUNNER_TEMP 'feed'
+          $work = Join-Path $env:RUNNER_TEMP 'work'
+          New-Item -ItemType Directory -Force -Path $feed, $work | Out-Null
+          # Only the osx-arm64 shell is patched to list every RID (build-slow).
+          Copy-Item "artifacts/osx-arm64/ai-proxy.$ver.nupkg" $feed
+          foreach ($rid in $rids) { Copy-Item "artifacts/$rid/ai-proxy.$rid.$ver.nupkg" $feed }
+          $count = @(Get-ChildItem $feed -Filter *.nupkg).Count
+          if ($count -ne 7) { throw "Expected 7 packages in the feed, found $count." }
+          $config = Join-Path $work 'nuget.config'
+          @(
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<configuration>'
+            '  <packageSources>'
+            '    <clear />'
+            "    <add key=`"local`" value=`"$feed`" />"
+            '  </packageSources>'
+            '</configuration>'
+          ) | Set-Content $config
+          $toolPath = Join-Path $env:RUNNER_TEMP 'tool'
+          Push-Location $work
+          try {
+            dotnet tool install ai-proxy --tool-path $toolPath --version $ver --configfile $config
+            if ($LASTEXITCODE -ne 0) { throw "dotnet tool install failed with exit code $LASTEXITCODE." }
+          }
+          finally { Pop-Location }
+          Get-ChildItem $toolPath | Format-Table Name, Length | Out-String | Write-Host
+          # The shim's name differs by platform and SDK (ai-proxy, ai-proxy.exe, ai-proxy.cmd).
+          $shim = 'ai-proxy.exe', 'ai-proxy.cmd', 'ai-proxy' |
+            ForEach-Object { Join-Path $toolPath $_ } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Select-Object -First 1
+          if (-not $shim) { throw "No ai-proxy shim found in $toolPath." }
+          "TOOL_SHIM=$shim" >> $env:GITHUB_ENV
+          "TOOL_VERSION=$ver" >> $env:GITHUB_ENV
+      - name: Smoke-test the installed tool
+        shell: pwsh
+        run: ./scripts/smoke-installed-tool.ps1 -Tool $env:TOOL_SHIM -ExpectedVersion $env:TOOL_VERSION
+
   certificates-macos:
     # The root CA's name-constraint tests on the macOS chain engine. macOS
     # reports a refused name with a different flag from Linux (OpenSSL), so the

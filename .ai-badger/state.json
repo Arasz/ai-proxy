@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-04T20:40:16.281797+00:00",
-  "next": "installed-tool CI + mcp EOF drain fix (plan ready; MCP SDK 2.3.1 does not fix EOF); then Codex launcher, musl grammars, compression reporting, lifecycle status/stop, #24, NSS cleanup, capture message id. Owner gate pending: quoted-echo build/park (PR #106).",
+  "lastUpdated": "2026-11-04T21:00:58.489826+00:00",
+  "next": "Codex launcher; then musl grammars, compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gate pending: quoted-echo build/park (PR #106 record).",
   "completedTasks": [
+    {
+      "taskId": "aip-installed-tool-smoke-and-mcp-drain",
+      "date": "2026-11-04",
+      "title": "Installed-tool CI smoke + mcp EOF drain (0.22.2)",
+      "pr": 107,
+      "version": "0.22.2",
+      "summary": "mcp holds stdin EOF until pending JSON-RPC requests are answered/cancelled or 30 s (SDK 2.3.0 drops replies after EOF). CI job installed-tool installs the packed tool from build-slow packages on ubuntu/windows/macos and runs scripts/smoke-installed-tool.ps1.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-replace-quoted-echoes-with-references",
       "date": "2026-11-04",
