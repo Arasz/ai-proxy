@@ -31,6 +31,11 @@ public sealed class DoctorSettings : CommandSettings
     [Description("Provider host to probe through the proxy.")]
     public string Host { get; init; } = DefaultHost;
 
+    [CommandOption("--timeout <SECONDS>")]
+    [DefaultValue(5)]
+    [Description("Seconds each network check may take.")]
+    public int Timeout { get; init; } = 5;
+
     [CommandOption("-f|--format <FORMAT>")]
     [DefaultValue(GainFormats.Text)]
     [Description("Output format: text, json.")]
@@ -51,6 +56,9 @@ public sealed class DoctorSettings : CommandSettings
             RuleFor(static settings => settings.Proxy)
                 .Must(static proxy => proxy is null || (Uri.TryCreate(proxy, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp))
                 .WithMessage("The proxy must be an absolute HTTP URL.");
+            RuleFor(static settings => settings.Timeout)
+                .InclusiveBetween(1, 300)
+                .WithMessage("The timeout must be between 1 and 300 seconds.");
             RuleFor(static settings => settings.Host)
                 .Must(static host => ProviderHostCatalog.Hosts.Contains(host))
                 .WithMessage("The host must be one of the provider hosts the proxy inspects: " + string.Join(", ", ProviderHostCatalog.Hosts) + ".");

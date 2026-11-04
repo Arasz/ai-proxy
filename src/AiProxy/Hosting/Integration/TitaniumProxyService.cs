@@ -1,7 +1,9 @@
 using System.Net;
+using System.Net.Mime;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
+using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
@@ -21,6 +23,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     /// <summary>File name of the generated pfx password, used when <c>Proxy:RootCertificatePassword</c> is not set.</summary>
     public const string RootCertificatePasswordFileName = "root-ca.password";
+
+    private const string SelfRequestMessage = "This port is the ai-proxy forward proxy, not an origin server. Set it as HTTP_PROXY/HTTPS_PROXY, not as a base URL.\n";
 
     private readonly ISystemProxyGuardLauncher _guardLauncher;
     private readonly ProviderRequestInspector _inspector;
@@ -304,7 +308,26 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
+        if (IsAddressedToSelf(e.HttpClient.Request.RequestUri))
+        {
+            var request = e.HttpClient.Request;
+            Log.AddressedToSelf(_logger, request.Method, request.RequestUri.AbsolutePath, request.Headers.GetFirstHeader(HeaderNames.UserAgent)?.Value);
+            e.GenericResponse(SelfRequestMessage, HttpStatusCode.BadRequest, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+            return Task.CompletedTask;
+        }
+
         return _inspector.BeforeRequestAsync(sender, e);
+    }
+
+    /// <summary>True when the request names this proxy's own listener as its origin, which Titanium cannot forward.</summary>
+    private bool IsAddressedToSelf(Uri target)
+    {
+        if (_endPoint is null || target.Port != _endPoint.Port)
+        {
+            return false;
+        }
+
+        return target.IsLoopback || (IPAddress.TryParse(target.Host, out var address) && address.Equals(_options.ListenAddress));
     }
 
     private Task BeforeResponseAsync(object sender, SessionEventArgs e)
@@ -392,5 +415,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         [LoggerMessage(EventId = 1308, Level = LogLevel.Warning, Message = "Replaced the ai-proxy root certificate {OldThumbprint} with a name-constrained one; restart every ai-proxy harness session so it reads the new root-ca.pem")]
         public static partial void RootReplaced(ILogger logger, string oldThumbprint);
+
+        [LoggerMessage(EventId = 1309, Level = LogLevel.Warning, Message = "Answered 400 to {Method} {Path} (User-Agent: {UserAgent}) addressed to the proxy port itself; the client uses the proxy as a base URL instead of as an HTTP proxy")]
+        public static partial void AddressedToSelf(ILogger logger, string method, string path, string? userAgent);
     }
 }
