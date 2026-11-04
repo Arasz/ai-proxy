@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.22.2](0.22.2-mcp-drain-on-eof.md) | `ai-proxy mcp` now answers requests still in flight when stdin closes, waiting up to 30 seconds, instead of printing nothing. | TBD |
 | [0.22.1](0.22.1-self-addressed-requests.md) | A request sent to the proxy port itself gets a 400 that explains to use it as HTTP_PROXY, plus one warning naming the client; the system proxy now bypasses loopback hosts. | [#105](https://github.com/Arasz/ai-proxy/pull/105) |
 | [0.22.0](0.22.0-doctor.md) | New `ai-proxy doctor` command: a read-only check of the API, HTTPS inspection, the root certificate and the proxy environment, with exit codes for scripts. `/health` also names the product and version. | [#103](https://github.com/Arasz/ai-proxy/pull/103) |
 | [0.21.1](0.21.1-serialized-schema-creation.md) | Creating the content tables is one transaction, so first use from several places no longer fails with "database is locked"; a failed queue read is retried on the next pass. | [#102](https://github.com/Arasz/ai-proxy/pull/102) |
