@@ -43,6 +43,12 @@ function Start-Tool([string[]]$ToolArguments) {
     $process
 }
 
+# Spectre colours its output when it detects CI, even into a pipe; checks match plain text.
+function Remove-Ansi([string]$text) {
+    if ($null -eq $text) { return '' }
+    $text -replace "`e\[[0-9;?]*[A-Za-z]", ''
+}
+
 function Stop-Tool($process) {
     if (-not $process.HasExited) { $process.Kill($true) }
 }
@@ -59,7 +65,7 @@ function Invoke-Tool([string[]]$ToolArguments) {
             return [pscustomobject]@{ TimedOut = $true; ExitCode = -1; Out = ''; Err = '' }
         }
         $process.WaitForExit()
-        [pscustomobject]@{ TimedOut = $false; ExitCode = $process.ExitCode; Out = $out.Result; Err = $err.Result }
+        [pscustomobject]@{ TimedOut = $false; ExitCode = $process.ExitCode; Out = (Remove-Ansi $out.Result); Err = (Remove-Ansi $err.Result) }
     }
     finally { Stop-Tool $process; $process.Dispose() }
 }
