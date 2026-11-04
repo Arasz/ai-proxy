@@ -52,6 +52,19 @@ public sealed class ContentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_publish_on_a_fresh_file_under_a_held_lock_gives_up_within_its_bound()
+    {
+        await using var holder = ContentSchema.Open(_databasePath);
+        holder.Execute("BEGIN IMMEDIATE;");
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAsync<SqliteException>(() => _store.StoreAsync(Record(), TestContext.Current.CancellationToken).AsTask());
+        watch.Stop();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"gave up after {watch.Elapsed}");
+    }
+
+    [Fact]
     public async Task A_published_record_is_in_the_queue_when_the_producer_returns()
     {
         await _store.StoreAsync(Record(), CancellationToken.None);

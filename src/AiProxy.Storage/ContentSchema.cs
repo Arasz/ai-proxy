@@ -43,17 +43,25 @@ public static class ContentSchema
         KeepUserOnly(path);
 
         var connection = new SqliteConnection(builder.ToString());
-        connection.Open();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA journal_mode;";
-        var mode = Convert.ToString(command.ExecuteScalar());
-        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            connection.Execute("PRAGMA journal_mode = WAL;");
-        }
+            connection.Open();
 
-        return connection;
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA journal_mode;";
+            var mode = Convert.ToString(command.ExecuteScalar());
+            if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+            {
+                connection.Execute("PRAGMA journal_mode = WAL;");
+            }
+
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Creates the file readable by the user only, and takes the other bits off one that is not.</summary>
@@ -91,21 +99,52 @@ public static class ContentSchema
         ///     statements on every connection. The create statements take a write lock, and a
         ///     write moves the change counter that the worker's poll reads, so running them on
         ///     every read would make the poll read every time and defeat the gate.
+        ///     The creation is one immediate transaction that checks the version again once it
+        ///     holds the lock, so connections that start together create the tables once, and
+        ///     a reader never sees tables without the version.
         /// </remarks>
         /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
         public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version;";
-            var version = Convert.ToInt64(command.ExecuteScalar());
-            if (version >= SchemaVersion)
+            if (connection.ReadUserVersion() >= SchemaVersion)
             {
                 return;
             }
 
-            connection.Execute(Sql.Statements, commandTimeoutSeconds);
-            connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
+            connection.Execute("BEGIN IMMEDIATE;", commandTimeoutSeconds);
+            try
+            {
+                if (connection.ReadUserVersion() < SchemaVersion)
+                {
+                    connection.Execute(Sql.Statements, commandTimeoutSeconds);
+                    connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
+                }
+
+                connection.Execute("COMMIT;", commandTimeoutSeconds);
+            }
+            catch
+            {
+                connection.RollBack();
+                throw;
+            }
+        }
+
+        private long ReadUserVersion()
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version;";
+            return Convert.ToInt64(command.ExecuteScalar());
+        }
+
+        private void RollBack()
+        {
+            try
+            {
+                connection.Execute("ROLLBACK;");
+            }
+            catch (SqliteException)
+            {
+            }
         }
 
         /// <summary>Runs a statement that returns nothing.</summary>

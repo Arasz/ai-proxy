@@ -137,6 +137,50 @@ public sealed class ContentStoreWorkerTests : IDisposable
         Assert.Equal(2, queue.Reads);
     }
 
+    [Fact]
+    public async Task A_pass_whose_queue_read_failed_reads_again()
+    {
+        var queue = new FailingFirstReadQueue();
+        var worker = new ContentStoreWorker(
+            new RecordingWriter(),
+            queue,
+            _options,
+            NullLogger<ContentStoreWorker>.Instance,
+            _time);
+
+        await Assert.ThrowsAsync<SqliteException>(() => worker.RunOnceAsync(CancellationToken.None));
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(2, queue.Reads);
+    }
+
+    private sealed class FailingFirstReadQueue : IContentQueue
+    {
+        public int Reads { get; private set; }
+
+        public Task<IReadOnlyList<ContentJob>> ReadAsync(int limit, CancellationToken cancellationToken)
+        {
+            Reads++;
+
+            if (Reads == 1)
+            {
+                throw new SqliteException("database is locked", 5);
+            }
+
+            return Task.FromResult<IReadOnlyList<ContentJob>>([]);
+        }
+
+        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(7L);
+        }
+    }
+
     private sealed class CountingQueue(IContentQueue inner) : IContentQueue
     {
         public int Reads { get; private set; }
