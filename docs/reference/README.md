@@ -8,3 +8,4 @@ mid-task, while a change is in progress. Filenames are a bare noun.
 | File | What it is |
 |---|---|
 | [environment-variables.md](environment-variables.md) | Every variable the proxy reads: provider upstreams, pass-through rules, compression and listener configuration. |
+| [doctor.md](doctor.md) | The `ai-proxy doctor` setup check: what each check tests, the statuses, options and exit codes. |

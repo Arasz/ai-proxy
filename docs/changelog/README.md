@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.22.0](0.22.0-doctor.md) | New `ai-proxy doctor` command: a read-only check of the API, HTTPS inspection, the root certificate and the proxy environment, with exit codes for scripts. `/health` also names the product and version. | [#103](https://github.com/Arasz/ai-proxy/pull/103) |
 | [0.21.1](0.21.1-serialized-schema-creation.md) | Creating the content tables is one transaction, so first use from several places no longer fails with "database is locked"; a failed queue read is retried on the next pass. | [#102](https://github.com/Arasz/ai-proxy/pull/102) |
 | [0.21.0](0.21.0-build-output-kind.md) | Build logs are their own content kind: every error and warning kept whole, repeats dropped, compiler command lines cut to a marked head; the verbose failure log goes from 60,672 to 5,367 characters. | [#100](https://github.com/Arasz/ai-proxy/pull/100) |
 | [0.20.0](0.20.0-region-size-minimum.md) | The size minimum is judged on a whole tool result, then every fragment is reduced, instead of skipping each short fragment. | [#99](https://github.com/Arasz/ai-proxy/pull/99) |
