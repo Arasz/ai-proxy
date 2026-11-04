@@ -11,12 +11,24 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     /// <inheritdoc />
     public void Set(ExplicitProxyEndPoint endPoint)
     {
-        var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp);
+        var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, BypassSettings());
         if (!result.Succeeded)
         {
             server.TryRestoreOriginalProxySettings();
             throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
         }
+    }
+
+    /// <summary>Adds the loopback hosts to the system bypass list, so local calls never loop back into the proxy.</summary>
+    public static SystemProxySettings BypassSettings()
+    {
+        var settings = new SystemProxySettings { BypassRuleMode = SystemProxyBypassRuleMode.Merge };
+        foreach (var host in (string[])["localhost", "127.0.0.1", "::1"])
+        {
+            settings.BypassRules.Add(host);
+        }
+
+        return settings;
     }
 
     /// <inheritdoc />
