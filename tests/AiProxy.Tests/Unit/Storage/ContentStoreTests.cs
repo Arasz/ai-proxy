@@ -52,6 +52,19 @@ public sealed class ContentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_publish_on_a_fresh_file_under_a_held_lock_gives_up_within_its_bound()
+    {
+        await using var holder = ContentSchema.Open(_databasePath);
+        holder.Execute("BEGIN IMMEDIATE;");
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAsync<SqliteException>(() => _store.StoreAsync(Record(), TestContext.Current.CancellationToken).AsTask());
+        watch.Stop();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"gave up after {watch.Elapsed}");
+    }
+
+    [Fact]
     public async Task A_published_record_is_in_the_queue_when_the_producer_returns()
     {
         await _store.StoreAsync(Record(), CancellationToken.None);
@@ -220,9 +233,8 @@ public sealed class ContentStoreTests : IDisposable
         // second and not the half minute a command waits by default. A request must not
         // hang on a locked database: the record is lost, the request goes out, and the
         // pipeline logs that the store failed.
-        // The schema exists before the lock is taken, as it does in the host: a schema
-        // change cannot wait for the write lock, so creating the tables under a held
-        // lock is a different thing from writing a row under one.
+        // The schema exists before the lock is taken, as it does in the host, so this
+        // covers writing a row under a held lock and not creating the tables under one.
         using (var setup = ContentSchema.Open(_databasePath))
         {
             setup.Ensure();

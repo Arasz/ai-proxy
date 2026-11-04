@@ -53,9 +53,8 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
             return 0;
         }
 
-        _lastDataVersion = version;
-
         var jobs = await queue.ReadAsync(BatchSize, cancellationToken).ConfigureAwait(false);
+        _lastDataVersion = version;
         var written = 0;
 
         foreach (var job in jobs)

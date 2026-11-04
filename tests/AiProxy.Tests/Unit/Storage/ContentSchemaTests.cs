@@ -5,6 +5,7 @@ using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using SQLitePCL;
 
 namespace AiProxy.Tests.Unit.Storage;
 
@@ -22,6 +23,8 @@ public sealed class ContentSchemaTests : IDisposable
         CREATE INDEX ccr_thread_created ON ccr_thread (created_at);
         PRAGMA user_version = 2;
         """;
+
+    private static readonly TimeSpan SafetyBound = TimeSpan.FromSeconds(10);
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
 
@@ -136,5 +139,160 @@ public sealed class ContentSchemaTests : IDisposable
         }
 
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(DatabasePath));
+    }
+
+    [Fact]
+    public async Task A_user_that_waited_for_the_schema_creates_nothing()
+    {
+        Directory.CreateDirectory(_directory);
+        using var first = ContentSchema.Open(DatabasePath);
+        using var second = ContentSchema.Open(DatabasePath);
+        using var firstAtCreate = new ManualResetEventSlim();
+        using var releaseFirst = new ManualResetEventSlim();
+        using var secondPastTheCheck = new ManualResetEventSlim();
+        using var firstTrace = new StatementTrace(first, sql =>
+        {
+            if (sql.StartsWith("CREATE", StringComparison.Ordinal) && !firstAtCreate.IsSet)
+            {
+                firstAtCreate.Set();
+                Hold(releaseFirst);
+            }
+        });
+        using var secondTrace = new StatementTrace(second, sql =>
+        {
+            if (!sql.StartsWith("PRAGMA user_version;", StringComparison.Ordinal))
+            {
+                secondPastTheCheck.Set();
+            }
+        });
+
+        var firstRun = Task.Factory.StartNew(() => first.Ensure(), TestContext.Current.CancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Assert.True(firstAtCreate.Wait(SafetyBound, TestContext.Current.CancellationToken));
+        var secondRun = Task.Factory.StartNew(() => second.Ensure(), TestContext.Current.CancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Assert.True(secondPastTheCheck.Wait(SafetyBound, TestContext.Current.CancellationToken));
+        releaseFirst.Set();
+        await firstRun.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+        await secondRun.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(secondTrace.Statements, sql => sql.StartsWith("CREATE", StringComparison.Ordinal));
+        Assert.DoesNotContain(secondTrace.Statements, sql => sql.StartsWith("PRAGMA user_version =", StringComparison.Ordinal));
+        Assert.Equal(3L, second.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    [Fact]
+    public async Task An_observer_sees_no_tables_while_the_schema_is_being_created()
+    {
+        Directory.CreateDirectory(_directory);
+        using var creator = ContentSchema.Open(DatabasePath);
+        using var observer = ContentSchema.Open(DatabasePath);
+        using var atVersion = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var trace = new StatementTrace(creator, sql =>
+        {
+            if (sql.StartsWith("PRAGMA user_version =", StringComparison.Ordinal))
+            {
+                atVersion.Set();
+                Hold(release);
+            }
+        });
+
+        var run = Task.Factory.StartNew(() => creator.Ensure(), TestContext.Current.CancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Assert.True(atVersion.Wait(SafetyBound, TestContext.Current.CancellationToken));
+        var tablesDuring = observer.ExecuteScalar<int>(CountTables);
+        var versionDuring = observer.ExecuteScalar<long>("PRAGMA user_version;");
+        release.Set();
+        await run.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, tablesDuring);
+        Assert.Equal(0L, versionDuring);
+        Assert.Equal(6, observer.ExecuteScalar<int>(CountTables));
+        Assert.Equal(3L, observer.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    [Fact]
+    public void A_first_use_that_cannot_get_the_lock_gives_up_within_its_bound()
+    {
+        Directory.CreateDirectory(_directory);
+        using var holder = ContentSchema.Open(DatabasePath);
+        using var user = ContentSchema.Open(DatabasePath);
+        holder.Execute("BEGIN IMMEDIATE;");
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<SqliteException>(() => user.Ensure(1));
+        watch.Stop();
+        holder.Execute("ROLLBACK;");
+        user.Ensure();
+
+        Assert.True(watch.Elapsed < SafetyBound, $"gave up after {watch.Elapsed}");
+        Assert.Equal(3L, user.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    [Fact]
+    public void A_creation_that_fails_inside_its_transaction_leaves_nothing_and_can_be_run_again()
+    {
+        Directory.CreateDirectory(_directory);
+        using var connection = ContentSchema.Open(DatabasePath);
+        connection.Execute("CREATE TABLE content_request_created (x INTEGER);");
+
+        Assert.Throws<SqliteException>(() => connection.Ensure());
+        Assert.Equal(0, connection.ExecuteScalar<int>(CountTables));
+        connection.Execute("DROP TABLE content_request_created;");
+        connection.Ensure();
+
+        Assert.Equal(6, connection.ExecuteScalar<int>(CountTables));
+        Assert.Equal(3L, connection.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    private static void Hold(ManualResetEventSlim release)
+    {
+        try
+        {
+            release.Wait(SafetyBound, TestContext.Current.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private const string CountTables = "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('content_request', 'content_chunk', 'content_queue', 'ccr_original', 'ccr_thread', 'content_queue_dead');";
+
+    /// <summary>Reports each statement a connection starts, from SQLite's own trace.</summary>
+    private sealed class StatementTrace : IDisposable
+    {
+        private readonly sqlite3 _handle;
+        private readonly delegate_trace _callback;
+        private readonly List<string> _statements = [];
+
+        public StatementTrace(SqliteConnection connection, Action<string> onStatement)
+        {
+            _handle = connection.Handle!;
+            _callback = (_, statement) =>
+            {
+                var text = statement.utf8_to_string().Trim();
+                lock (_statements)
+                {
+                    _statements.Add(text);
+                }
+
+                onStatement(text);
+            };
+            raw.sqlite3_trace(_handle, _callback, null);
+        }
+
+        public IReadOnlyList<string> Statements
+        {
+            get
+            {
+                lock (_statements)
+                {
+                    return [.. _statements];
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            raw.sqlite3_trace(_handle, (delegate_trace?)null, null);
+        }
     }
 }

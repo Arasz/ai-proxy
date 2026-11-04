@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using SQLitePCL;
 
 namespace AiProxy.Storage;
 
@@ -43,17 +44,25 @@ public static class ContentSchema
         KeepUserOnly(path);
 
         var connection = new SqliteConnection(builder.ToString());
-        connection.Open();
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA journal_mode;";
-        var mode = Convert.ToString(command.ExecuteScalar());
-        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            connection.Execute("PRAGMA journal_mode = WAL;");
-        }
+            connection.Open();
 
-        return connection;
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA journal_mode;";
+            var mode = Convert.ToString(command.ExecuteScalar());
+            if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+            {
+                connection.Execute("PRAGMA journal_mode = WAL;");
+            }
+
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Creates the file readable by the user only, and takes the other bits off one that is not.</summary>
@@ -87,25 +96,48 @@ public static class ContentSchema
     {
         /// <summary>Makes the tables when they are not there yet.</summary>
         /// <remarks>
-        ///     The check is a read of the file's user version, and not a run of the create
-        ///     statements on every connection. The create statements take a write lock, and a
-        ///     write moves the change counter that the worker's poll reads, so running them on
-        ///     every read would make the poll read every time and defeat the gate.
+        ///     Reads the user version first, so a current file costs no write. Otherwise it creates
+        ///     everything in one immediate transaction that checks the version again under the lock.
         /// </remarks>
         /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
         public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version;";
-            var version = Convert.ToInt64(command.ExecuteScalar());
-            if (version >= SchemaVersion)
+            if (connection.ReadUserVersion() >= SchemaVersion)
             {
                 return;
             }
 
-            connection.Execute(Sql.Statements, commandTimeoutSeconds);
-            connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
+            connection.Execute("BEGIN IMMEDIATE;", commandTimeoutSeconds);
+            try
+            {
+                if (connection.ReadUserVersion() < SchemaVersion)
+                {
+                    connection.Execute(Sql.Statements, commandTimeoutSeconds);
+                    connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
+                }
+
+                connection.Execute("COMMIT;", commandTimeoutSeconds);
+            }
+            catch
+            {
+                connection.RollBack();
+                throw;
+            }
+        }
+
+        private long ReadUserVersion()
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version;";
+            return Convert.ToInt64(command.ExecuteScalar());
+        }
+
+        private void RollBack()
+        {
+            if (raw.sqlite3_get_autocommit(connection.Handle) == 0)
+            {
+                connection.Execute("ROLLBACK;");
+            }
         }
 
         /// <summary>Runs a statement that returns nothing.</summary>
