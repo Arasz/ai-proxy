@@ -131,7 +131,7 @@ counts as unset and keeps `8080`; an invalid value stops startup with an error n
 
 ## Runtime isolation and restart
 
-<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:31#runtimeOptions -->
+<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:33#runtimeOptions -->
 | Variable | What it is |
 |---|---|
 | `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
