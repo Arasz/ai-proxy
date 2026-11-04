@@ -5,6 +5,8 @@
 
 Base: `origin/main` at `82a4482` (VERSION 0.19.1).
 
+Status note (2026-11-04): F1 and F2 shipped in 0.19.2, D6 in 0.20.0 and D5 in 0.21.0. The current open list is [2026-11-04-installed-0.19.1-test-and-open-features.md](2026-11-04-installed-0.19.1-test-and-open-features.md).
+
 ```chart:bars
 title: gain summary table width in columns (Spectre 0.57.2, values from the live store)
 A current, N0 and full headers: 128

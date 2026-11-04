@@ -1,6 +1,6 @@
 # 0006 - One tool, with local gain and retrieval clients
 
-Status: Draft (2026-10-26)
+Status: Accepted (drafted 2026-10-26; accepted 2026-11-04, shipped in 0.15.0)
 
 ## Context
 

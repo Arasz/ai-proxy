@@ -2,7 +2,7 @@
 
 Date: 2026-10-30. Source record: [2026-10-30-project-scope-review.md](2026-10-30-project-scope-review.md)
 (audited). Campaign branch `review/project-scope-2026-10-30`, draft PR #90. Base: main at
-`d6b79dd` (0.17.3). Status: revision 2; wave 1 merged (0.18.0), waves 2 to 4 pending.
+`d6b79dd` (0.17.3). Status: revision 2; wave 1 merged (0.18.0), later waves shipped through 0.19.1. What remains is listed in [the 2026-11-04 record](2026-11-04-installed-0.19.1-test-and-open-features.md).
 
 F1 already shipped as hotfix 0.17.3 (#89). This plan covers the remaining 29 findings.
 
