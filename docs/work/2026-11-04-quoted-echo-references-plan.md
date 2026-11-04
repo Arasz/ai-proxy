@@ -1,7 +1,7 @@
 # Plan: replace text a user copied from an earlier answer with a reference
 
 **Date:** 2026-11-04
-**Status:** next task, owner request of 2026-11-04. Research comes first; nothing is built.
+**Status:** research done ([record](2026-11-04-quoted-echo-references-research.md)); it recommends parking the feature. Waiting for the owner to rule on build or park. Nothing is built.
 
 ## The scenario
 
