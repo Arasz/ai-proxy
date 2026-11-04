@@ -24,6 +24,7 @@ assumed from `--data-directory`; doctor cannot ask a running proxy where its dir
 | `--proxy <URL>` | `http://127.0.0.1:{port}`, where the port comes from the `Proxy__Port` environment variable, or 8080 | The proxy listener. Overrides the default. |
 | `--data-directory <PATH>` | `~/.ai-proxy` | Where `root-ca.pem` lives. |
 | `--host <HOST>` | `api.anthropic.com` | A provider host the proxy inspects. |
+| `--timeout <SECONDS>` | `5` | How long each network check may take, from 1 to 300. Raise it on a slow or busy machine: the first inspected handshake makes the proxy create a certificate. |
 | `-f, --format <text\|json>` | `text` | Table or JSON. |
 
 ## Exit codes

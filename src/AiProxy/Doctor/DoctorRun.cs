@@ -12,26 +12,26 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
     private const string ProxyPortVariable = "Proxy__Port";
     private const string LegacyProxyPortVariable = "PROXY__PORT";
 
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _timeout = TimeSpan.FromSeconds(settings.Timeout);
 
     public async Task<DoctorReport> RunAsync(CancellationToken cancellationToken)
     {
         var proxy = ProxyAddress();
         var dataDirectory = Path.GetFullPath(settings.DataDirectory ?? ProxyRuntimeOptions.DefaultDataDirectory);
         using var handler = new HttpClientHandler { UseProxy = false };
-        using var http = new HttpClient(handler) { Timeout = Timeout };
+        using var http = new HttpClient(handler) { Timeout = _timeout };
         var api = await new ApiCheck(http, new Uri(settings.Endpoint), EntryPoint.ProductVersion).ProbeAsync(cancellationToken).ConfigureAwait(false);
 
         CheckResult first = api.Result;
         CheckResult inspection;
-        if (!api.Reachable && !await IsListeningAsync(proxy, cancellationToken).ConfigureAwait(false))
+        if (!api.Reachable && !await IsListeningAsync(proxy, _timeout, cancellationToken).ConfigureAwait(false))
         {
             first = new CheckResult(ApiCheck.Name, CheckStatus.Fail, $"The proxy is not running: nothing answers at {EndpointText.Safe(settings.Endpoint)} or listens at {EndpointText.Safe(proxy.ToString())}.", "Start ai-proxy.");
             inspection = new CheckResult(InspectionCheck.Name, CheckStatus.Unknown, "skipped because the proxy is not running.");
         }
         else
         {
-            inspection = await new InspectionCheck(proxy, settings.Host, dataDirectory, Timeout).RunAsync(cancellationToken).ConfigureAwait(false);
+            inspection = await new InspectionCheck(proxy, settings.Host, dataDirectory, _timeout).RunAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var root = await new RootCheck(dataDirectory, time, new SystemRootTrust()).RunAsync(cancellationToken).ConfigureAwait(false);
@@ -52,11 +52,11 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
         return new Uri(string.Format(CultureInfo.InvariantCulture, KnownNames.Network.ProxyUrlFormat, port));
     }
 
-    private static async Task<bool> IsListeningAsync(Uri proxy, CancellationToken cancellationToken)
+    private static async Task<bool> IsListeningAsync(Uri proxy, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var connection = new TcpClient();
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        limit.CancelAfter(Timeout);
+        limit.CancelAfter(timeout);
         try
         {
             await connection.ConnectAsync(proxy.Host, proxy.Port, limit.Token).ConfigureAwait(false);

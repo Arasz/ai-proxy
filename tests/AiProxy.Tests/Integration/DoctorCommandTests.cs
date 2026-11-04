@@ -36,7 +36,7 @@ public sealed class DoctorCommandTests
 
     private static string[] Options(ProxyHost proxy, string? host = null)
     {
-        return ["--endpoint", proxy.BaseAddress.ToString(), "--proxy", proxy.ProxyAddress.ToString(), "--data-directory", proxy.DataDirectory, "--host", host ?? "api.anthropic.com"];
+        return ["--endpoint", proxy.BaseAddress.ToString(), "--proxy", proxy.ProxyAddress.ToString(), "--data-directory", proxy.DataDirectory, "--host", host ?? "api.anthropic.com", "--timeout", "60"];
     }
 
     private static int ClosedPort()
@@ -124,13 +124,14 @@ public sealed class DoctorCommandTests
     }
 
     [Theory]
-    [InlineData("--host", "example.com")]
-    [InlineData("--format", "xml")]
-    [InlineData("--endpoint", "not a url")]
-    public async Task Bad_options_exit_one_with_a_message_on_stderr(string option, string value)
+    [InlineData("--host", "example.com", "provider hosts")]
+    [InlineData("--format", "xml", "text or json")]
+    [InlineData("--timeout", "0", "between 1 and 300")]
+    [InlineData("--endpoint", "not a url", "absolute HTTP")]
+    public async Task Bad_options_exit_one_with_a_message_on_stderr(string option, string value, string message)
     {
         var outcome = await RunAsync([], option, value);
         Assert.Equal(1, outcome.Exit);
-        Assert.NotEqual("", outcome.Error);
+        Assert.Contains(message, outcome.Error);
     }
 }
