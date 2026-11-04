@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-04T11:45:52.104366+00:00",
-  "next": "ai-proxy doctor v1 (plan ready); then installed-tool CI, Codex launcher, musl grammars, compression reporting, lifecycle status/stop, #24, NSS cleanup, capture message id. Open list: docs/work/2026-11-04-installed-0.19.1-test-and-open-features.md",
+  "lastUpdated": "2026-11-04T15:52:51.245120+00:00",
+  "next": "installed-tool CI + mcp EOF fix (plan ready; try ModelContextProtocol 2.3.1 first); then Codex launcher, musl grammars, compression reporting, lifecycle status/stop, #24, NSS cleanup, capture message id.",
   "completedTasks": [
+    {
+      "taskId": "aip-read-only-doctor-setup-check",
+      "date": "2026-11-04",
+      "title": "ai-proxy doctor v1: read-only setup check",
+      "pr": 103,
+      "version": "0.22.0",
+      "summary": "doctor: api (/health gains product+version), inspection (CONNECT handshake chains to published root; offline upstream OK; handshake errors Unknown), root (64 KiB bounded, constrained, expiry, advisory OS trust), environment (HTTPS_PROXY/HTTP_PROXY host:port). Exit 0/1/2. Agent-config checks deferred to v2.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-serialize-first-use-schema-init",
       "date": "2026-11-04",

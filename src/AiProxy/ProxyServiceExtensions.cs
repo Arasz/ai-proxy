@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using AiProxy.Ccr;
+using AiProxy.Cli;
 using AiProxy.Code;
 using AiProxy.Configuration;
 using AiProxy.Core.Capture;
@@ -8,6 +9,7 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
+using AiProxy.Core.Doctor;
 using AiProxy.Core.Gain;
 using AiProxy.Hosting;
 using AiProxy.Hosting.Api;
@@ -189,7 +191,7 @@ public static partial class ProxyServiceExtensions
             app.UseExceptionHandler();
             app.UseStatusCodePages();
             app.UseMiddleware<RequestLoggingMiddleware>();
-            app.MapGet("/health", () => Results.Json(new { status = "ok" }));
+            app.MapGet(HealthApi.Path, () => Results.Json(new { status = "ok", product = HealthApi.Product, version = EntryPoint.ProductVersion }));
             app.MapGainEndpoints();
 
             if (settings.Compression.Enabled)
