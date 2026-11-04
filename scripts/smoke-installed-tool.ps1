@@ -121,6 +121,7 @@ Write-Host "ok 4: doctor reports $(@($report.checks).Count) checks and exits 1"
 
 # 5. mcp with stdin held open
 $process = Start-Tool @('mcp', '--endpoint', $deadChannel)
+$null = $process.StandardError.ReadToEndAsync()
 try {
     foreach ($line in $mcpRequests) { $process.StandardInput.WriteLine($line) }
     $process.StandardInput.Flush()
@@ -155,6 +156,7 @@ else {
         $null = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($deadlineSeconds * 1000)) { Fail '6 (mcp, immediate EOF)' "process did not exit within $deadlineSeconds seconds." }
         $process.WaitForExit()
+        if ($process.ExitCode -ne 0) { Fail '6 (mcp, immediate EOF)' "exit code $($process.ExitCode), expected 0." }
         $ids = @($all.Result -split "`r?`n" | Where-Object { $_ } | ForEach-Object { Get-ResponseId $_ })
         foreach ($expected in 1, 2) {
             if ($ids -notcontains $expected) { Fail '6 (mcp, immediate EOF)' "no reply with id $expected before the process exited; got ids: [$($ids -join ', ')]." }

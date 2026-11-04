@@ -49,15 +49,12 @@ public static class McpServerProcess
         builder.Logging.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddProxyHttpClient();
         builder.Services.AddSingleton(new McpServerOptions(endpoint));
+        using var drainLog = LoggerFactory.Create(static log => log.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace));
         var pending = new PendingRequests();
-        var input = new DrainOnEofStream(Console.OpenStandardInput(), pending, TimeProvider.System, DrainBound);
+        var input = new DrainOnEofStream(Console.OpenStandardInput(), pending, TimeProvider.System, DrainBound, drainLog.CreateLogger<DrainOnEofStream>());
         builder.Services.AddMcpServer(options => options.Filters.Message.OutgoingFilters.Add(next => async (context, token) =>
             {
-                await next(context, token).ConfigureAwait(false);
-                if (context.JsonRpcMessage is JsonRpcMessageWithId { Id: var id } and (JsonRpcResponse or JsonRpcError))
-                {
-                    pending.Complete(id);
-                }
+                await pending.ReleaseAfterAsync(context.JsonRpcMessage, () => next(context, token)).ConfigureAwait(false);
             }))
             .WithStreamServerTransport(input, new BufferedStream(Console.OpenStandardOutput()))
             .WithTools<RetrievalTools>();

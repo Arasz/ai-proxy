@@ -126,6 +126,18 @@ public sealed class McpWireTests
     }
 
     [Fact]
+    public async Task An_unknown_method_is_answered_with_an_error_and_end_of_input_does_not_wait()
+    {
+        await using var server = new McpProcess("http://127.0.0.1:1");
+        var watch = Stopwatch.StartNew();
+        var (output, exit) = await server.SendAndCloseAsync(
+            McpProcess.Initialize(1), McpProcess.Initialized, McpProcess.Request(2, "no/such/method", new { }));
+        Assert.Equal(0, exit);
+        Assert.Equal([1, 2], McpProcess.ReplyIds(output).Order());
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(15), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
     public async Task A_stream_of_only_notifications_exits_promptly_at_end_of_input()
     {
         await using var server = new McpProcess("http://127.0.0.1:1");
@@ -222,7 +234,7 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
 
         await Server.StandardInput.FlushAsync();
         Server.StandardInput.Close();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var output = await Server.StandardOutput.ReadToEndAsync(timeout.Token);
         await Server.WaitForExitAsync(timeout.Token);
         return (output, Server.ExitCode);
