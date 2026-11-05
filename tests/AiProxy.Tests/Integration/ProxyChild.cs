@@ -42,6 +42,12 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
             start.ArgumentList.Add(argument);
         }
 
+        // A throwaway home, so a child whose data-directory setting is missing or ignored
+        // resolves ~/.ai-proxy under it and can never reach the developer's running proxy.
+        var home = Path.Combine(Path.GetTempPath(), "ai-proxy-child-home-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(home);
+        start.Environment["HOME"] = home;
+        start.Environment["USERPROFILE"] = home;
         start.Environment["Proxy__DataDirectory"] = directory;
         start.Environment["Proxy__ConfigureSystemProxy"] = "false";
         start.Environment["Proxy__TrustRootCertificate"] = "false";

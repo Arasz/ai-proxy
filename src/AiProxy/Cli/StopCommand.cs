@@ -11,7 +11,7 @@ public sealed class StopCommand : AsyncCommand<StopSettings>
     public override async Task<int> ExecuteAsync(CommandContext context, StopSettings settings, CancellationToken cancellationToken)
     {
         var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The stop command was registered without its runtime.");
-        var directory = ProxyDataDirectory.Resolve(settings.DataDirectory, runtime.Variable ?? Environment.GetEnvironmentVariable);
+        var directory = ProxyDataDirectory.FromEnvironment(settings.DataDirectory);
         var stopped = await new ProxyStop(new ProxyLease()).StopAsync(directory, cancellationToken).ConfigureAwait(false);
         var message = stopped is null
             ? $"ai-proxy is not running (data directory {directory})."

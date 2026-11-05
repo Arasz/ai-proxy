@@ -171,7 +171,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
         var reply = await pipe.ReadAsync<Reply>(deadline.Token);
         if (!reply.Accepted)
         {
-            throw new IOException("The ai-proxy owner refused shutdown. Stop it manually before starting again.");
+            throw new IOException("The ai-proxy owner refused shutdown. Stop it manually.");
         }
 
         // An acknowledgement only means shutdown was requested; final disposal must finish before replacement.
@@ -183,10 +183,17 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
 
     private static void EnsureProcessIdentityIntegrity(Process process, ProxyInfo owner)
     {
-        var processIdentity = new ProcessIdentity(process);
-        if (processIdentity.StartToken != owner.ProcessStartToken || !OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc)
+        try
         {
-            throw new IOException("The ai-proxy owner identity changed. Stop it manually before starting again.");
+            var processIdentity = new ProcessIdentity(process);
+            if (processIdentity.StartToken != owner.ProcessStartToken || !OperatingSystem.IsLinux() && process.StartTime.ToUniversalTime() != owner.StartUtc)
+            {
+                throw new IOException("The ai-proxy owner identity changed. Stop it manually.");
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new IOException("The ai-proxy owner exited while its identity was checked. Retry the command.", exception);
         }
     }
 
@@ -198,7 +205,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
             !Uri.TryCreate(owner.ProxyUrl, UriKind.Absolute, out var proxy) || proxy.Scheme != "http" ||
             owner.ApiUrls is not { Length: > 0 } || owner.ApiUrls.Any(url => !Uri.TryCreate(url, UriKind.Absolute, out _)))
         {
-            throw new IOException("The control peer is not a compatible ai-proxy owner. Stop it manually before starting again.");
+            throw new IOException("The control peer is not a compatible ai-proxy owner. Stop it manually.");
         }
     }
 

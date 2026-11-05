@@ -18,7 +18,7 @@ public sealed class StatusCommand : AsyncCommand<StatusSettings>
             throw new ArgumentException(validationError);
         }
 
-        var directory = ProxyDataDirectory.Resolve(settings.DataDirectory, runtime.Variable ?? Environment.GetEnvironmentVariable);
+        var directory = ProxyDataDirectory.FromEnvironment(settings.DataDirectory);
         var reading = await ProxyControl.ReadOwnerAsync(directory, cancellationToken).ConfigureAwait(false);
         var json = settings.Format == GainFormats.Json;
         switch (reading)

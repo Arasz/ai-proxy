@@ -29,16 +29,12 @@ public sealed class StopStatusTests
     }
 
     [Fact]
-    public async Task Stop_with_no_owner_reports_not_running_and_leaves_the_configured_port_alone()
+    public async Task Stop_with_no_owner_reports_not_running_and_never_touches_the_configured_port()
     {
         using var directory = new TemporaryDirectory();
         using var sentinel = new TcpListener(IPAddress.Loopback, 0);
         sentinel.Start();
         var port = ((IPEndPoint)sentinel.LocalEndpoint).Port;
-        var accepted = Task.Run(async () =>
-        {
-            using var client = await sentinel.AcceptTcpClientAsync(TestContext.Current.CancellationToken);
-        }, TestContext.Current.CancellationToken);
 
         await using var stop = Child.StartWith(directory.Path, ["stop"], false,
             new Dictionary<string, string?> { ["Proxy__Port"] = port.ToString(System.Globalization.CultureInfo.InvariantCulture) });
@@ -46,9 +42,27 @@ public sealed class StopStatusTests
 
         Assert.Equal(0, stop.Process.ExitCode);
         Assert.Contains("not running", stop.Output);
+        Assert.False(sentinel.Pending());
         using var probe = new TcpClient();
         await probe.ConnectAsync(IPAddress.Loopback, port, TestContext.Current.CancellationToken);
-        await accepted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Stop_finds_the_owner_through_an_upper_case_data_directory_variable()
+    {
+        using var directory = new TemporaryDirectory();
+        using var elsewhere = new TemporaryDirectory();
+        await using var owner = Child.Start(directory.Path, false);
+        await owner.ReadyAsync();
+        await ControlPipeClient.ReadInfoAsync(directory.Path);
+
+        await using var stop = Child.StartWith(elsewhere.Path, ["stop"], true,
+            new Dictionary<string, string?> { ["Proxy__DataDirectory"] = null, ["PROXY__DATADIRECTORY"] = directory.Path });
+        await ExitAsync(stop);
+
+        Assert.Equal(0, stop.Process.ExitCode);
+        Assert.Contains("Stopped", stop.Output);
+        await ExitAsync(owner);
     }
 
     [Fact]
@@ -72,40 +86,35 @@ public sealed class StopStatusTests
     }
 
     [Fact]
-    public async Task A_restart_started_while_stop_holds_the_claim_fails_fast()
+    public async Task A_restart_started_while_stop_waits_for_the_owner_to_exit_fails_fast()
     {
         using var directory = new TemporaryDirectory();
-        await using var owner = Child.Start(directory.Path, false);
-        await owner.ReadyAsync();
-        await ControlPipeClient.ReadInfoAsync(directory.Path);
-        Child? contender = null;
-        try
-        {
-            var stopped = await new ProxyStop(new ProxyLease()).StopAsync(directory.Path, TestContext.Current.CancellationToken, _ =>
-            {
-                contender = Child.Start(directory.Path, true);
-                Assert.True(contender.Process.WaitForExit(Wait), contender.Output);
-            });
+        using var dummy = new DummyOwner();
+        await using var runtime = new ProxyLease().AcquireRuntimeLease(directory.Path);
+        await using var fake = new FakeControlOwner(directory.Path, dummy.Info(), true);
 
-            Assert.Equal(owner.Process.Id, stopped?.Pid);
-            Assert.NotEqual(0, contender!.Process.ExitCode);
-            Assert.Contains("in progress", contender.Output);
-        }
-        finally
-        {
-            if (contender is not null)
-            {
-                await contender.DisposeAsync();
-            }
-        }
+        await using var stop = Child.StartWith(directory.Path, ["stop"]);
+        await WaitForAsync(() => fake.Commands.Contains("stop"));
+        Assert.False(stop.Process.HasExited);
+
+        await using var contender = Child.Start(directory.Path, true);
+        await ExitAsync(contender);
+        Assert.NotEqual(0, contender.Process.ExitCode);
+        Assert.Contains("in progress", contender.Output);
+        Assert.False(stop.Process.HasExited);
+
+        await dummy.EndAsync();
+        await ExitAsync(stop);
+        Assert.Equal(0, stop.Process.ExitCode);
     }
 
     [Fact]
-    public async Task Stop_exits_1_when_the_owner_refuses_shutdown()
+    public async Task Stop_exits_1_and_leaves_the_owner_alive_when_it_refuses_shutdown()
     {
         using var directory = new TemporaryDirectory();
+        using var dummy = new DummyOwner();
         await using var runtime = new ProxyLease().AcquireRuntimeLease(directory.Path);
-        await using var fake = new FakeControlOwner(directory.Path, CurrentProcessInfo(true), false);
+        await using var fake = new FakeControlOwner(directory.Path, dummy.Info(), false);
 
         await using var stop = Child.StartWith(directory.Path, ["stop"]);
         await ExitAsync(stop);
@@ -113,14 +122,16 @@ public sealed class StopStatusTests
         Assert.Equal(1, stop.Process.ExitCode);
         Assert.Contains("refused", stop.Output);
         Assert.Equal(["info", "stop"], fake.Commands);
+        Assert.True(dummy.Alive);
     }
 
     [Fact]
-    public async Task Stop_exits_1_and_never_kills_when_the_owner_identity_changed()
+    public async Task Stop_exits_1_and_leaves_the_process_alive_when_the_owner_identity_changed()
     {
         using var directory = new TemporaryDirectory();
+        using var dummy = new DummyOwner();
         await using var runtime = new ProxyLease().AcquireRuntimeLease(directory.Path);
-        await using var fake = new FakeControlOwner(directory.Path, CurrentProcessInfo(false), true);
+        await using var fake = new FakeControlOwner(directory.Path, dummy.Info(false), true);
 
         await using var stop = Child.StartWith(directory.Path, ["stop"]);
         await ExitAsync(stop);
@@ -128,8 +139,7 @@ public sealed class StopStatusTests
         Assert.Equal(1, stop.Process.ExitCode);
         Assert.Contains("identity", stop.Output);
         Assert.Equal(["info"], fake.Commands);
-        using var self = System.Diagnostics.Process.GetCurrentProcess();
-        Assert.False(self.HasExited);
+        Assert.True(dummy.Alive);
     }
 
     [Fact]
@@ -172,6 +182,21 @@ public sealed class StopStatusTests
     }
 
     [Fact]
+    public async Task A_child_without_a_data_directory_setting_never_resolves_the_real_home()
+    {
+        using var directory = new TemporaryDirectory();
+
+        await using var status = Child.StartWith(directory.Path, ["status"], true,
+            new Dictionary<string, string?> { ["Proxy__DataDirectory"] = null, ["PROXY__DATADIRECTORY"] = null });
+        await ExitAsync(status);
+
+        var real = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ai-proxy");
+        Assert.Equal(3, status.Process.ExitCode);
+        Assert.DoesNotContain(real, status.Output);
+        Assert.Contains("ai-proxy-child-home-", status.Output);
+    }
+
+    [Fact]
     public async Task Status_exits_1_when_the_owner_does_not_answer()
     {
         using var directory = new TemporaryDirectory();
@@ -188,7 +213,8 @@ public sealed class StopStatusTests
     public async Task Status_exits_1_when_the_owner_is_not_a_compatible_ai_proxy()
     {
         using var directory = new TemporaryDirectory();
-        var other = CurrentProcessInfo(true) with { Product = "other" };
+        using var dummy = new DummyOwner();
+        var other = dummy.Info() with { Product = "other" };
         await using var fake = new FakeControlOwner(directory.Path, other);
 
         await using var status = Child.StartWith(directory.Path, ["status"]);
@@ -198,12 +224,13 @@ public sealed class StopStatusTests
         Assert.Contains("compatible", status.Output);
     }
 
-    private static ControlPipeClient.Info CurrentProcessInfo(bool validIdentity)
+    private static async Task WaitForAsync(Func<bool> condition)
     {
-        using var self = System.Diagnostics.Process.GetCurrentProcess();
-        var token = validIdentity ? new ProcessIdentity(self).StartToken : "native:0";
-        return new ControlPipeClient.Info("ai-proxy", 1, "fake-nonce", self.Id, self.StartTime.ToUniversalTime(),
-            "http://127.0.0.1:1", ["http://127.0.0.1:2"], token);
+        using var deadline = new CancellationTokenSource(Wait);
+        while (!condition())
+        {
+            await Task.Delay(50, deadline.Token);
+        }
     }
 
     private static async Task ExitAsync(ProxyChild child)

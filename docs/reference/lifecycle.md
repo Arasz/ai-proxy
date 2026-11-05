@@ -22,7 +22,7 @@ any moment.
 | Exit | Meaning |
 |---|---|
 | 0 | An ai-proxy owner answered. |
-| 3 | Nothing accepted a connection on the control pipe. An owner from before the pipe existed, or one still starting, reads as not running. |
+| 3 | Nothing accepted a connection on the control pipe. An owner from before the pipe existed, or one still starting, reads as not running. On Windows the pipe takes one client at a time, so a running owner whose pipe another client holds for 3 seconds also reads as not running. |
 | 1 | A peer connected but stayed silent for 3 seconds, or is not a compatible ai-proxy owner. |
 
 During shutdown, `status` can still report an owner that has already accepted a stop request.
@@ -36,7 +36,7 @@ operation, so a start or restart launched meanwhile fails fast instead of racing
 | Exit | Meaning |
 |---|---|
 | 0 | The owner stopped, or none was running (`ai-proxy is not running`). |
-| 1 | Another start, restart or stop is in progress; the owner refused; its identity changed; or it did not answer or exit in time. Stop it manually. |
+| 1 | Another start, restart or stop is in progress; the owner refused; its identity changed; it did not answer or exit in time; or its process is gone but something still holds the lease. Stop it manually. |
 
 When the process lease is free, `stop` reports "not running" and leaves anything listening on
 the proxy port alone, because a port cannot identify an ai-proxy owner.
