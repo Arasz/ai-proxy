@@ -287,7 +287,11 @@ jobs:
           docker run --rm -v "$PWD:/src" -w /src
           mcr.microsoft.com/dotnet/sdk:10.0.403-alpine3.24@sha256:cc02b814237a76c4735fb6eeee87181597b5e56f2ce458a435e527674d91f4d7
           sh -c 'mkdir -p .nupkg-local &&
-          dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --
+          dotnet build tests/AiProxy.Tests --configuration Release --nologo &&
+          (apk info -e gcompat || echo "gcompat: not installed");
+          for f in $(find tests -name libtree-sitter.so -path "*Release*"); do echo "== $f"; ldd "$f" || true; done;
+          find tests -name libtree-sitter.so -path "*Release*" -delete;
+          dotnet test --project tests/AiProxy.Tests --configuration Release --no-build --nologo --
           --filter-namespace "AiProxy.Tests.Unit.Content.Code"'
 
   certificates-macos:
