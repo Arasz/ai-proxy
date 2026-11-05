@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-05T02:51:24.885596+00:00",
-  "next": "lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter build vs best-effort docs.",
+  "lastUpdated": "2026-11-05T10:00:11.477075+00:00",
+  "next": "#24 restore system proxy after crash, NSS cleanup, capture message id. Owner gates pending: ADR 0010 acceptance; quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter vs best-effort docs.",
   "completedTasks": [
+    {
+      "taskId": "aip-status-and-stop-commands",
+      "date": "2026-11-05",
+      "title": "ai-proxy status and stop (0.25.0)",
+      "pr": 111,
+      "version": "0.25.0",
+      "summary": "status (pipe only, exit 0/3/1, no secrets) and stop (startup claim held through the exit wait, graceful via the restart path, never kills). ADR 0010 Draft. Incident: a mutation run stopped the live proxy (child fell back to real ~/.ai-proxy); ProxyChild now sets a throwaway HOME/USERPROFILE.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-measure-ccr-follow-up-bytes",
       "date": "2026-11-05",
