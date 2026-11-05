@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-04T21:00:58.489826+00:00",
-  "next": "Codex launcher; then musl grammars, compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gate pending: quoted-echo build/park (PR #106 record).",
+  "lastUpdated": "2026-11-05T01:59:15.983653+00:00",
+  "next": "musl grammars (Alpine run), compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR.",
   "completedTasks": [
+    {
+      "taskId": "aip-codex-harness-trust-and-daemon",
+      "date": "2026-11-05",
+      "title": "Codex harness: CA trust and no-daemon (0.23.0)",
+      "pr": 108,
+      "version": "0.23.0",
+      "summary": "harness codex sets CODEX_CA_CERTIFICATE + AI_PROXY_CODEX_PROJECT, never SSL_CERT_FILE; prepends --no-daemon only for TUI/prompt/exec/review/resume/fork. Built-in openai provider stays unattributed (needs ADR, e.g. proxy userinfo). Subcommand list mirrors codex 0.166.0 --help.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-installed-tool-smoke-and-mcp-drain",
       "date": "2026-11-04",
