@@ -1,6 +1,6 @@
 # 0010 - Status and stop reuse the control pipe
 
-Status: Draft
+Status: Accepted
 
 ## Context
 

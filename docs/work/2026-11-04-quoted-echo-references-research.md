@@ -134,6 +134,8 @@ If the owner wants it anyway, the shape the evidence supports is: proxy-side (th
 
 ## Owner decisions needed
 
+Ruling (2026-11-05): build. The owner answered decision 1 only. Decisions 2 to 6 take the shape recommended above as defaults: proxy rewrite, off by default, assistant text only, at least 200 normalised characters, and the message-index plus quote-head plus id reference. The build plan can revisit any of them with evidence.
+
 1. Build or park, given a measured upper bound of 0.06% of prompt tokens.
 2. If built: the reference format (message index plus line plus quote head plus id, or something else).
 3. Proxy rewrite or a Claude Code hook that blocks and asks the user to resend (the hook cannot rewrite).
