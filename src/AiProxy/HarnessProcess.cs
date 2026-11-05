@@ -65,9 +65,10 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
                 start.ArgumentList.Add(argument);
             }
 
+            var proxyUrl = ProjectCredential.ProxyUrl(endpoint, project);
             foreach (var key in new[] { KnownNames.EnvironmentVariables.HttpProxy, KnownNames.EnvironmentVariables.HttpsProxy, KnownNames.EnvironmentVariables.LowerHttpProxy, KnownNames.EnvironmentVariables.LowerHttpsProxy })
             {
-                start.Environment[key] = endpoint.GetLeftPart(UriPartial.Authority);
+                start.Environment[key] = proxyUrl;
             }
 
             start.Environment.TryGetValue(KnownNames.EnvironmentVariables.NoProxy, out var upperBypass);

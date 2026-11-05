@@ -84,15 +84,36 @@ traffic is separated.
 
 ## Split the numbers by project
 
-The proxy knows a request's project only when the client sends the `X-Ai-Proxy-Project` header;
-the proxy removes it before the request goes upstream. For Claude Code, start it with
+The proxy takes a request's project from the `X-Ai-Proxy-Project` header when there is one, and
+otherwise from the proxy credential the client sends. `ai-proxy harness` sets that credential for
+you: it launches the agent with `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms pointing at
+`http://ai-proxy:<percent-encoded project path>@127.0.0.1:8080`, so any agent whose HTTP stack
+honours proxy userinfo is attributed to the directory you launched it from. That includes Codex's
+built-in provider (measured with Codex 0.166.0) and Claude Code (measured with 2.1.318).
+
+```bash
+ai-proxy harness codex -- exec "your prompt"
+```
+
+Without the launcher, set the variable yourself with the path percent-encoded:
+
+```bash
+HTTPS_PROXY="http://ai-proxy:%2FUsers%2Fme%2Fapp@127.0.0.1:8080" codex
+```
+
+The user name must be `ai-proxy` and the password is the project path. The proxy never requires
+the credential: a client without it is served as before, and a credential with another user name,
+a malformed value or an empty password is ignored. The proxy removes `Proxy-Authorization` from
+everything it forwards.
+
+The header stays the explicit route and wins over the credential. For Claude Code, start it with
 
 ```bash
 ANTHROPIC_CUSTOM_HEADERS="X-Ai-Proxy-Project: $PWD" claude
 ```
 
-For Codex, add `env_http_headers` to the selected custom model provider's existing table in
-`~/.codex/config.toml`. Replace `work` below with that provider's ID and keep its connection and
+For a Codex custom model provider, add `env_http_headers` to the selected provider's existing table
+in `~/.codex/config.toml`. Replace `work` below with that provider's ID and keep its connection and
 authentication settings:
 
 ```toml
@@ -100,28 +121,18 @@ authentication settings:
 env_http_headers = { "X-Ai-Proxy-Project" = "AI_PROXY_CODEX_PROJECT" }
 ```
 
-Then launch Codex from the project directory with `ai-proxy harness codex`, which exports
-`AI_PROXY_CODEX_PROJECT` with the current directory for you:
+`ai-proxy harness codex` exports `AI_PROXY_CODEX_PROJECT` with the current directory; without the
+launcher, set it yourself: `AI_PROXY_CODEX_PROJECT="$PWD" codex`. A built-in provider ID (`openai`,
+`ollama`, `lmstudio`) cannot be redefined as a custom provider, which is why the credential route
+above matters for it.
 
-```bash
-ai-proxy harness codex -- exec "your prompt"
-```
-Without the launcher, set it yourself: `AI_PROXY_CODEX_PROJECT="$PWD" codex`.
-
-The provider must be selected by `model_provider`. If you use a built-in provider, first define
-and select a [custom model provider](https://learn.chatgpt.com/docs/config-file/config-advanced#custom-model-providers);
-the built-in IDs `openai`, `ollama` and `lmstudio` are reserved. Keep the provider's upstream base
-URL: ai-proxy's port 8080 is a forward proxy, so Codex traffic still needs to follow the proxy
-settings and trust its inspection certificate. Codex cannot add headers to its built-in `openai`
-provider, so that traffic shows as unattributed in `gain`.
-
-The header setting was verified with Codex CLI 0.164.0, a loopback HTTP server and a fake API key.
-Live provider authentication and ChatGPT sign-in were outside that check.
+Two kinds of Codex traffic are not recorded yet, with or without a project: WebSocket turns, and
+requests to `chatgpt.com` made with ChatGPT sign-in (the proxy does not decrypt that host).
 
 Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
-another). Requests without the header have no project and show up only in unfiltered views. When the
+another). Requests with neither the header nor the credential have no project and show up only in unfiltered views. When the
 project has no requests, `gain` prints a hint naming the header and `ai-proxy harness`, which launches
-an agent with it set.
+an agent with the credential set.
 Statistics start with version 0.15.0; older requests are not backfilled.
 
 ## Let an agent read originals back

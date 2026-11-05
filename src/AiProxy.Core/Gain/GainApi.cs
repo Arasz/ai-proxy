@@ -8,4 +8,7 @@ public static class GainApi
 
     /// <summary>The request header that names a request's project; the proxy removes it before forwarding.</summary>
     public const string ProjectHeader = "X-Ai-Proxy-Project";
+
+    /// <summary>The user name of the proxy credential whose password is the project path.</summary>
+    public const string ProxyUser = "ai-proxy";
 }
