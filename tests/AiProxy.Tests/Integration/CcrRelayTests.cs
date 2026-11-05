@@ -29,7 +29,7 @@ public sealed class CcrRelayTests : IDisposable
     private const string PythonFile =
         "import os\nimport sys\nfrom typing import Any\n\n# A module comment long enough that the code view, hint included, is smaller than the file.\n\n\ndef value(item: Any) -> str:\n    \"\"\"Returns the item's text; the docstring stays in the view.\"\"\"\n    return os.fspath(item)  # the value the model reads back exactly\n\n\n# A second comment, so the file is over the compression minimum for source code.\ndef main() -> int:\n    # a third comment the view drops\n    print(value(sys.argv[0]))\n    return 0\n\n\n# Entry point; this comment goes too.\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
 
-    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o é🙂"));
 
     private static readonly string Id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Large)))[..16];
 
@@ -492,6 +492,7 @@ public sealed class CcrRelayTests : IDisposable
         var sent = upstream.Requests[1].Body;
         Assert.Equal(1, summary.FollowUps);
         Assert.Equal(Encoding.UTF8.GetByteCount(sent), summary.FollowUpBytes);
+        Assert.True(Encoding.UTF8.GetByteCount(sent) > sent.Length, "the fixture must be non-ASCII so bytes differ from characters");
         Assert.Equal(GainReportBuilder.Tokens(sent.Length), summary.EstimatedFollowUpTokens);
         Assert.Equal(1, summary.FollowUpMeasuredRequests);
     }
@@ -559,6 +560,7 @@ public sealed class CcrRelayTests : IDisposable
         {
             if (Interlocked.Increment(ref calls) == 2)
             {
+                // Runs while the follow-up is in flight, after the first response's headers returned, so the 10-minute HeadersDeadline never sees it.
                 time.Advance(TimeSpan.FromHours(3));
             }
 

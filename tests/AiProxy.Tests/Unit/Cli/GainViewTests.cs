@@ -67,6 +67,18 @@ public sealed class GainViewTests
     }
 
     [Fact]
+    public async Task A_report_with_no_measured_follow_ups_shows_no_billed_balance_line()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with { Summary = new GainTotals(5, EstimatedOriginalTokens: 10_000, EstimatedForwardedTokens: 6_000, EstimatedSavedTokens: 4_000) };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("Billed balance", fixture.Console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Csv_appends_the_follow_up_columns_after_bytes_and_leaves_the_earlier_columns_in_place()
     {
         using var fixture = new GainCommandTests.Fixture();

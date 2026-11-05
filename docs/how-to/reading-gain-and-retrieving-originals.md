@@ -39,7 +39,7 @@ figure and what it cost:
 
 The summary headers drop the word "tokens"; the bucket and attribution tables still spell it out.
 Table numbers under 10,000 are exact, with thousands separators. Larger ones show one decimal of K,
-M or B (`523.8K`, `261.2M`), so the summary fits a 100-column terminal and no number splits across
+M or B (`523.8K`, `261.2M`), so the summary fits an 80-column terminal and no number splits across
 lines. `--format csv` and `--format json` keep exact raw values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
 `netPercent`; the CSV adds `estimated_tool_tokens` and `estimated_net_tokens` after `error`.
 Version 0.24.0 adds `followUps`, `followUpBytes`, `estimatedFollowUpTokens`, `followUpMeasuredRequests`
@@ -55,10 +55,11 @@ inside the follow-up bodies, so subtracting it would count it twice. A stateless
 its whole forwarded body with the assistant turn and the tool results on each follow-up, so those
 bytes count again, as they are billed. A thread request sends only the results, so its follow-up
 is small. The line ends with `follow-ups measured on N of M requests`: requests recorded before
-version 0.24.0 carry no follow-up figures and are counted in M but not in N. The balance is an
-estimate like the other token counts; the Follow-up bytes are the exact length of the body sent.
+version 0.24.0 carry no follow-up figures and are counted in M but not in N, and a request whose follow-up write failed (logged only) still
+counts in N. The balance is an estimate from the sizes sent, not a provider-billed figure, which
+is why the Method line still says net billed savings are unavailable; the Follow-up bytes are the exact length of the body sent.
 
-Follow-ups appear in the summary and in the `--method`, `--rule`, `--layer` and `--pipeline`
+Follow-ups appear in the summary and in the `--by-method`, `--by-rule`, `--by-layer` and `--by-pipeline`
 attribution views, under the path of the request that caused them, and follow the project, date
 and provider filters. The `--daily`, `--weekly` and `--monthly` buckets list requests only, so
 their follow-up figures are zero. A follow-up is stamped with the time its request started, and it

@@ -20,9 +20,12 @@ public sealed class GainView
                 [Compact(report.Summary.Requests), Compact(report.Summary.EstimatedOriginalTokens), Compact(report.Summary.EstimatedForwardedTokens), Compact(report.Summary.EstimatedSavedTokens), Compact(report.Summary.EstimatedRetrievedTokens),
                     Compact(report.Summary.EstimatedToolTokens), Compact(report.Summary.EstimatedFollowUpTokens), Compact(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
             ], tight: true),
-            new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n"),
-            new Text($"Billed balance (all requests): {Number(report.Summary.EstimatedBilledBalanceTokens)} tokens (original - forwarded - follow-up; follow-ups measured on {Number(report.Summary.FollowUpMeasuredRequests)} of {Number(report.Summary.Requests)} requests).\n")
+            new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
         };
+        if (report.Summary.FollowUpMeasuredRequests > 0)
+        {
+            views.Add(new Text($"Billed balance (all requests): {Number(report.Summary.EstimatedBilledBalanceTokens)} tokens (estimated from sizes sent, not provider-billed: original - forwarded - follow-up; follow-ups measured on {Number(report.Summary.FollowUpMeasuredRequests)} of {Number(report.Summary.Requests)} requests).\n"));
+        }
         if (report.OtherTraffic is { } other)
         {
             views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
