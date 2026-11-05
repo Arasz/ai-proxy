@@ -25,6 +25,8 @@ internal static class KnownNames
         public const string LowerNoProxy = "no_proxy";
         public const string AnthropicCustomHeaders = "ANTHROPIC_CUSTOM_HEADERS";
         public const string NodeExtraCaCerts = "NODE_EXTRA_CA_CERTS";
+        public const string CodexCaCertificate = "CODEX_CA_CERTIFICATE";
+        public const string CodexProject = "AI_PROXY_CODEX_PROJECT";
     }
 
     internal static class Network

@@ -121,6 +121,70 @@ public sealed class ClientCommandTests
         Assert.Contains("Root CA file is missing", result.Error, StringComparison.Ordinal);
     }
 
+    private const string EnvironmentReport =
+        "#!/bin/sh\nprintf 'args:%s\\n' \"$*\"\nprintf 'CODEX_CA_CERTIFICATE=%s\\nAI_PROXY_CODEX_PROJECT=%s\\nSSL_CERT_FILE=%s\\nNODE_EXTRA_CA_CERTS=%s\\nHTTPS_PROXY=%s\\n' \"$CODEX_CA_CERTIFICATE\" \"$AI_PROXY_CODEX_PROJECT\" \"$SSL_CERT_FILE\" \"$NODE_EXTRA_CA_CERTS\" \"$HTTPS_PROXY\"\n";
+
+    [Fact]
+    public async Task Harness_launches_codex_without_a_daemon_and_trusts_the_proxy_root()
+    {
+        var run = await RunFakeAsync("codex", ["exec", "hi"], new Dictionary<string, string?>
+        {
+            ["CODEX_CA_CERTIFICATE"] = "/somewhere/else.pem",
+            ["SSL_CERT_FILE"] = null
+        });
+        Assert.Equal(0, run.Result.ExitCode);
+        Assert.Contains("args:--no-daemon exec hi\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"CODEX_CA_CERTIFICATE={run.Ca}\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"AI_PROXY_CODEX_PROJECT={Environment.CurrentDirectory}\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains("SSL_CERT_FILE=\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"HTTPS_PROXY=http://127.0.0.1:{run.Port}\n", run.Result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Harness_leaves_a_preset_ssl_cert_file_untouched_for_codex()
+    {
+        var run = await RunFakeAsync("codex", ["exec"], new Dictionary<string, string?> { ["SSL_CERT_FILE"] = "/user/bundle.pem" });
+        Assert.Contains("SSL_CERT_FILE=/user/bundle.pem\n", run.Result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Harness_gives_other_agents_no_codex_settings()
+    {
+        var run = await RunFakeAsync("claude", ["exec", "hi"], new Dictionary<string, string?> { ["CODEX_CA_CERTIFICATE"] = null, ["AI_PROXY_CODEX_PROJECT"] = null });
+        Assert.Contains("args:exec hi\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains("CODEX_CA_CERTIFICATE=\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains("AI_PROXY_CODEX_PROJECT=\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"NODE_EXTRA_CA_CERTS={run.Ca}\n", run.Result.Output, StringComparison.Ordinal);
+    }
+
+    private static async Task<FakeRun> RunFakeAsync(string name, string[] arguments, Dictionary<string, string?> extraEnvironment)
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "The fake executable uses a POSIX shell.");
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var executable = Path.Combine(directory.Path, name);
+        await File.WriteAllTextAsync(executable, EnvironmentReport, TestContext.Current.CancellationToken);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var ca = Path.Combine(directory.Path, "root-ca.pem");
+        await File.WriteAllTextAsync(ca, "public CA fixture", TestContext.Current.CancellationToken);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var environment = new Dictionary<string, string?>(extraEnvironment)
+        {
+            ["PATH"] = directory.Path + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"),
+            ["Proxy__Port"] = port.ToString(CultureInfo.InvariantCulture)
+        };
+        var result = await RunAsync(["harness", "--ca-file", ca, name, "--", .. arguments], environment);
+        return new FakeRun(result, ca, port);
+    }
+
+    private sealed record FakeRun(ProcessResult Result, string Ca, int Port);
+
     private static Task<ProcessResult> RunAsync(params string[] arguments)
     {
         return RunAsync(arguments, new Dictionary<string, string?>());
