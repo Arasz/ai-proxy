@@ -23,7 +23,7 @@ public static class EntryPoint
     public const int UsageExitCode = 2;
 
     /// <summary>The usage text for the start mode.</summary>
-    public const string StartUsage = "Start: ai-proxy [--restart] [--key=value | --key value ...]\n  --restart  Gracefully replace the owned proxy instance, waiting for its exit.\n  --version  Print the product version.";
+    public const string StartUsage = "Start: ai-proxy [--restart] [--key=value | --key value ...]\n  --restart  Gracefully replace the owned proxy instance, waiting for its exit.\n  --version  Print the product version.\nStop:   ai-proxy stop [--data-directory <path>]\nStatus: ai-proxy status [--data-directory <path>] [-f text|json]  (exit 3 when nothing runs)";
 
     /// <summary>The product version, from the VERSION file at build time.</summary>
     public static string ProductVersion { get; } = ReadVersion();

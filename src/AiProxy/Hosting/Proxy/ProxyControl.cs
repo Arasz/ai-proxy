@@ -99,22 +99,47 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
     /// <summary>Reads the running owner's identity without stopping it; null when no compatible owner answers within the deadline.</summary>
     internal static async Task<ProxyInfo?> TryReadOwnerAsync(string directory, CancellationToken token)
     {
+        return (await ReadOwnerAsync(directory, token)).Owner;
+    }
+
+    /// <summary>Reads the owner's identity and says why none was read: no peer, a silent peer, or an incompatible one.</summary>
+    internal static async Task<OwnerReading> ReadOwnerAsync(string directory, CancellationToken token)
+    {
+        await using var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(ConnectionDeadline);
         try
         {
-            await using var pipe = new NamedPipeClientStream(".", PipeName(directory), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-            deadline.CancelAfter(ConnectionDeadline);
             await pipe.ConnectAsync(deadline.Token);
-            await pipe.WriteAsync(new Request("info", DefaultProtocol), deadline.Token);
-            var owner = await pipe.ReadAsync<ProxyInfo>(deadline.Token);
-            EnsureProxyOwnerIsCompatible(owner);
-            return owner;
         }
-        catch (Exception exception) when (exception is IOException or JsonException or OperationCanceledException or TimeoutException)
+        catch (Exception exception) when (exception is IOException or TimeoutException or OperationCanceledException)
         {
             token.ThrowIfCancellationRequested();
-            return null;
+            return new OwnerReading(OwnerState.NotRunning);
         }
+
+        ProxyInfo owner;
+        try
+        {
+            await pipe.WriteAsync(new Request("info", DefaultProtocol), deadline.Token);
+            owner = await pipe.ReadAsync<ProxyInfo>(deadline.Token);
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or OperationCanceledException)
+        {
+            token.ThrowIfCancellationRequested();
+            return new OwnerReading(OwnerState.Unresponsive);
+        }
+
+        try
+        {
+            EnsureProxyOwnerIsCompatible(owner);
+        }
+        catch (IOException)
+        {
+            return new OwnerReading(OwnerState.Incompatible);
+        }
+
+        return new OwnerReading(OwnerState.Running, owner);
     }
 
     internal static async Task<ProxyInfo> StopOwnedAsync(string directory, CancellationToken token, Action<ProxyInfo>? beforeStop = null)
@@ -176,6 +201,21 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
             throw new IOException("The control peer is not a compatible ai-proxy owner. Stop it manually before starting again.");
         }
     }
+
+    /// <summary>What <see cref="ReadOwnerAsync" /> found on the control pipe.</summary>
+    internal enum OwnerState
+    {
+        /// <summary>A compatible owner answered.</summary>
+        Running,
+        /// <summary>Nothing accepted a connection.</summary>
+        NotRunning,
+        /// <summary>A peer connected but did not answer in time or broke the exchange.</summary>
+        Unresponsive,
+        /// <summary>A peer answered but is not an ai-proxy owner this version can talk to.</summary>
+        Incompatible
+    }
+
+    internal sealed record OwnerReading(OwnerState State, ProxyInfo? Owner = null);
 
     internal sealed record ProxyInfo(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken);
 

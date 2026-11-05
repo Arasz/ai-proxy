@@ -36,6 +36,10 @@ public sealed class EntryPointTests
 
     [Theory]
     [InlineData("gain")]
+    [InlineData("stop")]
+    [InlineData("status")]
+    [InlineData("status|-f|json")]
+    [InlineData("stop|--data-directory|x")]
     [InlineData("mcp|--endpoint|http://127.0.0.1:1")]
     [InlineData("--help")]
     [InlineData("--version")]

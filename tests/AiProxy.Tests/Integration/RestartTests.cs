@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
+using Child = AiProxy.Tests.Integration.ProxyChild;
 
 namespace AiProxy.Tests.Integration;
 
@@ -564,87 +565,6 @@ public sealed class RestartTests : IDisposable
     }
 
     private sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string? ProcessStartToken = null);
-
-    private sealed class Child(Process process) : IAsyncDisposable
-    {
-        private readonly ConcurrentQueue<string> _output = new();
-        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Process Process => process;
-        public string Output => string.Join("\n", _output);
-
-        public async ValueTask DisposeAsync()
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(true);
-            }
-
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await process.WaitForExitAsync(deadline.Token);
-            process.Dispose();
-        }
-
-        public static Child Start(string directory, bool restart, bool ephemeral = true, params string[] extra)
-        {
-            var start = new ProcessStartInfo("dotnet")
-            {
-                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
-            };
-            start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
-            if (restart)
-            {
-                start.ArgumentList.Add("--restart");
-            }
-
-            foreach (var argument in extra)
-            {
-                start.ArgumentList.Add(argument);
-            }
-
-            start.Environment["Proxy__DataDirectory"] = directory;
-            start.Environment["Proxy__ConfigureSystemProxy"] = "false";
-            start.Environment["Proxy__TrustRootCertificate"] = "false";
-            start.Environment["Proxy__Compression__Enabled"] = "false";
-            start.Environment["Proxy__Port"] = ephemeral ? "0" : null;
-            start.Environment["ASPNETCORE_URLS"] = ephemeral ? "http://127.0.0.1:0" : null;
-            var process = new Process { StartInfo = start };
-            var child = new Child(process);
-            process.OutputDataReceived += (_, args) => child.Record(args.Data);
-            process.ErrorDataReceived += (_, args) => child.Record(args.Data);
-            Assert.True(process.Start());
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            return child;
-        }
-
-        private void Record(string? line)
-        {
-            if (line is null)
-            {
-                return;
-            }
-
-            _output.Enqueue(line);
-            if (line.Contains("Application started", StringComparison.Ordinal))
-            {
-                _ready.TrySetResult();
-            }
-        }
-
-        public async Task ExitAsync()
-        {
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            await process.WaitForExitAsync(deadline.Token);
-        }
-
-        public async Task ReadyAsync()
-        {
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            var exited = process.WaitForExitAsync(deadline.Token);
-            var result = await Task.WhenAny(_ready.Task, exited).WaitAsync(deadline.Token);
-            Assert.True(result == _ready.Task, Output);
-        }
-    }
 
     /// <inheritdoc />
     public void Dispose()

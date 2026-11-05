@@ -96,7 +96,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
         }
         catch (IOException exception)
         {
-            throw new IOException("Another ai-proxy start or restart is in progress. Wait for it to finish, then retry.", exception);
+            throw new IOException("Another ai-proxy start, restart or stop is in progress. Wait for it to finish, then retry.", exception);
         }
     }
 }
