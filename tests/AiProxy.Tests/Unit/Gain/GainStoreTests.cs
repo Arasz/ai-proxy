@@ -343,6 +343,85 @@ public sealed class GainStoreTests
     }
 
     [Fact]
+    public async Task Sql_totals_match_the_in_memory_report_for_requests_recalls_and_follow_ups()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        var requests = new[] { Entry("a", "2026-11-01T10:00Z", "/a", "ccr.tool", 2_890, 1_445), Entry("b", "2026-11-02T10:00Z", "/a", "log", 578, 289) };
+        var path = new GainPath("POST", "ccr.tool", "tool_result", "content");
+        var recall = new GainRecallEvent(new GainRecall(requests[0].At, "p", "/a", "caller", "whole", 289, 100, null), path);
+        var followUps = new[]
+        {
+            new GainFollowUpEvent(new GainFollowUp(requests[0].At, "/a", 1, 1_000, 1_100, 346), path),
+            new GainFollowUpEvent(new GainFollowUp(requests[0].At, "/a", 2, 600, 700, 207), path)
+        };
+        foreach (var entry in requests)
+        {
+            await store.RecordAsync(entry, [], TestContext.Current.CancellationToken);
+        }
+
+        await store.RecallAsync(recall.Recall, "anthropic", path.Method, path.Rule, path.Layer, path.Pipeline, TestContext.Current.CancellationToken);
+        foreach (var followUp in followUps)
+        {
+            await store.FollowUpAsync(followUp.FollowUp, "anthropic", path.Method, path.Rule, path.Layer, path.Pipeline, TestContext.Current.CancellationToken);
+        }
+
+        var sql = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+        var memory = GainReportBuilder.Build(new GainQuery(), clock.GetUtcNow(), requests, [], [recall], followUps: followUps);
+
+        Assert.Equal(2, sql.Summary.FollowUps);
+        Assert.Equal(1_800, sql.Summary.FollowUpBytes);
+        Assert.Equal(2, sql.Summary.FollowUpMeasuredRequests);
+        Assert.Equal(memory.Summary, sql.Summary);
+        Assert.Equal(memory.Attributions.Single(row => row is { Dimension: "rule", Name: "ccr.tool" }),
+            sql.Attributions.Single(row => row is { Dimension: "rule", Name: "ccr.tool" }));
+        Assert.Equal(1_800, sql.Attributions.Single(row => row is { Dimension: "rule", Name: "ccr.tool" }).Totals.FollowUpBytes);
+    }
+
+    [Fact]
+    public async Task Daily_weekly_and_monthly_buckets_ignore_follow_ups()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z")));
+        var request = Entry("a", "2026-11-01T10:00Z", "/a", "ccr.tool", 2_890, 1_445);
+        await store.RecordAsync(request, [], TestContext.Current.CancellationToken);
+        await store.FollowUpAsync(new GainFollowUp(request.At, "/a", 1, 1_000, 1_100, 346), "anthropic", "POST", "ccr.tool", "tool_result", "content", TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, report.Summary.FollowUps);
+        foreach (var bucket in report.Daily.Concat(report.Weekly).Concat(report.Monthly))
+        {
+            Assert.Equal(0, bucket.Totals.FollowUps);
+            Assert.Equal(0, bucket.Totals.FollowUpBytes);
+            Assert.Equal(1, bucket.Totals.Requests);
+        }
+    }
+
+    [Fact]
+    public async Task A_request_stored_before_follow_ups_were_measured_counts_as_a_request_but_not_as_measured()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "gain.db");
+        var store = new SqliteGainStore(new GainStoreOptions(path), new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z")));
+        await store.RecordAsync(Entry("old", "2026-11-01T10:00Z", "/a", "log", 578, 289), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("new", "2026-11-02T10:00Z", "/a", "log", 578, 289), [], TestContext.Current.CancellationToken);
+        await using (var connection = new SqliteConnection($"Data Source={path}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE gain_event SET payload = json_remove(payload, '$.Totals.FollowUpMeasuredRequests', '$.Totals.FollowUps', '$.Totals.FollowUpBytes', '$.Totals.EstimatedFollowUpTokens') WHERE id = 'old'";
+            Assert.Equal(1, await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
+        }
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, report.Summary.Requests);
+        Assert.Equal(1, report.Summary.FollowUpMeasuredRequests);
+    }
+
+    [Fact]
     public async Task A_ledger_with_no_other_traffic_reports_zero_not_null()
     {
         using var directory = new TemporaryDirectory();

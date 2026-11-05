@@ -341,9 +341,10 @@ public sealed partial class ProviderRequestInspector(
         exchange.GainMethod = method;
         exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed or GainLabels.Rules.CcrTool ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
         exchange.GainPipeline = compression.Compresses ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
+        exchange.GainAt = time.GetUtcNow();
         try
         {
-            await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, time.GetUtcNow(), exchange.GainProject,
+            await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, exchange.GainAt, exchange.GainProject,
                     exchange.Dialect.ToString().ToLowerInvariant(), method, rule, exchange.GainLayer, exchange.GainPipeline,
                     GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length, toolCharacters)),
                 exchange.GainFailures, CancellationToken.None);

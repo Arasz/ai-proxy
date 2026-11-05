@@ -56,6 +56,34 @@ public sealed class GainNetTests
     }
 
     [Fact]
+    public void The_billed_balance_is_original_less_forwarded_less_follow_up_and_leaves_retrieved_out()
+    {
+        var totals = new GainTotals(1, EstimatedOriginalTokens: 10_000, EstimatedForwardedTokens: 6_000, EstimatedSavedTokens: 4_000,
+            EstimatedRetrievedTokens: 300, EstimatedFollowUpTokens: 1_500);
+
+        Assert.Equal(2_500, totals.EstimatedBilledBalanceTokens);
+        Assert.Equal(3_700, totals.EstimatedNetTokens);
+    }
+
+    [Fact]
+    public void A_built_report_sums_follow_ups_into_the_summary_and_their_path()
+    {
+        var request = new GainHistoryEntry("r1", Now, "/p", "anthropic", "POST", "ccr.tool", GainLabels.Unknown, GainLabels.Pipelines.Ccr,
+            GainReportBuilder.RequestTotals(4_000, 3_000, 4_000, 3_000));
+        var path = new GainPath("POST", "ccr.tool", GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr);
+        var followUp = new GainFollowUpEvent(new GainFollowUp(Now, "/p", 1, 2_890, 3_000, 1_000), path);
+
+        var report = GainReportBuilder.Build(new GainQuery(), Now, [request], [], [], followUps: [followUp]);
+
+        Assert.Equal(1, report.Summary.FollowUps);
+        Assert.Equal(3_000, report.Summary.FollowUpBytes);
+        Assert.Equal(1_000, report.Summary.EstimatedFollowUpTokens);
+        Assert.Equal(1, report.Summary.FollowUpMeasuredRequests);
+        Assert.Equal(1_000, report.Attributions.Single(row => row is { Dimension: "rule", Name: "ccr.tool" }).Totals.EstimatedFollowUpTokens);
+        Assert.Equal(0, Assert.Single(report.Daily).Totals.FollowUps);
+    }
+
+    [Fact]
     public void A_request_with_a_tool_keeps_the_tool_out_of_saved_and_reports_it_separately()
     {
         var totals = GainReportBuilder.RequestTotals(2_890, 2_890 + 289, 2_890, 2_890 + 289, 289);

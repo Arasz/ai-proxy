@@ -21,11 +21,12 @@ public static class GainReportBuilder
     {
         return new GainTotals(1, originalCharacters, forwardedCharacters, originalBytes, forwardedBytes,
             Tokens(originalCharacters), Tokens(forwardedCharacters), Tokens(originalCharacters) - Tokens(forwardedCharacters - toolCharacters),
-            EstimatedToolTokens: Tokens(toolCharacters));
+            EstimatedToolTokens: Tokens(toolCharacters), FollowUpMeasuredRequests: 1);
     }
 
     public static GainReport Build(GainQuery query, DateTimeOffset now, IReadOnlyList<GainHistoryEntry> requests,
-        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents, GainOtherTraffic? otherTraffic = null)
+        IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents, GainOtherTraffic? otherTraffic = null,
+        IReadOnlyList<GainFollowUpEvent>? followUps = null)
     {
         var recalls = recallEvents.Select(static recallEvent => recallEvent.Recall).ToArray();
         var summary = Sum(requests.Select(static request => request.Totals));
@@ -35,8 +36,16 @@ public static class GainReportBuilder
             RetrievedCharacters = recalls.Sum(static recall => recall.Characters),
             EstimatedRetrievedTokens = recalls.Sum(static recall => recall.EstimatedTokens)
         };
+        followUps ??= [];
+        summary = summary with
+        {
+            FollowUps = followUps.Count,
+            FollowUpBytes = followUps.Sum(static followUp => followUp.FollowUp.Bytes),
+            EstimatedFollowUpTokens = followUps.Sum(static followUp => followUp.FollowUp.EstimatedTokens)
+        };
         var attributed = requests.Select(static request => new Attributed(new GainPath(request.Method, request.Rule, request.Layer, request.Pipeline), request.Totals))
             .Concat(recallEvents.Select(static recallEvent => new Attributed(recallEvent.Path, RecallTotals(recallEvent.Recall))))
+            .Concat(followUps.Select(static followUp => new Attributed(followUp.Path, FollowUpTotals(followUp.FollowUp))))
             .ToArray();
         var attributions = new List<GainAttribution>();
         foreach (var (dimension, key) in Dimensions)
@@ -71,12 +80,19 @@ public static class GainReportBuilder
             sum.ForwardedBytes + row.ForwardedBytes, sum.EstimatedOriginalTokens + row.EstimatedOriginalTokens,
             sum.EstimatedForwardedTokens + row.EstimatedForwardedTokens, sum.EstimatedSavedTokens + row.EstimatedSavedTokens,
             sum.Recalls + row.Recalls, sum.RetrievedCharacters + row.RetrievedCharacters,
-            sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens));
+            sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens,
+            sum.FollowUps + row.FollowUps, sum.FollowUpBytes + row.FollowUpBytes, sum.EstimatedFollowUpTokens + row.EstimatedFollowUpTokens,
+            sum.FollowUpMeasuredRequests + row.FollowUpMeasuredRequests));
     }
 
     private static GainTotals RecallTotals(GainRecall recall)
     {
         return new GainTotals(Recalls: 1, RetrievedCharacters: recall.Characters, EstimatedRetrievedTokens: recall.EstimatedTokens);
+    }
+
+    private static GainTotals FollowUpTotals(GainFollowUp followUp)
+    {
+        return new GainTotals(FollowUps: 1, FollowUpBytes: followUp.Bytes, EstimatedFollowUpTokens: followUp.EstimatedTokens);
     }
 
     private static GainBucket[] Buckets(IReadOnlyList<GainHistoryEntry> rows, Func<DateTimeOffset, DateTimeOffset> start)

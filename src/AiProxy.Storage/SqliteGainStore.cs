@@ -49,6 +49,12 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             recall.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(recall)), null, cancellationToken), WritePath.Request, cancellationToken);
     }
 
+    public ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
+    {
+        return WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.FollowUp, Guid.CreateVersion7().ToString("N"), followUp.At,
+            followUp.Project, provider, method, rule, layer, pipeline, JsonSerializer.Serialize(followUp)), null, cancellationToken), WritePath.Request, cancellationToken);
+    }
+
     public async ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
     {
         await EnsureAsync(cancellationToken);
@@ -267,16 +273,22 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                            'Recalls',COALESCE(SUM(json_extract(totals,'$.Recalls')),0),
                                            'RetrievedCharacters',COALESCE(SUM(json_extract(totals,'$.RetrievedCharacters')),0),
                                            'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0),
-                                           'EstimatedToolTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedToolTokens')),0))
+                                           'EstimatedToolTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedToolTokens')),0),
+                                           'FollowUps',COALESCE(SUM(json_extract(totals,'$.FollowUps')),0),
+                                           'FollowUpBytes',COALESCE(SUM(json_extract(totals,'$.FollowUpBytes')),0),
+                                           'EstimatedFollowUpTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedFollowUpTokens')),0),
+                                           'FollowUpMeasuredRequests',COALESCE(SUM(json_extract(totals,'$.FollowUpMeasuredRequests')),0))
                                        """;
 
         public const string Aggregate = $"""
                                          WITH metrics AS (
                                              SELECT kind,at,method,rule,layer,pipeline,
                                                  CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
+                                                     WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
+                                                         'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
                                                      ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
                                                          'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
-                                             FROM gain_event WHERE kind IN ('request','recall') AND{Predicate})
+                                             FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate})
                                          SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
                                              '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
                                              '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
@@ -302,6 +314,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         public const string Request = "request";
         public const string Failure = "failure";
         public const string Recall = "recall";
+        public const string FollowUp = "followup";
         public const string Other = "other";
     }
 }

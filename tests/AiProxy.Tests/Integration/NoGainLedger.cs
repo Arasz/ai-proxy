@@ -20,6 +20,11 @@ internal sealed class NoGainLedger : IGainStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
+    {
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
     {
         return ValueTask.FromResult(GainReportBuilder.Build(query, TimeProvider.System.GetUtcNow(), [], [], []));
