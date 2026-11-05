@@ -260,6 +260,36 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke-installed-tool.ps1 -Tool $env:TOOL_SHIM -ExpectedVersion $env:TOOL_VERSION
 
+  musl-code-view:
+    # Canary: runs the code-view tests on Alpine (musl). TreeSitter.DotNet ships
+    # no linux-musl natives, so the musl payload carries the glibc builds; this
+    # job shows whether they load there. Not a required check.
+    # Image is the multi-arch manifest list digest of 10.0.403-alpine3.24; refresh with
+    # curl -sI -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json'
+    #   https://mcr.microsoft.com/v2/dotnet/sdk/manifests/<tag>
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Skip (doc-only change)
+        if: needs.changes.outputs.code != 'true'
+        run: echo "No code changed; skipping the musl canary."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.code == 'true'
+        with:
+          persist-credentials: false
+      - name: Code-view tests on Alpine
+        if: needs.changes.outputs.code == 'true'
+        run: >-
+          docker run --rm -v "$PWD:/src" -w /src
+          mcr.microsoft.com/dotnet/sdk:10.0.403-alpine3.24@sha256:cc02b814237a76c4735fb6eeee87181597b5e56f2ce458a435e527674d91f4d7
+          sh -c 'mkdir -p .nupkg-local &&
+          dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --
+          --filter-namespace "AiProxy.Tests.Unit.Content.Code"'
+
   certificates-macos:
     # The root CA's name-constraint tests on the macOS chain engine. macOS
     # reports a refused name with a different flag from Linux (OpenSSL), so the
