@@ -17,18 +17,17 @@ public sealed class CliApplication(GainRuntime runtime)
 
     private static readonly FrozenSet<string> Commands = new[]
     {
-        "-h", "-?", "--help", "--version", GainCommand.Command, DoctorCommand.Command, McpServerProcess.Command, HarnessProcess.Command
+        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, McpServerProcess.Command, HarnessProcess.Command
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static bool IsCommandInvocation(string[] args)
     {
-        return IsRootHelp(args) || (args.Length > 0 && Commands.Contains(args[0]));
+        return IsRootHelp(args) || (args.Length > 0 && (Commands.Contains(args[0]) || args[0] is "--version"));
     }
 
     private static bool IsRootHelp(string[] args)
     {
-        return args.Any(argument => argument is "-h" or "-?" or "--help") &&
-               (args.Length == 0 || args[0] is not (GainCommand.Command or DoctorCommand.Command or McpServerProcess.Command or HarnessProcess.Command));
+        return args.Any(argument => argument is "-h" or "-?" or "--help") && (args.Length == 0 || !Commands.Contains(args[0]));
     }
 
     public static async Task<int> RunProcessAsync(string[] args)
@@ -95,6 +94,12 @@ public sealed class CliApplication(GainRuntime runtime)
             config.AddCommand<DoctorCommand>(DoctorCommand.Command)
                 .WithData(runtime)
                 .WithDescription("Check the setup without changing anything.");
+            config.AddCommand<StatusCommand>(StatusCommand.Command)
+                .WithData(runtime)
+                .WithDescription("Show the running proxy instance (exit 3 when none runs).");
+            config.AddCommand<StopCommand>(StopCommand.Command)
+                .WithData(runtime)
+                .WithDescription("Gracefully stop the running proxy instance.");
             config.AddCommand<McpCommand>(McpServerProcess.Command)
                 .WithDescription("Run the retrieval MCP server over stdio.");
             var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)

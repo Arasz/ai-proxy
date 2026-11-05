@@ -55,4 +55,4 @@ jobs:
       - name: Prepare the local package feed
         run: New-Item -ItemType Directory -Force .nupkg-local | Out-Null
       - name: Run isolated native lifecycle tests
-        run: dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --filter-class 'AiProxy.Tests.Integration.RestartTests' --minimum-expected-tests 1
+        run: dotnet test --project tests/AiProxy.Tests --configuration Release --nologo --filter-class 'AiProxy.Tests.Integration.RestartTests' --filter-class 'AiProxy.Tests.Integration.StopStatusTests' --minimum-expected-tests 48

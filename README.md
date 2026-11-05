@@ -79,7 +79,8 @@ ai-proxy --restart
 
 The command waits for the owned process to exit, then runs the replacement in the foreground.
 It preserves the actual proxy and local API ports unless configuration explicitly overrides them.
-With no owner, it starts normally. Competing starts fail while a restart is in progress.
+With no owner, it starts normally. Competing starts fail while a restart or stop is in progress.
+To see or end the running instance without starting another, use `ai-proxy status` (exit 3 when nothing runs) and `ai-proxy stop`; see [lifecycle](docs/reference/lifecycle.md).
 A plain start while another instance runs exits with `ai-proxy is already running (pid N, port P). Use `ai-proxy --restart` to replace it.`
 An unknown command or a bare flag exits with code 2 and the usage text; `ai-proxy --version` prints the product version.
 Configuration options take `--key=value` or `--key value`; an unknown `Proxy:*` key stops startup and names the key.
