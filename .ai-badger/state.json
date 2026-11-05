@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-05T02:18:51.552329+00:00",
-  "next": "compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter build vs best-effort docs.",
+  "lastUpdated": "2026-11-05T02:51:24.885596+00:00",
+  "next": "lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter build vs best-effort docs.",
   "completedTasks": [
+    {
+      "taskId": "aip-measure-ccr-follow-up-bytes",
+      "date": "2026-11-05",
+      "title": "Gain: measure CCR follow-up bytes and relay balance (0.24.0)",
+      "pr": 110,
+      "version": "0.24.0",
+      "summary": "followup ledger event after each sent CCR follow-up (stamped at request start, attributed like recalls); Follow-up column + 'Billed balance (all requests)' in summary/by-*; buckets request-only; JSON v1 additive; CSV appended. Rest of the compression-reporting backlog item was already built.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-prove-musl-code-view-grammars",
       "date": "2026-11-05",
