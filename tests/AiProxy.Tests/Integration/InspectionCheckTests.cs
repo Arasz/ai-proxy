@@ -19,9 +19,15 @@ public sealed class InspectionCheckTests
         public IReadOnlyCollection<string> Hosts { get; } = hosts;
     }
 
-    private static InspectionCheck Check(Uri proxy, string host, string dataDirectory)
+    // Long enough for the proxy to create its first leaf certificate on a loaded CI runner.
+    private static readonly TimeSpan Generous = TimeSpan.FromSeconds(60);
+
+    // Tests that expect the check to give up use a short bound, so they do not wait a minute.
+    private static readonly TimeSpan Short = TimeSpan.FromSeconds(5);
+
+    private static InspectionCheck Check(Uri proxy, string host, string dataDirectory, TimeSpan? timeout = null)
     {
-        return new InspectionCheck(proxy, host, dataDirectory, TimeSpan.FromSeconds(10));
+        return new InspectionCheck(proxy, host, dataDirectory, timeout ?? Generous);
     }
 
     [Fact]
@@ -48,7 +54,7 @@ public sealed class InspectionCheckTests
     public async Task A_tunnel_the_proxy_does_not_decrypt_to_an_unreachable_host_is_unknown_not_failed()
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new NamedHosts(Host));
-        var result = await Check(proxy.ProxyAddress, "elsewhere.test", proxy.DataDirectory).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Check(proxy.ProxyAddress, "elsewhere.test", proxy.DataDirectory, Short).RunAsync(TestContext.Current.CancellationToken);
         Assert.Equal(CheckStatus.Unknown, result.Status);
     }
 
