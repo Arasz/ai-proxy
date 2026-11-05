@@ -33,7 +33,7 @@ public sealed class GainView
 
         if ((settings.Project || settings.ProjectPath is not null) && report.Summary.Requests == 0)
         {
-            views.Add(new Text($"No requests for this project. Traffic is attributed only when the client sends the {GainApi.ProjectHeader} header or the proxy credential that `ai-proxy harness` sets; launch the agent with `ai-proxy harness`.\n"));
+            views.Add(new Text($"No requests for this project. Traffic is attributed only when the client sends the {GainApi.ProjectHeader} header or the proxy credential; launch the agent with `ai-proxy harness` to set both.\n"));
         }
         if (settings.History)
         {

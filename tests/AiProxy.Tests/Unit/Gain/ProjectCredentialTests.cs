@@ -35,13 +35,21 @@ public sealed class ProjectCredentialTests
     }
 
     [Theory]
-    [InlineData("Bearer abc")]
-    [InlineData("Digest abc")]
+    [InlineData("Bearer")]
+    [InlineData("Digest")]
     public void Ignores_non_basic(string scheme)
     {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/project/a"));
 
-        Assert.Null(ProjectCredential.Read($"{scheme.Split(' ')[0]} {payload}"));
+        Assert.Null(ProjectCredential.Read($"{scheme} {payload}"));
+    }
+
+    [Fact]
+    public void Tolerates_space_around_the_payload()
+    {
+        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/p"));
+
+        Assert.Equal("/p", ProjectCredential.Read($"Basic  {payload} "));
     }
 
     [Fact]
@@ -110,6 +118,14 @@ public sealed class ProjectCredentialTests
     public void Empty_header_does_not_count()
     {
         Assert.Equal("/request", ProjectCredential.Resolve("", "/request", null));
+    }
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void Blank_header_does_not_count(string header)
+    {
+        Assert.Equal("/request", ProjectCredential.Resolve(header, "/request", null));
     }
 
     [Fact]

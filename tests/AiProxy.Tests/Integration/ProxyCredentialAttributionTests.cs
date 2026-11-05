@@ -24,8 +24,41 @@ public sealed class ProxyCredentialAttributionTests
     private static async Task<string?> OnlyProjectAsync(ProxyHost proxy)
     {
         using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
-        var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
-        return Assert.Single(report!.History).Project;
+        for (var attempt = 0; ; attempt++)
+        {
+            var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+            if (report!.History.Count == 1 || attempt == 40)
+            {
+                return Assert.Single(report.History).Project;
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+    }
+
+    private static async Task<GainReport> ReportAsync(ProxyHost proxy)
+    {
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        return (await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken))!;
+    }
+
+    private static async Task<(HttpStatusCode Status, FakeUpstream Upstream)> SendThroughTunnelAsync(ProxyHost proxy, X509Certificate2 upstreamCertificate, FakeUpstream upstream, string tunnelCredential, string? requestCredential)
+    {
+        proxy.Services.GetRequiredService<TitaniumProxyService>().Server.ServerCertificateValidationCallback += (_, e) =>
+        {
+            e.IsValid = e.Certificate is not null && e.Certificate.GetCertHashString() == upstreamCertificate.GetCertHashString();
+            return Task.CompletedTask;
+        };
+        using var proxyRoot = LoadProxyRoot(proxy.DataDirectory);
+        using var handler = new SocketsHttpHandler
+        {
+            UseProxy = false,
+            ConnectCallback = (context, token) => ConnectThroughAsync(proxy.ProxyAddress, context.DnsEndPoint, tunnelCredential, token),
+            SslOptions = new SslClientAuthenticationOptions { RemoteCertificateValidationCallback = (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate as X509Certificate2, errors) }
+        };
+        using var client = new HttpClient(handler);
+        using var response = await client.SendAsync(Post(new Uri(upstream.BaseAddress, "/v1/messages"), requestCredential), TestContext.Current.CancellationToken);
+        return (response.StatusCode, upstream);
     }
 
     private static HttpRequestMessage Post(Uri uri, string? credential, string? project = null)
@@ -64,24 +97,53 @@ public sealed class ProxyCredentialAttributionTests
         using var upstreamCertificate = CreateUpstreamCertificate();
         await using var upstream = await FakeUpstream.StartAsync(upstreamCertificate);
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
-        proxy.Services.GetRequiredService<TitaniumProxyService>().Server.ServerCertificateValidationCallback += (_, e) =>
-        {
-            e.IsValid = e.Certificate is not null && e.Certificate.GetCertHashString() == upstreamCertificate.GetCertHashString();
-            return Task.CompletedTask;
-        };
-        using var proxyRoot = LoadProxyRoot(proxy.DataDirectory);
-        using var handler = new SocketsHttpHandler
-        {
-            UseProxy = false,
-            ConnectCallback = (context, token) => ConnectThroughAsync(proxy.ProxyAddress, context.DnsEndPoint, Credential("/project/c"), token),
-            SslOptions = new SslClientAuthenticationOptions { RemoteCertificateValidationCallback = (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate as X509Certificate2, errors) }
-        };
-        using var client = new HttpClient(handler);
 
-        using var response = await client.SendAsync(Post(new Uri(upstream.BaseAddress, "/v1/messages"), null), TestContext.Current.CancellationToken);
+        var (status, _) = await SendThroughTunnelAsync(proxy, upstreamCertificate, upstream, Credential("/project/c"), null);
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal("/project/c", await OnlyProjectAsync(proxy));
+    }
+
+    [Fact]
+    public async Task A_request_credential_wins_over_the_tunnel_credential()
+    {
+        using var upstreamCertificate = CreateUpstreamCertificate();
+        await using var upstream = await FakeUpstream.StartAsync(upstreamCertificate);
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+
+        var (status, _) = await SendThroughTunnelAsync(proxy, upstreamCertificate, upstream, Credential("/from/tunnel"), Credential("/from/request"));
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal("/from/request", await OnlyProjectAsync(proxy));
+    }
+
+    [Theory]
+    [InlineData("Bearer ai-proxy-token")]
+    [InlineData("")]
+    public async Task A_credential_that_is_not_an_ai_proxy_credential_is_served_without_a_project(string value)
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+        using var client = new HttpClient(new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true });
+
+        using var response = await client.SendAsync(Post(new Uri(upstream.BaseAddress, "/v1/messages"), value), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("/project/c", await OnlyProjectAsync(proxy));
+        Assert.Null(await OnlyProjectAsync(proxy));
+    }
+
+    [Fact]
+    public async Task A_bearer_scheme_carrying_the_payload_is_not_a_project()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+        using var client = new HttpClient(new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true });
+        var bearer = "Bearer " + Credential("/project/x")["Basic ".Length..];
+
+        using var response = await client.SendAsync(Post(new Uri(upstream.BaseAddress, "/v1/messages"), bearer), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(await OnlyProjectAsync(proxy));
     }
 
     [Fact]
@@ -124,32 +186,52 @@ public sealed class ProxyCredentialAttributionTests
     }
 
     [Fact]
-    public async Task A_tunnel_to_an_undecrypted_host_is_opened_and_the_origin_never_sees_the_credential()
+    public async Task A_tunnel_to_an_undecrypted_host_relays_the_clients_bytes_alone_and_records_no_gain()
     {
         using var origin = new TcpListener(IPAddress.Loopback, 0);
         origin.Start();
-        var received = ReadOriginAsync(origin);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        var received = ReadOriginAsync(origin, timeout.Token);
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
         var target = new DnsEndPoint("127.0.0.1", ((IPEndPoint)origin.LocalEndpoint).Port);
+        Task? handshake = null;
 
-        await using (var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, Credential("/project/f"), TestContext.Current.CancellationToken))
+        await using (var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, Credential("/project/f"), timeout.Token))
         {
             using var tls = new SslStream(tunnel);
-            var handshake = tls.AuthenticateAsClientAsync("origin.test");
-            var bytes = Convert.FromHexString(await received.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-            Assert.Equal(0x16, bytes[0]);
-            Assert.DoesNotContain(ProxyAuthorization, Encoding.ASCII.GetString(bytes), StringComparison.OrdinalIgnoreCase);
-            tunnel.Dispose();
-            await Assert.ThrowsAnyAsync<Exception>(() => handshake);
+            try
+            {
+                handshake = tls.AuthenticateAsClientAsync("origin.test");
+                var bytes = await received;
+                var text = Encoding.ASCII.GetString(bytes);
+                Assert.Equal(0x16, bytes[0]);
+                Assert.Contains("origin.test", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("CONNECT", text, StringComparison.Ordinal);
+                Assert.DoesNotContain(ProxyAuthorization, text, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                tunnel.Dispose();
+                if (handshake is not null)
+                {
+                    await Task.WhenAny(handshake, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                    _ = handshake.Exception;
+                }
+            }
         }
+
+        var report = await ReportAsync(proxy);
+        Assert.Empty(report.History);
+        Assert.Equal(new GainOtherTraffic(0, 0), report.OtherTraffic);
     }
 
-    private static async Task<string> ReadOriginAsync(TcpListener origin)
+    private static async Task<byte[]> ReadOriginAsync(TcpListener origin, CancellationToken token)
     {
-        using var client = await origin.AcceptTcpClientAsync();
+        using var client = await origin.AcceptTcpClientAsync(token);
         var buffer = new byte[4096];
-        var read = await client.GetStream().ReadAsync(buffer);
-        return Convert.ToHexString(buffer, 0, read);
+        var read = await client.GetStream().ReadAsync(buffer, token);
+        return buffer[..read];
     }
 
     private static async ValueTask<Stream> ConnectThroughAsync(Uri proxy, DnsEndPoint target, string credential, CancellationToken token)
@@ -159,6 +241,9 @@ public sealed class ProxyCredentialAttributionTests
         var stream = new NetworkStream(socket, true);
         var connect = $"CONNECT {target.Host}:{target.Port} HTTP/1.1\r\nHost: {target.Host}:{target.Port}\r\n{ProxyAuthorization}: {credential}\r\n\r\n";
         await stream.WriteAsync(Encoding.ASCII.GetBytes(connect), token);
+        using var headTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        headTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+        token = headTimeout.Token;
         var head = new StringBuilder();
         var one = new byte[1];
         while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))

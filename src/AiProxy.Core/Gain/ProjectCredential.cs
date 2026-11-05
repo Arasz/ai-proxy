@@ -17,7 +17,7 @@ public static class ProjectCredential
             return null;
         }
 
-        var encoded = proxyAuthorization.AsSpan(BasicScheme.Length).Trim();
+        var encoded = proxyAuthorization.AsSpan(BasicScheme.Length);
         var buffer = new byte[encoded.Length];
         if (!Convert.TryFromBase64Chars(encoded, buffer, out var written))
         {
@@ -53,6 +53,6 @@ public static class ProjectCredential
     /// <summary>Picks the project: the header, else the request credential, else the tunnel's credential.</summary>
     public static string? Resolve(string? header, string? requestCredential, string? connectCredential)
     {
-        return !string.IsNullOrEmpty(header) ? header : requestCredential ?? connectCredential;
+        return !string.IsNullOrWhiteSpace(header) ? header : requestCredential ?? connectCredential;
     }
 }

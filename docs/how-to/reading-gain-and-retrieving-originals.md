@@ -87,7 +87,7 @@ traffic is separated.
 The proxy takes a request's project from the `X-Ai-Proxy-Project` header when there is one, and
 otherwise from the proxy credential the client sends. `ai-proxy harness` sets that credential for
 you: it launches the agent with `HTTP_PROXY`, `HTTPS_PROXY` and their lowercase forms pointing at
-`http://ai-proxy:<percent-encoded project path>@127.0.0.1:8080`, so any agent whose HTTP stack
+`http://ai-proxy:<percent-encoded project path>@<proxy address>` (by default 127.0.0.1:8080), so any agent whose HTTP stack
 honours proxy userinfo is attributed to the directory you launched it from. That includes Codex's
 built-in provider (measured with Codex 0.166.0) and Claude Code (measured with 2.1.318).
 
@@ -95,7 +95,7 @@ built-in provider (measured with Codex 0.166.0) and Claude Code (measured with 2
 ai-proxy harness codex -- exec "your prompt"
 ```
 
-Without the launcher, set the variable yourself with the path percent-encoded:
+Without the launcher, set the variable yourself with the path percent-encoded (the example uses the default proxy address):
 
 ```bash
 HTTPS_PROXY="http://ai-proxy:%2FUsers%2Fme%2Fapp@127.0.0.1:8080" codex
