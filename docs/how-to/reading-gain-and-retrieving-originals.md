@@ -75,17 +75,20 @@ authentication settings:
 env_http_headers = { "X-Ai-Proxy-Project" = "AI_PROXY_CODEX_PROJECT" }
 ```
 
-Then launch Codex from the project directory:
+Then launch Codex from the project directory with `ai-proxy harness codex`, which exports
+`AI_PROXY_CODEX_PROJECT` with the current directory for you:
 
 ```bash
-AI_PROXY_CODEX_PROJECT="$PWD" codex
+ai-proxy harness codex -- exec "your prompt"
 ```
+Without the launcher, set it yourself: `AI_PROXY_CODEX_PROJECT="$PWD" codex`.
 
 The provider must be selected by `model_provider`. If you use a built-in provider, first define
 and select a [custom model provider](https://learn.chatgpt.com/docs/config-file/config-advanced#custom-model-providers);
 the built-in IDs `openai`, `ollama` and `lmstudio` are reserved. Keep the provider's upstream base
 URL: ai-proxy's port 8080 is a forward proxy, so Codex traffic still needs to follow the proxy
-settings and trust its inspection certificate.
+settings and trust its inspection certificate. Codex cannot add headers to its built-in `openai`
+provider, so that traffic shows as unattributed in `gain`.
 
 The header setting was verified with Codex CLI 0.164.0, a loopback HTTP server and a fake API key.
 Live provider authentication and ChatGPT sign-in were outside that check.

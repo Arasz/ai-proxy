@@ -125,7 +125,9 @@ public sealed class RootCheckTests : IDisposable
     {
         using var root = Root(Now);
         WritePem(root.ExportCertificatePem());
-        Assert.Equal(CheckStatus.Warn, (await Run(trusted: false)).Status);
+        var result = await Run(trusted: false);
+        Assert.Equal(CheckStatus.Warn, result.Status);
+        Assert.Contains("CODEX_CA_CERTIFICATE", result.Detail, StringComparison.Ordinal);
     }
 
     [Fact]

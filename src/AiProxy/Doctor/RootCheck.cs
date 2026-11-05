@@ -71,6 +71,6 @@ internal sealed class RootCheck(string dataDirectory, TimeProvider time, IRootTr
 
         return trust.IsTrusted(root)
             ? new CheckResult(Name, CheckStatus.Pass, $"The root at {where} is constrained, valid until {root.NotAfter:yyyy-MM-dd}, and trusted by this system.")
-            : new CheckResult(Name, CheckStatus.Warn, $"The root at {where} is valid but this system does not trust it; clients that use NODE_EXTRA_CA_CERTS are unaffected.", "Trust the root system-wide only if a client needs it.");
+            : new CheckResult(Name, CheckStatus.Warn, $"The root at {where} is valid but this system does not trust it; clients that use NODE_EXTRA_CA_CERTS or CODEX_CA_CERTIFICATE are unaffected.", "Trust the root system-wide only if a client needs it.");
     }
 }

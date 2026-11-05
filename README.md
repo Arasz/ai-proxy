@@ -126,6 +126,22 @@ directory; ai-proxy removes that header before forwarding. See the
 for the verified Codex project-header configuration. Keep each provider's upstream base URL;
 port 8080 is a forward proxy, not an API base URL.
 
+### Codex
+
+```bash
+ai-proxy harness codex -- exec "summarize this repo"
+```
+For Codex the launcher sets the same proxy variables and points `CODEX_CA_CERTIFICATE` at the
+root CA file. It replaces a value you set yourself, and it never sets `SSL_CERT_FILE`. It also
+puts `--no-daemon` before your arguments, so an already running Codex daemon cannot bypass the
+proxy. Nothing is added when the first argument is `remote-control` or `app-server`, or when you
+pass `--no-daemon` or `--remote` yourself.
+
+Codex cannot add headers to its built-in `openai` provider, so that traffic shows as
+unattributed in `gain`. For a custom model provider, add the `env_http_headers` recipe from the
+[gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project);
+the launcher exports `AI_PROXY_CODEX_PROJECT` with the current directory for you.
+
 ## Check the setup
 
 If an agent does not seem to go through the proxy, ask it:

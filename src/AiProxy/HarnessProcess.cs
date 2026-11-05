@@ -60,7 +60,7 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
 
             var start = new ProcessStartInfo(settings.Executable) { UseShellExecute = false };
             IEnumerable<string> arguments = context.Data is string[] forwardedArguments ? forwardedArguments : context.Remaining.Raw;
-            foreach (var argument in arguments)
+            foreach (var argument in CodexHarness.LaunchArguments(settings.Executable, arguments.ToArray()))
             {
                 start.ArgumentList.Add(argument);
             }
@@ -78,6 +78,12 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
             start.Environment[KnownNames.EnvironmentVariables.NoProxy] = bypass;
             start.Environment[KnownNames.EnvironmentVariables.LowerNoProxy] = bypass;
             start.Environment[KnownNames.EnvironmentVariables.NodeExtraCaCerts] = ca;
+            if (CodexHarness.IsCodex(settings.Executable))
+            {
+                start.Environment[KnownNames.EnvironmentVariables.CodexCaCertificate] = ca;
+                start.Environment[KnownNames.EnvironmentVariables.CodexProject] = project;
+            }
+
             var headers = (customHeaders ?? "")
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Where(static header => !header.Split(':', 2)[0].Trim().Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase))
