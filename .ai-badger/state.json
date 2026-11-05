@@ -1,7 +1,16 @@
 {
-  "lastUpdated": "2026-11-05T01:59:15.983653+00:00",
-  "next": "musl grammars (Alpine run), compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR.",
+  "lastUpdated": "2026-11-05T02:18:51.552329+00:00",
+  "next": "compression reporting, lifecycle status/stop, #24 restore system proxy, NSS cleanup, capture message id. Owner gates pending: quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter build vs best-effort docs.",
   "completedTasks": [
+    {
+      "taskId": "aip-prove-musl-code-view-grammars",
+      "date": "2026-11-05",
+      "title": "Prove code views on linux-musl (Alpine canary)",
+      "pr": 109,
+      "version": null,
+      "summary": "musl-code-view CI canary: 170 code-view tests pass in dotnet/sdk alpine (no gcompat) though ldd shows glibc _chk symbols unresolved; red proof (delete libtree-sitter.so) fails. Fragile; owner gate: build musl libtree-sitter vs document best effort.",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-codex-harness-trust-and-daemon",
       "date": "2026-11-05",
