@@ -9,7 +9,7 @@ directory, never trusts a certificate and sends no HTTP request to a provider.
 |---|---|---|---|---|
 | `api` | `GET {endpoint}/health` answers as `ai-proxy`. | Nothing answers, or another server does. If the proxy port is also closed, one failure says the proxy is not running. | The running version differs from the command's. | An older proxy answers without `product`. |
 | `inspection` | `CONNECT {host}:443` through the proxy, then a TLS handshake only. The leaf must chain to `<data-directory>/root-ca.pem`. | The host is not decrypted, or the certificate does not chain to that root. | | The proxy answered the tunnel request with a status other than 200, the tunnel or handshake timed out or was reset (including when the proxy cannot reach an upstream), or the published root could not be read. Also reported (as "skipped") when the proxy is not running. |
-| `root` | Reads `<data-directory>/root-ca.pem` (at most 64 KiB). | Missing, holds a private key, not limited to the provider hosts, or outside its validity period. | Expires within 30 days, or the operating system does not trust it (advisory; `NODE_EXTRA_CA_CERTS` and `CODEX_CA_CERTIFICATE` clients are unaffected). | |
+| `root` | Reads `<data-directory>/root-ca.pem` (at most 64 KiB). | Missing, holds a private key, not limited to the provider hosts, or outside its validity period. | Expires within 30 days, or the operating system does not trust it (advisory; `NODE_EXTRA_CA_CERTS` clients and Codex launched through `ai-proxy harness` are unaffected). | |
 | `environment` | `HTTPS_PROXY` and `HTTP_PROXY`, either case, against the proxy address. | A variable names another endpoint. | | |
 
 An unset variable passes: clients that use the system proxy are covered. Output shows only

@@ -43,12 +43,33 @@ public sealed class CodexHarnessTests
     [Theory]
     [InlineData("remote-control", "start")]
     [InlineData("app-server", "--listen", "stdio://")]
-    [InlineData("exec", "--no-daemon", "hi")]
-    [InlineData("--remote", "ws://host:1")]
-    [InlineData("exec", "--remote=ws://host:1")]
-    public void Codex_arguments_that_already_decide_the_daemon_are_left_alone(params string[] arguments)
+    [InlineData("agents")]
+    [InlineData("queue", "msg")]
+    [InlineData("-c", "k=v", "app-server")]
+    [InlineData("--no-daemon", "exec", "hi")]
+    [InlineData("--remote", "ws://x")]
+    [InlineData("--remote=ws://x", "exec")]
+    public void Codex_commands_that_need_the_daemon_or_choose_one_are_left_alone(params string[] arguments)
     {
         Assert.Equal(arguments, CodexHarness.LaunchArguments("codex", arguments));
+    }
+
+    public static TheoryData<string[]> ModelRuns => new()
+    {
+        { ["-c", "k=v", "exec", "hi"] },
+        { ["--model", "o3", "-C", "/x", "exec"] },
+        { ["fix it"] },
+        { ["-m", "o3", "fix it"] },
+        { ["--oss"] },
+        { ["resume", "--last"] },
+        { ["e", "hi"] }
+    };
+
+    [Theory]
+    [MemberData(nameof(ModelRuns))]
+    public void Codex_runs_that_start_a_model_session_get_no_daemon(string[] arguments)
+    {
+        Assert.Equal(["--no-daemon", .. arguments], CodexHarness.LaunchArguments("codex", arguments));
     }
 
     [Fact]
