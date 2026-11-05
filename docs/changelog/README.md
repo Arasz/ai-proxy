@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.24.0](0.24.0-gain-follow-up-bytes.md) | `gain` records the follow-up requests of CCR retrievals (bytes and estimated tokens), adds a Follow-up column and a `Billed balance (all requests)` line; JSON and CSV gain follow-up fields. | [#110](https://github.com/Arasz/ai-proxy/pull/110) |
 | [0.23.0](0.23.0-codex-harness.md) | `ai-proxy harness codex` trusts the proxy root through `CODEX_CA_CERTIFICATE`, adds `--no-daemon`, and exports `AI_PROXY_CODEX_PROJECT`. | [#108](https://github.com/Arasz/ai-proxy/pull/108) |
 | [0.22.2](0.22.2-mcp-drain-on-eof.md) | `ai-proxy mcp` now answers requests still in flight when stdin closes, waiting up to 30 seconds, instead of printing nothing. | [#107](https://github.com/Arasz/ai-proxy/pull/107) |
 | [0.22.1](0.22.1-self-addressed-requests.md) | A request sent to the proxy port itself gets a 400 that explains to use it as HTTP_PROXY, plus one warning naming the client; the system proxy now bypasses loopback hosts. | [#105](https://github.com/Arasz/ai-proxy/pull/105) |

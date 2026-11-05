@@ -23,7 +23,8 @@ ai-proxy gain --format json   # or csv; same numbers as the text view
 ai-proxy gain --watch         # live view, Ctrl+C exits
 ```
 
-Token counts are estimates at 2.89 characters per token, and they cover the first request only.
+Token counts are estimates at 2.89 characters per token. Saved and Net cover the first request only;
+the Follow-up column and the billed balance below add what the proxy's own follow-up requests cost.
 Character and byte counts are measured. The summary, bucket and attribution tables show the gross
 figure and what it cost:
 
@@ -32,14 +33,38 @@ figure and what it cost:
 | Saved | Original minus forwarded, without the injected `proxy_retrieve` definition. |
 | Retrieved | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
 | Tool | The `proxy_retrieve` definition the proxy added to requests that carry tools. |
+| Follow-up | The body of every follow-up request the proxy sent upstream to answer a `proxy_retrieve` call inside your request. |
 | Net | Saved minus retrieved minus tool. Negative when the cost is larger than the saving. |
 | Saved % and Net % | Saved and net as a share of the original tokens, to one decimal. |
 
 The summary headers drop the word "tokens"; the bucket and attribution tables still spell it out.
 Table numbers under 10,000 are exact, with thousands separators. Larger ones show one decimal of K,
-M or B (`523.8K`, `261.2M`), so the summary fits a 100-column terminal and no number splits across
+M or B (`523.8K`, `261.2M`), so the summary fits an 80-column terminal and no number splits across
 lines. `--format csv` and `--format json` keep exact raw values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
-`netPercent`; the CSV adds `estimated_tool_tokens` and `estimated_net_tokens` as its last two columns.
+`netPercent`; the CSV adds `estimated_tool_tokens` and `estimated_net_tokens` after `error`.
+Version 0.24.0 adds `followUps`, `followUpBytes`, `estimatedFollowUpTokens`, `followUpMeasuredRequests`
+and `estimatedBilledBalanceTokens` to the JSON totals (schema version unchanged), and appends
+`follow_ups`, `follow_up_bytes`, `estimated_follow_up_tokens` and `estimated_billed_balance_tokens`
+to the CSV after `bytes`.
+
+Under the table, `Billed balance (all requests)` is original minus forwarded minus follow-up tokens.
+It answers a different question than Net. Net asks what the first request saved once retrievals are
+paid for; the balance asks what every request sent upstream cost against sending the originals
+untouched. Retrieved is not subtracted from the balance because the retrieved text already travels
+inside the follow-up bodies, so subtracting it would count it twice. A stateless request resends
+its whole forwarded body with the assistant turn and the tool results on each follow-up, so those
+bytes count again, as they are billed. A thread request sends only the results, so its follow-up
+is small. The line ends with `follow-ups measured on N of M requests`: requests recorded before
+version 0.24.0 carry no follow-up figures and are counted in M but not in N, and a request whose follow-up write failed (logged only) still
+counts in N. The balance is an estimate from the sizes sent, not a provider-billed figure, which
+is why the Method line still says net billed savings are unavailable; the Follow-up bytes are the exact length of the body sent.
+
+Follow-ups appear in the summary and in the `--by-method`, `--by-rule`, `--by-layer` and `--by-pipeline`
+attribution views, under the path of the request that caused them, and follow the project, date
+and provider filters. The `--daily`, `--weekly` and `--monthly` buckets list requests only, so
+their follow-up figures are zero. A follow-up is stamped with the time its request started, and it
+is recorded only after the provider accepts it; a refused or failed follow-up records nothing.
+Capture does not need to be on.
 
 A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
 inspect, such as a body over 8 MB or a chunked body, are not counted). A request whose only change is
@@ -49,7 +74,7 @@ and percentages: `POST` to `/v1/messages` (Anthropic), the chat completions, com
 messages endpoints (OpenAI-style hosts, OpenRouter) and `generateContent` / `streamGenerateContent` (Gemini).
 Other calls to a provider host, such as Claude Code telemetry, are recorded as **other traffic** and shown
 apart: a line `Other traffic: N requests, B bytes` under the table, an `other` row in CSV (the `bytes`
-column, appended last) and `otherTraffic` (`requests`, `bytes`) at the end of the JSON report. They follow the
+column) and `otherTraffic` (`requests`, `bytes`) at the end of the JSON report. They follow the
 same project, date and provider filters and `--reset`. Rows recorded before this change cannot be sorted again
 because the path was not kept; telemetry recorded then stays in the totals as `unchanged`, and only new
 traffic is separated.

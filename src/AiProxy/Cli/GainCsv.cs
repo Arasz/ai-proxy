@@ -9,7 +9,7 @@ public sealed class GainCsv
 {
     public string Render(GainReport report, GainSettings settings)
     {
-        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes\r\n");
+        var csv = new StringBuilder("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes,follow_ups,follow_up_bytes,estimated_follow_up_tokens,estimated_billed_balance_tokens\r\n");
         Add(csv, "summary", Stamp(report.GeneratedAt), report.Measurement.Kind, "", "", report.Summary);
         if (report.OtherTraffic is { } other)
         {
@@ -84,7 +84,9 @@ public sealed class GainCsv
             section, at, name, project ?? "", provider ?? "", totals.Requests.ToString(CultureInfo.InvariantCulture), totals.EstimatedSavedTokens.ToString(CultureInfo.InvariantCulture),
             totals.EstimatedRetrievedTokens.ToString(CultureInfo.InvariantCulture), error ?? "",
             totals.EstimatedToolTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedNetTokens.ToString(CultureInfo.InvariantCulture),
-            bytes?.ToString(CultureInfo.InvariantCulture) ?? ""
+            bytes?.ToString(CultureInfo.InvariantCulture) ?? "",
+            totals.FollowUps.ToString(CultureInfo.InvariantCulture), totals.FollowUpBytes.ToString(CultureInfo.InvariantCulture),
+            totals.EstimatedFollowUpTokens.ToString(CultureInfo.InvariantCulture), totals.EstimatedBilledBalanceTokens.ToString(CultureInfo.InvariantCulture)
         };
         csv.AppendJoin(',', fields.Select(Escape)).Append("\r\n");
     }

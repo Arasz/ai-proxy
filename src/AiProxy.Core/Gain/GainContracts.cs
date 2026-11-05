@@ -38,10 +38,17 @@ public sealed record GainTotals(
     long Recalls = 0,
     long RetrievedCharacters = 0,
     long EstimatedRetrievedTokens = 0,
-    long EstimatedToolTokens = 0)
+    long EstimatedToolTokens = 0,
+    long FollowUps = 0,
+    long FollowUpBytes = 0,
+    long EstimatedFollowUpTokens = 0,
+    long FollowUpMeasuredRequests = 0)
 {
     /// <summary>Saved tokens less what retrievals read back and what the injected tool definition cost.</summary>
     public long EstimatedNetTokens => EstimatedSavedTokens - EstimatedRetrievedTokens - EstimatedToolTokens;
+
+    /// <summary>Original less forwarded less follow-up tokens: what every request cost against sending it untouched; recalls are already inside the follow-up bodies.</summary>
+    public long EstimatedBilledBalanceTokens => EstimatedOriginalTokens - EstimatedForwardedTokens - EstimatedFollowUpTokens;
 
     /// <summary>Saved tokens as a percentage of the original, to one decimal; zero when there was no original.</summary>
     public decimal SavedPercent => Percent(EstimatedSavedTokens);
@@ -84,6 +91,12 @@ public sealed record GainPath(string Method, string Rule, string Layer, string P
 
 /// <summary>A recall as the ledger holds it: the recall and the path it is attributed to.</summary>
 public sealed record GainRecallEvent(GainRecall Recall, GainPath Path);
+
+/// <summary>A follow-up request the CCR relay sent upstream to carry retrieval results; <c>Bytes</c> is its body length and <c>Characters</c> its text.</summary>
+public sealed record GainFollowUp(DateTimeOffset At, string? Project, int Round, long Characters, long Bytes, long EstimatedTokens);
+
+/// <summary>A follow-up as the ledger holds it: the follow-up and the path it is attributed to.</summary>
+public sealed record GainFollowUpEvent(GainFollowUp FollowUp, GainPath Path);
 
 /// <summary>A failed stage without request or credential contents.</summary>
 public sealed record GainFailure(DateTimeOffset At, string RequestId, string? Project, string Stage, string Error);
@@ -128,6 +141,7 @@ public interface IGainStore
     ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken);
     ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken);
     ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken);
+    ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken);
     ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken);
     ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken);
 }

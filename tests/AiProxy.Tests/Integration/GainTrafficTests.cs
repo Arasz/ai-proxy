@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
+using Microsoft.AspNetCore.Http;
+using static AiProxy.Tests.Unit.Content.Ccr.RetrievalLoopTests;
 
 namespace AiProxy.Tests.Integration;
 
@@ -48,5 +51,35 @@ public sealed class GainTrafficTests
         Assert.Equal(1, report!.Summary.Requests);
         Assert.Equal(new GainOtherTraffic(1, telemetry.Length), report.OtherTraffic);
         Assert.Equal(1, Assert.Single(report.History).Totals.Requests);
+    }
+
+    [Fact]
+    public async Task A_follow_up_is_recorded_when_request_capture_is_off()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var calls = 0;
+        upstream.Handler = async (_, context) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            await context.Response.WriteAsync(Interlocked.Increment(ref calls) == 1
+                ? Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, CcrRelayTests.Retrieve))
+                : Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        };
+        using var directory = new TemporaryDirectory();
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string> { ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = Path.Combine(directory.Path, "content.db") },
+            providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
+        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
+        using var client = new HttpClient(handler);
+
+        using var response = await client.PostAsync(new Uri(upstream.BaseAddress, "/v1/messages"),
+            new StringContent(CcrRelayTests.StatelessRequest(), Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, upstream.Requests.Count);
+        Assert.Equal(1, report!.Summary.FollowUps);
+        Assert.Equal(Encoding.UTF8.GetByteCount(upstream.Requests[1].Body), report.Summary.FollowUpBytes);
     }
 }

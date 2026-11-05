@@ -17,6 +17,9 @@ public sealed class CapturedExchange
     public string GainPipeline { get; set; } = "unknown";
     public List<GainFailure> GainFailures { get; } = [];
 
+    /// <summary>When the request was recorded; its CCR follow-ups carry the same time so they fall in the same period.</summary>
+    public DateTimeOffset GainAt { get; set; }
+
     /// <summary>Whether the request is a model call; anything else is recorded as other traffic, outside the savings totals.</summary>
     public bool IsModelCall { get; init; } = true;
 

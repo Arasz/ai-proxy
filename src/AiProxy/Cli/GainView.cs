@@ -15,13 +15,17 @@ public sealed class GainView
         var views = new List<IRenderable>
         {
             new Text("estimated initial-request token reductions (tokens)\n"),
-            Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Net", "Saved %", "Net %"],
+            Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Follow-up", "Net", "Saved %", "Net %"],
             [
                 [Compact(report.Summary.Requests), Compact(report.Summary.EstimatedOriginalTokens), Compact(report.Summary.EstimatedForwardedTokens), Compact(report.Summary.EstimatedSavedTokens), Compact(report.Summary.EstimatedRetrievedTokens),
-                    Compact(report.Summary.EstimatedToolTokens), Compact(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
-            ]),
+                    Compact(report.Summary.EstimatedToolTokens), Compact(report.Summary.EstimatedFollowUpTokens), Compact(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
+            ], tight: true),
             new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
         };
+        if (report.Summary.FollowUpMeasuredRequests > 0)
+        {
+            views.Add(new Text($"Billed balance (all requests): {Number(report.Summary.EstimatedBilledBalanceTokens)} tokens (estimated from sizes sent, not provider-billed: original - forwarded - follow-up; follow-ups measured on {Number(report.Summary.FollowUpMeasuredRequests)} of {Number(report.Summary.Requests)} requests).\n"));
+        }
         if (report.OtherTraffic is { } other)
         {
             views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
@@ -121,12 +125,13 @@ public sealed class GainView
             buckets.Select(static row => new[] { Stamp(row.Start), Compact(row.Totals.Requests), Compact(row.Totals.EstimatedSavedTokens), Compact(row.Totals.EstimatedRetrievedTokens), Compact(row.Totals.EstimatedNetTokens) })));
     }
 
-    private static Table Table(string[] columns, IEnumerable<string[]> rows)
+    /// <summary>A table; <paramref name="tight"/> drops the right padding so the ten summary columns still fit an 80-column terminal.</summary>
+    private static Table Table(string[] columns, IEnumerable<string[]> rows, bool tight = false)
     {
         var table = new Table().Border(TableBorder.Rounded);
         foreach (var column in columns)
         {
-            table.AddColumn(new TableColumn(new Text(column)));
+            table.AddColumn(new TableColumn(new Text(column)) { Padding = tight ? new Padding(1, 0, 0, 0) : new Padding(1, 0, 1, 0) });
         }
 
         var any = false;

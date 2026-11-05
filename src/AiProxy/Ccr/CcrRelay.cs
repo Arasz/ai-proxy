@@ -235,6 +235,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 response = await SendWithPingsAsync(forwarded);
                 if (response.IsSuccessStatusCode)
                 {
+                    await RecordFollowUpAsync(loop, forwarded);
                     continue;
                 }
 
@@ -369,6 +370,21 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             }
         }
 
+        private async Task RecordFollowUpAsync(RetrievalLoop loop, byte[] followUp)
+        {
+            try
+            {
+                var characters = Encoding.UTF8.GetCharCount(followUp);
+                await relay.Gain.FollowUpAsync(new GainFollowUp(exchange.GainAt, exchange.GainProject, loop.Answered, characters, followUp.Length,
+                        GainReportBuilder.Tokens(characters)), exchange.Dialect.ToString().ToLowerInvariant(),
+                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation);
+            }
+            catch (Exception exception) when (!_cancellation.IsCancellationRequested)
+            {
+                Log.FollowUpWriteFailed(relay.Logger, exchange.GainId, exception);
+            }
+        }
+
         private async Task<string?> OriginalAsync(string id)
         {
             if (originals.TryGetValue(id, out var original))
@@ -443,6 +459,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     {
         [LoggerMessage(EventId = 1610, Level = LogLevel.Warning, Message = "The provider {ProviderHost} sent no response headers before the deadline for a CCR request")]
         public static partial void UpstreamSilent(ILogger logger, string providerHost);
+
+        [LoggerMessage(EventId = 1613, Level = LogLevel.Warning, Message = "Follow-up metadata for request {RequestId} could not be recorded")]
+        public static partial void FollowUpWriteFailed(ILogger logger, string requestId, Exception exception);
 
         [LoggerMessage(EventId = 1609, Level = LogLevel.Warning, Message = "Recall metadata for request {RequestId} could not be recorded")]
         public static partial void RecallWriteFailed(ILogger logger, string requestId, Exception exception);

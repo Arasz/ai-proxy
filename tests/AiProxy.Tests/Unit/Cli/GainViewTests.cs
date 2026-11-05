@@ -43,8 +43,57 @@ public sealed class GainViewTests
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "csv"], TestContext.Current.CancellationToken);
         var csv = fixture.Output.ToString();
-        Assert.StartsWith("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes\r\n", csv, StringComparison.Ordinal);
+        Assert.StartsWith("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes,", csv, StringComparison.Ordinal);
         Assert.Contains("other,,other-traffic,,,179,0,0,,0,0,123456", csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_summary_shows_a_follow_up_column_and_the_billed_balance_with_how_many_requests_were_measured()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with
+        {
+            Summary = new GainTotals(5, EstimatedOriginalTokens: 10_000, EstimatedForwardedTokens: 6_000, EstimatedSavedTokens: 4_000,
+                EstimatedRetrievedTokens: 300, FollowUps: 2, FollowUpBytes: 4_321, EstimatedFollowUpTokens: 1_500, FollowUpMeasuredRequests: 3)
+        };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        var output = fixture.Console.Output;
+        Assert.Contains("Follow-up", output, StringComparison.Ordinal);
+        Assert.Contains("Billed balance (all requests): 2,500 tokens", output, StringComparison.Ordinal);
+        Assert.Contains("follow-ups measured on 3 of 5 requests", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_report_with_no_measured_follow_ups_shows_no_billed_balance_line()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with { Summary = new GainTotals(5, EstimatedOriginalTokens: 10_000, EstimatedForwardedTokens: 6_000, EstimatedSavedTokens: 4_000) };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("Billed balance", fixture.Console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Csv_appends_the_follow_up_columns_after_bytes_and_leaves_the_earlier_columns_in_place()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with
+        {
+            Summary = new GainTotals(5, EstimatedOriginalTokens: 10_000, EstimatedForwardedTokens: 6_000, EstimatedSavedTokens: 4_000,
+                FollowUps: 2, FollowUpBytes: 4_321, EstimatedFollowUpTokens: 1_500, FollowUpMeasuredRequests: 3)
+        };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "csv"], TestContext.Current.CancellationToken);
+        var csv = fixture.Output.ToString();
+
+        Assert.StartsWith("section,at,name,project,provider,requests,estimated_saved_tokens,estimated_retrieved_tokens,error,estimated_tool_tokens,estimated_net_tokens,bytes,follow_ups,follow_up_bytes,estimated_follow_up_tokens,estimated_billed_balance_tokens\r\n", csv, StringComparison.Ordinal);
+        Assert.Contains(",4000,0,,0,4000,,2,4321,1500,2500\r\n", csv, StringComparison.Ordinal);
     }
 
     [Fact]

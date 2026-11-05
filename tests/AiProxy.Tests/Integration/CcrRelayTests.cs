@@ -29,11 +29,11 @@ public sealed class CcrRelayTests : IDisposable
     private const string PythonFile =
         "import os\nimport sys\nfrom typing import Any\n\n# A module comment long enough that the code view, hint included, is smaller than the file.\n\n\ndef value(item: Any) -> str:\n    \"\"\"Returns the item's text; the docstring stays in the view.\"\"\"\n    return os.fspath(item)  # the value the model reads back exactly\n\n\n# A second comment, so the file is over the compression minimum for source code.\ndef main() -> int:\n    # a third comment the view drops\n    print(value(sys.argv[0]))\n    return 0\n\n\n# Entry point; this comment goes too.\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
 
-    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+    private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o é🙂"));
 
     private static readonly string Id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Large)))[..16];
 
-    private static readonly string Retrieve = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3 });
+    internal static readonly string Retrieve = JsonSerializer.Serialize(new { id = Id, mode = "lines", start = 2, end = 3 });
 
     private static readonly string ViewId = CcrView.IdOf(CodeFile);
 
@@ -361,7 +361,7 @@ public sealed class CcrRelayTests : IDisposable
         };
     }
 
-    private static string StatelessRequest()
+    internal static string StatelessRequest()
     {
         return Request().ToJsonString();
     }
@@ -473,6 +473,126 @@ public sealed class CcrRelayTests : IDisposable
         var recall = Assert.Single(gain!.Recalls);
         Assert.Equal(Id, recall.PreviewId);
         Assert.Equal("lines", recall.Mode);
+    }
+
+    [Fact]
+    public async Task A_stateless_follow_up_records_the_bytes_of_the_body_it_sent_upstream()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+        {
+        }
+
+        var summary = (await GainAsync(proxy)).Summary;
+        var sent = upstream.Requests[1].Body;
+        Assert.Equal(1, summary.FollowUps);
+        Assert.Equal(Encoding.UTF8.GetByteCount(sent), summary.FollowUpBytes);
+        Assert.True(Encoding.UTF8.GetByteCount(sent) > sent.Length, "the fixture must be non-ASCII so bytes differ from characters");
+        Assert.Equal(GainReportBuilder.Tokens(sent.Length), summary.EstimatedFollowUpTokens);
+        Assert.Equal(1, summary.FollowUpMeasuredRequests);
+    }
+
+    [Fact]
+    public async Task A_thread_follow_up_records_the_smaller_body_that_continues_the_hidden_turn()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_A", "tool_use", 1, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_B", "end_turn", 1, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, CreateRequest()))
+        {
+        }
+
+        var summary = (await GainAsync(proxy)).Summary;
+        Assert.Equal(1, summary.FollowUps);
+        Assert.Equal(Encoding.UTF8.GetByteCount(upstream.Requests[1].Body), summary.FollowUpBytes);
+        Assert.True(summary.FollowUpBytes < Encoding.UTF8.GetByteCount(upstream.Requests[0].Body), "a thread follow-up does not resend the forwarded body");
+    }
+
+    [Fact]
+    public async Task A_follow_up_the_upstream_refuses_records_nothing()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var calls = 0;
+        upstream.Handler = async (_, context) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                context.Response.ContentType = "text/event-stream";
+                await context.Response.WriteAsync(Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)));
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("""{"type":"error","error":{"type":"invalid_request_error","message":"no"}}""");
+        };
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+        {
+        }
+
+        Assert.Equal(2, upstream.Requests.Count);
+        var summary = (await GainAsync(proxy)).Summary;
+        Assert.Equal(0, summary.FollowUps);
+        Assert.Equal(0, summary.FollowUpBytes);
+    }
+
+    [Fact]
+    public async Task A_follow_up_is_stamped_with_the_time_the_request_started_not_the_time_it_was_relayed()
+    {
+        var time = new FakeTimeProvider();
+        var started = time.GetUtcNow();
+        await using var upstream = await FakeUpstream.StartAsync();
+        var calls = 0;
+        var stream = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        upstream.Handler = (fake, context) =>
+        {
+            if (Interlocked.Increment(ref calls) == 2)
+            {
+                // Runs while the follow-up is in flight, after the first response's headers returned, so the 10-minute HeadersDeadline never sees it.
+                time.Advance(TimeSpan.FromHours(3));
+            }
+
+            return stream(fake, context);
+        };
+        await using var proxy = await StartProxyAsync(time);
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+        {
+        }
+
+        var atStart = await GainAsync(proxy, started, started.AddSeconds(1));
+        Assert.Equal(1, atStart.Summary.Requests);
+        Assert.Equal(1, atStart.Summary.FollowUps);
+        Assert.Equal(0, (await GainAsync(proxy, started.AddHours(3))).Summary.FollowUps);
+    }
+
+    private static async Task<GainReport> GainAsync(ProxyHost proxy, DateTimeOffset? from = null, DateTimeOffset? to = null)
+    {
+        var query = new List<string>();
+        if (from is { } start)
+        {
+            query.Add($"from={Uri.EscapeDataString(start.ToString("O"))}");
+        }
+
+        if (to is { } end)
+        {
+            query.Add($"to={Uri.EscapeDataString(end.ToString("O"))}");
+        }
+
+        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        return (await api.GetFromJsonAsync<GainReport>($"/gain?{string.Join('&', query)}", TestContext.Current.CancellationToken))!;
     }
 
     private static Func<FakeUpstream, HttpContext, Task> Script(params string[] streams)
