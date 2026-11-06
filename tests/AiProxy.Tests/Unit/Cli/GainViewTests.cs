@@ -51,11 +51,29 @@ public sealed class GainViewTests
     }
 
     [Fact]
-    public async Task A_proxy_that_sends_no_harness_totals_still_gets_the_single_summary()
+    public async Task A_model_other_block_and_other_traffic_share_one_heading()
     {
         using var fixture = new GainCommandTests.Fixture();
         fixture.Console.Profile.Width = 240;
-        fixture.Handler.Report = fixture.Handler.Report with { OtherTraffic = new GainOtherTraffic(1, 2), Harnesses = null };
+        fixture.Handler.Report = fixture.Handler.Report with
+        {
+            OtherTraffic = new GainOtherTraffic(1, 2),
+            Harnesses = [new GainAttribution("harness", "other", new GainTotals(Requests: 1))]
+        };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        Assert.Single(fixture.Console.Output.Split('\n'), static line => line.StartsWith("-other-", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_report_without_harness_rows_still_gets_the_single_summary(bool emptyLedger)
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with { OtherTraffic = new GainOtherTraffic(1, 2), Harnesses = emptyLedger ? [] : null };
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
