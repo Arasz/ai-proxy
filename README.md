@@ -114,7 +114,7 @@ The defaults are `http://127.0.0.1:8080` (or the port in `PROXY__PORT`) and
 `~/.ai-proxy/root-ca.pem`. To use a different running proxy or CA file:
 
 ```bash
-ai-proxy harness --proxy http://127.0.0.1:9080 --ca-file /path/to/root-ca.pem claude -- --model sonnet
+ai-proxy harness --proxy http://127.0.0.1:9080 --ca-file /path/to/root-ca.pem claude --model sonnet
 ```
 
 The selected CA file replaces `NODE_EXTRA_CA_CERTS` for Claude. If you need additional

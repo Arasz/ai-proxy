@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.27.2](0.27.2-harness-forwards-arguments.md) | `ai-proxy harness <executable>` forwards arguments without `--`, so `ai-proxy harness claude --resume <id>` works. | [#117](https://github.com/Arasz/ai-proxy/pull/117) |
 | [0.27.1](0.27.1-certificate-store-warnings.md) | Expected macOS certificate store failures are one-line warnings, and a replaced root that cannot be removed no longer stops the start. | [#116](https://github.com/Arasz/ai-proxy/pull/116) |
 | [0.27.0](0.27.0-record-codex-chatgpt-traffic.md) | `chatgpt.com` (Codex ChatGPT sign-in) is recorded in `gain` for harness tunnels only: credential-gated decrypt, 426 for WebSocket upgrades, zstd request bodies decoded, Responses `response.completed` usage read. Root rotates once. | [#115](https://github.com/Arasz/ai-proxy/pull/115) |
 | [0.26.0](0.26.0-proxy-credential-attribution.md) | `ai-proxy harness` puts the project into the proxy URL credential, so Codex built-in provider traffic and any client honouring proxy userinfo is attributed in `gain`; the proxy strips `Proxy-Authorization`. | [#113](https://github.com/Arasz/ai-proxy/pull/113) |
