@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.27.0](0.27.0-record-codex-chatgpt-traffic.md) | `chatgpt.com` (Codex ChatGPT sign-in) is recorded in `gain` for harness tunnels only: credential-gated decrypt, 426 for WebSocket upgrades, zstd request bodies decoded, Responses `response.completed` usage read. Root rotates once. | [pulls](https://github.com/Arasz/ai-proxy/pulls) |
 | [0.26.0](0.26.0-proxy-credential-attribution.md) | `ai-proxy harness` puts the project into the proxy URL credential, so Codex built-in provider traffic and any client honouring proxy userinfo is attributed in `gain`; the proxy strips `Proxy-Authorization`. | [#113](https://github.com/Arasz/ai-proxy/pull/113) |
 | [0.25.1](0.25.1-content-read-race.md) | Reading a kept original no longer answers 404 for a record the writer is moving from the queue into the content tables. | [#114](https://github.com/Arasz/ai-proxy/pull/114) |
 | [0.25.0](0.25.0-status-and-stop.md) | `ai-proxy status` shows the running instance (exit 3 when none) and `ai-proxy stop` shuts it down gracefully. | [#111](https://github.com/Arasz/ai-proxy/pull/111) |

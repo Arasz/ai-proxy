@@ -17,10 +17,11 @@ every other destination through. There are no upstream or pass-through rules to 
 | Anthropic     | `api.anthropic.com`                                                                                                       |
 | Google Gemini | `generativelanguage.googleapis.com`                                                                                       |
 | OpenRouter    | `openrouter.ai`, `eu.openrouter.ai`                                                                                       |
+| ChatGPT (Codex sign-in) | `chatgpt.com`, decrypted only for `ai-proxy harness` clients, never changed                                |
 
 HTTPS requests to those hosts are decrypted so ai-proxy can inspect and optionally compress
 request bodies. The first run creates and asks the operating system to trust a per-user root
-certificate. HTTPS for every other host stays in an opaque CONNECT tunnel. This lets MCP
+certificate. `chatgpt.com` is decrypted only when the tunnel carries the `ai-proxy harness` credential, so a browser's ChatGPT traffic stays opaque; its requests are recorded, never compressed. HTTPS for every other host stays in an opaque CONNECT tunnel. This lets MCP
 servers and other tools continue to work without exposing their HTTPS contents to the proxy.
 Clients that ignore the operating system proxy, or do not trust the user's root certificates,
 will connect directly or reject inspected provider HTTPS requests.

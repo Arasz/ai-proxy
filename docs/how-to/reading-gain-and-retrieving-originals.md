@@ -126,8 +126,10 @@ launcher, set it yourself: `AI_PROXY_CODEX_PROJECT="$PWD" codex`. A built-in pro
 `ollama`, `lmstudio`) cannot be redefined as a custom provider, which is why the credential route
 above matters for it.
 
-Two kinds of Codex traffic are not recorded yet, with or without a project: WebSocket turns, and
-requests to `chatgpt.com` made with ChatGPT sign-in (the proxy does not decrypt that host).
+Codex signed in with ChatGPT talks to `chatgpt.com`. The proxy records it only under
+`ai-proxy harness`: it decrypts that host only for a tunnel carrying the harness credential, and
+answers Codex's WebSocket upgrade with 426 so the turn goes over HTTPS. Codex run outside the
+harness, and WebSocket turns to any host, are not recorded.
 
 Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
 another). Requests with neither the header nor the credential have no project and show up only in unfiltered views. When the
