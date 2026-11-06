@@ -18,6 +18,8 @@ internal static class UsageJson
     public const string Response = "response";
     public const string ResponseObject = "response";
     public const string ResponseCompleted = "response.completed";
+    public const string ResponseIncomplete = "response.incomplete";
+    public const string ResponseFailed = "response.failed";
     public const string InputTokensDetails = "input_tokens_details";
     public const string CachedTokens = "cached_tokens";
 }

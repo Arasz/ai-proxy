@@ -388,8 +388,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         var connect = e.HttpClient.ConnectRequest;
         e.DecryptSsl = !string.IsNullOrWhiteSpace(connect?.Host) &&
                        Uri.TryCreate($"https://{connect.Host}", UriKind.Absolute, out var address) &&
-                       _providerHosts.Find(address.Host) is not null &&
-                       (!_providerHosts.IsHarnessOnly(address.Host) ||
+                       _providerHosts.Find(address.Host) is { } provider &&
+                       (!provider.HarnessOnly ||
                         ProjectCredential.Read(connect.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null);
         return Task.CompletedTask;
     }

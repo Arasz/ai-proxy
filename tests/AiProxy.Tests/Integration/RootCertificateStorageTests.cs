@@ -315,7 +315,7 @@ public sealed class RootCertificateStorageTests
     {
         public IReadOnlyCollection<string> Hosts => hosts;
 
-        public Dialect? Find(string host) => null;
+        public ProviderHost? Find(string host) => null;
     }
 
     /// <summary>Records trust calls instead of touching a certificate store.</summary>

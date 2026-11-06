@@ -1,6 +1,7 @@
 using System.Text;
 using AiProxy.Hosting.Integration;
 using ZstdSharp;
+using ZstdSharp.Unsafe;
 
 namespace AiProxy.Tests.Unit.Capture;
 
@@ -44,6 +45,22 @@ public sealed class ZstdRequestBodyTests
         Assert.Equal(SixteenMiB, ZstdRequestBody.Decode(Encode(new byte[SixteenMiB])).Length);
     }
 
+    [Fact]
+    public void A_frame_declaring_a_window_above_the_decoder_cap_is_refused_even_when_its_content_is_small()
+    {
+        var encoded = Encode(Encoding.UTF8.GetBytes("small"), windowLog: 27);
+
+        Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode(encoded));
+    }
+
+    [Fact]
+    public void A_frame_declaring_a_window_at_the_decoder_cap_is_decoded()
+    {
+        var original = Encoding.UTF8.GetBytes("small");
+
+        Assert.Equal(original, ZstdRequestBody.Decode(Encode(original, windowLog: 24)));
+    }
+
     [Theory]
     [InlineData("zstd", true)]
     [InlineData(" ZSTD ", true)]
@@ -55,11 +72,16 @@ public sealed class ZstdRequestBodyTests
         Assert.Equal(expected, ZstdRequestBody.IsZstd(encoding));
     }
 
-    private static byte[] Encode(byte[] bytes)
+    private static byte[] Encode(byte[] bytes, int? windowLog = null)
     {
         using var output = new MemoryStream();
         using (var encoder = new CompressionStream(output, 3, leaveOpen: true))
         {
+            if (windowLog is { } log)
+            {
+                encoder.SetParameter(ZSTD_cParameter.ZSTD_c_windowLog, log);
+            }
+
             encoder.Write(bytes);
         }
 

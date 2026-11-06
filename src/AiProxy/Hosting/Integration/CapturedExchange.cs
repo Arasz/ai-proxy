@@ -32,10 +32,10 @@ public sealed class CapturedExchange
     /// <summary>The capture id the request row was kept under; null when the request was not captured.</summary>
     public string? CaptureId { get; set; }
 
-    /// <summary>The request body length as the client sent it.</summary>
+    /// <summary>The request body length on the wire, still content-encoded.</summary>
     public long RequestBytes { get; set; }
 
-    /// <summary>The request body length as the proxy forwarded it.</summary>
+    /// <summary>The request body length as the proxy forwarded it, still content-encoded.</summary>
     public long ForwardedBytes { get; set; }
 
     /// <summary>Whether the proxy answers the client itself through the CCR relay, so the response is not Titanium's to read.</summary>

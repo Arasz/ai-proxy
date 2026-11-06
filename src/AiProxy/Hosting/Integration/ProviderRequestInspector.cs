@@ -10,12 +10,15 @@ using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
-using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Hosting.Integration;
 
 /// <summary>Inspects, captures and compresses requests sent to provider API hosts.</summary>
+/// <remarks>
+///     A zstd body is record-only on every provider host: it is decoded for capture and gain, never compressed.
+///     A harness-only host is recorded only when the request or its tunnel carries an ai-proxy credential.
+/// </remarks>
 /// <param name="compression">Compresses provider bodies; the pass-through pipeline leaves them alone.</param>
 /// <param name="providerHosts">Says which hosts are provider APIs.</param>
 /// <param name="capture">Where every provider request body is kept as sent; <see cref="NoRequestCapture" /> keeps nothing.</param>
@@ -51,12 +54,18 @@ public sealed partial class ProviderRequestInspector(
         request.Headers.RemoveHeader(GainApi.ProjectHeader);
         request.Headers.RemoveHeader(HeaderNames.ProxyAuthorization);
         var host = request.RequestUri.Host;
-        if (providerHosts.Find(host) is not { } dialect)
+        if (providerHosts.Find(host) is not { } provider)
         {
             return;
         }
 
-        var recordOnly = providerHosts.IsHarnessOnly(host);
+        var dialect = provider.Dialect;
+        var recordOnly = provider.HarnessOnly;
+        if (recordOnly && requestCredential is null && connectCredential is null)
+        {
+            return;
+        }
+
         if (recordOnly && request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase))
         {
             Log.WebSocketRefused(logger, host);
@@ -71,6 +80,14 @@ public sealed partial class ProviderRequestInspector(
 
         if (request.ContentLength is < 0 or > MaxInspectedBodyBytes)
         {
+            return;
+        }
+
+        var contentEncoding = request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value;
+        var encoded = ZstdRequestBody.IsZstd(contentEncoding);
+        if (recordOnly && !encoded && !string.IsNullOrWhiteSpace(contentEncoding) && !contentEncoding.Trim().Equals("identity", StringComparison.OrdinalIgnoreCase))
+        {
+            // Reading a gzip or br body would make Titanium decode and re-encode it, which changes the forwarded bytes.
             return;
         }
 
@@ -89,7 +106,7 @@ public sealed partial class ProviderRequestInspector(
         exchange.RequestBytes = body.Length;
         exchange.ForwardedBytes = body.Length;
         e.UserData = exchange;
-        var content = Decode(exchange, request, body);
+        var content = encoded ? Decode(exchange, request.RequestUri.Host, body) : body;
 
         if (capture.Keeps)
         {
@@ -104,7 +121,7 @@ public sealed partial class ProviderRequestInspector(
             exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
         }
 
-        if (compression.Compresses && !recordOnly && content == body)
+        if (compression.Compresses && !recordOnly && !encoded)
         {
             var plan = await ccr.DecideAsync(dialect, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
             if (plan.Failure is { } failure)
@@ -352,24 +369,19 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>
-    ///     The body as text for capture and measurement: a zstd body decoded, any other body as sent. A zstd body that
-    ///     does not decode is logged, noted as a gain failure and used as sent.
+    ///     A zstd body decoded for capture and measurement. A body that does not decode, for any reason, is logged,
+    ///     noted as a gain failure and used as sent; forwarding never depends on it.
     /// </summary>
-    private byte[] Decode(CapturedExchange exchange, Request request, byte[] body)
+    private byte[] Decode(CapturedExchange exchange, string host, byte[] body)
     {
-        if (!ZstdRequestBody.IsZstd(request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value))
-        {
-            return body;
-        }
-
         var stage = time.GetTimestamp();
         try
         {
             return ZstdRequestBody.Decode(body);
         }
-        catch (InvalidDataException exception)
+        catch (Exception exception) when (exception is not (OutOfMemoryException or StackOverflowException))
         {
-            Log.ZstdDecodeFailed(logger, request.RequestUri.Host, exception);
+            Log.ZstdDecodeFailed(logger, host, exception);
             exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "zstd", exception.GetType().Name));
             return body;
         }

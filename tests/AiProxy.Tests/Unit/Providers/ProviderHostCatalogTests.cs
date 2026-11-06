@@ -1,4 +1,5 @@
 using AiProxy.Core.Providers;
+using AiProxy.Hosting;
 
 namespace AiProxy.Tests.Unit.Providers;
 
@@ -66,5 +67,14 @@ public sealed class ProviderHostCatalogTests
     public void Other_hosts_are_not_harness_only(string host)
     {
         Assert.False(ProviderHostCatalog.IsHarnessOnly(host));
+    }
+
+    [Theory]
+    [InlineData("chatgpt.com", Dialect.OpenAi, true)]
+    [InlineData("api.openai.com", Dialect.OpenAi, false)]
+    [InlineData("api.anthropic.com", Dialect.Anthropic, false)]
+    public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly)
+    {
+        Assert.Equal(new ProviderHost(dialect, harnessOnly), new CanonicalProviderHosts().Find(host));
     }
 }

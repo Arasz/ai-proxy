@@ -295,6 +295,29 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
     }
 
+    [Theory]
+    [InlineData("response.incomplete")]
+    [InlineData("response.failed")]
+    public void A_responses_stream_that_ends_without_completing_still_gives_its_usage(string type)
+    {
+        var stream = ResponsesStream.Replace("response.completed", type, StringComparison.Ordinal);
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+    }
+
+    [Fact]
+    public void A_responses_usage_on_another_event_is_not_read()
+    {
+        var stream = ResponsesStream.Replace("response.completed", "response.in_progress", StringComparison.Ordinal);
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal(new UsageReading(null, "no-usage"), reading);
+    }
+
     [Fact]
     public void A_responses_usage_without_cached_tokens_counts_all_input_as_uncached()
     {

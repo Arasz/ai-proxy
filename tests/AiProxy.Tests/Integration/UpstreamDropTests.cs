@@ -163,7 +163,7 @@ public sealed class UpstreamDropTests
 
     private sealed class NoProviderHosts : IProviderHosts
     {
-        public Dialect? Find(string host)
+        public ProviderHost? Find(string host)
         {
             return null;
         }

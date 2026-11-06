@@ -4,42 +4,39 @@ namespace AiProxy.Core.Providers;
 /// <remarks>Matching is exact: a wildcard would also catch non-API hosts such as <c>mcp.openrouter.ai</c>.</remarks>
 public static class ProviderHostCatalog
 {
-    private static readonly IReadOnlyDictionary<string, Dialect> Providers = new Dictionary<string, Dialect>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, ProviderHost> Providers = new Dictionary<string, ProviderHost>(StringComparer.OrdinalIgnoreCase)
     {
-        ["api.openai.com"] = Dialect.OpenAi,
-        ["us.api.openai.com"] = Dialect.OpenAi,
-        ["eu.api.openai.com"] = Dialect.OpenAi,
-        ["gb.api.openai.com"] = Dialect.OpenAi,
-        ["ca.api.openai.com"] = Dialect.OpenAi,
-        ["au.api.openai.com"] = Dialect.OpenAi,
-        ["jp.api.openai.com"] = Dialect.OpenAi,
-        ["kr.api.openai.com"] = Dialect.OpenAi,
-        ["sg.api.openai.com"] = Dialect.OpenAi,
-        ["in.api.openai.com"] = Dialect.OpenAi,
-        ["ae.api.openai.com"] = Dialect.OpenAi,
-        ["api.anthropic.com"] = Dialect.Anthropic,
-        ["generativelanguage.googleapis.com"] = Dialect.Gemini,
-        ["openrouter.ai"] = Dialect.OpenAi,
-        ["eu.openrouter.ai"] = Dialect.OpenAi,
-        ["chatgpt.com"] = Dialect.OpenAi
+        ["api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["us.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["eu.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["gb.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["ca.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["au.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["jp.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["kr.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["sg.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["in.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["ae.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["api.anthropic.com"] = new(Dialect.Anthropic, HarnessOnly: false),
+        ["generativelanguage.googleapis.com"] = new(Dialect.Gemini, HarnessOnly: false),
+        ["openrouter.ai"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["eu.openrouter.ai"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["chatgpt.com"] = new(Dialect.OpenAi, HarnessOnly: true)
     };
-
-    private static readonly HashSet<string> HarnessOnly = new(StringComparer.OrdinalIgnoreCase) { "chatgpt.com" };
 
     /// <summary>Every canonical provider host.</summary>
     public static IReadOnlyCollection<string> Hosts { get; } = [.. Providers.Keys];
 
-    /// <summary>Returns the provider dialect for a canonical host, or null for default pass-through.</summary>
-    public static Dialect? Find(string host)
+    /// <summary>Returns the canonical host's dialect and harness-only flag, or null for default pass-through.</summary>
+    public static ProviderHost? Lookup(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
-        return Providers.TryGetValue(host.TrimEnd('.'), out var dialect) ? dialect : null;
+        return Providers.GetValueOrDefault(host.TrimEnd('.'));
     }
 
+    /// <summary>Returns the provider dialect for a canonical host, or null for default pass-through.</summary>
+    public static Dialect? Find(string host) => Lookup(host)?.Dialect;
+
     /// <summary>Whether the host also serves browsers, so the proxy decrypts it only for traffic that carries an ai-proxy credential.</summary>
-    public static bool IsHarnessOnly(string host)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(host);
-        return HarnessOnly.Contains(host.TrimEnd('.'));
-    }
+    public static bool IsHarnessOnly(string host) => Lookup(host)?.HarnessOnly == true;
 }

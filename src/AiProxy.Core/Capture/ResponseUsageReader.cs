@@ -109,7 +109,7 @@ public static class ResponseUsageReader
 
     /// <summary>
     ///     Folds the usage of <c>message_start</c> and every <c>message_delta</c>, or of <c>response.completed</c>
-    ///     for OpenAI; a later non-null count wins.
+    ///     for OpenAI the terminal <c>response.completed</c>, <c>response.incomplete</c> or <c>response.failed</c>; a later non-null count wins.
     /// </summary>
     private static UsageReading ReadStream(ReadOnlyMemory<byte> body, Dialect dialect)
     {
@@ -164,7 +164,9 @@ public static class ResponseUsageReader
 
         if (dialect == Dialect.OpenAi)
         {
-            return type.ValueEquals(UsageJson.ResponseCompleted) ? ReadResponse(usage, root.PropertyOrDefault(UsageJson.Response)) : usage;
+            return type.ValueEquals(UsageJson.ResponseCompleted) || type.ValueEquals(UsageJson.ResponseIncomplete) || type.ValueEquals(UsageJson.ResponseFailed)
+                ? ReadResponse(usage, root.PropertyOrDefault(UsageJson.Response))
+                : usage;
         }
 
         if (type.ValueEquals(UsageJson.MessageStart))

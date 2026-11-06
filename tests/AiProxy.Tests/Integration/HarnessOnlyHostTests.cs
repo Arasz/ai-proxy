@@ -110,9 +110,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
         await using var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, Credential("/project/ws"), token);
         await using var tls = new SslStream(tunnel, false, (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate as X509Certificate2, errors));
         await tls.AuthenticateAsClientAsync("127.0.0.1");
-        var upgrade = $"GET {CodexPath} HTTP/1.1\r\nHost: 127.0.0.1:{target.Port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-                      "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
-        await tls.WriteAsync(Encoding.ASCII.GetBytes(upgrade), token);
+        await tls.WriteAsync(Encoding.ASCII.GetBytes(Upgrade(CodexPath, target.Port)), token);
         var head = await ReadHeadAsync(tls, token);
 
         Assert.StartsWith("HTTP/1.1 426", head, StringComparison.Ordinal);
@@ -165,12 +163,12 @@ public sealed class HarnessOnlyHostTests : IDisposable
             providerHosts: new HarnessLoopbackHosts());
         var body = Encoding.UTF8.GetBytes(ResponsesBody(ToolOutput));
 
-        using var response = await PlainPostAsync(proxy, upstream, new ByteArrayContent(body) { Headers = { ContentType = new MediaTypeHeaderValue("application/json") } });
+        using var response = await PlainPostAsync(proxy, upstream, JsonContent(body), Credential("/project/plain"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
         var row = await OnlyHistoryAsync(proxy);
-        Assert.Equal((GainLabels.Rules.Unchanged, GainLabels.Pipelines.Passthrough), (row.Rule, row.Pipeline));
+        Assert.Equal(("/project/plain", GainLabels.Rules.Unchanged, GainLabels.Pipelines.Passthrough), (row.Project, row.Rule, row.Pipeline));
     }
 
     [Fact]
@@ -182,7 +180,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
             providerHosts: new LoopbackProviderHosts(Dialect.OpenAi));
         var body = Encoding.UTF8.GetBytes(ResponsesBody(ToolOutput));
 
-        using var response = await PlainPostAsync(proxy, upstream, new ByteArrayContent(body) { Headers = { ContentType = new MediaTypeHeaderValue("application/json") } });
+        using var response = await PlainPostAsync(proxy, upstream, JsonContent(body), null);
 
         Assert.NotEqual(body, Assert.Single(upstream.Requests).BodyBytes);
     }
@@ -195,14 +193,84 @@ public sealed class HarnessOnlyHostTests : IDisposable
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new HarnessLoopbackHosts(), logging: logs);
         byte[] garbage = [0x28, 0xB5, 0x2F, 0xFD, 0xFF, 0x00, 0x13, 0x37, 0x42, 0x42, 0x42];
 
-        using var response = await PlainPostAsync(proxy, upstream, ZstdContent(garbage));
+        using var response = await PlainPostAsync(proxy, upstream, ZstdContent(garbage), Credential("/project/plain"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(garbage, Assert.Single(upstream.Requests).BodyBytes);
         Assert.Contains(logs.Entries, entry => entry.EventId == ZstdDecodeFailedEventId);
-        var report = await ReportAsync(proxy);
         Assert.Equal(GainLabels.Rules.Unchanged, (await OnlyHistoryAsync(proxy)).Rule);
-        Assert.Contains(report.Failures, failure => failure.Stage == "zstd");
+        Assert.Contains((await ReportAsync(proxy)).Failures, failure => failure.Stage == "zstd");
+    }
+
+    [Fact]
+    public async Task A_plain_request_to_a_harness_only_host_without_a_credential_is_forwarded_and_never_recorded()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string> { ["Proxy:Capture"] = "true" }, providerHosts: new HarnessLoopbackHosts());
+        var body = Encoding.UTF8.GetBytes(ResponsesBody("hello"));
+
+        using var response = await PlainPostAsync(proxy, upstream, JsonContent(body), null);
+        // A credentialed request after it: once its row is in, the first one had its chance to be recorded.
+        using var marker = await PlainPostAsync(proxy, upstream, JsonContent(body), Credential("/project/marker"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([body, body], upstream.Requests.Select(static request => request.BodyBytes));
+        Assert.Equal("/project/marker", (await OnlyHistoryAsync(proxy)).Project);
+        Assert.Single(await ReadCapturedBodiesAsync(proxy));
+    }
+
+    [Fact]
+    public async Task A_corrupt_zstd_body_to_a_compressing_host_is_forwarded_unchanged_with_one_zstd_failure_and_no_compression_failure()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string> { ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = _databasePath },
+            providerHosts: new LoopbackProviderHosts(Dialect.OpenAi));
+        var garbage = Encoding.UTF8.GetBytes(ResponsesBody(ToolOutput));
+
+        using var response = await PlainPostAsync(proxy, upstream, ZstdContent(garbage), null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(garbage, Assert.Single(upstream.Requests).BodyBytes);
+        await OnlyHistoryAsync(proxy);
+        Assert.Equal(["zstd"], (await ReportAsync(proxy)).Failures.Select(static failure => failure.Stage));
+    }
+
+    [Theory]
+    [InlineData("/backend-api/codex/other", true)]
+    [InlineData(CodexPath, false)]
+    public async Task A_websocket_upgrade_off_the_codex_path_or_off_a_harness_only_host_is_not_answered_426(string path, bool harnessOnly)
+    {
+        using var upstreamCertificate = CreateUpstreamCertificate();
+        await using var upstream = await FakeUpstream.StartAsync(upstreamCertificate);
+        IProviderHosts hosts = harnessOnly ? new HarnessLoopbackHosts() : new LoopbackProviderHosts(Dialect.OpenAi);
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: hosts);
+        TrustUpstream(proxy, upstreamCertificate);
+        using var proxyRoot = LoadProxyRoot(proxy.DataDirectory);
+        var target = new DnsEndPoint("127.0.0.1", upstream.BaseAddress.Port);
+        var token = TestContext.Current.CancellationToken;
+
+        await using var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, Credential("/project/ws"), token);
+        await using var tls = new SslStream(tunnel, false, (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate as X509Certificate2, errors));
+        await tls.AuthenticateAsClientAsync("127.0.0.1");
+        await tls.WriteAsync(Encoding.ASCII.GetBytes(Upgrade(path, target.Port)), token);
+        var head = await ReadHeadAsync(tls, token);
+
+        Assert.DoesNotContain(" 426 ", head, StringComparison.Ordinal);
+        Assert.Equal(path, Assert.Single(upstream.Requests).Path);
+    }
+
+    private static string Upgrade(string path, int port)
+    {
+        return $"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+               "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
+    }
+
+    private static ByteArrayContent JsonContent(byte[] body)
+    {
+        var content = new ByteArrayContent(body);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        return content;
     }
 
     private static string ResponsesBody(string output)
@@ -234,11 +302,17 @@ public sealed class HarnessOnlyHostTests : IDisposable
         return new HttpRequestMessage(HttpMethod.Post, uri) { Content = ZstdContent(encoded) };
     }
 
-    private static async Task<HttpResponseMessage> PlainPostAsync(ProxyHost proxy, FakeUpstream upstream, HttpContent content)
+    private static async Task<HttpResponseMessage> PlainPostAsync(ProxyHost proxy, FakeUpstream upstream, HttpContent content, string? credential)
     {
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true };
         using var client = new HttpClient(handler);
-        return await client.PostAsync(new Uri(upstream.BaseAddress, CodexPath), content, TestContext.Current.CancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(upstream.BaseAddress, CodexPath)) { Content = content };
+        if (credential is not null)
+        {
+            request.Headers.TryAddWithoutValidation(ProxyAuthorization, credential);
+        }
+
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private static void TrustUpstream(ProxyHost proxy, X509Certificate2 upstreamCertificate)
@@ -325,14 +399,9 @@ public sealed class HarnessOnlyHostTests : IDisposable
     {
         public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 
-        public Dialect? Find(string host)
+        public ProviderHost? Find(string host)
         {
-            return IsHarnessOnly(host) ? Dialect.OpenAi : null;
-        }
-
-        public bool IsHarnessOnly(string host)
-        {
-            return host is "127.0.0.1" or "localhost" or "::1" or "[::1]";
+            return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(Dialect.OpenAi, HarnessOnly: true) : null;
         }
     }
 }
