@@ -13,7 +13,7 @@ public sealed class ShortcutCommand : AsyncCommand<ShortcutSettings>
         var path = (runtime.Variable ?? Environment.GetEnvironmentVariable)("PATH");
         try
         {
-            var shortcut = HarnessShortcut.Find(path, OperatingSystem.IsWindows()) ?? throw new ArgumentException("ai-proxy was not found on PATH, so there is no directory to put the shortcut in.");
+            var shortcut = HarnessShortcut.Find(path, OperatingSystem.IsWindows() ? ShortcutScript.Batch : ShortcutScript.Shell) ?? throw new ArgumentException("ai-proxy was not found on PATH, so there is no directory to put the shortcut in.");
             var message = settings.Remove ? shortcut.Remove() : shortcut.Create();
             await runtime.Output.WriteLineAsync(message).ConfigureAwait(false);
             return 0;
