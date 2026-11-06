@@ -79,8 +79,7 @@ public sealed class CliApplication(GainRuntime runtime)
             args = ["--help"];
         }
 
-        var separator = args.Length > 0 && args[0] == HarnessProcess.Command ? Array.IndexOf(args, "--") : -1;
-        var harnessArguments = separator >= 0 ? args[(separator + 1)..] : null;
+        var split = HarnessArguments.Split(args);
         var app = new CommandApp();
         app.Configure(config =>
         {
@@ -104,15 +103,15 @@ public sealed class CliApplication(GainRuntime runtime)
                 .WithDescription("Run the retrieval MCP server over stdio.");
             var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)
                 .WithDescription("Launch a harness executable through the running proxy.")
-                .WithExample(HarnessProcess.Command, "claude", "--", "--model", "opus");
-            if (harnessArguments is not null)
+                .WithExample(HarnessProcess.Command, "claude", "--model", "opus");
+            if (split.Forwarded is not null)
             {
-                harness.WithData(harnessArguments);
+                harness.WithData(split.Forwarded);
             }
         });
         try
         {
-            return await app.RunAsync(separator >= 0 ? args[..separator] : args, cancellationToken).ConfigureAwait(false);
+            return await app.RunAsync(split.Launcher, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

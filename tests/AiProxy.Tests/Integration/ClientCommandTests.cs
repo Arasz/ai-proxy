@@ -175,7 +175,16 @@ public sealed class ClientCommandTests
         Assert.EndsWith(Path.Combine("a b", "ż"), userInfo, StringComparison.Ordinal);
     }
 
-    private static async Task<FakeRun> RunFakeAsync(string name, string[] arguments, Dictionary<string, string?> extraEnvironment, string? workingDirectory = null)
+    [Fact]
+    public async Task Harness_arguments_need_no_separator()
+    {
+        var run = await RunFakeAsync("claude", ["--resume", "abc"], new Dictionary<string, string?>(), separator: false);
+
+        Assert.Equal(0, run.Result.ExitCode);
+        Assert.Contains("args:--resume abc\n", run.Result.Output, StringComparison.Ordinal);
+    }
+
+    private static async Task<FakeRun> RunFakeAsync(string name, string[] arguments, Dictionary<string, string?> extraEnvironment, string? workingDirectory = null, bool separator = true)
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "The fake executable uses a POSIX shell.");
         using var directory = new TemporaryDirectory();
@@ -197,7 +206,7 @@ public sealed class ClientCommandTests
             ["PATH"] = directory.Path + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"),
             ["Proxy__Port"] = port.ToString(CultureInfo.InvariantCulture)
         };
-        var result = await RunAsync(["harness", "--ca-file", ca, name, "--", .. arguments], environment, workingDirectory);
+        var result = await RunAsync(["harness", "--ca-file", ca, name, .. separator ? ["--"] : Array.Empty<string>(), .. arguments], environment, workingDirectory);
         return new FakeRun(result, ca, port);
     }
 
