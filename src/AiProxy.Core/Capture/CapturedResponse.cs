@@ -21,4 +21,8 @@ public sealed record CapturedResponse(
     long ResponseBytes,
     ResponseUsage? Usage,
     string? UsageError,
-    IReadOnlyList<StageTiming> Stages);
+    IReadOnlyList<StageTiming> Stages)
+{
+    /// <summary>The upstream response identifier, when its dialect exposes one.</summary>
+    public string? MessageId { get; init; }
+}

@@ -6,6 +6,7 @@ internal static class UsageJson
     public const string Usage = "usage";
     public const string Type = "type";
     public const string Message = "message";
+    public const string Id = "id";
     public const string InputTokens = "input_tokens";
     public const string OutputTokens = "output_tokens";
     public const string CacheCreationInputTokens = "cache_creation_input_tokens";
