@@ -31,6 +31,13 @@ public sealed class EnvironmentCheckTests
         Assert.Equal(CheckStatus.Pass, result.Status);
     }
 
+    [Fact]
+    public async Task A_variable_naming_the_proxy_with_a_project_credential_passes()
+    {
+        var result = await Run(new() { ["HTTPS_PROXY"] = "http://ai-proxy:%2Fhome%2Fme@127.0.0.1:8080" });
+        Assert.Equal(CheckStatus.Pass, result.Status);
+    }
+
     [Theory]
     [InlineData("http://127.0.0.1:9999")]
     [InlineData("http://proxy.corp:8080")]

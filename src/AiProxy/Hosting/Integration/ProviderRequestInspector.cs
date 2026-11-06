@@ -39,8 +39,11 @@ public sealed partial class ProviderRequestInspector(
     public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
         var request = e.HttpClient.Request;
-        var project = request.Headers.GetFirstHeader(GainApi.ProjectHeader)?.Value;
+        var requestCredential = ProjectCredential.Read(request.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
+        var connectCredential = ProjectCredential.Read(e.HttpClient.ConnectRequest?.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
+        var project = ProjectCredential.Resolve(request.Headers.GetFirstHeader(GainApi.ProjectHeader)?.Value, requestCredential, connectCredential);
         request.Headers.RemoveHeader(GainApi.ProjectHeader);
+        request.Headers.RemoveHeader(HeaderNames.ProxyAuthorization);
         if (providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
         {
             return;

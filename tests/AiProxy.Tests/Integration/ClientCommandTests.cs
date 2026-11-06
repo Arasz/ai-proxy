@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using AiProxy.Core.Gain;
 using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 
@@ -88,7 +89,7 @@ public sealed class ClientCommandTests
         Assert.Contains("child stderr", result.Error, StringComparison.Ordinal);
         foreach (var variable in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
         {
-            Assert.Contains($"{variable}=http://127.0.0.1:{port}\n", result.Output, StringComparison.Ordinal);
+            Assert.Contains($"{variable}={ProjectCredential.ProxyUrl(new Uri($"http://127.0.0.1:{port}"), Environment.CurrentDirectory)}\n", result.Output, StringComparison.Ordinal);
         }
 
         Assert.Contains(ca, result.Output, StringComparison.Ordinal);
@@ -137,7 +138,7 @@ public sealed class ClientCommandTests
         Assert.Contains($"CODEX_CA_CERTIFICATE={run.Ca}\n", run.Result.Output, StringComparison.Ordinal);
         Assert.Contains($"AI_PROXY_CODEX_PROJECT={Environment.CurrentDirectory}\n", run.Result.Output, StringComparison.Ordinal);
         Assert.Contains("SSL_CERT_FILE=\n", run.Result.Output, StringComparison.Ordinal);
-        Assert.Contains($"HTTPS_PROXY=http://127.0.0.1:{run.Port}\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"HTTPS_PROXY={ProjectCredential.ProxyUrl(new Uri($"http://127.0.0.1:{run.Port}"), Environment.CurrentDirectory)}\n", run.Result.Output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -155,9 +156,26 @@ public sealed class ClientCommandTests
         Assert.Contains("CODEX_CA_CERTIFICATE=\n", run.Result.Output, StringComparison.Ordinal);
         Assert.Contains("AI_PROXY_CODEX_PROJECT=\n", run.Result.Output, StringComparison.Ordinal);
         Assert.Contains($"NODE_EXTRA_CA_CERTS={run.Ca}\n", run.Result.Output, StringComparison.Ordinal);
+        Assert.Contains($"HTTPS_PROXY={ProjectCredential.ProxyUrl(new Uri($"http://127.0.0.1:{run.Port}"), Environment.CurrentDirectory)}\n", run.Result.Output, StringComparison.Ordinal);
     }
 
-    private static async Task<FakeRun> RunFakeAsync(string name, string[] arguments, Dictionary<string, string?> extraEnvironment)
+    [Fact]
+    public async Task Harness_proxy_credential_decodes_to_the_working_directory()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "The fake executable uses a POSIX shell.");
+        using var root = new TemporaryDirectory();
+        var working = Path.Combine(root.Path, "a b", "ż");
+        Directory.CreateDirectory(working);
+
+        var run = await RunFakeAsync("claude", ["x"], new Dictionary<string, string?>(), working);
+
+        var line = run.Result.Output.Split('\n').Single(static line => line.StartsWith("HTTPS_PROXY=", StringComparison.Ordinal));
+        var userInfo = Uri.UnescapeDataString(new Uri(line["HTTPS_PROXY=".Length..]).UserInfo);
+        Assert.StartsWith("ai-proxy:/", userInfo, StringComparison.Ordinal);
+        Assert.EndsWith(Path.Combine("a b", "ż"), userInfo, StringComparison.Ordinal);
+    }
+
+    private static async Task<FakeRun> RunFakeAsync(string name, string[] arguments, Dictionary<string, string?> extraEnvironment, string? workingDirectory = null)
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "The fake executable uses a POSIX shell.");
         using var directory = new TemporaryDirectory();
@@ -179,7 +197,7 @@ public sealed class ClientCommandTests
             ["PATH"] = directory.Path + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"),
             ["Proxy__Port"] = port.ToString(CultureInfo.InvariantCulture)
         };
-        var result = await RunAsync(["harness", "--ca-file", ca, name, "--", .. arguments], environment);
+        var result = await RunAsync(["harness", "--ca-file", ca, name, "--", .. arguments], environment, workingDirectory);
         return new FakeRun(result, ca, port);
     }
 
@@ -190,9 +208,9 @@ public sealed class ClientCommandTests
         return RunAsync(arguments, new Dictionary<string, string?>());
     }
 
-    private static async Task<ProcessResult> RunAsync(string[] arguments, IReadOnlyDictionary<string, string?> environment)
+    private static async Task<ProcessResult> RunAsync(string[] arguments, IReadOnlyDictionary<string, string?> environment, string? workingDirectory = null)
     {
-        var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
+        var start = new ProcessStartInfo("dotnet") { WorkingDirectory = workingDirectory ?? "", RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true, UseShellExecute = false };
         start.Environment["Proxy__Port"] = "0";
         foreach (var (key, value) in environment)
         {

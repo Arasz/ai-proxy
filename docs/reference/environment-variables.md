@@ -129,6 +129,14 @@ the listener address and system proxy marker report that actual bound port. An e
 counts as unset and keeps `8080`; an invalid value stops startup with an error naming `Proxy:Port`.
 <!-- /trust:trustchecked -->
 
+## Proxy variables set by the harness
+
+`ai-proxy harness` sets `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy` and `https_proxy` for the agent it
+launches to `http://ai-proxy:<percent-encoded project path>@<proxy address>`, by default 127.0.0.1:8080 (`--proxy` or `Proxy:Port` change it). The password is the
+launch directory and attributes the agent's provider traffic in `gain`; see
+[reading gain](../how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project).
+`--proxy` still takes a URL without credentials.
+
 ## Runtime isolation and restart
 
 <!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:33#runtimeOptions -->
