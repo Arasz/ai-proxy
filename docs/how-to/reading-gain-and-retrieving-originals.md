@@ -139,6 +139,8 @@ The password is the project path, percent-encoded. The proxy answers Codex's Web
 with 426, so the turn goes over HTTPS. A tunnel without the credential stays opaque, so browser
 traffic to `chatgpt.com` is never read. WebSocket turns to any host are not recorded.
 
+Credentialed tunnels to `chatgpt.com` use HTTP/1.1, not HTTP/2 ([ADR 0013](../adr/0013-pin-harness-only-hosts-to-http11.md)).
+
 Run `ai-proxy gain --project` in the same directory to filter to it (`--project-path <PATH>` names
 another). Requests with neither the header nor the credential have no project and show up only in unfiltered views. When the
 project has no requests, `gain` prints a hint naming the header and `ai-proxy harness`, which launches

@@ -402,11 +402,17 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     private Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
     {
         var connect = e.HttpClient.ConnectRequest;
-        e.DecryptSsl = !string.IsNullOrWhiteSpace(connect?.Host) &&
-                       Uri.TryCreate($"https://{connect.Host}", UriKind.Absolute, out var address) &&
-                       _providerHosts.Find(address.Host) is { } provider &&
+        var provider = !string.IsNullOrWhiteSpace(connect?.Host) && Uri.TryCreate($"https://{connect.Host}", UriKind.Absolute, out var address)
+            ? _providerHosts.Find(address.Host)
+            : null;
+        e.DecryptSsl = provider is not null &&
                        (!provider.HarnessOnly ||
-                        ProjectCredential.Read(connect.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null);
+                        ProjectCredential.Read(connect!.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null);
+        if (e.DecryptSsl && provider!.HarnessOnly)
+        {
+            e.UpstreamHttpProtocol = UpstreamHttpProtocol.Http11;
+        }
+
         return Task.CompletedTask;
     }
 
