@@ -3,7 +3,13 @@ using AiProxy.Hosting.Marker;
 namespace AiProxy.Hosting.Guard;
 
 /// <summary>The <c>--guard-system-proxy</c> mode: waits for the owner's pipe to end and, if it died, clears the system proxy under the marker lock.</summary>
-public sealed class GuardCommand(string dataDirectory, Func<Task> clearProxy, TimeSpan lockWait, TimeProvider timeProvider)
+public sealed class GuardCommand(
+    string dataDirectory,
+    Func<Task> clearProxy,
+    TimeSpan lockWait,
+    TimeProvider timeProvider,
+    Func<SystemProxyMarker, Task<bool>>? restoreIfOwned = null,
+    Func<string, bool>? isOwned = null)
 {
     /// <summary>The first argument that selects guard mode; the second is the data directory.</summary>
     public const string Argument = "--guard-system-proxy";
@@ -43,7 +49,22 @@ public sealed class GuardCommand(string dataDirectory, Func<Task> clearProxy, Ti
         {
             if (marker.PreviousRunDied)
             {
-                await clearProxy();
+                if (marker.PreviousSettingsSnapshot is not null)
+                {
+                    if (restoreIfOwned is null)
+                    {
+                        throw new InvalidOperationException("The system proxy snapshot recovery provider is unavailable.");
+                    }
+
+                    await restoreIfOwned(marker);
+                }
+                else
+                {
+                    if (marker.PreviousEndpoint is { } endpoint && (isOwned is null || isOwned(endpoint)))
+                    {
+                        await clearProxy();
+                    }
+                }
             }
 
             marker.Delete();

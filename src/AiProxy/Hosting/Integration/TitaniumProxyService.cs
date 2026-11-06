@@ -199,17 +199,25 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         if (marker.PreviousRunDied)
         {
             Log.PreviousRunDied(_logger, marker.PreviousEndpoint);
-            await _systemProxyRegistrar.ClearAsync();
+            if (marker.PreviousSettingsSnapshot is not null)
+            {
+                await new SystemProxyRecovery(_systemProxyRegistrar).RestoreIfOwned(marker);
+            }
+            else
+            {
+                await _systemProxyRegistrar.ClearAsync();
+            }
         }
 
-        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint.Port));
+        var previousSettingsSnapshot = _systemProxyRegistrar.Capture();
+        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint.Port), previousSettingsSnapshot);
         try
         {
             _systemProxyRegistrar.Set(_endPoint);
         }
         catch
         {
-            marker.Delete();
+            marker.Dispose();
             _marker = null;
             throw;
         }

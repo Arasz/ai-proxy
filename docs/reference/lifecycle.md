@@ -40,3 +40,16 @@ operation, so a start or restart launched meanwhile fails fast instead of racing
 
 When the process lease is free, `stop` reports "not running" and leaves anything listening on
 the proxy port alone, because a port cannot identify an ai-proxy owner.
+
+## Crash recovery
+
+When system-proxy integration is enabled, ai-proxy writes a private marker before changing the
+current user's HTTP and HTTPS proxy. The marker stores the prior platform settings so a guard
+process or the next start can restore them after a crash. Recovery runs only while the proxy
+still matches the endpoint recorded by ai-proxy. Windows also checks the manual proxy values and
+bypass list. Settings changed by another app are left alone.
+
+After restoration, ai-proxy reads the current settings again and compares them with the saved
+snapshot. A mismatch keeps the marker and reports the failure so a later start can retry. Normal
+shutdown uses the same ownership check and exact snapshot verification. If setting the proxy
+fails partway through startup, ai-proxy leaves the marker so the next start can retry recovery.

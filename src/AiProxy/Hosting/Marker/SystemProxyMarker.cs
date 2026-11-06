@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using AiProxy.Hosting.Proxy;
 
 namespace AiProxy.Hosting.Marker;
@@ -16,18 +17,23 @@ public sealed class SystemProxyMarker : IDisposable
     /// other openers still conflict because their own share mode excludes our read/write access.
     /// </summary>
     private static readonly FileShare LockShare = OperatingSystem.IsWindows() ? FileShare.Delete : FileShare.None;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _path;
     private readonly FileStream _stream;
 
-    private SystemProxyMarker(FileStream stream, string path, string? previousEndpoint)
+    private SystemProxyMarker(FileStream stream, string path, string? previousEndpoint, string? previousSettingsSnapshot)
     {
         _stream = stream;
         _path = path;
         PreviousEndpoint = previousEndpoint;
+        PreviousSettingsSnapshot = previousSettingsSnapshot;
     }
 
     /// <summary>The endpoint the file still named when it was taken, or null when it was empty.</summary>
     public string? PreviousEndpoint { get; }
+
+    /// <summary>The serialized system proxy settings that preceded the previous run, when available.</summary>
+    public string? PreviousSettingsSnapshot { get; }
 
     /// <summary>True when the file still named an endpoint, so an earlier run ended with the system proxy set.</summary>
     public bool PreviousRunDied => PreviousEndpoint is not null;
@@ -45,13 +51,18 @@ public sealed class SystemProxyMarker : IDisposable
         var deadline = timeProvider.GetUtcNow() + wait;
         while (true)
         {
+            FileStream? stream = null;
             try
             {
-                var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
-                return new SystemProxyMarker(stream, path, ReadEndpoint(stream));
+                stream = OpenMarker(path);
+                var record = ReadRecord(stream);
+                var marker = new SystemProxyMarker(stream, path, record.Endpoint, record.PreviousSettingsSnapshot);
+                stream = null;
+                return marker;
             }
             catch (IOException exception)
             {
+                stream?.Dispose();
                 if (timeProvider.GetUtcNow() >= deadline)
                 {
                     throw new InvalidOperationException(
@@ -61,16 +72,22 @@ public sealed class SystemProxyMarker : IDisposable
 
                 await Task.Delay(TimeSpan.FromMilliseconds(50 + Random.Shared.Next(0, 50)), timeProvider);
             }
+            catch
+            {
+                stream?.Dispose();
+                throw;
+            }
         }
     }
 
-    /// <summary>Replaces the file content with <paramref name="endPoint" /> as <c>host:port</c>.</summary>
-    public void Write(IPEndPoint endPoint)
+    /// <summary>Records the proxy endpoint and the system settings that must be restored after a crash.</summary>
+    public void Write(IPEndPoint endPoint, string? previousSettingsSnapshot = null)
     {
         _stream.SetLength(0);
         _stream.Position = 0;
-        _stream.Write(Encoding.UTF8.GetBytes($"{endPoint.Address}:{endPoint.Port}"));
-        _stream.Flush();
+        var record = new MarkerRecord(endPoint.ToString(), previousSettingsSnapshot);
+        JsonSerializer.Serialize(_stream, record, JsonOptions);
+        _stream.Flush(true);
     }
 
     /// <summary>Empties the file and keeps the hold, recording that the system proxy no longer needs clearing.</summary>
@@ -88,14 +105,66 @@ public sealed class SystemProxyMarker : IDisposable
         _stream.Dispose();
     }
 
-    private static string? ReadEndpoint(FileStream stream)
+    private static MarkerRecord ReadRecord(FileStream stream)
     {
         if (stream.Length == 0)
         {
-            return null;
+            return new MarkerRecord(null, null);
         }
 
         var text = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true).ReadToEnd().Trim();
-        return text.Length == 0 ? "unknown" : text;
+        if (text.Length == 0)
+        {
+            throw new InvalidDataException("The system proxy marker contains no valid record.");
+        }
+
+        try
+        {
+            var record = JsonSerializer.Deserialize<MarkerRecord>(text, JsonOptions);
+            if (record?.Endpoint is null || !IPEndPoint.TryParse(record.Endpoint, out _))
+            {
+                throw new InvalidDataException("The system proxy marker contains an invalid endpoint.");
+            }
+
+            return record;
+        }
+        catch (JsonException exception)
+        {
+            // Older versions wrote only the endpoint. Keep recognizing that marker so upgrades still recover.
+            if (IPEndPoint.TryParse(text, out _))
+            {
+                return new MarkerRecord(text, null);
+            }
+
+            throw new InvalidDataException("The system proxy marker is malformed.", exception);
+        }
     }
+
+    private static FileStream OpenMarker(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
+        }
+
+        var stream = new FileStream(path, new FileStreamOptions
+        {
+            Mode = FileMode.OpenOrCreate,
+            Access = FileAccess.ReadWrite,
+            Share = LockShare,
+            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+        });
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
+
+    private sealed record MarkerRecord(string? Endpoint, string? PreviousSettingsSnapshot);
 }
