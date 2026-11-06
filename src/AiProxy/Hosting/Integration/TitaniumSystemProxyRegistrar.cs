@@ -1,3 +1,4 @@
+using System.Net;
 using AiProxy.Hosting.Proxy;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.Models;
@@ -8,9 +9,31 @@ namespace AiProxy.Hosting.Integration;
 /// <param name="server">The running proxy server whose system proxy settings are changed.</param>
 public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemProxyRegistrar
 {
+    private string? _previousSettingsSnapshot;
+    private string? _endpoint;
+
+    private TitaniumSystemProxySnapshotProvider SnapshotProvider => new(server);
+
+    /// <inheritdoc />
+    public string Capture()
+    {
+        _previousSettingsSnapshot = SnapshotProvider.Capture();
+        return _previousSettingsSnapshot;
+    }
+
+    /// <inheritdoc />
+    public bool IsOwned(string endpoint) => SnapshotProvider.IsOwned(endpoint);
+
+    /// <inheritdoc />
+    public bool IsOwned(string endpoint, string snapshot) => SnapshotProvider.IsOwned(endpoint, snapshot);
+
+    /// <inheritdoc />
+    public Task<bool> RestoreIfOwned(string endpoint, string snapshot) => SnapshotProvider.RestoreIfOwned(endpoint, snapshot);
+
     /// <inheritdoc />
     public void Set(ExplicitProxyEndPoint endPoint)
     {
+        _endpoint = new IPEndPoint(endPoint.IpAddress, endPoint.Port).ToString();
         var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, BypassSettings());
         if (!result.Succeeded)
         {
@@ -34,12 +57,12 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     /// <inheritdoc />
     public void Restore()
     {
-        // The macOS backend swallows some of its own errors, so a success result can still hide a partial restore.
-        var result = server.TryRestoreOriginalProxySettings();
-        if (!result.Succeeded)
+        if (_endpoint is null || _previousSettingsSnapshot is null)
         {
-            throw new InvalidOperationException($"The system proxy could not be restored: {result.Message}");
+            throw new InvalidOperationException("The system proxy recovery snapshot is unavailable.");
         }
+
+        SnapshotProvider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot).GetAwaiter().GetResult();
     }
 
     /// <inheritdoc />

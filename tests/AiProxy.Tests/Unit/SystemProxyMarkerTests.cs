@@ -27,6 +27,72 @@ public sealed class SystemProxyMarkerTests
     }
 
     [Fact]
+    public async Task The_previous_system_proxy_snapshot_is_preserved_for_crash_recovery()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        const string snapshot = "{\"http\":\"http://corporate:8080\",\"https\":null,\"enabled\":false}";
+
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), snapshot);
+        }
+
+        using var next = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.Equal("127.0.0.1:9090", next.PreviousEndpoint);
+        Assert.Equal(snapshot, next.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public async Task A_torn_json_marker_is_rejected_instead_of_treated_as_a_legacy_endpoint()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, SystemProxyMarker.FileName);
+        const string tornRecord = "{\"endpoint\":\"127.0.0.1:9090\"";
+        await File.WriteAllTextAsync(path, tornRecord, TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System));
+
+        Assert.Equal(tornRecord, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_valid_endpoint_only_marker_remains_readable_for_upgrade_recovery()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory.Path, SystemProxyMarker.FileName),
+            "127.0.0.1:9090",
+            TestContext.Current.CancellationToken);
+
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        Assert.Equal("127.0.0.1:9090", marker.PreviousEndpoint);
+        Assert.Null(marker.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public async Task The_marker_file_is_private_to_the_current_user_on_unix()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        var mode = File.GetUnixFileMode(Path.Combine(directory.Path, SystemProxyMarker.FileName));
+
+        Assert.Equal(UnixFileMode.None, mode & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                                                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute));
+    }
+
+    [Fact]
     public async Task A_held_marker_cannot_be_acquired_without_waiting()
     {
         using var directory = new TemporaryDirectory();
