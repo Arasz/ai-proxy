@@ -121,7 +121,7 @@ public sealed record GainRecall(
 /// <summary>Whether this release measures a requested feature.</summary>
 public sealed record GainCapability(string Name, bool Supported, string? Reason = null);
 
-/// <summary>The same filtered statistics consumed by every frontend; <c>OtherTraffic</c> and <c>Harnesses</c> are null only in a report from a proxy that predates other-traffic counting.</summary>
+/// <summary>The same filtered statistics consumed by every frontend; <c>OtherTraffic</c> and <c>Harnesses</c> are null when the proxy or builder that made the report does not fill them.</summary>
 public sealed record GainReport(
     int SchemaVersion,
     DateTimeOffset GeneratedAt,

@@ -14,7 +14,7 @@ by rebinding a domain name. Set `AllowedHosts` if you move it to another address
 
 ## See what the proxy saved
 
-`ai-proxy gain` prints one block per harness: `claude`, `codex` and `other`. The harness comes from
+`ai-proxy gain` prints a block for each of `claude`, `codex` and `other` that has data. The harness comes from
 the provider, because the ledger does not record the client: Anthropic is `claude`, OpenAI is
 `codex`, and everything else is `other`. A script calling the Anthropic API therefore counts as
 `claude`. A retrieval with no known provider also lands in `other`, so that block can show recalls

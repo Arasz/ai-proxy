@@ -77,7 +77,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         var attributions = Attributions.SelectMany(dimension =>
                 rows.Where(row => row.View == dimension)
                     .OrderBy(static row => row.Name, StringComparer.Ordinal)
-                    .Select(row => new GainAttribution(dimension, row.Name, row.ConvertToTotals())))
+                    .Select(row => new GainAttribution(dimension, row.Name ?? "", row.ConvertToTotals())))
             .ToArray();
         return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
         {
@@ -202,7 +202,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record AggregateRow(string View, long Start, string Name, string Totals)
+    private sealed record AggregateRow(string View, long Start, string? Name, string Totals)
     {
         public GainTotals ConvertToTotals()
         {

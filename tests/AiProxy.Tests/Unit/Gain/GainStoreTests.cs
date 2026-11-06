@@ -388,12 +388,13 @@ public sealed class GainStoreTests
         var token = TestContext.Current.CancellationToken;
         var at = clock.GetUtcNow();
         var totals = GainReportBuilder.RequestTotals(1_000, 900, 1_000, 900);
-        foreach (var (id, provider) in new[] { ("a", "anthropic"), ("b", "openai"), ("c", "openai"), ("d", "gemini") })
+        foreach (var (id, provider) in new (string, string?)[] { ("a", "anthropic"), ("b", "openai"), ("c", "openai"), ("d", "gemini"), ("e", null) })
         {
             await store.RecordAsync(new GainHistoryEntry(id, at, "/p", provider, "POST", "r", "l", "p", totals), [], token);
         }
 
         await store.RecallAsync(new GainRecall(at, "x", "/p", "caller", "whole", 289, 100, null), "anthropic", "POST", "r", "l", "p", token);
+        await store.RecallAsync(new GainRecall(at, "y", "/p", "caller", "whole", 100, 50, null), null, "POST", "r", "l", "p", token);
         await store.FollowUpAsync(new GainFollowUp(at, "/p", 1, 1_000, 1_100, 346), "openai", "POST", "r", "l", "p", token);
 
         var report = await store.QueryAsync(new GainQuery(), token);
@@ -403,8 +404,9 @@ public sealed class GainStoreTests
         Assert.Equal(1, harnesses["claude"].Recalls);
         Assert.Equal(2, harnesses["codex"].Requests);
         Assert.Equal(1, harnesses["codex"].FollowUps);
-        Assert.Equal(1, harnesses["other"].Requests);
-        Assert.Equal(report.Summary.Requests, harnesses.Values.Sum(static row => row.Requests));
+        Assert.Equal(2, harnesses["other"].Requests);
+        Assert.Equal(1, harnesses["other"].Recalls);
+        Assert.Equal(report.Summary, GainReportBuilder.Sum(harnesses.Values));
     }
 
     [Fact]
