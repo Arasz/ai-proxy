@@ -1,6 +1,6 @@
 # 0011 - Project attribution through proxy credentials
 
-Status: Draft
+Status: Accepted
 
 ## Context
 
