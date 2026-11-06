@@ -48,12 +48,98 @@ public sealed class ResponseUsageReaderTests
     }
 
     [Fact]
+    public void A_message_body_gives_its_upstream_message_id_without_changing_usage_reading()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(MessageBody), Json, null);
+
+        Assert.Equal("msg_1", reading.MessageId);
+        Assert.Equal(new ResponseUsage(11, 22, 33, 44), reading.Usage);
+    }
+
+    [Fact]
     public void A_stream_takes_the_start_counts_and_lets_the_final_delta_win()
     {
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream), EventStream, null);
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
+    }
+
+    [Fact]
+    public void An_anthropic_stream_reads_the_message_id_from_message_start()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(Stream), EventStream, null);
+
+        Assert.Equal("msg_1", reading.MessageId);
+    }
+
+    [Fact]
+    public void An_openai_stream_uses_the_last_completed_response_id()
+    {
+        const string stream = """
+                            data: {"type":"response.created","response":{"id":"resp_created","object":"response"}}
+
+                            data: {"type":"response.completed","response":{"object":"response","id":"resp_old","usage":{"input_tokens":1,"output_tokens":1}}}
+
+                            data: {"type":"response.completed","response":{"object":"response","id":"resp_final","usage":{"input_tokens":2,"output_tokens":2}}}
+
+                            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal("resp_final", reading.MessageId);
+    }
+
+    /// <summary>Reads the shared top-level ID on streamed Chat Completions chunks.</summary>
+    [Fact]
+    public void An_openai_chat_completions_stream_keeps_its_chunk_id()
+    {
+        const string stream = """
+                            data: {"id":"chatcmpl_stream_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant"}}]}
+
+                            data: {"id":"chatcmpl_stream_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hello"}}]}
+
+                            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal("chatcmpl_stream_1", reading.MessageId);
+    }
+
+    /// <summary>Uses response.created as the ID fallback when a terminal event was cut.</summary>
+    [Fact]
+    public void A_cut_responses_terminal_keeps_the_created_id_when_its_terminal_id_is_unreadable()
+    {
+        const string stream = """
+                            data: {"type":"response.created","response":{"id":"resp_created","object":"response","status":"in_progress"}}
+
+                            :ai-proxy-cut-terminal data: {"type":"response.completed","response":{"usage":{"input_tokens":21,"output_tokens":4}}}
+
+                            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal("resp_created", reading.MessageId);
+        Assert.Equal(new ResponseUsage(21, 4, null, null), reading.Usage);
+    }
+
+    [Theory]
+    [InlineData("{\"id\":\"chatcmpl_123\",\"choices\":[]}", Dialect.OpenAi, "chatcmpl_123")]
+    [InlineData("{\"object\":\"response\",\"id\":\"resp_123\",\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}", Dialect.OpenAi, "resp_123")]
+    [InlineData("{\"type\":\"message\",\"id\":\"msg_1\",\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}", Dialect.Anthropic, "msg_1")]
+    public void A_json_response_keeps_its_top_level_id(string body, Dialect dialect, string expected)
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(body), Json, null, dialect);
+
+        Assert.Equal(expected, reading.MessageId);
+    }
+
+    [Fact]
+    public void A_response_without_an_upstream_id_keeps_the_id_null()
+    {
+        var reading = ResponseUsageReader.Read("{\"usage\":{\"input_tokens\":1,\"output_tokens\":2}}"u8.ToArray(), Json, null);
+
+        Assert.Null(reading.MessageId);
     }
 
     [Fact]
@@ -284,6 +370,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Fact]
@@ -293,6 +380,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Theory]
@@ -306,6 +394,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Fact]
@@ -331,7 +420,7 @@ public sealed class ResponseUsageReaderTests
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
 
-        Assert.Equal(new UsageReading(null, "no-usage"), reading);
+        Assert.Equal(new UsageReading(null, "no-usage", "resp_1"), reading);
     }
 
     [Fact]

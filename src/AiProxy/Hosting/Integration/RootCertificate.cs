@@ -45,11 +45,16 @@ internal sealed class TitaniumRootCertificate(CertificateManager certificates) :
     /// <inheritdoc />
     /// <remarks>Matches by thumbprint only: Titanium's own untrust helpers also match by common name, which would remove other
     /// Titanium-based tools' roots. On macOS the login-keychain trust Titanium added with <c>security add-trusted-cert</c> is
-    /// removed with <c>security delete-certificate -Z</c>, as Titanium itself does. Linux NSS databases are not cleaned.</remarks>
+    /// removed with <c>security delete-certificate -Z</c>, as Titanium itself does. Linux NSS databases are cleaned by thumbprint.</remarks>
     public void Untrust(string thumbprint)
     {
         certificates.RemoveCertificateByThumbprint(StoreName.Root, StoreLocation.CurrentUser, thumbprint);
         certificates.RemoveCertificateByThumbprint(StoreName.My, StoreLocation.CurrentUser, thumbprint);
+        if (OperatingSystem.IsLinux())
+        {
+            new NssCertificateStore().Remove(thumbprint, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        }
+
         if (OperatingSystem.IsMacOS() && !CertificateManager.AreInteractiveRootStoreMutationsSuppressed)
         {
             var start = new ProcessStartInfo("/usr/bin/security") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };

@@ -214,7 +214,10 @@ public sealed partial class ProviderRequestInspector(
                     kept.Length,
                     reading.Usage,
                     reading.Error,
-                    exchange.Stages.ToArray()),
+                    exchange.Stages.ToArray())
+                {
+                    MessageId = reading.MessageId
+                },
                 CancellationToken.None);
         }
         catch (Exception exception)

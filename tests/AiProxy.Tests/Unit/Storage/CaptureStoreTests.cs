@@ -188,6 +188,50 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.Equal("new", Assert.Single(await ReadResponsesAsync()).RequestId);
     }
 
+    [Fact]
+    public async Task A_response_capture_keeps_its_message_id()
+    {
+        await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
+        await _store.StoreResponseAsync(
+            new CapturedResponse("r1", DateTimeOffset.UnixEpoch, 200, 2, 2, 5, new ResponseUsage(1, 2, null, null), null, [])
+            {
+                MessageId = "resp_123"
+            },
+            TestContext.Current.CancellationToken);
+
+        var row = Assert.Single(await ReadResponsesAsync());
+
+        Assert.Equal("resp_123", row.MessageId);
+    }
+
+    [Fact]
+    public async Task Adding_the_message_id_column_preserves_existing_response_rows()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
+        await using (var old = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString()))
+        {
+            await old.OpenAsync(TestContext.Current.CancellationToken);
+            await old.ExecuteAsync("""
+                                   CREATE TABLE capture_request (request_id TEXT PRIMARY KEY, captured_at TEXT NOT NULL, provider TEXT NOT NULL, host TEXT NOT NULL, path TEXT NOT NULL, body BLOB NOT NULL);
+                                   CREATE TABLE capture_response (request_id TEXT PRIMARY KEY, completed_at TEXT NOT NULL, status INTEGER, request_bytes INTEGER, forwarded_bytes INTEGER, response_bytes INTEGER, input_tokens INTEGER, output_tokens INTEGER, cache_creation_input_tokens INTEGER, cache_read_input_tokens INTEGER, usage_error TEXT, stages TEXT NOT NULL);
+                                   INSERT INTO capture_request VALUES ('old', '2026-10-22T00:00:00.0000000+00:00', 'Anthropic', 'api.anthropic.com', '/v1/messages', x'7B7D');
+                                   INSERT INTO capture_response VALUES ('old', '2026-10-22T00:00:00.0000000+00:00', 200, 12, 10, 20, 7, 3, 2, 1, NULL, '{}');
+                                   """);
+        }
+
+        var store = new SqliteCaptureStore(_databasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
+        await store.StoreResponseAsync(
+            new CapturedResponse("new", DateTimeOffset.UnixEpoch, 200, 2, 2, 5, new ResponseUsage(1, 2, null, null), null, [])
+            {
+                MessageId = "resp_new"
+            },
+            TestContext.Current.CancellationToken);
+
+        var rows = await ReadResponsesAsync();
+        Assert.Contains(rows, row => row.RequestId == "old" && row.InputTokens == 7 && row.ResponseBytes == 20 && row.MessageId is null);
+        Assert.Contains(rows, row => row.RequestId == "new" && row.MessageId == "resp_new");
+    }
+
     private async Task<IReadOnlyList<ResponseRow>> ReadResponsesAsync()
     {
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _databasePath, Mode = SqliteOpenMode.ReadOnly }.ToString());
@@ -197,7 +241,8 @@ public sealed class CaptureStoreTests : IDisposable
                                                                    request_bytes AS RequestBytes, forwarded_bytes AS ForwardedBytes, response_bytes AS ResponseBytes,
                                                                    input_tokens AS InputTokens, output_tokens AS OutputTokens,
                                                                    cache_creation_input_tokens AS CacheCreationInputTokens, cache_read_input_tokens AS CacheReadInputTokens,
-                                                                   usage_error AS UsageError, stages AS Stages
+                                                                   usage_error AS UsageError, stages AS Stages,
+                                                                   response_message_id AS MessageId
                                                             FROM capture_response;
                                                             """);
         return rows.ToList();
@@ -232,7 +277,8 @@ public sealed class CaptureStoreTests : IDisposable
         long? CacheCreationInputTokens,
         long? CacheReadInputTokens,
         string? UsageError,
-        string Stages);
+        string Stages,
+        string? MessageId);
 
     private sealed record CaptureRow(string RequestId, string CapturedAt, string Provider, string Host, string Path, byte[] Body);
 }

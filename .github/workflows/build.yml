@@ -116,6 +116,9 @@ jobs:
         # switch (MSB1006, "Property is not valid"). Passing the list here
         # broke the build; declaring it in the project is the fix.
         run: mkdir -p .nupkg-local && dotnet build --configuration Release --nologo
+      - name: Install NSS tools for Linux certificate cleanup coverage
+        if: needs.changes.outputs.code == 'true'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libnss3-tools
       - name: Test
         if: needs.changes.outputs.code == 'true'
         run: dotnet test --configuration Release --no-build --nologo

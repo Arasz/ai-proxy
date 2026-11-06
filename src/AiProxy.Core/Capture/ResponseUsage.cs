@@ -10,4 +10,5 @@ public sealed record ResponseUsage(
 /// <summary>What reading a response body gave: the usage, or why there is none.</summary>
 /// <param name="Usage">The counts read; null when <paramref name="Error" /> says why not.</param>
 /// <param name="Error">A short reason such as <c>malformed</c> or <c>encoding:zstd</c>; null when usage was read.</param>
-public sealed record UsageReading(ResponseUsage? Usage, string? Error);
+/// <param name="MessageId">The upstream response identifier, when its dialect exposes one.</param>
+public sealed record UsageReading(ResponseUsage? Usage, string? Error, string? MessageId = null);

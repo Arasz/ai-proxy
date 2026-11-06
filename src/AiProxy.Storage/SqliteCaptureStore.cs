@@ -117,6 +117,7 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
                 response.Usage?.CacheCreationInputTokens,
                 response.Usage?.CacheReadInputTokens,
                 response.UsageError,
+                response.MessageId,
                 Stages = StagesJson(response.Stages)
             },
             commandTimeout: ContentSchema.RequestCommandTimeoutSeconds,
@@ -210,6 +211,37 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
 
         using var connection = ContentSchema.Open(_databasePath);
         connection.Execute(Sql.Schema, ContentSchema.RequestCommandTimeoutSeconds);
+        EnsureResponseMessageIdColumn(connection);
+    }
+
+    /// <summary>Adds the response identifier column once without discarding rows written by earlier versions.</summary>
+    private static void EnsureResponseMessageIdColumn(SqliteConnection connection)
+    {
+        connection.Execute("BEGIN IMMEDIATE", commandTimeout: ContentSchema.RequestCommandTimeoutSeconds);
+        try
+        {
+            var exists = connection.ExecuteScalar<long>("SELECT COUNT(*) FROM pragma_table_info('capture_response') WHERE name = 'response_message_id';") > 0;
+            if (!exists)
+            {
+                connection.Execute("ALTER TABLE capture_response ADD COLUMN response_message_id TEXT", commandTimeout: ContentSchema.RequestCommandTimeoutSeconds);
+            }
+
+            connection.Execute("COMMIT");
+        }
+        catch (Exception migrationFailure)
+        {
+            try
+            {
+                connection.Execute("ROLLBACK");
+            }
+            catch (Exception rollbackFailure)
+            {
+                // Retain the cleanup error without replacing the migration failure.
+                migrationFailure.Data["CaptureSchemaMigration.RollbackFailure"] = rollbackFailure;
+            }
+
+            throw;
+        }
     }
 
     private static partial class Log
@@ -245,6 +277,7 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
                                          cache_creation_input_tokens INTEGER,
                                          cache_read_input_tokens     INTEGER,
                                          usage_error                 TEXT,
+                                         response_message_id        TEXT,
                                          stages                      TEXT NOT NULL
                                      );
                                      CREATE INDEX IF NOT EXISTS capture_response_completed ON capture_response (completed_at);
@@ -258,10 +291,10 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         public const string InsertResponse = """
                                              INSERT INTO capture_response (
                                                  request_id, completed_at, status, request_bytes, forwarded_bytes, response_bytes,
-                                                 input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usage_error, stages)
+                                                 input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usage_error, response_message_id, stages)
                                              VALUES (
                                                  @RequestId, @CompletedAt, @StatusCode, @RequestBytes, @ForwardedBytes, @ResponseBytes,
-                                                 @InputTokens, @OutputTokens, @CacheCreationInputTokens, @CacheReadInputTokens, @UsageError, @Stages);
+                                                 @InputTokens, @OutputTokens, @CacheCreationInputTokens, @CacheReadInputTokens, @UsageError, @MessageId, @Stages);
                                              """;
     }
 }

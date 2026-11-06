@@ -107,7 +107,8 @@ public static class ResponseUsageReader
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
         var usage = dialect == Dialect.OpenAi ? ReadResponse(null, root) : Merge(null, root.PropertyOrDefault(UsageJson.Usage));
-        return usage is null ? new UsageReading(null, NoUsage) : new UsageReading(usage, null);
+        var messageId = root.StringProperty(UsageJson.Id);
+        return new UsageReading(usage, usage is null ? NoUsage : null, messageId);
     }
 
     /// <summary>
@@ -117,6 +118,7 @@ public static class ResponseUsageReader
     private static UsageReading ReadStream(ReadOnlyMemory<byte> body, Dialect dialect)
     {
         ResponseUsage? usage = null;
+        string? messageId = null;
         var broken = false;
         foreach (var line in Lines(body))
         {
@@ -139,7 +141,10 @@ public static class ResponseUsageReader
 
             try
             {
-                usage = Fold(usage, data, dialect);
+                using var document = JsonDocument.Parse(data);
+                var root = document.RootElement;
+                messageId = ReadStreamMessageId(root, dialect) ?? messageId;
+                usage = Fold(usage, root, dialect);
             }
             catch (JsonException)
             {
@@ -149,17 +154,39 @@ public static class ResponseUsageReader
 
         return (usage, broken) switch
         {
-            (null, true) => new UsageReading(null, Malformed),
-            (null, false) => new UsageReading(null, NoUsage),
-            (_, true) => new UsageReading(usage, Truncated),
-            _ => new UsageReading(usage, null)
+            (null, true) => new UsageReading(null, Malformed, messageId),
+            (null, false) => new UsageReading(null, NoUsage, messageId),
+            (_, true) => new UsageReading(usage, Truncated, messageId),
+            _ => new UsageReading(usage, null, messageId)
         };
     }
 
-    private static ResponseUsage? Fold(ResponseUsage? usage, ReadOnlyMemory<byte> data, Dialect dialect)
+    /// <summary>Reads the identifier carried by one already parsed stream event.</summary>
+    private static string? ReadStreamMessageId(JsonElement root, Dialect dialect)
     {
-        using var document = JsonDocument.Parse(data);
-        var root = document.RootElement;
+        var type = root.StringProperty(UsageJson.Type);
+        if (dialect == Dialect.Anthropic && type == UsageJson.MessageStart)
+        {
+            return root.PropertyOrDefault(UsageJson.Message).StringProperty(UsageJson.Id);
+        }
+
+        if (dialect == Dialect.OpenAi &&
+            type is UsageJson.ResponseCreated or UsageJson.ResponseCompleted or UsageJson.ResponseIncomplete or UsageJson.ResponseFailed)
+        {
+            return root.PropertyOrDefault(UsageJson.Response).StringProperty(UsageJson.Id);
+        }
+
+        if (dialect == Dialect.OpenAi && root.StringProperty(UsageJson.Object) == UsageJson.ChatCompletionChunk)
+        {
+            return root.StringProperty(UsageJson.Id);
+        }
+
+        return null;
+    }
+
+    /// <summary>Folds usage from one already parsed stream event into the counts read so far.</summary>
+    private static ResponseUsage? Fold(ResponseUsage? usage, JsonElement root, Dialect dialect)
+    {
         var type = root.PropertyOrDefault(UsageJson.Type);
         if (type.IsMissing)
         {
