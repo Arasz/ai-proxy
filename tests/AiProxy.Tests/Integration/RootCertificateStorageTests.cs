@@ -194,6 +194,58 @@ public sealed class RootCertificateStorageTests
     }
 
     [Fact]
+    public async Task A_certificate_store_failure_during_trust_is_a_one_line_warning()
+    {
+        using var directory = new TemporaryDirectory();
+        var trust = new RecordingTrust();
+        var log = new RecordingLoggerProvider();
+        await using var service = CreateService(directory.Path, null, true, trust, log);
+        trust.DuringTrust = () => service.Server.Logger.LogError(new InvalidOperationException("Failed to open Root", new UnauthorizedAccessException("Access is denied.")), "{Context}", "Certificate operation failed");
+
+        await StartAndStopTrustingAsync(service);
+
+        var warning = Assert.Single(log.Entries, entry => entry.EventId == 1310);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Null(warning.Exception);
+        Assert.Contains("Failed to open Root: Access is denied.", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(log.Entries, entry => entry.Level >= LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task Any_other_titanium_error_stays_an_error()
+    {
+        using var directory = new TemporaryDirectory();
+        var trust = new RecordingTrust();
+        var log = new RecordingLoggerProvider();
+        await using var service = CreateService(directory.Path, null, true, trust, log);
+        trust.DuringTrust = () => service.Server.Logger.LogError(new InvalidOperationException("broken"), "{Context}", "Listener failed");
+
+        await StartAndStopTrustingAsync(service);
+
+        var error = Assert.Single(log.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.NotNull(error.Exception);
+        Assert.DoesNotContain(log.Entries, entry => entry.EventId == 1310);
+    }
+
+    [Fact]
+    public async Task A_replaced_root_that_cannot_be_untrusted_warns_and_the_start_goes_on()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteOldRoot(directory.Path, "");
+        var trust = new RecordingTrust { UntrustFailure = new IOException("security is missing") };
+        var log = new RecordingLoggerProvider();
+        await using var service = CreateService(directory.Path, null, true, trust, log);
+
+        await StartAndStopTrustingAsync(service);
+
+        var warning = Assert.Single(log.Entries, entry => entry.EventId == 1311);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Contains(oldThumbprint, warning.Message, StringComparison.Ordinal);
+        Assert.Contains("security is missing", warning.Message, StringComparison.Ordinal);
+        Assert.Single(log.Entries, entry => entry.EventId == 1308);
+    }
+
+    [Fact]
     public async Task A_root_certificate_no_known_password_opens_stops_the_start_and_stays_on_disk()
     {
         using var directory = new TemporaryDirectory();
@@ -286,6 +338,21 @@ public sealed class RootCertificateStorageTests
         await service.StopAsync(CancellationToken.None);
     }
 
+    /// <summary>Runs a trusting start, which clears Titanium's process-wide suppression, and puts the suppression back.</summary>
+    private static async Task StartAndStopTrustingAsync(TitaniumProxyService service)
+    {
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
     private static TitaniumProxyService CreateService(
         string dataDirectory,
         string? password,
@@ -325,6 +392,10 @@ public sealed class RootCertificateStorageTests
 
         public List<string> Calls { get; } = [];
 
+        public Action? DuringTrust { get; set; }
+
+        public Exception? UntrustFailure { get; init; }
+
         public void Load()
         {
             Calls.Add("load");
@@ -339,12 +410,17 @@ public sealed class RootCertificateStorageTests
         public void Trust()
         {
             Calls.Add("trust");
+            DuringTrust?.Invoke();
             _trusted = true;
         }
 
         public void Untrust(string thumbprint)
         {
             Calls.Add($"untrust {thumbprint}");
+            if (UntrustFailure is not null)
+            {
+                throw UntrustFailure;
+            }
         }
     }
 }

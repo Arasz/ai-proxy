@@ -1,7 +1,25 @@
 {
-  "lastUpdated": "2026-11-05T10:00:11.477075+00:00",
-  "next": "#24 restore system proxy after crash, NSS cleanup, capture message id. Owner gates pending: ADR 0010 acceptance; quoted-echo build/park (PR #106); Codex built-in provider attribution ADR; musl libtree-sitter vs best-effort docs.",
+  "lastUpdated": "2026-11-06",
+  "next": "Owner live smoke of 0.27.0 Codex chatgpt.com recording; quoted-echo references build (high loop, default shape); #24 restore system proxy after crash, NSS cleanup, capture message id.",
   "completedTasks": [
+    {
+      "taskId": "aip-record-codex-chatgpt-subscription-traffic",
+      "date": "2026-11-06",
+      "title": "Record Codex chatgpt.com traffic for harness sessions (0.27.0)",
+      "pr": 115,
+      "version": "0.27.0",
+      "summary": "ADR 0012: chatgpt.com harness-only/record-only host (ProviderHost record), decrypt only with ai-proxy CONNECT credential, 426 on Codex WebSocket upgrade, zstd request decode (ZstdSharp.Port 0.8.8, window cap 2^24, 16 MiB), Responses completed/incomplete/failed usage incl. events longer than the tail window. Root rotates once. Owner live smoke pending (Cloudflare TLS risk).",
+      "hasNotes": false
+    },
+    {
+      "taskId": "aip-attribute-codex-builtin-provider-traffic",
+      "date": "2026-11-06",
+      "title": "Attribute harness traffic through proxy credentials (0.26.0)",
+      "pr": 113,
+      "version": "0.26.0",
+      "summary": "ADR 0011 accepted: harness puts the project in the proxy URL userinfo; proxy reads Proxy-Authorization (request, then CONNECT) after X-Ai-Proxy-Project, strips it, never requires auth. Side fix 0.25.1 (#114): content GetAsync checks the queue before the table (CI 404 flake).",
+      "hasNotes": false
+    },
     {
       "taskId": "aip-status-and-stop-commands",
       "date": "2026-11-05",

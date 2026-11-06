@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Net;
 using System.Net.Mime;
+using System.Security.Cryptography;
 using AiProxy.Core.Gain;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
@@ -115,7 +117,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         CertificateManager.SuppressInteractiveRootStoreMutations = !_options.TrustRootCertificate;
-        Server.Logging.LoggerFactory = _loggerFactory;
+        Server.Logging.LoggerFactory = new TitaniumLoggerFactory(_loggerFactory);
+        Server.ApplyLoggingConfiguration();
         Server.EnableHttpInterception = true;
         Server.MaxBufferedBodyBytes = 8 * 1024 * 1024;
         Server.ViaHeaderPseudonym = "";
@@ -139,7 +142,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             trust.EnsureTrusted();
             if (root.ReplacedThumbprint is { } old)
             {
-                trust.Untrust(old);
+                Untrust(trust, old);
             }
         }
 
@@ -274,6 +277,19 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
         {
             Log.GuardUnreachable(_logger, exception);
+        }
+    }
+
+    /// <summary>Removes a replaced root; a failure leaves it trusted but never stops the start, because the new root already works.</summary>
+    private void Untrust(IRootCertificate trust, string thumbprint)
+    {
+        try
+        {
+            trust.Untrust(thumbprint);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception or CryptographicException)
+        {
+            Log.UntrustFailed(_logger, thumbprint, exception.Message);
         }
     }
 
@@ -419,6 +435,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         [LoggerMessage(EventId = 1308, Level = LogLevel.Warning, Message = "Replaced the ai-proxy root certificate {OldThumbprint} with a name-constrained one; restart every ai-proxy harness session so it reads the new root-ca.pem")]
         public static partial void RootReplaced(ILogger logger, string oldThumbprint);
+
+        [LoggerMessage(EventId = 1311, Level = LogLevel.Warning, Message = "The replaced root certificate {Thumbprint} is still trusted and can be removed by hand: {Failure}")]
+        public static partial void UntrustFailed(ILogger logger, string thumbprint, string failure);
 
         [LoggerMessage(EventId = 1309, Level = LogLevel.Warning, Message = "Answered 400 to {Method} {Path} (User-Agent: {UserAgent}) addressed to the proxy port itself; the client uses the proxy as a base URL instead of as an HTTP proxy")]
         public static partial void AddressedToSelf(ILogger logger, string method, string path, string? userAgent);
