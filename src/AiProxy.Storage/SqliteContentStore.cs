@@ -7,9 +7,9 @@ namespace AiProxy.Storage;
 /// <summary>Keeps what the proxy compressed, in a SQLite file.</summary>
 /// <remarks>
 ///     The write is a hand-off, not a write: the record is published to the queue and the
-///     background writer puts it in the content tables. The read looks in the content tables
-///     first and in the queue second, so a record that has not been written yet is still
-///     served.
+///     background writer puts it in the content tables. The read looks in the queue first and
+///     in the content tables second, because the writer commits the table before it deletes the
+///     job. A record that has not been written yet is still served.
 /// </remarks>
 /// <param name="options">Where the store keeps what the proxy compressed.</param>
 /// <param name="queue">The queue that carries the record to the writer.</param>
@@ -26,6 +26,13 @@ public sealed class SqliteContentStore(ContentStoreOptions options, ContentQueue
     /// <inheritdoc />
     public async ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
     {
+        var pending = await queue.FindPendingAsync(requestId, cancellationToken).ConfigureAwait(false);
+
+        if (pending is not null)
+        {
+            return pending;
+        }
+
         await using var connection = ContentSchema.Open(_databasePath);
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);
 
@@ -48,9 +55,7 @@ public sealed class SqliteContentStore(ContentStoreOptions options, ContentQueue
 
         if (row is null)
         {
-            var pending = await queue.FindPendingAsync(requestId, cancellationToken).ConfigureAwait(false);
-
-            return pending;
+            return null;
         }
 
         const string selectChunks = """

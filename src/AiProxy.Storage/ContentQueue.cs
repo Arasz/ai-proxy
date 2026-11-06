@@ -39,7 +39,7 @@ public sealed record ContentJob(long JobId, ContentRecord Record);
 ///     because the pragma that tells it whether anything changed does not move for a
 ///     connection's own commits.
 /// </remarks>
-public sealed class ContentQueue(ContentStoreOptions options, TimeProvider time) : IContentQueue
+public class ContentQueue(ContentStoreOptions options, TimeProvider time) : IContentQueue
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -101,7 +101,7 @@ public sealed class ContentQueue(ContentStoreOptions options, TimeProvider time)
     /// <summary>Finds the record still waiting in the queue for a request, without taking it out.</summary>
     /// <param name="requestId">The request's id.</param>
     /// <param name="cancellationToken">The token that stops the read.</param>
-    public async Task<ContentRecord?> FindPendingAsync(string requestId, CancellationToken cancellationToken)
+    public virtual async Task<ContentRecord?> FindPendingAsync(string requestId, CancellationToken cancellationToken)
     {
         await using var connection = ContentSchema.Open(_databasePath);
         connection.Ensure(ContentSchema.RequestCommandTimeoutSeconds);

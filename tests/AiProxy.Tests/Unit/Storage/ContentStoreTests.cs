@@ -104,6 +104,21 @@ public sealed class ContentStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_record_the_writer_moves_during_the_read_is_still_found()
+    {
+        var options = new ContentStoreOptions(_databasePath);
+        var racing = new WriterMovesDuringLookup(options, _store);
+        var store = new SqliteContentStore(options, racing);
+        await store.StoreAsync(Record(), CancellationToken.None);
+
+        var stored = await store.GetAsync("request-1", CancellationToken.None);
+
+        Assert.True(racing.Moved);
+        Assert.NotNull(stored);
+        Assert.Equal("the original bödy", stored.Original);
+    }
+
+    [Fact]
     public async Task An_unknown_request_id_is_null()
     {
         var stored = await _store.GetAsync("never-stored", CancellationToken.None);
@@ -273,5 +288,24 @@ public sealed class ContentStoreTests : IDisposable
             Encoding.UTF8.GetByteCount(row.Original),
             row.Ratio,
             6);
+    }
+
+    /// <summary>Runs the writer's move, table insert then job delete, the first time the queue is asked about a request.</summary>
+    private sealed class WriterMovesDuringLookup(ContentStoreOptions options, SqliteContentStore writer) : ContentQueue(options, TimeProvider.System)
+    {
+        public bool Moved { get; private set; }
+
+        public override async Task<ContentRecord?> FindPendingAsync(string requestId, CancellationToken cancellationToken)
+        {
+            if (!Moved)
+            {
+                Moved = true;
+                var job = Assert.Single(await ReadAsync(10, cancellationToken));
+                await writer.PersistAsync(job.Record, cancellationToken);
+                await RemoveAsync(job.JobId, cancellationToken);
+            }
+
+            return await base.FindPendingAsync(requestId, cancellationToken);
+        }
     }
 }
