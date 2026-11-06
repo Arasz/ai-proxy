@@ -380,6 +380,34 @@ public sealed class GainStoreTests
     }
 
     [Fact]
+    public async Task Harness_totals_come_from_the_provider_column_and_count_recalls_and_follow_ups()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-01T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        var token = TestContext.Current.CancellationToken;
+        var at = clock.GetUtcNow();
+        var totals = GainReportBuilder.RequestTotals(1_000, 900, 1_000, 900);
+        foreach (var (id, provider) in new[] { ("a", "anthropic"), ("b", "openai"), ("c", "openai"), ("d", "gemini") })
+        {
+            await store.RecordAsync(new GainHistoryEntry(id, at, "/p", provider, "POST", "r", "l", "p", totals), [], token);
+        }
+
+        await store.RecallAsync(new GainRecall(at, "x", "/p", "caller", "whole", 289, 100, null), "anthropic", "POST", "r", "l", "p", token);
+        await store.FollowUpAsync(new GainFollowUp(at, "/p", 1, 1_000, 1_100, 346), "openai", "POST", "r", "l", "p", token);
+
+        var report = await store.QueryAsync(new GainQuery(), token);
+
+        var harnesses = report.Harnesses!.ToDictionary(static row => row.Name, static row => row.Totals);
+        Assert.Equal(["claude", "codex", "other"], report.Harnesses!.Select(static row => row.Name));
+        Assert.Equal(1, harnesses["claude"].Recalls);
+        Assert.Equal(2, harnesses["codex"].Requests);
+        Assert.Equal(1, harnesses["codex"].FollowUps);
+        Assert.Equal(1, harnesses["other"].Requests);
+        Assert.Equal(report.Summary.Requests, harnesses.Values.Sum(static row => row.Requests));
+    }
+
+    [Fact]
     public async Task Daily_weekly_and_monthly_buckets_ignore_follow_ups()
     {
         using var directory = new TemporaryDirectory();

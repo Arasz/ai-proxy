@@ -119,6 +119,10 @@ ai-proxy harness --proxy http://127.0.0.1:9080 --ca-file /path/to/root-ca.pem cl
 
 The selected CA file replaces `NODE_EXTRA_CA_CERTS` for Claude. If you need additional
 private CAs, pass a PEM bundle containing those certificates and the proxy's public CA.
+`ai-proxy shortcut` adds an `aph` command beside `ai-proxy`, so `aph claude` runs
+`ai-proxy harness claude`. It never replaces a file it did not create, and `ai-proxy shortcut --remove`
+deletes it.
+
 Use `ai-proxy harness --help` for launcher options; use `ai-proxy harness claude -- --help` for Claude's help.
 
 The proxy settings route traffic through ai-proxy, and `NODE_EXTRA_CA_CERTS` lets the Node

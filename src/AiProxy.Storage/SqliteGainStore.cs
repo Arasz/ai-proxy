@@ -89,7 +89,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Attributions = attributions,
             Failures = failures,
             Recalls = recalls,
-            OtherTraffic = other
+            OtherTraffic = other,
+            Harnesses = GainReportBuilder.Harnesses(rows.Where(static row => row.View == "provider")
+                .Select(static row => new GainProviderTotals(row.Name, row.ConvertToTotals())))
         };
     }
 
@@ -282,7 +284,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
         public const string Aggregate = $"""
                                          WITH metrics AS (
-                                             SELECT kind,at,method,rule,layer,pipeline,
+                                             SELECT kind,at,provider,method,rule,layer,pipeline,
                                                  CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
                                                      WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
                                                          'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
@@ -298,6 +300,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                          UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
                                          UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
                                          GROUP BY dimension,Name
+                                         UNION ALL SELECT 'provider',0,provider,{SumJson}FROM metrics GROUP BY provider
                                          """;
     }
 
