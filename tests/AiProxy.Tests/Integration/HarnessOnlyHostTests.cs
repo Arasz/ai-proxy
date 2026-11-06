@@ -105,6 +105,18 @@ public sealed class HarnessOnlyHostTests : IDisposable
     }
 
     [Fact]
+    public async Task A_decrypted_harness_only_tunnel_negotiates_http11_so_no_origin_http2_settings_reach_the_client()
+    {
+        Assert.Equal(SslApplicationProtocol.Http11, await NegotiatedAsync(new HarnessLoopbackHosts()));
+    }
+
+    [Fact]
+    public async Task A_decrypted_tunnel_to_any_other_host_keeps_http2_so_the_pin_check_can_fail()
+    {
+        Assert.Equal(SslApplicationProtocol.Http2, await NegotiatedAsync(new LoopbackProviderHosts(Dialect.OpenAi)));
+    }
+
+    [Fact]
     public async Task A_websocket_upgrade_to_codex_responses_gets_426_from_the_proxy_and_never_reaches_upstream()
     {
         using var upstreamCertificate = CreateUpstreamCertificate();
@@ -266,6 +278,26 @@ public sealed class HarnessOnlyHostTests : IDisposable
 
         Assert.DoesNotContain(" 426 ", head, StringComparison.Ordinal);
         Assert.Equal(path, Assert.Single(upstream.Requests).Path);
+    }
+
+    private static async Task<SslApplicationProtocol> NegotiatedAsync(IProviderHosts hosts)
+    {
+        using var upstreamCertificate = CreateUpstreamCertificate();
+        await using var upstream = await FakeUpstream.StartAsync(upstreamCertificate);
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: hosts);
+        TrustUpstream(proxy, upstreamCertificate);
+        using var proxyRoot = LoadProxyRoot(proxy.DataDirectory);
+        var token = TestContext.Current.CancellationToken;
+
+        await using var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, new DnsEndPoint("127.0.0.1", upstream.BaseAddress.Port), Credential("/project/alpn"), token);
+        await using var tls = new SslStream(tunnel);
+        await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+        {
+            TargetHost = "127.0.0.1",
+            ApplicationProtocols = [SslApplicationProtocol.Http2, SslApplicationProtocol.Http11],
+            RemoteCertificateValidationCallback = (_, certificate, _, errors) => ChainsTo(proxyRoot, certificate as X509Certificate2, errors)
+        }, token);
+        return tls.NegotiatedApplicationProtocol;
     }
 
     private static string Upgrade(string path, int port)

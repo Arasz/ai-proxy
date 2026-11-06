@@ -32,6 +32,7 @@ Codex 0.166.0 (source tag `rust-v0.166.0`) behaves as follows:
 4. The proxy decodes zstd request bodies with a managed zstd package for capture and `gain`. It
    forwards the original bytes.
 5. Harness-only hosts are record-only. The proxy never changes their requests or responses.
+   ADR 0013 pins their decrypted tunnels to HTTP/1.1.
 6. The usage reader reads the Responses `response.completed` event in SSE and JSON bodies.
 
 ## Consequences
