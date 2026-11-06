@@ -74,9 +74,9 @@ ceiling above (a warning is logged once when it stops and once when it resumes).
 measurement is over to give the disk space back; a delete frees pages for reuse but does not shrink the file. A failed write is logged as a warning and the request goes out regardless.
 
 Each captured request also gets one row of `capture_response`, under the same `request_id`, once
-its response has passed through, whatever its status code. The row holds numbers only: the
-completion time, the status code, the request body size as sent and as forwarded, the response
-body size on the wire, the four token counts the provider reported (`input_tokens`,
+its response has passed through, whatever its status code. The row holds the optional upstream
+response ID plus the completion time, status code, request body size as sent and as forwarded,
+response body size on the wire, and the four token counts the provider reported (`input_tokens`,
 `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`), and `stages`, a JSON
 object of how many microseconds each step took. The stages are the proxy's own (`body-read`,
 `capture-write`, `compression` and its `compression.*` steps, `set-body`, `usage-read`, and
@@ -84,10 +84,15 @@ object of how many microseconds each step took. The stages are the proxy's own (
 (`titanium.client-request-read`, `titanium.connection-wait`, `titanium.request-send`,
 `titanium.ttfb`, `titanium.response-delivery`, `titanium.total`).
 
-Usage is read for Anthropic only: from a JSON message's `usage`, or from an event stream's
-`message_start` and final `message_delta`. OpenAI's `prompt_tokens` and `completion_tokens` are not
-mapped, because OpenAI counts cached tokens inside its prompt count and Anthropic does not, so an
-OpenAI response gets `no-usage`.
+Usage is read from Anthropic Messages JSON and streams, and OpenAI Responses JSON and streams.
+Anthropic stream usage folds `message_start` and `message_delta`; OpenAI stream usage uses the
+terminal Responses event. OpenAI Chat Completions `prompt_tokens` and `completion_tokens` are not
+mapped because their cached-token accounting differs from Anthropic's.
+
+When the upstream exposes an identifier, `capture_response.response_message_id` stores the
+Anthropic JSON message ID or `message_start.message.id`, an OpenAI JSON top-level `id`, a Chat
+Completions chunk's top-level `id`, or the nested Responses ID. For Responses streams the last
+terminal event's ID wins. Older `capture.db` files gain this nullable column without losing rows.
 
 The response body is not stored, and neither are response headers. The proxy copies the body as
 it streams past to the client, never holding it back, reads the usage once the response is

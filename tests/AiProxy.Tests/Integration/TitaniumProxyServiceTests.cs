@@ -60,6 +60,10 @@ public sealed class TitaniumProxyServiceTests
         Assert.NotEqual(0, port);
 
         Assert.Equal(0, registrar.RestoreCount);
+        Assert.True(File.Exists(MarkerPath(directory)), "A failed system-proxy set must retain its pre-set snapshot for recovery.");
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.True(marker.PreviousRunDied);
+        Assert.Equal("prior-system-proxy-settings", marker.PreviousSettingsSnapshot);
         var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
         listener.Stop();
@@ -77,7 +81,27 @@ public sealed class TitaniumProxyServiceTests
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["clear", "set", "launch", "restore", "restored"], events);
+        Assert.Equal(["clear", "capture", "set", "launch", "restore", "restored"], events);
+    }
+
+    [Fact]
+    public async Task A_crashed_owner_snapshot_is_restored_before_the_new_proxy_captures_settings()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "exact-prior-settings");
+        }
+
+        var events = new List<string>();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "127.0.0.1:9090" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events));
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["restore-snapshot:exact-prior-settings", "capture", "set", "launch", "restore", "restored"], events);
     }
 
     [Fact]
@@ -120,7 +144,7 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore", "restored"], events);
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
     }
 
@@ -139,7 +163,7 @@ public sealed class TitaniumProxyServiceTests
         var port = service.Address.Port;
         Assert.NotEqual(0, port);
 
-        Assert.Equal(["set", "launch", "restore"], events);
+        Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
         using var reopened = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         new TcpListener(IPAddress.Loopback, port).Start();
@@ -180,7 +204,7 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore", "restored"], events);
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.False(File.Exists(MarkerPath(directory)));
         new TcpListener(IPAddress.Loopback, port).Start();
@@ -199,7 +223,7 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore"], events);
+        Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.True(new FileInfo(MarkerPath(directory)).Length > 0);
         new TcpListener(IPAddress.Loopback, port).Start();
@@ -296,7 +320,32 @@ public sealed class TitaniumProxyServiceTests
 
         public ExplicitProxyEndPoint? EndPoint { get; private set; }
 
+        public string? OwnedEndpoint { get; set; }
+
         public int RestoreCount { get; private set; }
+
+        public string Capture()
+        {
+            events?.Add("capture");
+            return "prior-system-proxy-settings";
+        }
+
+        public bool IsOwned(string endpoint) => endpoint == OwnedEndpoint;
+
+        public bool IsOwned(string endpoint, string snapshot) => endpoint == OwnedEndpoint;
+
+        public Task<bool> RestoreIfOwned(string endpoint, string snapshot)
+        {
+            if (endpoint != OwnedEndpoint)
+            {
+                return Task.FromResult(false);
+            }
+
+            events?.Add($"restore-snapshot:{snapshot}");
+            OwnedEndpoint = null;
+            RestoreCount++;
+            return Task.FromResult(true);
+        }
 
         public void Set(ExplicitProxyEndPoint endPoint)
         {
@@ -307,6 +356,7 @@ public sealed class TitaniumProxyServiceTests
 
             events?.Add("set");
             EndPoint = endPoint;
+            OwnedEndpoint = $"{endPoint.IpAddress}:{endPoint.Port}";
         }
 
         public void Restore()

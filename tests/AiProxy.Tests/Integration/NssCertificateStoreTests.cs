@@ -184,8 +184,17 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         await File.WriteAllTextAsync(scriptPath, script, CancellationToken.None);
         File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RunAsync(scriptPath, [pidPath], cancellationToken: cancellation.Token));
+        using var cancellation = new CancellationTokenSource();
+        var run = RunAsync(scriptPath, [pidPath], cancellationToken: cancellation.Token);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (!File.Exists(pidPath) && !run.IsCompleted && DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(File.Exists(pidPath), "The fixture command did not publish its PID before the timeout.");
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
 
         var childId = int.Parse(await File.ReadAllTextAsync(pidPath, CancellationToken.None));
         Assert.True(HasExited(childId), $"certutil test process {childId} was left running after cancellation.");

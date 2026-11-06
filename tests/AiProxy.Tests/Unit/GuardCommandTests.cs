@@ -31,6 +31,59 @@ public sealed class GuardCommandTests
     }
 
     [Fact]
+    public async Task A_parent_that_died_with_a_snapshot_uses_conditional_restore_under_the_lock()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var owner = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            owner.Write(new IPEndPoint(IPAddress.Loopback, 9090), "previous");
+        }
+
+        var snapshotProvider = new GuardSnapshotProvider { Current = "127.0.0.1:9090" };
+        var recovery = new SystemProxyRecovery(snapshotProvider);
+        var clears = 0;
+
+        var command = new GuardCommand(directory.Path, () =>
+        {
+            clears++;
+            return Task.CompletedTask;
+        }, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned);
+
+        var exitCode = await command.Run(new StringReader(""));
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("previous", snapshotProvider.Restored);
+        Assert.Equal(0, clears);
+        Assert.False(File.Exists(MarkerPath(directory)));
+    }
+
+    [Fact]
+    public async Task A_snapshot_mismatch_keeps_the_marker_for_recovery_retry()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var owner = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            owner.Write(new IPEndPoint(IPAddress.Loopback, 9090), "previous");
+        }
+
+        var command = new GuardCommand(
+            directory.Path,
+            static () => Task.CompletedTask,
+            TimeSpan.Zero,
+            TimeProvider.System,
+            static _ => Task.FromException<bool>(new InvalidOperationException("Restored settings differ from the snapshot.")));
+
+        var exitCode = await command.Run(new StringReader(""));
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("127.0.0.1:9090", marker.PreviousEndpoint);
+        Assert.Equal("previous", marker.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
     public async Task A_marker_that_another_instance_still_holds_is_left_alone_and_nothing_is_cleared()
     {
         using var directory = new TemporaryDirectory();
@@ -76,6 +129,31 @@ public sealed class GuardCommandTests
                 return Task.FromException(exception);
             }
         }, TimeSpan.Zero, TimeProvider.System).Run(new StringReader(""));
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(0, clears);
+        Assert.False(File.Exists(MarkerPath(directory)));
+    }
+
+    [Fact]
+    public async Task A_legacy_crash_marker_does_not_clear_settings_after_an_external_proxy_change()
+    {
+        using var directory = new TemporaryDirectory();
+        await LeaveMarker(directory);
+        var clears = 0;
+
+        var command = new GuardCommand(
+            directory.Path,
+            () =>
+            {
+                clears++;
+                return Task.CompletedTask;
+            },
+            TimeSpan.Zero,
+            TimeProvider.System,
+            isOwned: static _ => false);
+
+        var exitCode = await command.Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
@@ -149,6 +227,31 @@ public sealed class GuardCommandTests
         Directory.CreateDirectory(directory.Path);
         using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
         marker.Write(new IPEndPoint(IPAddress.Loopback, ProxyRuntimeOptions.DefaultPort));
+    }
+
+    private sealed class GuardSnapshotProvider : ISystemProxySnapshotProvider
+    {
+        public string Current { get; set; } = "";
+
+        public string? Restored { get; private set; }
+
+        public string Capture() => Current;
+
+        public bool IsOwned(string endpoint) => string.Equals(Current, endpoint, StringComparison.Ordinal);
+
+        public bool IsOwned(string endpoint, string snapshot) => IsOwned(endpoint);
+
+        public Task<bool> RestoreIfOwned(string endpoint, string snapshot)
+        {
+            if (!string.Equals(Current, endpoint, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+
+            Restored = snapshot;
+            Current = snapshot;
+            return Task.FromResult(true);
+        }
     }
 
     private static async Task<bool> ThrowsAsync(Func<Task> action)

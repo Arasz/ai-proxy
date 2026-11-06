@@ -52,7 +52,10 @@ loading the pfx failed, Titanium silently made a new root and saved it over the 
   `NODE_EXTRA_CA_CERTS` is read once, when a client starts.
 - Adding a provider domain later needs a root rotation: delete `root-ca.pfx` and restart.
   A constrained root that is still valid is kept as it is.
-- On Linux, NSS databases keep the old root until it is removed by hand.
+- When replacing a root on Linux, ai-proxy removes only the matching certificate from existing
+  SQL NSS databases in the shared user store and Firefox profiles. If `certutil` is unavailable
+  or a matching certificate cannot be removed, startup logs the cleanup failure and continues
+  because the new root is already usable.
 
 ## Rejected
 
