@@ -17,7 +17,15 @@ public sealed class RootCertificateAuthorityTests
     {
         var domains = RootCertificateAuthority.PermittedDomains(ProviderHostCatalog.Hosts);
 
-        Assert.Equal(["anthropic.com", "googleapis.com", "openai.com", "openrouter.ai"], domains.Order(StringComparer.Ordinal));
+        Assert.Equal(["anthropic.com", "chatgpt.com", "googleapis.com", "openai.com", "openrouter.ai"], domains.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void A_root_made_before_chatgpt_com_joined_the_catalog_no_longer_permits_exactly_the_catalog_hosts()
+    {
+        using var old = RootCertificateAuthority.Create([.. ProviderHostCatalog.Hosts.Where(static host => host != "chatgpt.com")], Now);
+
+        Assert.False(RootCertificateAuthority.PermitsExactly(old, [.. ProviderHostCatalog.Hosts]));
     }
 
     [Fact]

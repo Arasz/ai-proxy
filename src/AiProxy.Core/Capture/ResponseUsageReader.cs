@@ -4,17 +4,18 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using AiProxy.Core.Json;
+using AiProxy.Core.Providers;
 
 namespace AiProxy.Core.Capture;
 
-/// <summary>Reads Anthropic token usage out of a provider response body as it arrived on the wire.</summary>
+/// <summary>Reads Anthropic Messages and OpenAI Responses token usage out of a provider response body as it arrived on the wire.</summary>
 /// <remarks>Every <c>usage_error</c> value the capture writes is one of the constants here.</remarks>
 public static class ResponseUsageReader
 {
     /// <summary>The error when the body was not valid JSON, or a stream had no usage before a bad event.</summary>
     public const string Malformed = "malformed";
 
-    /// <summary>The error when the body was readable and carried no Anthropic usage.</summary>
+    /// <summary>The error when the body was readable and carried no usage in its dialect's shape.</summary>
     public const string NoUsage = "no-usage";
 
     /// <summary>The error when the body did not decode with its content encoding, or was cut short inside it.</summary>
@@ -38,8 +39,14 @@ public static class ResponseUsageReader
     /// <param name="body">The body bytes, still content-encoded.</param>
     /// <param name="contentType">The response content type; <c>text/event-stream</c> is read as a stream of events.</param>
     /// <param name="contentEncoding">The response content encoding: gzip, deflate, br, identity or none.</param>
-    public static UsageReading Read(ReadOnlyMemory<byte> body, string? contentType, string? contentEncoding)
+    /// <param name="dialect">Anthropic reads Messages usage, OpenAI reads Responses usage, any other dialect has none.</param>
+    public static UsageReading Read(ReadOnlyMemory<byte> body, string? contentType, string? contentEncoding, Dialect dialect = Dialect.Anthropic)
     {
+        if (dialect is not (Dialect.Anthropic or Dialect.OpenAi))
+        {
+            return new UsageReading(null, NoUsage);
+        }
+
         var encoding = contentEncoding?.Trim().ToLowerInvariant();
         ReadOnlyMemory<byte> decoded;
         try
@@ -74,7 +81,7 @@ public static class ResponseUsageReader
 
         try
         {
-            return IsEventStream(contentType) ? ReadStream(decoded) : ReadMessage(decoded);
+            return IsEventStream(contentType) ? ReadStream(decoded, dialect) : ReadMessage(decoded, dialect);
         }
         catch (JsonException)
         {
@@ -87,7 +94,7 @@ public static class ResponseUsageReader
         return contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static UsageReading ReadMessage(ReadOnlyMemory<byte> body)
+    private static UsageReading ReadMessage(ReadOnlyMemory<byte> body, Dialect dialect)
     {
         if (body.Span.Trim(" \t\r\n"u8).IsEmpty)
         {
@@ -95,12 +102,16 @@ public static class ResponseUsageReader
         }
 
         using var document = JsonDocument.Parse(body);
-        var usage = Merge(null, document.RootElement.PropertyOrDefault(UsageJson.Usage));
+        var root = document.RootElement;
+        var usage = dialect == Dialect.OpenAi ? ReadResponse(null, root) : Merge(null, root.PropertyOrDefault(UsageJson.Usage));
         return usage is null ? new UsageReading(null, NoUsage) : new UsageReading(usage, null);
     }
 
-    /// <summary>Folds the usage of <c>message_start</c> and every <c>message_delta</c>; a later non-null count wins.</summary>
-    private static UsageReading ReadStream(ReadOnlyMemory<byte> body)
+    /// <summary>
+    ///     Folds the usage of <c>message_start</c> and every <c>message_delta</c>, or of <c>response.completed</c>
+    ///     for OpenAI; a later non-null count wins.
+    /// </summary>
+    private static UsageReading ReadStream(ReadOnlyMemory<byte> body, Dialect dialect)
     {
         ResponseUsage? usage = null;
         var broken = false;
@@ -119,7 +130,7 @@ public static class ResponseUsageReader
 
             try
             {
-                usage = Fold(usage, data);
+                usage = Fold(usage, data, dialect);
             }
             catch (JsonException)
             {
@@ -136,7 +147,7 @@ public static class ResponseUsageReader
         };
     }
 
-    private static ResponseUsage? Fold(ResponseUsage? usage, ReadOnlyMemory<byte> data)
+    private static ResponseUsage? Fold(ResponseUsage? usage, ReadOnlyMemory<byte> data, Dialect dialect)
     {
         using var document = JsonDocument.Parse(data);
         var root = document.RootElement;
@@ -149,6 +160,11 @@ public static class ResponseUsageReader
         if (!type.IsString)
         {
             throw new JsonException("An event type must be a string.");
+        }
+
+        if (dialect == Dialect.OpenAi)
+        {
+            return type.ValueEquals(UsageJson.ResponseCompleted) ? ReadResponse(usage, root.PropertyOrDefault(UsageJson.Response)) : usage;
         }
 
         if (type.ValueEquals(UsageJson.MessageStart))
@@ -201,6 +217,39 @@ public static class ResponseUsageReader
             output ?? current?.OutputTokens,
             cacheCreation ?? current?.CacheCreationInputTokens,
             cacheRead ?? current?.CacheReadInputTokens);
+    }
+
+    /// <summary>
+    ///     Takes the usage of a Responses <c>response</c> object. OpenAI's input count includes the cached tokens,
+    ///     so the cached ones become the cache-read count and the rest the input count, as Anthropic reports them.
+    /// </summary>
+    private static ResponseUsage? ReadResponse(ResponseUsage? current, JsonElement response)
+    {
+        if (response.StringProperty(UsageJson.Object) != UsageJson.ResponseObject)
+        {
+            return current;
+        }
+
+        var usage = response.PropertyOrDefault(UsageJson.Usage);
+        if (!usage.IsObject)
+        {
+            return current;
+        }
+
+        var input = usage.Int64Property(UsageJson.InputTokens);
+        var output = usage.Int64Property(UsageJson.OutputTokens);
+        var cached = usage.PropertyOrDefault(UsageJson.InputTokensDetails).Int64Property(UsageJson.CachedTokens);
+        if (input is null && output is null && cached is null)
+        {
+            return current;
+        }
+
+        if (cached > input)
+        {
+            throw new JsonException("The cached tokens exceed the input tokens.");
+        }
+
+        return new ResponseUsage(input - (cached ?? 0), output, null, cached);
     }
 
     /// <summary>A gzip body whose trailer does not hold the decoded length was cut short.</summary>

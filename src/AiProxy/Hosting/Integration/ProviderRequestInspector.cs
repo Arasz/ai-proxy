@@ -10,6 +10,7 @@ using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
+using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Hosting.Integration;
@@ -32,6 +33,11 @@ public sealed partial class ProviderRequestInspector(
 {
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
+    /// <summary>The Codex Responses path; a WebSocket upgrade to it on a harness-only host gets 426, so Codex falls back to HTTPS.</summary>
+    public const string CodexResponsesPath = "/backend-api/codex/responses";
+
+    private const string UpgradeRequired = "ai-proxy records this host over HTTPS only; retry without a WebSocket.\n";
+
     /// <summary>Whether capture is on, so the proxy has to time exchanges and hand over each finished response.</summary>
     internal bool CapturesResponses => capture.Keeps;
 
@@ -44,7 +50,21 @@ public sealed partial class ProviderRequestInspector(
         var project = ProjectCredential.Resolve(request.Headers.GetFirstHeader(GainApi.ProjectHeader)?.Value, requestCredential, connectCredential);
         request.Headers.RemoveHeader(GainApi.ProjectHeader);
         request.Headers.RemoveHeader(HeaderNames.ProxyAuthorization);
-        if (providerHosts.Find(request.RequestUri.Host) is not { } dialect || !request.HasBody)
+        var host = request.RequestUri.Host;
+        if (providerHosts.Find(host) is not { } dialect)
+        {
+            return;
+        }
+
+        var recordOnly = providerHosts.IsHarnessOnly(host);
+        if (recordOnly && request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase))
+        {
+            Log.WebSocketRefused(logger, host);
+            e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+            return;
+        }
+
+        if (!request.HasBody)
         {
             return;
         }
@@ -69,11 +89,12 @@ public sealed partial class ProviderRequestInspector(
         exchange.RequestBytes = body.Length;
         exchange.ForwardedBytes = body.Length;
         e.UserData = exchange;
+        var content = Decode(exchange, request, body);
 
         if (capture.Keeps)
         {
             stage = time.GetTimestamp();
-            if (await CaptureAsync(captureId, dialect, request.RequestUri, body))
+            if (await CaptureAsync(captureId, dialect, request.RequestUri, content))
             {
                 exchange.CaptureId = captureId;
                 e.DataReceived += exchange.OnDataReceived;
@@ -83,7 +104,7 @@ public sealed partial class ProviderRequestInspector(
             exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
         }
 
-        if (compression.Compresses)
+        if (compression.Compresses && !recordOnly && content == body)
         {
             var plan = await ccr.DecideAsync(dialect, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
             if (plan.Failure is { } failure)
@@ -113,7 +134,7 @@ public sealed partial class ProviderRequestInspector(
         }
         else
         {
-            await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.Unchanged);
+            await RecordGainAsync(exchange, request.Method, content, content, GainLabels.Rules.Unchanged, passthrough: true);
         }
 
         exchange.Stages.Add("inspector", time.GetElapsedTime(started));
@@ -160,11 +181,9 @@ public sealed partial class ProviderRequestInspector(
         {
             var response = e.HttpClient.Response;
             var stage = time.GetTimestamp();
-            var reading = exchange.Dialect != Dialect.Anthropic
-                ? new UsageReading(null, ResponseUsageReader.NoUsage)
-                : kept.OverCap
-                    ? new UsageReading(null, ResponseUsageReader.OverCap)
-                    : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+            var reading = kept.OverCap
+                ? new UsageReading(null, ResponseUsageReader.OverCap)
+                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value, exchange.Dialect);
             exchange.Stages.Add("usage-read", time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
@@ -332,7 +351,35 @@ public sealed partial class ProviderRequestInspector(
         }
     }
 
-    private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule, int toolCharacters = 0)
+    /// <summary>
+    ///     The body as text for capture and measurement: a zstd body decoded, any other body as sent. A zstd body that
+    ///     does not decode is logged, noted as a gain failure and used as sent.
+    /// </summary>
+    private byte[] Decode(CapturedExchange exchange, Request request, byte[] body)
+    {
+        if (!ZstdRequestBody.IsZstd(request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value))
+        {
+            return body;
+        }
+
+        var stage = time.GetTimestamp();
+        try
+        {
+            return ZstdRequestBody.Decode(body);
+        }
+        catch (InvalidDataException exception)
+        {
+            Log.ZstdDecodeFailed(logger, request.RequestUri.Host, exception);
+            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "zstd", exception.GetType().Name));
+            return body;
+        }
+        finally
+        {
+            exchange.Stages.Add("zstd-decode", time.GetElapsedTime(stage));
+        }
+    }
+
+    private async Task RecordGainAsync(CapturedExchange exchange, string method, byte[] original, byte[] forwarded, string rule, int toolCharacters = 0, bool passthrough = false)
     {
         if (!exchange.IsModelCall)
         {
@@ -343,7 +390,7 @@ public sealed partial class ProviderRequestInspector(
         exchange.GainRule = rule;
         exchange.GainMethod = method;
         exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed or GainLabels.Rules.CcrTool ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
-        exchange.GainPipeline = compression.Compresses ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
+        exchange.GainPipeline = compression.Compresses && !passthrough ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
         exchange.GainAt = time.GetUtcNow();
         try
         {
@@ -390,6 +437,12 @@ public sealed partial class ProviderRequestInspector(
 
         [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "Capturing the response from {ProviderHost} failed; the response was relayed and its numbers are not kept")]
         public static partial void ResponseCaptureFailed(ILogger logger, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1408, Level = LogLevel.Warning, Message = "The zstd body of a request to {ProviderHost} did not decode; it was forwarded as sent and measured undecoded")]
+        public static partial void ZstdDecodeFailed(ILogger logger, string providerHost, Exception exception);
+
+        [LoggerMessage(EventId = 1409, Level = LogLevel.Information, Message = "Answered 426 to a WebSocket upgrade to {ProviderHost}, so the client falls back to HTTPS the proxy can record")]
+        public static partial void WebSocketRefused(ILogger logger, string providerHost);
 
         [LoggerMessage(EventId = 1405, Level = LogLevel.Error, Message = "The CCR thread ledger could not be read for a request to {ProviderHost}; the client was told to retry")]
         public static partial void LedgerLookupFailed(ILogger logger, string providerHost, Exception exception);

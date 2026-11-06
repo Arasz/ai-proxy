@@ -43,6 +43,9 @@ public sealed class DoctorSettings : CommandSettings
 
     internal sealed class Validator : AbstractValidator<DoctorSettings>
     {
+        // The inspection check sends no credential, so a harness-only host would never be decrypted for it.
+        private static readonly string[] InspectedHosts = [.. ProviderHostCatalog.Hosts.Where(static host => !ProviderHostCatalog.IsHarnessOnly(host))];
+
         public Validator()
         {
             ClassLevelCascadeMode = CascadeMode.Stop;
@@ -60,8 +63,8 @@ public sealed class DoctorSettings : CommandSettings
                 .InclusiveBetween(1, 300)
                 .WithMessage("The timeout must be between 1 and 300 seconds.");
             RuleFor(static settings => settings.Host)
-                .Must(static host => ProviderHostCatalog.Hosts.Contains(host))
-                .WithMessage("The host must be one of the provider hosts the proxy inspects: " + string.Join(", ", ProviderHostCatalog.Hosts) + ".");
+                .Must(static host => InspectedHosts.Contains(host))
+                .WithMessage("The host must be one of the provider hosts the proxy inspects: " + string.Join(", ", InspectedHosts) + ".");
         }
 
         public static string? Error(DoctorSettings settings)

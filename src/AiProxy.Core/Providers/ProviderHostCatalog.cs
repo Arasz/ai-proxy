@@ -20,8 +20,11 @@ public static class ProviderHostCatalog
         ["api.anthropic.com"] = Dialect.Anthropic,
         ["generativelanguage.googleapis.com"] = Dialect.Gemini,
         ["openrouter.ai"] = Dialect.OpenAi,
-        ["eu.openrouter.ai"] = Dialect.OpenAi
+        ["eu.openrouter.ai"] = Dialect.OpenAi,
+        ["chatgpt.com"] = Dialect.OpenAi
     };
+
+    private static readonly HashSet<string> HarnessOnly = new(StringComparer.OrdinalIgnoreCase) { "chatgpt.com" };
 
     /// <summary>Every canonical provider host.</summary>
     public static IReadOnlyCollection<string> Hosts { get; } = [.. Providers.Keys];
@@ -31,5 +34,12 @@ public static class ProviderHostCatalog
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         return Providers.TryGetValue(host.TrimEnd('.'), out var dialect) ? dialect : null;
+    }
+
+    /// <summary>Whether the host also serves browsers, so the proxy decrypts it only for traffic that carries an ai-proxy credential.</summary>
+    public static bool IsHarnessOnly(string host)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+        return HarnessOnly.Contains(host.TrimEnd('.'));
     }
 }

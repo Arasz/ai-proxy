@@ -125,6 +125,7 @@ public sealed class DoctorCommandTests
 
     [Theory]
     [InlineData("--host", "example.com", "provider hosts")]
+    [InlineData("--host", "chatgpt.com", "provider hosts")]
     [InlineData("--format", "xml", "text or json")]
     [InlineData("--timeout", "0", "between 1 and 300")]
     [InlineData("--endpoint", "not a url", "absolute HTTP")]

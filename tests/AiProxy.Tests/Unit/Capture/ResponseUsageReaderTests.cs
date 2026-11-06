@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Providers;
 
 namespace AiProxy.Tests.Unit.Capture;
 
@@ -258,6 +259,90 @@ public sealed class ResponseUsageReaderTests
         var reading = ResponseUsageReader.Read("""{"usage":{"input_tokens":"many","output_tokens":3}}"""u8.ToArray(), Json, null);
 
         Assert.Equal(new ResponseUsage(null, 3, null, null), reading.Usage);
+    }
+
+    private const string ResponsesStream = """
+                                           event: response.created
+                                           data: {"type":"response.created","response":{"id":"resp_1","object":"response","status":"in_progress","usage":null}}
+
+                                           event: response.output_text.delta
+                                           data: {"type":"response.output_text.delta","delta":"hi"}
+
+                                           event: response.completed
+                                           data: {"type":"response.completed","response":{"id":"resp_1","object":"response","status":"completed","usage":{"input_tokens":1000,"input_tokens_details":{"cached_tokens":800},"output_tokens":50,"output_tokens_details":{"reasoning_tokens":10},"total_tokens":1050}}}
+
+                                           """;
+
+    private const string ResponsesBody = """
+                                         {"id":"resp_1","object":"response","status":"completed","output":[],"usage":{"input_tokens":1000,"input_tokens_details":{"cached_tokens":800},"output_tokens":50,"output_tokens_details":{"reasoning_tokens":10},"total_tokens":1050}}
+                                         """;
+
+    [Fact]
+    public void A_responses_stream_counts_cached_tokens_as_cache_read_and_only_the_uncached_rest_as_input()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(ResponsesStream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+    }
+
+    [Fact]
+    public void A_responses_json_body_counts_cached_tokens_as_cache_read_and_only_the_uncached_rest_as_input()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(ResponsesBody), Json, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+    }
+
+    [Fact]
+    public void A_responses_usage_without_cached_tokens_counts_all_input_as_uncached()
+    {
+        const string body = """{"object":"response","usage":{"input_tokens":1000,"output_tokens":50}}""";
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(body), Json, null, Dialect.OpenAi);
+
+        Assert.Equal(new ResponseUsage(1000, 50, null, null), reading.Usage);
+    }
+
+    [Fact]
+    public void Responses_cached_tokens_above_input_tokens_are_malformed()
+    {
+        const string body = """{"object":"response","usage":{"input_tokens":10,"input_tokens_details":{"cached_tokens":11},"output_tokens":1}}""";
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(body), Json, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Usage);
+        Assert.Equal("malformed", reading.Error);
+    }
+
+    [Theory]
+    [InlineData(Json, """{"object":"chat.completion","usage":{"input_tokens":100,"prompt_tokens":100,"completion_tokens":2}}""")]
+    [InlineData(Json, MessageBody)]
+    [InlineData(EventStream, Stream)]
+    public void An_openai_body_that_is_not_a_responses_body_is_no_usage(string contentType, string body)
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(body), contentType, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Usage);
+        Assert.Equal("no-usage", reading.Error);
+    }
+
+    [Fact]
+    public void A_responses_stream_read_as_anthropic_is_no_usage()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(ResponsesStream), EventStream, null, Dialect.Anthropic);
+
+        Assert.Null(reading.Usage);
+        Assert.Equal("no-usage", reading.Error);
+    }
+
+    [Fact]
+    public void A_gemini_body_is_no_usage()
+    {
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(MessageBody), Json, null, Dialect.Gemini);
+
+        Assert.Equal(new UsageReading(null, "no-usage"), reading);
     }
 
     private static byte[] Encode(byte[] bytes, string encoding)

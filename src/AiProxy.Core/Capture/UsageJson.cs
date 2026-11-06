@@ -1,6 +1,6 @@
 namespace AiProxy.Core.Capture;
 
-/// <summary>The property names and event types of the usage an Anthropic response carries.</summary>
+/// <summary>The property names and event types of the usage an Anthropic or OpenAI Responses response carries.</summary>
 internal static class UsageJson
 {
     public const string Usage = "usage";
@@ -13,4 +13,11 @@ internal static class UsageJson
 
     public const string MessageStart = "message_start";
     public const string MessageDelta = "message_delta";
+
+    public const string Object = "object";
+    public const string Response = "response";
+    public const string ResponseObject = "response";
+    public const string ResponseCompleted = "response.completed";
+    public const string InputTokensDetails = "input_tokens_details";
+    public const string CachedTokens = "cached_tokens";
 }
