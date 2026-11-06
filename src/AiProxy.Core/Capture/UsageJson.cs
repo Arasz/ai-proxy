@@ -16,9 +16,11 @@ internal static class UsageJson
     public const string MessageDelta = "message_delta";
 
     public const string Object = "object";
+    /// <summary>The JSON object kind emitted by OpenAI Chat Completions stream chunks.</summary>
     public const string ChatCompletionChunk = "chat.completion.chunk";
     public const string Response = "response";
     public const string ResponseObject = "response";
+    public const string ResponseCreated = "response.created";
     public const string ResponseCompleted = "response.completed";
     public const string ResponseIncomplete = "response.incomplete";
     public const string ResponseFailed = "response.failed";

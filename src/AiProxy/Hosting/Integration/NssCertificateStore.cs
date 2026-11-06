@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
@@ -8,6 +9,7 @@ namespace AiProxy.Hosting.Integration;
 internal sealed partial class NssCertificateStore
 {
     private const int CommandTimeoutMilliseconds = 5000;
+    private static readonly string[] TrustedCertutilPaths = ["/usr/bin/certutil", "/usr/sbin/certutil", "/bin/certutil"];
 
     /// <summary>Deletes only certificates whose DER thumbprint matches <paramref name="thumbprint" />.</summary>
     public void Remove(string thumbprint, string homeDirectory)
@@ -29,6 +31,7 @@ internal sealed partial class NssCertificateStore
             throw new InvalidOperationException("certutil is required to remove a replaced proxy root from the user's NSS databases.");
         }
 
+        var deletionFailures = new List<string>();
         foreach (var database in databases)
         {
             foreach (var nickname in Nicknames(database, certutil))
@@ -38,12 +41,25 @@ internal sealed partial class NssCertificateStore
 
                 if (string.Equals(certificate.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase))
                 {
-                    Run(certutil, ["-D", "-d", $"sql:{database}", "-n", nickname]);
+                    try
+                    {
+                        Run(certutil, ["-D", "-d", $"sql:{database}", "-n", nickname]);
+                    }
+                    catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
+                    {
+                        deletionFailures.Add($"{database}, nickname '{nickname}': {exception.Message}");
+                    }
                 }
             }
         }
+
+        if (deletionFailures.Count > 0)
+        {
+            throw new InvalidOperationException($"Could not remove the replaced proxy root from NSS: {string.Join("; ", deletionFailures)}");
+        }
     }
 
+    /// <summary>Finds existing NSS databases in the user's shared store and Firefox profiles.</summary>
     private static IEnumerable<string> Databases(string homeDirectory)
     {
         var candidates = new List<string> { Path.Combine(homeDirectory, ".pki", "nssdb") };
@@ -52,6 +68,7 @@ internal sealed partial class NssCertificateStore
         return candidates.Where(static path => File.Exists(Path.Combine(path, "cert9.db"))).Distinct(StringComparer.Ordinal);
     }
 
+    /// <summary>Finds direct child profile directories that contain an SQL NSS database.</summary>
     private static IEnumerable<string> Profiles(string directory)
     {
         return Directory.Exists(directory)
@@ -59,6 +76,7 @@ internal sealed partial class NssCertificateStore
             : [];
     }
 
+    /// <summary>Lists certificate nicknames in one NSS database.</summary>
     private static IEnumerable<string> Nicknames(string database, string certutil)
     {
         var result = Run(certutil, ["-L", "-d", $"sql:{database}"]);
@@ -73,11 +91,11 @@ internal sealed partial class NssCertificateStore
         }
     }
 
+    /// <summary>Finds certutil only in standard absolute system locations.</summary>
     private static string? FindCertutil()
     {
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
+        foreach (var executable in TrustedCertutilPaths)
         {
-            var executable = Path.Combine(directory, "certutil");
             if (File.Exists(executable))
             {
                 return executable;
@@ -87,6 +105,7 @@ internal sealed partial class NssCertificateStore
         return null;
     }
 
+    /// <summary>Runs certutil with separate arguments and fails on timeout or a nonzero exit code.</summary>
     private static string Run(string executable, IReadOnlyList<string> arguments)
     {
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };

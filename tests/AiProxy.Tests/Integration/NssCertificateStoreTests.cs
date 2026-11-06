@@ -1,24 +1,31 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using AiProxy.Hosting.Integration;
 
 namespace AiProxy.Tests.Integration;
 
+/// <summary>Exercises NSS root cleanup in isolated per-test user databases.</summary>
 public sealed class NssCertificateStoreTests : IAsyncDisposable
 {
     private readonly string _home = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
     private string Database => Path.Combine(_home, ".pki", "nssdb");
+    private string FirefoxDatabase => Path.Combine(_home, ".mozilla", "firefox", "profile.default");
 
+    /// <summary>A missing NSS database stays absent and does not prevent cleanup.</summary>
     [Fact]
     public void Removing_from_a_missing_user_database_is_safe()
     {
         Assert.SkipWhen(!OperatingSystem.IsLinux(), "The NSS user store cleanup runs on Linux.");
 
         new NssCertificateStore().Remove("0000000000000000000000000000000000000000", _home);
+
+        Assert.False(Directory.Exists(Database));
     }
 
+    /// <summary>A corrupt existing NSS database reports the certutil failure.</summary>
     [Fact]
     public async Task A_database_query_failure_is_reported()
     {
@@ -32,13 +39,51 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         Assert.Contains("certutil", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>A failed deletion is reported while cleanup continues in other databases.</summary>
+    [Fact]
+    public async Task A_failed_deletion_is_reported_after_other_databases_are_cleaned()
+    {
+        Assert.SkipWhen(!OperatingSystem.IsLinux(), "The NSS user store cleanup runs on Linux.");
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        Assert.SkipWhen(!await IsAvailableAsync("certutil"), "Install libnss3-tools to run the NSS database test.");
+        Directory.CreateDirectory(Database);
+        Directory.CreateDirectory(FirefoxDatabase);
+        await InitializeDatabaseAsync(Database);
+        await InitializeDatabaseAsync(FirefoxDatabase);
+
+        using var oldRoot = Certificate("old proxy root");
+        var pem = await WritePemAsync(oldRoot, "old-shared.pem");
+        await ImportAsync("old proxy root", pem, Database);
+        await ImportAsync("old proxy root", pem, FirefoxDatabase);
+
+        SetDatabaseReadOnly(Database);
+        try
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => new NssCertificateStore().Remove(oldRoot.Thumbprint!, _home));
+
+            Assert.Contains(Database, error.Message, StringComparison.Ordinal);
+            Assert.Contains("old proxy root", error.Message, StringComparison.Ordinal);
+            Assert.True(await ContainsAsync("old proxy root", Database));
+            Assert.False(await ContainsAsync("old proxy root", FirefoxDatabase));
+        }
+        finally
+        {
+            SetDatabaseWritable(Database);
+        }
+    }
+
+    /// <summary>Only the matching old root is removed from the isolated NSS database.</summary>
     [Fact]
     public async Task Removing_a_replaced_root_from_the_user_database_keeps_unrelated_roots()
     {
         Assert.SkipWhen(!OperatingSystem.IsLinux(), "The NSS user store cleanup runs on Linux.");
         Assert.SkipWhen(!await IsAvailableAsync("certutil"), "Install libnss3-tools to run the NSS database test.");
         Directory.CreateDirectory(Database);
-        await RunAsync("certutil", ["-N", "--empty-password", "-d", $"sql:{Database}"]);
+        await InitializeDatabaseAsync(Database);
 
         using var oldRoot = Certificate("old proxy root");
         using var currentRoot = Certificate("current proxy root");
@@ -46,17 +91,18 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         var oldPem = await WritePemAsync(oldRoot, "old.pem");
         var currentPem = await WritePemAsync(currentRoot, "current.pem");
         var unrelatedPem = await WritePemAsync(unrelated, "unrelated.pem");
-        await ImportAsync("old proxy root", oldPem);
-        await ImportAsync("current proxy root", currentPem);
-        await ImportAsync("unrelated root", unrelatedPem);
+        await ImportAsync("old proxy root", oldPem, Database);
+        await ImportAsync("current proxy root", currentPem, Database);
+        await ImportAsync("unrelated root", unrelatedPem, Database);
 
         new NssCertificateStore().Remove(oldRoot.Thumbprint!, _home);
 
-        Assert.False(await ContainsAsync("old proxy root"));
-        Assert.True(await ContainsAsync("current proxy root"));
-        Assert.True(await ContainsAsync("unrelated root"));
+        Assert.False(await ContainsAsync("old proxy root", Database));
+        Assert.True(await ContainsAsync("current proxy root", Database));
+        Assert.True(await ContainsAsync("unrelated root", Database));
     }
 
+    /// <summary>Removes the isolated user profile after each test.</summary>
     public ValueTask DisposeAsync()
     {
         if (Directory.Exists(_home))
@@ -67,16 +113,25 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    private async Task ImportAsync(string nickname, string pemPath)
+    /// <summary>Creates a passwordless SQL NSS database at the given path.</summary>
+    private static async Task InitializeDatabaseAsync(string database)
     {
-        await RunAsync("certutil", ["-A", "-d", $"sql:{Database}", "-n", nickname, "-t", "CT,C,C", "-i", pemPath]);
+        await RunAsync("certutil", ["-N", "--empty-password", "-d", $"sql:{database}"]);
     }
 
-    private async Task<bool> ContainsAsync(string nickname)
+    /// <summary>Imports one certificate under its test nickname.</summary>
+    private static async Task ImportAsync(string nickname, string pemPath, string database)
     {
-        return await RunAsync("certutil", ["-L", "-d", $"sql:{Database}", "-n", nickname], allowFailure: true) == 0;
+        await RunAsync("certutil", ["-A", "-d", $"sql:{database}", "-n", nickname, "-t", "CT,C,C", "-i", pemPath]);
     }
 
+    /// <summary>Checks whether certutil can find a nickname in one database.</summary>
+    private static async Task<bool> ContainsAsync(string nickname, string database)
+    {
+        return await RunAsync("certutil", ["-L", "-d", $"sql:{database}", "-n", nickname], allowFailure: true) == 0;
+    }
+
+    /// <summary>Writes one test certificate as PEM into the isolated profile.</summary>
     private async Task<string> WritePemAsync(X509Certificate2 certificate, string name)
     {
         var path = Path.Combine(_home, name);
@@ -84,6 +139,7 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         return path;
     }
 
+    /// <summary>Creates a short-lived self-signed test root with the requested subject.</summary>
     private static X509Certificate2 Certificate(string name)
     {
         using var key = RSA.Create(2048);
@@ -91,6 +147,7 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 
+    /// <summary>Checks whether a command can be started and returns a supported help status.</summary>
     private static async Task<bool> IsAvailableAsync(string executable)
     {
         try
@@ -103,7 +160,67 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         }
     }
 
-    private static async Task<int> RunAsync(string executable, IReadOnlyList<string> arguments, bool allowFailure = false)
+    /// <summary>Reaps a child process after cancellation while waiting or draining its output.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Run_async_stops_a_child_when_cancelled_while_it_waits_or_reads_output(bool writesOutput)
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "The cancellation fixture uses a POSIX executable.");
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(_home);
+        var scriptPath = Path.Combine(_home, "slow-command");
+        var pidPath = Path.Combine(_home, "child.pid");
+        var output = writesOutput ? "while :; do printf '%1024s\\n' x; done" : "sleep 30";
+        var script = $$"""
+                     #!/bin/sh
+                     printf '%s\n' "$$" > "$1"
+                     {{output}}
+                     """;
+        await File.WriteAllTextAsync(scriptPath, script, CancellationToken.None);
+        File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RunAsync(scriptPath, [pidPath], cancellationToken: cancellation.Token));
+
+        var childId = int.Parse(await File.ReadAllTextAsync(pidPath, CancellationToken.None));
+        Assert.True(HasExited(childId), $"certutil test process {childId} was left running after cancellation.");
+    }
+
+    [SupportedOSPlatform("linux")]
+    /// <summary>Makes the certificate database itself read-only for a failed-delete fixture.</summary>
+    private static void SetDatabaseReadOnly(string database)
+    {
+        File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead);
+    }
+
+    [SupportedOSPlatform("linux")]
+    /// <summary>Restores database write access so fixture cleanup can remove it.</summary>
+    private static void SetDatabaseWritable(string database)
+    {
+        File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    /// <summary>Checks whether a child PID has exited, including when its process record is gone.</summary>
+    private static bool HasExited(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Runs a test command and reaps it before propagating cancellation.</summary>
+    private static async Task<int> RunAsync(string executable, IReadOnlyList<string> arguments, bool allowFailure = false, CancellationToken cancellationToken = default)
     {
         var start = new ProcessStartInfo(executable) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var argument in arguments)
@@ -112,10 +229,32 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         }
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {executable}.");
-        var stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
-        var stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
-        await Task.WhenAll(stdout, stderr);
+        var token = cancellationToken.CanBeCanceled ? cancellationToken : TestContext.Current.CancellationToken;
+        var stdout = process.StandardOutput.ReadToEndAsync(token);
+        var stderr = process.StandardError.ReadToEndAsync(token);
+        try
+        {
+            await Task.WhenAll(stdout, stderr, process.WaitForExitAsync(token));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(true);
+            }
+
+            await process.WaitForExitAsync(CancellationToken.None);
+            try
+            {
+                await Task.WhenAll(stdout, stderr);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+            }
+
+            throw;
+        }
+
         if (!allowFailure && process.ExitCode != 0)
         {
             throw new InvalidOperationException($"{executable} failed ({process.ExitCode}): {stderr.Result}\n{stdout.Result}");

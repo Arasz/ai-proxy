@@ -141,8 +141,10 @@ public static class ResponseUsageReader
 
             try
             {
-                messageId = ReadStreamMessageId(data, dialect) ?? messageId;
-                usage = Fold(usage, data, dialect);
+                using var document = JsonDocument.Parse(data);
+                var root = document.RootElement;
+                messageId = ReadStreamMessageId(root, dialect) ?? messageId;
+                usage = Fold(usage, root, dialect);
             }
             catch (JsonException)
             {
@@ -159,17 +161,17 @@ public static class ResponseUsageReader
         };
     }
 
-    private static string? ReadStreamMessageId(ReadOnlyMemory<byte> data, Dialect dialect)
+    /// <summary>Reads the identifier carried by one already parsed stream event.</summary>
+    private static string? ReadStreamMessageId(JsonElement root, Dialect dialect)
     {
-        using var document = JsonDocument.Parse(data);
-        var root = document.RootElement;
         var type = root.StringProperty(UsageJson.Type);
         if (dialect == Dialect.Anthropic && type == UsageJson.MessageStart)
         {
             return root.PropertyOrDefault(UsageJson.Message).StringProperty(UsageJson.Id);
         }
 
-        if (dialect == Dialect.OpenAi && type == UsageJson.ResponseCompleted)
+        if (dialect == Dialect.OpenAi &&
+            type is UsageJson.ResponseCreated or UsageJson.ResponseCompleted or UsageJson.ResponseIncomplete or UsageJson.ResponseFailed)
         {
             return root.PropertyOrDefault(UsageJson.Response).StringProperty(UsageJson.Id);
         }
@@ -182,10 +184,9 @@ public static class ResponseUsageReader
         return null;
     }
 
-    private static ResponseUsage? Fold(ResponseUsage? usage, ReadOnlyMemory<byte> data, Dialect dialect)
+    /// <summary>Folds usage from one already parsed stream event into the counts read so far.</summary>
+    private static ResponseUsage? Fold(ResponseUsage? usage, JsonElement root, Dialect dialect)
     {
-        using var document = JsonDocument.Parse(data);
-        var root = document.RootElement;
         var type = root.PropertyOrDefault(UsageJson.Type);
         if (type.IsMissing)
         {

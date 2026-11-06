@@ -77,6 +77,8 @@ public sealed class ResponseUsageReaderTests
     public void An_openai_stream_uses_the_last_completed_response_id()
     {
         const string stream = """
+                            data: {"type":"response.created","response":{"id":"resp_created","object":"response"}}
+
                             data: {"type":"response.completed","response":{"object":"response","id":"resp_old","usage":{"input_tokens":1,"output_tokens":1}}}
 
                             data: {"type":"response.completed","response":{"object":"response","id":"resp_final","usage":{"input_tokens":2,"output_tokens":2}}}
@@ -88,6 +90,7 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal("resp_final", reading.MessageId);
     }
 
+    /// <summary>Reads the shared top-level ID on streamed Chat Completions chunks.</summary>
     [Fact]
     public void An_openai_chat_completions_stream_keeps_its_chunk_id()
     {
@@ -101,6 +104,23 @@ public sealed class ResponseUsageReaderTests
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
 
         Assert.Equal("chatcmpl_stream_1", reading.MessageId);
+    }
+
+    /// <summary>Uses response.created as the ID fallback when a terminal event was cut.</summary>
+    [Fact]
+    public void A_cut_responses_terminal_keeps_the_created_id_when_its_terminal_id_is_unreadable()
+    {
+        const string stream = """
+                            data: {"type":"response.created","response":{"id":"resp_created","object":"response","status":"in_progress"}}
+
+                            :ai-proxy-cut-terminal data: {"type":"response.completed","response":{"usage":{"input_tokens":21,"output_tokens":4}}}
+
+                            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal("resp_created", reading.MessageId);
+        Assert.Equal(new ResponseUsage(21, 4, null, null), reading.Usage);
     }
 
     [Theory]
@@ -350,6 +370,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Fact]
@@ -359,6 +380,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Theory]
@@ -372,6 +394,7 @@ public sealed class ResponseUsageReaderTests
 
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+        Assert.Equal("resp_1", reading.MessageId);
     }
 
     [Fact]
@@ -397,7 +420,7 @@ public sealed class ResponseUsageReaderTests
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
 
-        Assert.Equal(new UsageReading(null, "no-usage"), reading);
+        Assert.Equal(new UsageReading(null, "no-usage", "resp_1"), reading);
     }
 
     [Fact]

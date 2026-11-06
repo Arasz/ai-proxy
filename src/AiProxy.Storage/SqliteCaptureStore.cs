@@ -214,6 +214,7 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         EnsureResponseMessageIdColumn(connection);
     }
 
+    /// <summary>Adds the response identifier column once without discarding rows written by earlier versions.</summary>
     private static void EnsureResponseMessageIdColumn(SqliteConnection connection)
     {
         connection.Execute("BEGIN IMMEDIATE", commandTimeout: ContentSchema.RequestCommandTimeoutSeconds);
@@ -227,9 +228,18 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
 
             connection.Execute("COMMIT");
         }
-        catch
+        catch (Exception migrationFailure)
         {
-            connection.Execute("ROLLBACK");
+            try
+            {
+                connection.Execute("ROLLBACK");
+            }
+            catch (Exception rollbackFailure)
+            {
+                // Retain the cleanup error without replacing the migration failure.
+                migrationFailure.Data["CaptureSchemaMigration.RollbackFailure"] = rollbackFailure;
+            }
+
             throw;
         }
     }
