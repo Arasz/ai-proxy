@@ -479,6 +479,36 @@ public sealed class RequestCaptureTests : IDisposable
     }
 
     [Fact]
+    public async Task An_openai_responses_stream_records_its_completed_usage_with_cached_tokens_as_cache_read()
+    {
+        const string events = """
+                              event: response.created
+                              data: {"type":"response.created","response":{"object":"response","usage":null}}
+
+                              event: response.completed
+                              data: {"type":"response.completed","response":{"object":"response","usage":{"input_tokens":1000,"input_tokens_details":{"cached_tokens":800},"output_tokens":50,"total_tokens":1050}}}
+
+
+                              """;
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = static (_, context) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            return context.Response.WriteAsync(events);
+        };
+        await using var proxy = await ProxyHost.StartAsync(
+            new Dictionary<string, string> { ["Proxy:Capture"] = "true" },
+            providerHosts: new LoopbackProviderHosts(Dialect.OpenAi));
+
+        using var response = await SendAsync(proxy, upstream, [.. """{"model":"m"}"""u8]);
+        await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        var row = Assert.Single(await ReadResponsesAsync(proxy));
+        Assert.Null(row.UsageError);
+        Assert.Equal((200L, 50L, (long?)null, 800L), (row.InputTokens, row.OutputTokens, row.CacheCreationInputTokens, row.CacheReadInputTokens));
+    }
+
+    [Fact]
     public async Task An_error_status_still_gets_a_row_with_the_status_and_no_usage()
     {
         const string error = """{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}""";
@@ -857,9 +887,9 @@ public sealed class RequestCaptureTests : IDisposable
     /// <summary>Treats one host as a provider and every other host as pass-through traffic.</summary>
     private sealed class SingleProviderHost(string host, Dialect dialect) : IProviderHosts
     {
-        public Dialect? Find(string candidate)
+        public ProviderHost? Find(string candidate)
         {
-            return string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? dialect : null;
+            return string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? new ProviderHost(dialect, HarnessOnly: false) : null;
         }
 
         public IReadOnlyCollection<string> Hosts { get; } = [host];

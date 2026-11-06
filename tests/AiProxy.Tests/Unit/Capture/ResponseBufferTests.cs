@@ -1,5 +1,6 @@
 using System.Text;
 using AiProxy.Core.Capture;
+using AiProxy.Core.Providers;
 
 namespace AiProxy.Tests.Unit.Capture;
 
@@ -104,6 +105,48 @@ public sealed class ResponseBufferTests
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
     }
 
+    [Theory]
+    [InlineData("response.completed")]
+    [InlineData("response.incomplete")]
+    [InlineData("response.failed")]
+    public void A_responses_terminal_event_longer_than_the_tail_that_starts_after_the_head_still_gives_its_usage(string type)
+    {
+        var stream = Encoding.UTF8.GetBytes(ResponsesStream(type, 3 * ResponseBuffer.TailBytes));
+        var terminalStart = Encoding.UTF8.GetString(stream).IndexOf($"event: {type}", StringComparison.Ordinal);
+        Assert.True(terminalStart > ResponseBuffer.HeadBytes, "the terminal event must start after the head window");
+        Assert.True(stream.Length - terminalStart > ResponseBuffer.TailBytes, "the terminal event must be longer than the tail window");
+        var buffer = ResponseBuffer.For(EventStream, null);
+
+        Append(buffer, stream, 4093);
+
+        Assert.True(buffer.Body.Length <= ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes + 64, $"kept {buffer.Body.Length} bytes");
+        var reading = ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.OpenAi);
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
+    }
+
+    [Fact]
+    public void A_cut_responses_event_that_is_not_terminal_gives_no_usage()
+    {
+        var stream = Encoding.UTF8.GetBytes(ResponsesStream("response.in_progress", 3 * ResponseBuffer.TailBytes));
+        var buffer = ResponseBuffer.For(EventStream, null);
+
+        Append(buffer, stream, 4093);
+
+        Assert.Equal(new UsageReading(null, ResponseUsageReader.NoUsage), ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.OpenAi));
+    }
+
+    [Fact]
+    public void A_cut_anthropic_line_is_still_dropped_even_when_it_ends_in_a_responses_usage()
+    {
+        var stream = Encoding.UTF8.GetBytes(ResponsesStream("response.completed", 3 * ResponseBuffer.TailBytes));
+        var buffer = ResponseBuffer.For(EventStream, null);
+
+        Append(buffer, stream, 4093);
+
+        Assert.Equal(ResponseUsageReader.NoUsage, ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.Anthropic).Error);
+    }
+
     [Fact]
     public void A_released_buffer_holds_nothing()
     {
@@ -121,6 +164,25 @@ public sealed class ResponseBufferTests
         {
             buffer.Append(bytes.AsSpan(offset, Math.Min(chunk, bytes.Length - offset)));
         }
+    }
+
+    /// <summary>A Responses stream: deltas past the head window, then one event of <paramref name="type" /> whose output is <paramref name="outputBytes" /> long and whose usage comes last.</summary>
+    private static string ResponsesStream(string type, int outputBytes)
+    {
+        var text = new StringBuilder();
+        text.Append("event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"object\":\"response\",\"usage\":null}}\n\n");
+        var index = 0;
+        while (text.Length < ResponseBuffer.HeadBytes * 2)
+        {
+            text.Append("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"word ").Append(index++).Append("\"}\n\n");
+        }
+
+        var output = string.Concat(Enumerable.Repeat("a \\\"usage\\\":{} word ", outputBytes / 20));
+        text.Append("event: ").Append(type).Append("\ndata: {\"type\":\"").Append(type)
+            .Append("\",\"response\":{\"object\":\"response\",\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"")
+            .Append(output)
+            .Append("\"}]}],\"usage\":{\"input_tokens\":1000,\"input_tokens_details\":{\"cached_tokens\":800},\"output_tokens\":50,\"output_tokens_details\":{\"reasoning_tokens\":10},\"total_tokens\":1050},\"user\":null,\"metadata\":{}}}\n\n");
+        return text.ToString();
     }
 
     private static string Stream(int events)

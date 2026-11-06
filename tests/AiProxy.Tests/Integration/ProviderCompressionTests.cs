@@ -144,9 +144,9 @@ public sealed class ProviderCompressionTests : IDisposable
 /// <summary>Treats loopback hosts as a provider, so a local upstream stands in for a provider API.</summary>
 internal sealed class LoopbackProviderHosts(Dialect dialect) : IProviderHosts
 {
-    public Dialect? Find(string host)
+    public ProviderHost? Find(string host)
     {
-        return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? dialect : null;
+        return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(dialect, HarnessOnly: false) : null;
     }
 
     public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];

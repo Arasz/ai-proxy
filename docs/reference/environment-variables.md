@@ -19,11 +19,16 @@ opaque tunnel.
 | Anthropic | `api.anthropic.com` | [data residency](https://platform.claude.com/docs/en/manage-claude/data-residency) |
 | Google Gemini | `generativelanguage.googleapis.com` | [API reference](https://ai.google.dev/api) |
 | OpenRouter | `openrouter.ai`, `eu.openrouter.ai` | [quickstart](https://openrouter.ai/docs/quickstart) |
+| ChatGPT (Codex sign-in) | `chatgpt.com`, harness only | [ADR 0012](../adr/0012-record-codex-chatgpt-subscription-traffic.md) |
 
 Hosts match exactly; there is no subdomain wildcard. A wildcard on `openrouter.ai` would also
 decrypt `mcp.openrouter.ai`, which is an MCP server and not the chat API. Anthropic picks a
 region with the `inference_geo` request field, so it has no regional host. The list was checked
 against each provider's documentation on 2026-10-24.
+
+`chatgpt.com` is harness only: the proxy decrypts it only when the CONNECT carries the
+`ai-proxy harness` credential, answers a WebSocket upgrade to `/backend-api/codex/responses`
+with 426 so Codex uses HTTPS, and records requests without changing them.
 
 ai-proxy sets the current user's system HTTP and HTTPS proxy to `127.0.0.1:8080` (or the port in `PROXY__PORT`) while it
 runs, then restores the prior settings at shutdown. It creates a per-user root certificate

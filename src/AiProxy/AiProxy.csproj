@@ -53,6 +53,7 @@
         <PackageReference Include="Spectre.Console"/>
         <PackageReference Include="Spectre.Console.Cli"/>
         <PackageReference Include="Titanium.Web.Proxy"/>
+        <PackageReference Include="ZstdSharp.Port"/>
     </ItemGroup>
 
 </Project>

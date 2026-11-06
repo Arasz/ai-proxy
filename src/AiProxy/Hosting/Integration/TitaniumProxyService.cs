@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mime;
+using AiProxy.Core.Gain;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
@@ -381,12 +382,15 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         e.TerminateSession();
     }
 
+    /// <summary>Decrypts a provider host; a harness-only host only when the CONNECT carries an ai-proxy credential.</summary>
     private Task BeforeTunnelConnectRequestAsync(object sender, TunnelConnectSessionEventArgs e)
     {
-        var authority = e.HttpClient.ConnectRequest?.Host;
-        e.DecryptSsl = !string.IsNullOrWhiteSpace(authority) &&
-                       Uri.TryCreate($"https://{authority}", UriKind.Absolute, out var address) &&
-                       _providerHosts.Find(address.Host) is not null;
+        var connect = e.HttpClient.ConnectRequest;
+        e.DecryptSsl = !string.IsNullOrWhiteSpace(connect?.Host) &&
+                       Uri.TryCreate($"https://{connect.Host}", UriKind.Absolute, out var address) &&
+                       _providerHosts.Find(address.Host) is { } provider &&
+                       (!provider.HarnessOnly ||
+                        ProjectCredential.Read(connect.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null);
         return Task.CompletedTask;
     }
 

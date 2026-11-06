@@ -2,12 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using AiProxy.Core.Gain;
 using AiProxy.Core.Providers;
 using Microsoft.Extensions.DependencyInjection;
+using static AiProxy.Tests.Integration.TunnelClient;
 using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
 namespace AiProxy.Tests.Integration;
@@ -15,11 +15,7 @@ namespace AiProxy.Tests.Integration;
 /// <summary>A proxy credential names the project of provider traffic and never reaches an origin.</summary>
 public sealed class ProxyCredentialAttributionTests
 {
-    private const string ProxyAuthorization = "Proxy-Authorization";
     private const string Body = """{"messages":[]}""";
-
-    private static string Credential(string project) =>
-        "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{GainApi.ProxyUser}:{project}"));
 
     private static async Task<string?> OnlyProjectAsync(ProxyHost proxy)
     {
@@ -224,72 +220,5 @@ public sealed class ProxyCredentialAttributionTests
         var report = await ReportAsync(proxy);
         Assert.Empty(report.History);
         Assert.Equal(new GainOtherTraffic(0, 0), report.OtherTraffic);
-    }
-
-    private static async Task<byte[]> ReadOriginAsync(TcpListener origin, CancellationToken token)
-    {
-        using var client = await origin.AcceptTcpClientAsync(token);
-        var buffer = new byte[4096];
-        var read = await client.GetStream().ReadAsync(buffer, token);
-        return buffer[..read];
-    }
-
-    private static async ValueTask<Stream> ConnectThroughAsync(Uri proxy, DnsEndPoint target, string credential, CancellationToken token)
-    {
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-        await socket.ConnectAsync(new IPEndPoint(IPAddress.Parse(proxy.Host), proxy.Port), token);
-        var stream = new NetworkStream(socket, true);
-        var connect = $"CONNECT {target.Host}:{target.Port} HTTP/1.1\r\nHost: {target.Host}:{target.Port}\r\n{ProxyAuthorization}: {credential}\r\n\r\n";
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(connect), token);
-        using var headTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        headTimeout.CancelAfter(TimeSpan.FromSeconds(10));
-        token = headTimeout.Token;
-        var head = new StringBuilder();
-        var one = new byte[1];
-        while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
-        {
-            if (await stream.ReadAsync(one, token) == 0)
-            {
-                throw new IOException("The proxy closed the tunnel request.");
-            }
-
-            head.Append((char)one[0]);
-        }
-
-        Assert.StartsWith("HTTP/1.1 200", head.ToString(), StringComparison.Ordinal);
-        return stream;
-    }
-
-    private static bool ChainsTo(X509Certificate2 root, X509Certificate2? certificate, SslPolicyErrors errors)
-    {
-        if (certificate is null || (errors & ~SslPolicyErrors.RemoteCertificateChainErrors) != SslPolicyErrors.None)
-        {
-            return false;
-        }
-
-        using var chain = new X509Chain();
-        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-        chain.ChainPolicy.CustomTrustStore.Add(root);
-        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-        return chain.Build(certificate);
-    }
-
-    private static X509Certificate2 LoadProxyRoot(string dataDirectory)
-    {
-        using var withKey = X509CertificateLoader.LoadPkcs12FromFile(
-            Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName),
-            File.ReadAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName)));
-        return X509CertificateLoader.LoadCertificate(withKey.RawData);
-    }
-
-    private static X509Certificate2 CreateUpstreamCertificate()
-    {
-        using var key = RSA.Create(2048);
-        var request = new CertificateRequest("CN=127.0.0.1", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        var names = new SubjectAlternativeNameBuilder();
-        names.AddIpAddress(IPAddress.Loopback);
-        request.CertificateExtensions.Add(names.Build());
-        using var created = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
-        return X509CertificateLoader.LoadPkcs12(created.Export(X509ContentType.Pfx), null);
     }
 }
