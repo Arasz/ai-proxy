@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 
@@ -13,27 +12,33 @@ internal sealed partial class NssCertificateStore
     /// <summary>Deletes only certificates whose DER thumbprint matches <paramref name="thumbprint" />.</summary>
     public void Remove(string thumbprint, string homeDirectory)
     {
-        if (!OperatingSystem.IsLinux() || !File.Exists(FindCertutil()))
+        if (!OperatingSystem.IsLinux())
         {
             return;
         }
 
-        foreach (var database in Databases(homeDirectory))
+        var databases = Databases(homeDirectory).ToArray();
+        if (databases.Length == 0)
         {
-            foreach (var nickname in Nicknames(database))
-            {
-                var exported = Run(FindCertutil(), ["-L", "-d", $"sql:{database}", "-n", nickname, "-a"]);
-                if (exported.ExitCode != 0 || !TryLoadCertificate(exported.Output, out var certificate) || certificate is null)
-                {
-                    continue;
-                }
+            return;
+        }
 
-                using (certificate)
+        var certutil = FindCertutil();
+        if (certutil is null)
+        {
+            throw new InvalidOperationException("certutil is required to remove a replaced proxy root from the user's NSS databases.");
+        }
+
+        foreach (var database in databases)
+        {
+            foreach (var nickname in Nicknames(database, certutil))
+            {
+                var exported = Run(certutil, ["-L", "-d", $"sql:{database}", "-n", nickname, "-a"]);
+                using var certificate = X509Certificate2.CreateFromPem(exported);
+
+                if (string.Equals(certificate.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(certificate.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Run(FindCertutil(), ["-D", "-d", $"sql:{database}", "-n", nickname], requireSuccess: true);
-                    }
+                    Run(certutil, ["-D", "-d", $"sql:{database}", "-n", nickname]);
                 }
             }
         }
@@ -54,15 +59,11 @@ internal sealed partial class NssCertificateStore
             : [];
     }
 
-    private static IEnumerable<string> Nicknames(string database)
+    private static IEnumerable<string> Nicknames(string database, string certutil)
     {
-        var result = Run(FindCertutil(), ["-L", "-d", $"sql:{database}"]);
-        if (result.ExitCode != 0)
-        {
-            yield break;
-        }
+        var result = Run(certutil, ["-L", "-d", $"sql:{database}"]);
 
-        foreach (var line in result.Output.Split('\n'))
+        foreach (var line in result.Split('\n'))
         {
             var match = NicknameRow().Match(line.TrimEnd('\r'));
             if (match.Success)
@@ -72,21 +73,7 @@ internal sealed partial class NssCertificateStore
         }
     }
 
-    private static bool TryLoadCertificate(string pem, out X509Certificate2? certificate)
-    {
-        try
-        {
-            certificate = X509Certificate2.CreateFromPem(pem);
-            return true;
-        }
-        catch (CryptographicException)
-        {
-            certificate = null;
-            return false;
-        }
-    }
-
-    private static string FindCertutil()
+    private static string? FindCertutil()
     {
         foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
         {
@@ -97,10 +84,10 @@ internal sealed partial class NssCertificateStore
             }
         }
 
-        return "certutil";
+        return null;
     }
 
-    private static (int ExitCode, string Output) Run(string executable, IReadOnlyList<string> arguments, bool requireSuccess = false)
+    private static string Run(string executable, IReadOnlyList<string> arguments)
     {
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments)
@@ -111,7 +98,7 @@ internal sealed partial class NssCertificateStore
         using var process = Process.Start(start);
         if (process is null)
         {
-            return (-1, string.Empty);
+            throw new InvalidOperationException("certutil could not be started.");
         }
 
         var output = process.StandardOutput.ReadToEndAsync();
@@ -120,16 +107,16 @@ internal sealed partial class NssCertificateStore
         {
             process.Kill(true);
             process.WaitForExit();
-            return (-1, string.Empty);
+            throw new InvalidOperationException("certutil did not finish within five seconds.");
         }
 
         Task.WaitAll(output, error);
-        if (requireSuccess && process.ExitCode != 0)
+        if (process.ExitCode != 0)
         {
             throw new InvalidOperationException($"certutil failed ({process.ExitCode}): {error.Result}");
         }
 
-        return (process.ExitCode, output.Result);
+        return output.Result;
     }
 
     [GeneratedRegex(@"^(?<name>.+?)\s{2,}[A-Za-z,]{3,}$")]

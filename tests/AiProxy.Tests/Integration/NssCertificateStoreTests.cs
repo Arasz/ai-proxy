@@ -20,6 +20,19 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_database_query_failure_is_reported()
+    {
+        Assert.SkipWhen(!OperatingSystem.IsLinux(), "The NSS user store cleanup runs on Linux.");
+        Assert.SkipWhen(!await IsAvailableAsync("certutil"), "Install libnss3-tools to run the NSS database test.");
+        Directory.CreateDirectory(Database);
+        await File.WriteAllTextAsync(Path.Combine(Database, "cert9.db"), "not an NSS database", TestContext.Current.CancellationToken);
+
+        var error = Assert.Throws<InvalidOperationException>(() => new NssCertificateStore().Remove("0000000000000000000000000000000000000000", _home));
+
+        Assert.Contains("certutil", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Removing_a_replaced_root_from_the_user_database_keeps_unrelated_roots()
     {
         Assert.SkipWhen(!OperatingSystem.IsLinux(), "The NSS user store cleanup runs on Linux.");

@@ -16,6 +16,7 @@ internal static class UsageJson
     public const string MessageDelta = "message_delta";
 
     public const string Object = "object";
+    public const string ChatCompletionChunk = "chat.completion.chunk";
     public const string Response = "response";
     public const string ResponseObject = "response";
     public const string ResponseCompleted = "response.completed";

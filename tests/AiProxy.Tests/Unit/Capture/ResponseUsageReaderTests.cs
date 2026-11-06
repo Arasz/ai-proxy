@@ -88,6 +88,21 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal("resp_final", reading.MessageId);
     }
 
+    [Fact]
+    public void An_openai_chat_completions_stream_keeps_its_chunk_id()
+    {
+        const string stream = """
+                            data: {"id":"chatcmpl_stream_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant"}}]}
+
+                            data: {"id":"chatcmpl_stream_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hello"}}]}
+
+                            """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Equal("chatcmpl_stream_1", reading.MessageId);
+    }
+
     [Theory]
     [InlineData("{\"id\":\"chatcmpl_123\",\"choices\":[]}", Dialect.OpenAi, "chatcmpl_123")]
     [InlineData("{\"object\":\"response\",\"id\":\"resp_123\",\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}", Dialect.OpenAi, "resp_123")]

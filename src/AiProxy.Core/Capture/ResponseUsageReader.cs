@@ -174,6 +174,11 @@ public static class ResponseUsageReader
             return root.PropertyOrDefault(UsageJson.Response).StringProperty(UsageJson.Id);
         }
 
+        if (dialect == Dialect.OpenAi && root.StringProperty(UsageJson.Object) == UsageJson.ChatCompletionChunk)
+        {
+            return root.StringProperty(UsageJson.Id);
+        }
+
         return null;
     }
 
