@@ -32,6 +32,38 @@ public sealed class GainViewTests
     }
 
     [Fact]
+    public async Task Gain_prints_one_block_per_harness_with_other_traffic_under_other()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with
+        {
+            OtherTraffic = new GainOtherTraffic(179, 123_456),
+            Harnesses = [new GainAttribution("harness", "claude", new GainTotals(Requests: 7001)), new GainAttribution("harness", "codex", new GainTotals(Requests: 7002))]
+        };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        var output = fixture.Console.Output;
+        var positions = new[] { "-claude---", "7,001", "-codex---", "7,002", "-other---", "Other traffic: 179 requests" }.Select(text => output.IndexOf(text, StringComparison.Ordinal)).ToArray();
+        Assert.DoesNotContain(-1, positions);
+        Assert.Equal(positions.Order(), positions);
+    }
+
+    [Fact]
+    public async Task A_proxy_that_sends_no_harness_totals_still_gets_the_single_summary()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        fixture.Console.Profile.Width = 240;
+        fixture.Handler.Report = fixture.Handler.Report with { OtherTraffic = new GainOtherTraffic(1, 2), Harnesses = null };
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
+
+        Assert.Contains("Saved %", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("-other-", fixture.Console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Other_traffic_is_shown_apart_from_the_savings_row_in_the_table_and_appended_to_csv_and_json()
     {
         using var fixture = new GainCommandTests.Fixture();

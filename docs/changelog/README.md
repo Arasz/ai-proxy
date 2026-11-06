@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.28.0](0.28.0-gain-per-harness-and-aph.md) | `ai-proxy gain` shows a block per harness, and `ai-proxy shortcut` adds an `aph` command. | [#119](https://github.com/Arasz/ai-proxy/pull/119) |
 | [0.27.3](0.27.3-chatgpt-http11.md) | Decrypted `chatgpt.com` tunnels use HTTP/1.1, so upstream errors reach Codex instead of an HTTP/2 frame error. | [#118](https://github.com/Arasz/ai-proxy/pull/118) |
 | [0.27.2](0.27.2-harness-forwards-arguments.md) | `ai-proxy harness <executable>` forwards arguments without `--`, so `ai-proxy harness claude --resume <id>` works. | [#117](https://github.com/Arasz/ai-proxy/pull/117) |
 | [0.27.1](0.27.1-certificate-store-warnings.md) | Expected macOS certificate store failures are one-line warnings, and a replaced root that cannot be removed no longer stops the start. | [#116](https://github.com/Arasz/ai-proxy/pull/116) |

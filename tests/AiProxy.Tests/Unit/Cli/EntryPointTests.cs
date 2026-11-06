@@ -37,6 +37,7 @@ public sealed class EntryPointTests
     [Theory]
     [InlineData("gain")]
     [InlineData("stop")]
+    [InlineData("shortcut")]
     [InlineData("status")]
     [InlineData("status|-f|json")]
     [InlineData("stop|--data-directory|x")]

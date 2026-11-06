@@ -89,6 +89,9 @@ public sealed record GainHistoryEntry(
 /// <summary>Totals assigned once within one attribution dimension.</summary>
 public sealed record GainAttribution(string Dimension, string Name, GainTotals Totals);
 
+/// <summary>The totals of one provider; a null provider is one the ledger does not know.</summary>
+public sealed record GainProviderTotals(string? Provider, GainTotals Totals);
+
 /// <summary>The method, rule, layer and pipeline an event is attributed to.</summary>
 public sealed record GainPath(string Method, string Rule, string Layer, string Pipeline);
 
@@ -118,7 +121,7 @@ public sealed record GainRecall(
 /// <summary>Whether this release measures a requested feature.</summary>
 public sealed record GainCapability(string Name, bool Supported, string? Reason = null);
 
-/// <summary>The same filtered statistics consumed by every frontend; <c>OtherTraffic</c> is null only in a report from a proxy that predates other-traffic counting.</summary>
+/// <summary>The same filtered statistics consumed by every frontend; <c>OtherTraffic</c> and <c>Harnesses</c> are null only in a report from a proxy that predates other-traffic counting.</summary>
 public sealed record GainReport(
     int SchemaVersion,
     DateTimeOffset GeneratedAt,
@@ -133,7 +136,8 @@ public sealed record GainReport(
     IReadOnlyList<GainFailure> Failures,
     IReadOnlyList<GainRecall> Recalls,
     IReadOnlyList<GainCapability> Capabilities,
-    GainOtherTraffic? OtherTraffic = null);
+    GainOtherTraffic? OtherTraffic = null,
+    IReadOnlyList<GainAttribution>? Harnesses = null);
 
 /// <summary>The number of metadata rows reset through the server snapshot cutoff.</summary>
 public sealed record GainResetResult(long Removed, DateTimeOffset Cutoff);

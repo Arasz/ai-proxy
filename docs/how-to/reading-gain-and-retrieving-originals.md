@@ -14,6 +14,13 @@ by rebinding a domain name. Set `AllowedHosts` if you move it to another address
 
 ## See what the proxy saved
 
+`ai-proxy gain` prints one block per harness: `claude`, `codex` and `other`. The harness comes from
+the provider, because the ledger does not record the client: Anthropic is `claude`, OpenAI is
+`codex`, and everything else is `other`. A script calling the Anthropic API therefore counts as
+`claude`. A retrieval with no known provider also lands in `other`, so that block can show recalls
+with zero requests. `other` also lists non-model traffic such as telemetry. `--format json` has the
+same split in `harnesses`, next to the overall `summary`.
+
 ```bash
 ai-proxy gain                 # summary
 ai-proxy gain --daily         # UTC days; --weekly starts on Monday, --monthly, --all

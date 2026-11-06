@@ -17,7 +17,7 @@ public sealed class CliApplication(GainRuntime runtime)
 
     private static readonly FrozenSet<string> Commands = new[]
     {
-        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, McpServerProcess.Command, HarnessProcess.Command
+        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, ShortcutCommand.Command, McpServerProcess.Command, HarnessProcess.Command
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static bool IsCommandInvocation(string[] args)
@@ -99,6 +99,9 @@ public sealed class CliApplication(GainRuntime runtime)
             config.AddCommand<StopCommand>(StopCommand.Command)
                 .WithData(runtime)
                 .WithDescription("Gracefully stop the running proxy instance.");
+            config.AddCommand<ShortcutCommand>(ShortcutCommand.Command)
+                .WithData(runtime)
+                .WithDescription("Create or remove the aph shortcut for ai-proxy harness.");
             config.AddCommand<McpCommand>(McpServerProcess.Command)
                 .WithDescription("Run the retrieval MCP server over stdio.");
             var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)

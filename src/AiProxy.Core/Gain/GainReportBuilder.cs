@@ -11,6 +11,15 @@ public static class GainReportBuilder
         new("layer", static path => path.Layer), new("pipeline", static path => path.Pipeline)
     ];
 
+    /// <summary>Merges provider totals into one row per harness, always in <see cref="GainHarness.Names"/> order.</summary>
+    public static IReadOnlyList<GainAttribution> Harnesses(IEnumerable<GainProviderTotals> rows)
+    {
+        var byHarness = rows.ToLookup(static row => GainHarness.Of(row.Provider), static row => row.Totals, StringComparer.Ordinal);
+        return GainHarness.Names.Where(byHarness.Contains)
+            .Select(name => new GainAttribution(GainHarness.Dimension, name, Sum(byHarness[name])))
+            .ToArray();
+    }
+
     public static long Tokens(long characters)
     {
         return (long)(characters / CharactersPerToken);

@@ -8,29 +8,22 @@ namespace AiProxy.Cli;
 /// <summary>Renders server-computed statistics without recomputing accounting.</summary>
 public sealed class GainView
 {
+    private const int HeadingWidth = 24;
+
     private static readonly (decimal Unit, string Name)[] Units = [(1_000m, "K"), (1_000_000m, "M"), (1_000_000_000m, "B")];
 
     public IRenderable Render(GainReport report, GainSettings settings)
     {
         var views = new List<IRenderable>
         {
-            new Text("estimated initial-request token reductions (tokens)\n"),
-            Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Follow-up", "Net", "Saved %", "Net %"],
-            [
-                [Compact(report.Summary.Requests), Compact(report.Summary.EstimatedOriginalTokens), Compact(report.Summary.EstimatedForwardedTokens), Compact(report.Summary.EstimatedSavedTokens), Compact(report.Summary.EstimatedRetrievedTokens),
-                    Compact(report.Summary.EstimatedToolTokens), Compact(report.Summary.EstimatedFollowUpTokens), Compact(report.Summary.EstimatedNetTokens), Percent(report.Summary.SavedPercent), Percent(report.Summary.NetPercent)]
-            ], tight: true),
-            new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n")
+            new Text("estimated initial-request token reductions (tokens)\n")
         };
+        AddTotals(views, report);
+        views.Add(new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n"));
         if (report.Summary.FollowUpMeasuredRequests > 0)
         {
             views.Add(new Text($"Billed balance (all requests): {Number(report.Summary.EstimatedBilledBalanceTokens)} tokens (estimated from sizes sent, not provider-billed: original - forwarded - follow-up; follow-ups measured on {Number(report.Summary.FollowUpMeasuredRequests)} of {Number(report.Summary.Requests)} requests).\n"));
         }
-        if (report.OtherTraffic is { } other)
-        {
-            views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
-        }
-
         if ((settings.Project || settings.ProjectPath is not null) && report.Summary.Requests == 0)
         {
             views.Add(new Text($"No requests for this project. Traffic is attributed only when the client sends the {GainApi.ProjectHeader} header or the proxy credential; launch the agent with `ai-proxy harness` to set both.\n"));
@@ -116,6 +109,46 @@ public sealed class GainView
         }
 
         return new Rows(views);
+    }
+
+    /// <summary>One block per harness, or the single summary table of a report from a proxy that sends no harness totals.</summary>
+    private static void AddTotals(List<IRenderable> views, GainReport report)
+    {
+        var harnesses = report.Harnesses ?? [];
+        if (harnesses.Count == 0)
+        {
+            views.Add(Summary(report.Summary));
+        }
+
+        foreach (var harness in harnesses)
+        {
+            views.Add(Heading(harness.Name));
+            views.Add(Summary(harness.Totals));
+        }
+
+        if (report.OtherTraffic is { } other)
+        {
+            if (harnesses.Count > 0 && harnesses.All(static harness => harness.Name != GainHarness.Other))
+            {
+                views.Add(Heading(GainHarness.Other));
+            }
+
+            views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
+        }
+    }
+
+    private static Text Heading(string name)
+    {
+        return new Text($"-{name}".PadRight(HeadingWidth, '-'));
+    }
+
+    private static Table Summary(GainTotals totals)
+    {
+        return Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Follow-up", "Net", "Saved %", "Net %"],
+        [
+            [Compact(totals.Requests), Compact(totals.EstimatedOriginalTokens), Compact(totals.EstimatedForwardedTokens), Compact(totals.EstimatedSavedTokens), Compact(totals.EstimatedRetrievedTokens),
+                Compact(totals.EstimatedToolTokens), Compact(totals.EstimatedFollowUpTokens), Compact(totals.EstimatedNetTokens), Percent(totals.SavedPercent), Percent(totals.NetPercent)]
+        ], tight: true);
     }
 
     private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
