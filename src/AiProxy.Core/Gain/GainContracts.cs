@@ -25,7 +25,10 @@ public sealed record GainMeasurement(
     string Scope = "initial-request",
     bool NetSavingsAvailable = false);
 
-/// <summary>Measured sizes and estimated token counts of decoded bodies (a zstd body after decoding); saved counts may be negative.</summary>
+/// <summary>
+///     Measured sizes and estimated token counts of decoded bodies, zstd included; a zstd body that does not decode is
+///     counted as sent, still encoded. Saved counts may be negative.
+/// </summary>
 public sealed record GainTotals(
     long Requests = 0,
     long OriginalCharacters = 0,

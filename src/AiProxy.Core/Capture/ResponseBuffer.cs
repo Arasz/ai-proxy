@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace AiProxy.Core.Capture;
 
 /// <summary>Keeps what of a response body is needed to read its usage, as the bytes pass to the client.</summary>
@@ -11,6 +13,12 @@ public sealed class ResponseBuffer
 
     /// <summary>The bytes kept from the end of a plain event stream.</summary>
     public const int TailBytes = 64 * 1024;
+
+    /// <summary>
+    ///     Starts a line holding the kept end of a Responses terminal event that began before the tail; the reader takes
+    ///     its usage from it. An SSE comment, so nothing else reads it as an event.
+    /// </summary>
+    internal const string CutTerminalLine = ":ai-proxy-cut-terminal ";
 
     private IStrategy? _strategy;
 
@@ -83,13 +91,32 @@ public sealed class ResponseBuffer
         }
     }
 
-    /// <summary>The first <see cref="HeadBytes" /> and a rolling last <see cref="TailBytes" />.</summary>
+    /// <summary>
+    ///     The first <see cref="HeadBytes" /> and a rolling last <see cref="TailBytes" />. It also notes where the last
+    ///     Responses terminal event line starts and ends, so a terminal event longer than the tail keeps its end.
+    /// </summary>
     private sealed class Window : IStrategy
     {
+        private const int LineHeadBytes = 64;
+
+        private static readonly byte[][] TerminalStarts =
+        [
+            .. new[] { "response.completed", "response.incomplete", "response.failed" }
+                .SelectMany(static type => new[] { $"data: {{\"type\":\"{type}\"", $"data:{{\"type\":\"{type}\"" })
+                .Select(static start => Encoding.UTF8.GetBytes(start))
+        ];
+
         private readonly byte[] _head = new byte[HeadBytes];
+        private readonly byte[] _lineHead = new byte[LineHeadBytes];
         private readonly byte[] _tail = new byte[TailBytes];
         private long _afterHead;
         private int _headCount;
+        private bool _lineChecked;
+        private int _lineHeadCount;
+        private long _lineStart;
+        private long _position;
+        private long _terminalEnd = -1;
+        private long _terminalStart = -1;
 
         public ReadOnlyMemory<byte> Body
         {
@@ -111,6 +138,12 @@ public sealed class ResponseBuffer
                 _tail.AsSpan(0, start).CopyTo(tail.AsSpan(TailBytes - start));
                 var headEnd = head.LastIndexOf((byte)'\n') + 1;
                 var tailStart = tail.AsSpan().IndexOf((byte)'\n') + 1;
+                var kept = _position - TailBytes;
+                if (_terminalStart >= 0 && _terminalStart < kept && (_terminalEnd < 0 || _terminalEnd >= kept))
+                {
+                    return StitchCutTerminal(head[..headEnd], tail, tailStart);
+                }
+
                 var stitched = new byte[headEnd + 1 + (TailBytes - tailStart)];
                 head[..headEnd].CopyTo(stitched);
                 stitched[headEnd] = (byte)'\n';
@@ -119,8 +152,83 @@ public sealed class ResponseBuffer
             }
         }
 
+        private static byte[] StitchCutTerminal(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, int tailStart)
+        {
+            var end = tailStart == 0 ? tail.Length : tailStart - 1;
+            var marker = Encoding.ASCII.GetBytes(CutTerminalLine);
+            var rest = tail[end..];
+            var stitched = new byte[head.Length + 1 + marker.Length + end + rest.Length + 1];
+            var at = 0;
+            head.CopyTo(stitched);
+            at += head.Length;
+            stitched[at++] = (byte)'\n';
+            marker.CopyTo(stitched.AsSpan(at));
+            at += marker.Length;
+            tail[..end].CopyTo(stitched.AsSpan(at));
+            at += end;
+            stitched[at++] = (byte)'\n';
+            rest.CopyTo(stitched.AsSpan(at));
+            return stitched;
+        }
+
+        private static bool IsTerminal(ReadOnlySpan<byte> lineHead)
+        {
+            foreach (var terminal in TerminalStarts)
+            {
+                if (lineHead.StartsWith(terminal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>Follows line starts and remembers the span of the last Responses terminal event line.</summary>
+        private void Track(ReadOnlySpan<byte> bytes)
+        {
+            while (!bytes.IsEmpty)
+            {
+                var newline = bytes.IndexOf((byte)'\n');
+                var part = newline < 0 ? bytes : bytes[..newline];
+                if (!_lineChecked)
+                {
+                    var count = Math.Min(part.Length, LineHeadBytes - _lineHeadCount);
+                    part[..count].CopyTo(_lineHead.AsSpan(_lineHeadCount));
+                    _lineHeadCount += count;
+                    if (_lineHeadCount == LineHeadBytes || newline >= 0)
+                    {
+                        _lineChecked = true;
+                        if (IsTerminal(_lineHead.AsSpan(0, _lineHeadCount)))
+                        {
+                            _terminalStart = _lineStart;
+                            _terminalEnd = -1;
+                        }
+                    }
+                }
+
+                if (newline < 0)
+                {
+                    _position += bytes.Length;
+                    return;
+                }
+
+                _position += newline + 1;
+                if (_terminalStart == _lineStart)
+                {
+                    _terminalEnd = _position - 1;
+                }
+
+                _lineStart = _position;
+                _lineHeadCount = 0;
+                _lineChecked = false;
+                bytes = bytes[(newline + 1)..];
+            }
+        }
+
         public bool Append(ReadOnlySpan<byte> bytes)
         {
+            Track(bytes);
             var toHead = Math.Min(bytes.Length, HeadBytes - _headCount);
             bytes[..toHead].CopyTo(_head.AsSpan(_headCount));
             _headCount += toHead;

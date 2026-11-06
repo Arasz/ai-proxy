@@ -6,8 +6,8 @@ namespace AiProxy.Core.Capture;
 /// <param name="RequestId">The id of the <see cref="CapturedRequest" /> this response answered.</param>
 /// <param name="CompletedAt">When the response finished passing through the proxy.</param>
 /// <param name="StatusCode">The upstream's HTTP status code.</param>
-/// <param name="RequestBytes">The request body length on the wire, still content-encoded.</param>
-/// <param name="ForwardedBytes">The request body length as the proxy forwarded it, still content-encoded.</param>
+/// <param name="RequestBytes">The length of the request body Titanium read: gzip, deflate and br decoded, zstd still encoded.</param>
+/// <param name="ForwardedBytes">The length of the body the proxy handed Titanium to forward, measured like <paramref name="RequestBytes" />.</param>
 /// <param name="ResponseBytes">The response body length on the wire, still content-encoded.</param>
 /// <param name="Usage">The token usage read from the response; null when <paramref name="UsageError" /> says why not.</param>
 /// <param name="UsageError">Why usage was not read, such as <c>over-cap</c> or <c>malformed</c>; null when it was.</param>

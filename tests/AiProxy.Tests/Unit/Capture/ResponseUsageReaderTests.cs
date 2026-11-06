@@ -309,6 +309,22 @@ public sealed class ResponseUsageReaderTests
     }
 
     [Fact]
+    public void A_later_responses_terminal_event_without_some_counts_keeps_the_counts_read_earlier()
+    {
+        var stream = ResponsesStream + """
+                                       event: response.failed
+                                       data: {"type":"response.failed","response":{"object":"response","usage":{"output_tokens":60}}}
+
+
+                                       """;
+
+        var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
+
+        Assert.Null(reading.Error);
+        Assert.Equal(new ResponseUsage(200, 60, null, 800), reading.Usage);
+    }
+
+    [Fact]
     public void A_responses_usage_on_another_event_is_not_read()
     {
         var stream = ResponsesStream.Replace("response.completed", "response.in_progress", StringComparison.Ordinal);

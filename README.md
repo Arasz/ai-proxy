@@ -17,7 +17,7 @@ every other destination through. There are no upstream or pass-through rules to 
 | Anthropic     | `api.anthropic.com`                                                                                                       |
 | Google Gemini | `generativelanguage.googleapis.com`                                                                                       |
 | OpenRouter    | `openrouter.ai`, `eu.openrouter.ai`                                                                                       |
-| ChatGPT (Codex sign-in) | `chatgpt.com`, decrypted only for `ai-proxy harness` clients, never changed                                |
+| ChatGPT (Codex sign-in) | `chatgpt.com`, decrypted only for tunnels carrying the ai-proxy credential, never changed                  |
 
 HTTPS requests to those hosts are decrypted so ai-proxy can inspect and optionally compress
 request bodies. The first run creates and asks the operating system to trust a per-user root
@@ -145,10 +145,12 @@ line that already starts with `--no-daemon` or `--remote`.
 On Windows, an npm install of Codex provides `codex.cmd`. The launcher starts the process without
 a shell and does not resolve `.cmd` files, so pass the full path to `codex.cmd`.
 
-Codex cannot add headers to its built-in `openai` provider, so that traffic shows as
-unattributed in `gain`. For a custom model provider, add the `env_http_headers` recipe from the
-[gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project);
-the launcher exports `AI_PROXY_CODEX_PROJECT` with the current directory for you.
+The launcher also puts the project in the proxy URL as an ai-proxy credential, so `gain`
+attributes Codex traffic to the current directory, built-in `openai` provider included. A custom
+model provider can send the `X-Ai-Proxy-Project` header instead (the `env_http_headers` recipe in
+the [gain guide](docs/how-to/reading-gain-and-retrieving-originals.md#split-the-numbers-by-project));
+when the header is present, it wins. Codex signed in with ChatGPT is recorded too: the proxy
+decrypts `chatgpt.com` only for tunnels that carry the credential, and never changes that traffic.
 
 ## Check the setup
 

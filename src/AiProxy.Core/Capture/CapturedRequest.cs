@@ -8,7 +8,7 @@ namespace AiProxy.Core.Capture;
 /// <param name="Provider">The provider dialect the host belongs to.</param>
 /// <param name="Host">The provider host the request was addressed to.</param>
 /// <param name="Path">The request path, without the query string.</param>
-/// <param name="Body">The body as the client sent it, with a zstd content encoding decoded.</param>
+/// <param name="Body">The body as Titanium read it, with zstd decoded too; a zstd body that does not decode is kept as sent, still encoded.</param>
 public sealed record CapturedRequest(
     string RequestId,
     DateTimeOffset CapturedAt,

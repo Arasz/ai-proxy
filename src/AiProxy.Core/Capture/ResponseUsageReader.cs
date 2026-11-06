@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using AiProxy.Core.Json;
 using AiProxy.Core.Providers;
@@ -34,6 +35,8 @@ public static class ResponseUsageReader
     public const int MaxDecodedBytes = 16 * 1024 * 1024;
 
     private static readonly byte[] DataField = "data:"u8.ToArray();
+    private static readonly byte[] CutTerminalLine = Encoding.ASCII.GetBytes(ResponseBuffer.CutTerminalLine);
+    private static readonly byte[] UsageKey = "\"usage\":"u8.ToArray();
 
     /// <summary>Decodes the body and reads its usage; never throws on what the upstream sent.</summary>
     /// <param name="body">The body bytes, still content-encoded.</param>
@@ -117,6 +120,12 @@ public static class ResponseUsageReader
         var broken = false;
         foreach (var line in Lines(body))
         {
+            if (dialect == Dialect.OpenAi && line.Span.StartsWith(CutTerminalLine))
+            {
+                usage = ReadCutTerminal(usage, line.Span[CutTerminalLine.Length..]);
+                continue;
+            }
+
             if (!line.Span.StartsWith(DataField))
             {
                 continue;
@@ -232,7 +241,64 @@ public static class ResponseUsageReader
             return current;
         }
 
-        var usage = response.PropertyOrDefault(UsageJson.Usage);
+        return ReadResponseUsage(current, response.PropertyOrDefault(UsageJson.Usage));
+    }
+
+    /// <summary>
+    ///     Reads the usage out of the kept end of a terminal event cut by the capture window: the last unescaped
+    ///     <c>"usage":</c> key, which the response object puts after its output. Anything unreadable keeps the counts so far.
+    /// </summary>
+    private static ResponseUsage? ReadCutTerminal(ResponseUsage? current, ReadOnlySpan<byte> line)
+    {
+        var end = line.Length;
+        while (line[..end].LastIndexOf(UsageKey) is var at and >= 0)
+        {
+            if (IsEscaped(line, at))
+            {
+                end = at;
+                continue;
+            }
+
+            var reader = new Utf8JsonReader(line[(at + UsageKey.Length)..], false, default);
+            try
+            {
+                if (!JsonDocument.TryParseValue(ref reader, out var document))
+                {
+                    return current;
+                }
+
+                using (document)
+                {
+                    return ReadResponseUsage(current, document.RootElement);
+                }
+            }
+            catch (JsonException)
+            {
+                return current;
+            }
+        }
+
+        return current;
+    }
+
+    /// <summary>Whether the quote at <paramref name="at" /> follows an odd run of backslashes, so it sits inside a string.</summary>
+    private static bool IsEscaped(ReadOnlySpan<byte> line, int at)
+    {
+        var backslashes = 0;
+        while (at - backslashes > 0 && line[at - backslashes - 1] == (byte)'\\')
+        {
+            backslashes++;
+        }
+
+        return backslashes % 2 == 1;
+    }
+
+    /// <summary>
+    ///     Folds a Responses <c>usage</c> object into the counts read so far: a count it leaves out keeps the earlier one.
+    ///     Input and cache-read come as a pair from <c>input_tokens</c>, so they are kept or replaced together.
+    /// </summary>
+    private static ResponseUsage? ReadResponseUsage(ResponseUsage? current, JsonElement usage)
+    {
         if (!usage.IsObject)
         {
             return current;
@@ -251,7 +317,10 @@ public static class ResponseUsageReader
             throw new JsonException("The cached tokens exceed the input tokens.");
         }
 
-        return new ResponseUsage(input - (cached ?? 0), output, null, cached);
+        output ??= current?.OutputTokens;
+        return input is null
+            ? new ResponseUsage(current?.InputTokens, output, null, cached ?? current?.CacheReadInputTokens)
+            : new ResponseUsage(input - (cached ?? 0), output, null, cached);
     }
 
     /// <summary>A gzip body whose trailer does not hold the decoded length was cut short.</summary>

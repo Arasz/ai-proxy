@@ -17,12 +17,17 @@ internal static class TunnelClient
     public static string Credential(string project) =>
         "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{GainApi.ProxyUser}:{project}"));
 
+    /// <summary>Accepts one connection and reads the first TLS record whole: its 5-byte header and the length it names.</summary>
     public static async Task<byte[]> ReadOriginAsync(TcpListener origin, CancellationToken token)
     {
         using var client = await origin.AcceptTcpClientAsync(token);
-        var buffer = new byte[4096];
-        var read = await client.GetStream().ReadAsync(buffer, token);
-        return buffer[..read];
+        var stream = client.GetStream();
+        var header = new byte[5];
+        await stream.ReadExactlyAsync(header, token);
+        var record = new byte[header.Length + ((header[3] << 8) | header[4])];
+        header.CopyTo(record, 0);
+        await stream.ReadExactlyAsync(record.AsMemory(header.Length), token);
+        return record;
     }
 
     public static async ValueTask<Stream> ConnectThroughAsync(Uri proxy, DnsEndPoint target, string? credential, CancellationToken token)

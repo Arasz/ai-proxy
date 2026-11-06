@@ -60,9 +60,17 @@ public sealed class HarnessOnlyHostTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task A_tunnel_to_a_harness_only_host_without_a_credential_stays_opaque()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Bearer x")]
+    [InlineData("Basic c29tZW9uZTovcHJvamVjdC9vdGhlcg==")]
+    public async Task A_tunnel_to_a_harness_only_host_without_an_ai_proxy_credential_stays_opaque(string? proxyAuthorization)
     {
+        if (proxyAuthorization is not null && proxyAuthorization.StartsWith("Basic ", StringComparison.Ordinal))
+        {
+            Assert.Equal("someone:/project/other", Encoding.UTF8.GetString(Convert.FromBase64String(proxyAuthorization["Basic ".Length..])));
+        }
+
         using var origin = new TcpListener(IPAddress.Loopback, 0);
         origin.Start();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -72,7 +80,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
         var target = new DnsEndPoint("127.0.0.1", ((IPEndPoint)origin.LocalEndpoint).Port);
         Task? handshake = null;
 
-        await using (var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, null, timeout.Token))
+        await using (var tunnel = await ConnectThroughAsync(proxy.ProxyAddress, target, proxyAuthorization, timeout.Token))
         {
             using var tls = new SslStream(tunnel);
             try
