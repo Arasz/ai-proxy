@@ -8,7 +8,7 @@ public interface ISystemProxyRegistrar : ISystemProxySnapshotProvider
 {
     /// <summary>
     ///     Captures the settings to restore later. Each HTTP or HTTPS value still pointing at one of <paramref name="staleEndpoints" />
-    ///     takes its value from <paramref name="previousSnapshot" />, or is turned off when that has none or points there too.
+    ///     takes its active value from <paramref name="previousSnapshot" />, or is turned off when that has none, was inactive, or points there too.
     /// </summary>
     RestoreTarget CaptureRestoreTarget(IReadOnlyCollection<IPEndPoint> staleEndpoints, string? previousSnapshot);
 

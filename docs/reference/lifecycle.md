@@ -93,7 +93,11 @@ settings.
 Every start also cleans the settings it saves as the ones to restore. Each HTTP or HTTPS value that
 is in effect and still points at an ai-proxy endpoint is replaced before the settings are saved: by
 the same value from the settings the previous run saved, or, when there is none (or it points at
-ai-proxy too), by turning that protocol off. A value points at ai-proxy when its port matches and
+ai-proxy too), by turning that protocol off. A saved value counts only if it was in effect when it
+was saved, so a leftover host behind a switch that was off is not switched back on. On Windows a
+stale `https=` entry with no saved `https=` entry takes the saved unnamed entry (`host:port`, which
+Windows applies to both protocols), and a proxy left with no HTTP or HTTPS entry at all is turned
+off, as Titanium does when it removes the last one. A value points at ai-proxy when its port matches and
 its host is `localhost`, a loopback address or the endpoint's own address. A proxy on another
 machine that happens to use the same port is not touched. The endpoints checked are the previous
 run's, from the marker, and this run's own. A value that is not in effect (a macOS proxy switched
@@ -104,8 +108,16 @@ something was replaced the log shows warning 1317 with the endpoints that matche
 proxy from a crashed run no longer outlives the next clean shutdown, and the manual fix is not
 needed.
 
+Cleaning never stops a start. When the captured settings cannot be read (a Titanium update changed
+their shape, say), warning 1318 says so and they are saved as captured, stale values included,
+which is what every start did before 0.28.6. When they were cleaned but Titanium's backend would not
+take the cleaned copy, warning 1319 says so, the backend is re-armed with a fresh capture, and that
+capture is saved instead. After either warning, check the proxy once ai-proxy has shut down.
+
 Two consequences follow. First, a proxy you set by hand to ai-proxy's own port is turned off at
-shutdown, because it cannot be told apart from one ai-proxy left behind. Second, a shutdown that
+shutdown, because it cannot be told apart from one ai-proxy left behind. On GNOME or KDE, a crashed
+run whose saved settings were in auto (PAC) mode comes back with the proxy off rather than in auto
+mode, because only manual values are carried over. Second, a shutdown that
 logged 1315 deletes the marker, so the settings saved before that run are gone. If HTTPS still
 pointed at ai-proxy then, the next start turns HTTPS off instead of putting back the proxy you had
 before ai-proxy (a corporate proxy, say), and you set that one again by hand.

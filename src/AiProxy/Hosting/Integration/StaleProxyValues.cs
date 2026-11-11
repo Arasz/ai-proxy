@@ -1,5 +1,4 @@
 using System.Net;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AiProxy.Hosting.Proxy;
@@ -13,38 +12,40 @@ namespace AiProxy.Hosting.Integration;
 /// </summary>
 internal static class StaleProxyValues
 {
-    private const string MacBackend = "Titanium.Web.Proxy.Helpers.MacOsSystemProxyBackend";
     private const string LinuxBackend = "Titanium.Web.Proxy.Helpers.LinuxSystemProxyBackend";
     private const string WindowsBackend = "Titanium.Web.Proxy.Helpers.SystemProxyManager";
-    private static readonly string[] MacProtocols = ["Http", "Https"];
     private static readonly string[] WindowsProtocols = ["http", "https"];
 
-    /// <summary>The cleaned target, or null when nothing pointed at <paramref name="stale" /> or the capture has an unexpected shape.</summary>
-    public static RestoreTarget? Replace(string current, IReadOnlyCollection<IPEndPoint> stale, string? previous)
+    /// <summary>
+    ///     The cleaned target. When nothing pointed at <paramref name="stale" />, it is <paramref name="current" /> as captured; when the
+    ///     capture could not be cleaned, it is <paramref name="current" /> too, with <see cref="RestoreTarget.CleanFailure" /> saying why.
+    /// </summary>
+    public static RestoreTarget Replace(string current, IReadOnlyCollection<IPEndPoint> stale, string? previous) =>
+        Replace(current, stale, previous, WindowsInfoType);
+
+    /// <summary><see cref="Replace(string, IReadOnlyCollection{IPEndPoint}, string?)" /> with Titanium's Windows proxy type looked up by <paramref name="windowsInfoType" />.</summary>
+    internal static RestoreTarget Replace(string current, IReadOnlyCollection<IPEndPoint> stale, string? previous, Func<Type> windowsInfoType)
     {
         try
         {
-            if (Snapshot.Parse(current) is not { } snapshot)
-            {
-                return null;
-            }
+            var snapshot = Snapshot.Parse(current) ?? throw Unexpected();
 
             // Each backend reads only its own fields, so a previous snapshot from another backend contributes nothing.
             var before = Snapshot.Parse(previous);
             var matched = new Matches(stale);
             var changed = snapshot.BackendType switch
             {
-                MacBackend => CleanMac(snapshot, before, matched),
+                TitaniumSystemProxySnapshotProvider.MacBackendType => CleanMac(snapshot, before, matched),
                 LinuxBackend => CleanGnome(snapshot, before, matched) | CleanKde(snapshot, before, matched),
-                WindowsBackend => CleanWindows(snapshot, before, matched),
-                _ => false
+                WindowsBackend => CleanWindows(snapshot, before, matched, windowsInfoType),
+                _ => throw Unexpected()
             };
-            return changed ? new RestoreTarget(snapshot.ToJson(), matched.Found) : null;
+            return changed ? new RestoreTarget(snapshot.ToJson(), matched.Found) : new RestoreTarget(current, []);
         }
-        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException or ArgumentException or
-                                              TargetInvocationException or NotSupportedException)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            return null;
+            // Any failure here, a Titanium type or member gone missing included, must not stop the start: keep the capture as taken.
+            return new RestoreTarget(current, []) { CleanFailure = exception };
         }
     }
 
@@ -64,7 +65,7 @@ internal static class StaleProxyValues
         {
             var name = RequiredText(service, "Service");
             var previousService = previousServices.FirstOrDefault(item => Text(item, "Service") == name);
-            foreach (var protocol in MacProtocols)
+            foreach (var protocol in TitaniumSystemProxySnapshotProvider.MacProtocols)
             {
                 if (!RequiredBool(service, $"{protocol}Enabled") ||
                     !matched.Add(RequiredText(service, $"{protocol}Host"), RequiredInt(service, $"{protocol}Port")))
@@ -90,7 +91,10 @@ internal static class StaleProxyValues
         return changed;
     }
 
-    /// <summary>GNOME: in manual mode, a stale host and port take the previous ones or are emptied; the mode follows.</summary>
+    /// <summary>
+    ///     GNOME: in manual mode, a stale host and port take the previous ones while those were in manual mode too, or are emptied;
+    ///     with no host left, the mode turns off.
+    /// </summary>
     private static bool CleanGnome(Snapshot snapshot, Snapshot? previous, Matches matched)
     {
         if (snapshot.Field("_gnome") is not JsonObject gnome || RequiredText(gnome, "Mode") != "manual")
@@ -98,7 +102,7 @@ internal static class StaleProxyValues
             return false;
         }
 
-        var previousGnome = previous?.Field("_gnome") as JsonObject;
+        var previousGnome = previous?.Field("_gnome") is JsonObject before && Text(before, "Mode") == "manual" ? before : null;
         var httpStale = matched.Add(RequiredText(gnome, "HttpHost"), RequiredInt(gnome, "HttpPort"));
         var httpsStale = matched.Add(RequiredText(gnome, "HttpsHost"), RequiredInt(gnome, "HttpsPort"));
         if (!httpStale && !httpsStale)
@@ -106,13 +110,17 @@ internal static class StaleProxyValues
             return false;
         }
 
-        var httpRestored = httpStale && ReplaceGnome(gnome, previousGnome, "Http", matched);
-        var httpsRestored = httpsStale && ReplaceGnome(gnome, previousGnome, "Https", matched);
-        if (httpStale && httpsStale && httpRestored && httpsRestored)
+        if (httpStale)
         {
-            gnome["Mode"] = Text(previousGnome!, "Mode") ?? "manual";
+            ReplaceGnome(gnome, previousGnome, "Http", matched);
         }
-        else if (RequiredText(gnome, "HttpHost").Length == 0 && RequiredText(gnome, "HttpsHost").Length == 0)
+
+        if (httpsStale)
+        {
+            ReplaceGnome(gnome, previousGnome, "Https", matched);
+        }
+
+        if (RequiredText(gnome, "HttpHost").Length == 0 && RequiredText(gnome, "HttpsHost").Length == 0)
         {
             gnome["Mode"] = "none";
         }
@@ -121,23 +129,34 @@ internal static class StaleProxyValues
         return true;
     }
 
-    /// <summary>Copies one GNOME protocol's host and port from <paramref name="previous" />, or empties it; true when copied.</summary>
-    private static bool ReplaceGnome(JsonObject gnome, JsonObject? previous, string protocol, Matches matched)
+    /// <summary>Copies one GNOME protocol's host and port from <paramref name="previous" />, or empties it.</summary>
+    private static void ReplaceGnome(JsonObject gnome, JsonObject? previous, string protocol, Matches matched)
     {
-        var host = previous is null ? null : Text(previous, $"{protocol}Host");
-        var port = previous is null ? null : Int(previous, $"{protocol}Port");
-        var usable = host is not null && port is not null && !matched.PointsAt(host, port.Value);
-        gnome[$"{protocol}Host"] = usable ? host : "";
-        gnome[$"{protocol}Port"] = usable ? port : 0;
-        if (protocol == "Http")
+        if (previous is not null && Text(previous, $"{protocol}Host") is { } host && Int(previous, $"{protocol}Port") is { } port &&
+            !matched.PointsAt(host, port))
         {
-            gnome["HttpEnabled"] = usable && Bool(previous!, "HttpEnabled") is true;
+            gnome[$"{protocol}Host"] = host;
+            gnome[$"{protocol}Port"] = port;
+            if (protocol == "Http")
+            {
+                gnome["HttpEnabled"] = Bool(previous, "HttpEnabled") is true;
+            }
+
+            return;
         }
 
-        return usable;
+        gnome[$"{protocol}Host"] = "";
+        gnome[$"{protocol}Port"] = 0;
+        if (protocol == "Http")
+        {
+            gnome["HttpEnabled"] = false;
+        }
     }
 
-    /// <summary>KDE: in manual mode (<c>ProxyType</c> 1), a stale proxy URL takes the previous one or is emptied; the type follows.</summary>
+    /// <summary>
+    ///     KDE: in manual mode (<c>ProxyType</c> 1), a stale proxy URL takes the previous one while that was in manual mode too, or is
+    ///     emptied; with no URL left, the type turns off.
+    /// </summary>
     private static bool CleanKde(Snapshot snapshot, Snapshot? previous, Matches matched)
     {
         if (snapshot.Field("_kde") is not JsonObject kde || RequiredText(kde, "ProxyType") != "1")
@@ -145,7 +164,7 @@ internal static class StaleProxyValues
             return false;
         }
 
-        var previousKde = previous?.Field("_kde") as JsonObject;
+        var previousKde = previous?.Field("_kde") is JsonObject before && Text(before, "ProxyType") == "1" ? before : null;
         var httpStale = matched.Add(RequiredText(kde, "HttpProxy"));
         var httpsStale = matched.Add(RequiredText(kde, "HttpsProxy"));
         if (!httpStale && !httpsStale)
@@ -153,13 +172,17 @@ internal static class StaleProxyValues
             return false;
         }
 
-        var httpRestored = httpStale && ReplaceKde(kde, previousKde, "HttpProxy", matched);
-        var httpsRestored = httpsStale && ReplaceKde(kde, previousKde, "HttpsProxy", matched);
-        if (httpStale && httpsStale && httpRestored && httpsRestored)
+        if (httpStale)
         {
-            kde["ProxyType"] = Text(previousKde!, "ProxyType") ?? "1";
+            ReplaceKde(kde, previousKde, "HttpProxy", matched);
         }
-        else if (RequiredText(kde, "HttpProxy").Length == 0 && RequiredText(kde, "HttpsProxy").Length == 0)
+
+        if (httpsStale)
+        {
+            ReplaceKde(kde, previousKde, "HttpsProxy", matched);
+        }
+
+        if (RequiredText(kde, "HttpProxy").Length == 0 && RequiredText(kde, "HttpsProxy").Length == 0)
         {
             kde["ProxyType"] = "0";
         }
@@ -168,20 +191,18 @@ internal static class StaleProxyValues
         return true;
     }
 
-    /// <summary>Copies one KDE proxy URL from <paramref name="previous" />, or empties it; true when copied.</summary>
-    private static bool ReplaceKde(JsonObject kde, JsonObject? previous, string key, Matches matched)
+    /// <summary>Copies one KDE proxy URL from <paramref name="previous" />, or empties it.</summary>
+    private static void ReplaceKde(JsonObject kde, JsonObject? previous, string key, Matches matched)
     {
-        var value = previous is null ? null : Text(previous, key);
-        var usable = value is not null && !matched.PointsAtUrl(value);
-        kde[key] = usable ? value : "";
-        return usable;
+        kde[key] = previous is not null && Text(previous, key) is { } value && !matched.PointsAtUrl(value) ? value : "";
     }
 
     /// <summary>
-    ///     Windows: while the manual proxy is active, a stale <c>ProxyServer</c> entry takes the previous entry for its protocol or is
-    ///     dropped. A stale unnamed entry takes the previous unnamed one, else the previous http/https entries it stood for.
+    ///     Windows: while the manual proxy is active, a stale <c>ProxyServer</c> entry takes the previous active entry for its protocol,
+    ///     else the previous unnamed address, or is dropped. A stale unnamed entry takes the previous unnamed one, else the previous
+    ///     http/https entries it stood for. With no http or https entry left, the proxy turns off, as Titanium's own removal does.
     /// </summary>
-    private static bool CleanWindows(Snapshot snapshot, Snapshot? previous, Matches matched)
+    private static bool CleanWindows(Snapshot snapshot, Snapshot? previous, Matches matched, Func<Type> windowsInfoType)
     {
         if (snapshot.Field("originalValues") is not JsonObject info ||
             !TitaniumSystemProxySnapshotProvider.WindowsProxyIsActive(Int(info, "ProxyEnable"), Text(info, "AutoConfigUrl")))
@@ -190,9 +211,10 @@ internal static class StaleProxyValues
         }
 
         var entries = WindowsEntry.Parse(Text(info, "ProxyServer"));
-        var previousEntries = WindowsEntry.Parse((previous?.Field("originalValues") as JsonObject) is { } before ? Text(before, "ProxyServer") : null)
-            .Where(entry => !matched.PointsAtUrl(entry.Address))
-            .ToArray();
+        var previousEntries = previous?.Field("originalValues") is JsonObject before &&
+                              TitaniumSystemProxySnapshotProvider.WindowsProxyIsActive(Int(before, "ProxyEnable"), Text(before, "AutoConfigUrl"))
+            ? WindowsEntry.Parse(Text(before, "ProxyServer")).Where(entry => !matched.PointsAtUrl(entry.Address)).ToArray()
+            : [];
         var result = new List<string>();
         var changed = false;
         foreach (var entry in entries)
@@ -206,7 +228,15 @@ internal static class StaleProxyValues
             changed = true;
             if (entry.Protocol is not null)
             {
-                result.AddRange(previousEntries.Where(item => SameProtocol(item.Protocol, entry.Protocol)).Select(item => item.Text).Take(1));
+                if (previousEntries.FirstOrDefault(item => SameProtocol(item.Protocol, entry.Protocol)) is { } named)
+                {
+                    result.Add(named.Text);
+                }
+                else if (previousEntries.FirstOrDefault(item => item.Protocol is null) is { } unnamedFallback)
+                {
+                    // Titanium reads an unnamed entry as both http and https, so it stands for the missing named one.
+                    result.Add($"{entry.Protocol}={unnamedFallback.Address}");
+                }
             }
             else if (previousEntries.FirstOrDefault(item => item.Protocol is null) is { } unnamed)
             {
@@ -225,18 +255,22 @@ internal static class StaleProxyValues
             return false;
         }
 
-        info["ProxyServer"] = string.Join(';', result);
-        if (result.Count == 0)
+        var proxyServer = string.Join(';', result);
+        info["ProxyServer"] = proxyServer;
+        if (!WindowsEntry.Parse(proxyServer).Any(entry => entry.ServesHttp))
         {
             info["ProxyEnable"] = 0;
         }
 
         // Re-encode through Titanium's own type, so the derived Proxies and BypassList match what a capture would write.
-        var type = typeof(ProxyServer).Assembly.GetType("Titanium.Web.Proxy.Helpers.ProxyInfo", true)!;
+        var type = windowsInfoType();
         var rebuilt = SystemProxySnapshotCodec.Read(info.ToJsonString(), type);
         snapshot.SetField("originalValues", JsonNode.Parse(SystemProxySnapshotCodec.Write(rebuilt, type)));
         return true;
     }
+
+    /// <summary>Titanium's internal Windows <c>ProxyInfo</c> type; throws when the installed Titanium no longer has it.</summary>
+    private static Type WindowsInfoType() => typeof(ProxyServer).Assembly.GetType("Titanium.Web.Proxy.Helpers.ProxyInfo", true)!;
 
     /// <summary>True when both protocol names are set and equal, ignoring case.</summary>
     private static bool SameProtocol(string? left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
@@ -270,7 +304,7 @@ internal static class StaleProxyValues
     /// <summary>Returns <paramref name="value" />; throws when the capture lacks it.</summary>
     private static T Required<T>(T? value) where T : class => value ?? throw Unexpected();
 
-    /// <summary>The failure for a capture whose shape this version does not know; <see cref="Replace" /> turns it into "no change".</summary>
+    /// <summary>The failure for a capture whose shape this version does not know; <see cref="Replace(string, IReadOnlyCollection{IPEndPoint}, string?)" /> keeps the capture as taken.</summary>
     private static InvalidOperationException Unexpected() => new("The captured system proxy snapshot has an unexpected shape.");
 
     /// <summary>A macOS proxy: whether it is on, and where it points.</summary>
@@ -279,6 +313,9 @@ internal static class StaleProxyValues
     /// <summary>One WinINET <c>ProxyServer</c> entry: its protocol (null when unnamed), its address and its original text.</summary>
     private sealed record WindowsEntry(string? Protocol, string Address, string Text)
     {
+        /// <summary>True for an http, https or unnamed entry: the ones Titanium reads as an HTTP proxy.</summary>
+        public bool ServesHttp => Protocol is null || WindowsProtocols.Any(protocol => SameProtocol(Protocol, protocol));
+
         /// <summary>The entries of a <c>ProxyServer</c> value, in order.</summary>
         public static WindowsEntry[] Parse(string? proxyServer)
         {

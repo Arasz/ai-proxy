@@ -113,15 +113,53 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
     public void A_capture_with_nothing_stale_is_kept_and_not_loaded()
     {
         using var server = new ProxyServer(false);
-        var platform = new FakePlatform();
+        var captured = Mac(MacService("Wi-Fi", MacProxy.On("corp.example", 80), MacProxy.On("secure.example", 443)));
+        var platform = new FakePlatform { CaptureResult = captured };
         var registrar = new TitaniumSystemProxyRegistrar(server, platform);
 
         var target = registrar.CaptureRestoreTarget([new IPEndPoint(IPAddress.Loopback, 9090)], null);
 
         Assert.False(target.ReplacedStaleValues);
-        Assert.Equal("captured-1", target.Snapshot);
+        Assert.Null(target.CleanFailure);
+        Assert.Null(target.LoadFailure);
+        Assert.Equal(captured, target.Snapshot);
         Assert.Empty(platform.Loaded);
-        Assert.Equal("captured-1", registrar.PreviousSettingsSnapshot);
+        Assert.Equal(captured, registrar.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public void A_capture_that_cannot_be_cleaned_is_kept_and_not_loaded_and_says_why()
+    {
+        using var server = new ProxyServer(false);
+        var platform = new FakePlatform { CaptureResult = "not a snapshot" };
+        var registrar = new TitaniumSystemProxyRegistrar(server, platform);
+
+        var target = registrar.CaptureRestoreTarget([new IPEndPoint(IPAddress.Loopback, 9090)], null);
+
+        Assert.NotNull(target.CleanFailure);
+        Assert.False(target.ReplacedStaleValues);
+        Assert.Equal("not a snapshot", target.Snapshot);
+        Assert.Empty(platform.Loaded);
+        Assert.Equal("not a snapshot", registrar.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public void A_cleaned_capture_the_backend_cannot_load_falls_back_to_a_fresh_raw_capture_and_says_why()
+    {
+        using var server = new ProxyServer(false);
+        var captured = Mac(MacService("Wi-Fi", MacProxy.On("corp.example", 80), MacProxy.On("127.0.0.1", 9090)));
+        var failure = new MissingFieldException("MacOsSystemProxyBackend", "_original");
+        var platform = new FakePlatform { CaptureResult = captured, LoadFailure = failure };
+        var registrar = new TitaniumSystemProxyRegistrar(server, platform);
+
+        var target = registrar.CaptureRestoreTarget([new IPEndPoint(IPAddress.Loopback, 9090)], null);
+
+        Assert.Same(failure, target.LoadFailure);
+        Assert.False(target.ReplacedStaleValues);
+        Assert.Equal(captured, target.Snapshot);
+        Assert.True(platform.Disarmed);
+        Assert.Equal(2, platform.Captures);
+        Assert.Equal(captured, registrar.PreviousSettingsSnapshot);
     }
 
     [Fact]
@@ -148,7 +186,7 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
         var own = MacProxy.On("127.0.0.1", 8080);
         var current = Mac(MacService("Wi-Fi", MacProxy.On("corp.example", 80), MacProxy.On("127.0.0.1", 9)));
         var applied = Mac(MacService("Wi-Fi", own, own));
-        var cleaned = StaleProxyValues.Replace(current, [new IPEndPoint(IPAddress.Loopback, 8080), new IPEndPoint(IPAddress.Loopback, 9)], null)!.Snapshot;
+        var cleaned = StaleProxyValues.Replace(current, [new IPEndPoint(IPAddress.Loopback, 8080), new IPEndPoint(IPAddress.Loopback, 9)], null).Snapshot;
 
         Assert.True(TitaniumSystemProxySnapshotProvider.SnapshotsMatch(cleaned, MacRestoreReadBack(cleaned, applied)));
     }
@@ -202,11 +240,26 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
         /// <summary>The snapshots loaded into the backend, in order.</summary>
         public List<string> Loaded { get; } = [];
 
-        /// <inheritdoc />
-        public string Capture() => CaptureResult ?? $"captured-{++Captures}";
+        /// <summary>What every load throws, or null when loads succeed.</summary>
+        public Exception? LoadFailure { get; init; }
 
         /// <inheritdoc />
-        public void Load(string snapshot) => Loaded.Add(snapshot);
+        public string Capture()
+        {
+            Captures++;
+            return CaptureResult ?? $"captured-{Captures}";
+        }
+
+        /// <inheritdoc />
+        public void Load(string snapshot)
+        {
+            if (LoadFailure is not null)
+            {
+                throw LoadFailure;
+            }
+
+            Loaded.Add(snapshot);
+        }
 
         /// <inheritdoc />
         public string Apply(ExplicitProxyEndPoint endPoint) => $"applied-{endPoint.IpAddress}:{endPoint.Port}";

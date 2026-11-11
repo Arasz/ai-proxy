@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using AiProxy.Hosting.Integration;
+using AiProxy.Hosting.Proxy;
 using static AiProxy.Tests.Unit.ProxySnapshots;
 
 namespace AiProxy.Tests.Unit;
@@ -24,7 +25,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         Assert.Equal(Other, MacProxyOf(target.Snapshot, "Wi-Fi", "Http"));
         Assert.Equal(Secure, MacProxyOf(target.Snapshot, "Wi-Fi", "Https"));
         Assert.Equal([Own], target.ReplacedEndpoints);
@@ -37,7 +37,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
         Assert.Equal(Other, MacProxyOf(target.Snapshot, "Wi-Fi", "Http"));
     }
@@ -50,7 +49,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
     }
 
@@ -62,7 +60,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(1, "https=secure.example:443"), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
@@ -74,7 +71,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         var gnome = Field(target.Snapshot, "_gnome")!;
         Assert.Equal("manual", gnome["Mode"]!.GetValue<string>());
         Assert.Equal("", gnome["HttpHost"]!.GetValue<string>());
@@ -89,7 +85,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         var kde = Field(target.Snapshot, "_kde")!;
         Assert.Equal("", kde["HttpProxy"]!.GetValue<string>());
         Assert.Equal("http://secure.example:443", kde["HttpsProxy"]!.GetValue<string>());
@@ -101,7 +96,7 @@ public sealed class StaleProxyValuesTests
     {
         var current = Mac(MacService("Wi-Fi", Corporate, Secure));
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Theory]
@@ -111,7 +106,7 @@ public sealed class StaleProxyValuesTests
     {
         var current = Mac(MacService("Wi-Fi", Corporate, MacProxy.On(host, port)));
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Fact]
@@ -122,7 +117,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         Assert.Equal(MacProxy.On("wifi.example", 443), MacProxyOf(target.Snapshot, "Wi-Fi", "Https"));
         Assert.Equal(Secure, MacProxyOf(target.Snapshot, "Ethernet", "Https"));
     }
@@ -135,7 +129,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         var gnome = Field(target.Snapshot, "_gnome")!;
         Assert.Equal("manual", gnome["Mode"]!.GetValue<string>());
         Assert.Equal("corp.example", gnome["HttpHost"]!.GetValue<string>());
@@ -150,7 +143,7 @@ public sealed class StaleProxyValuesTests
     {
         var current = Linux(Gnome(mode, "127.0.0.1", 8080, "127.0.0.1", 8080));
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Fact]
@@ -160,7 +153,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         var gnome = Field(target.Snapshot, "_gnome")!;
         Assert.Equal("none", gnome["Mode"]!.GetValue<string>());
         Assert.Equal("", gnome["HttpHost"]!.GetValue<string>());
@@ -169,16 +161,15 @@ public sealed class StaleProxyValuesTests
     }
 
     [Fact]
-    public void R9_kde_with_both_protocols_restored_from_previous_takes_the_previous_proxy_type()
+    public void R9_kde_with_both_protocols_restored_from_an_active_previous_takes_the_previous_proxies_in_manual_mode()
     {
         var current = Linux(null, Kde("1", "http://127.0.0.1:8080", "http://127.0.0.1:8080"));
-        var previous = Linux(null, Kde("2", "http://corp.example:80", "http://secure.example:443"));
+        var previous = Linux(null, Kde("1", "http://corp.example:80", "http://secure.example:443"));
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         var kde = Field(target.Snapshot, "_kde")!;
-        Assert.Equal("2", kde["ProxyType"]!.GetValue<string>());
+        Assert.Equal("1", kde["ProxyType"]!.GetValue<string>());
         Assert.Equal("http://corp.example:80", kde["HttpProxy"]!.GetValue<string>());
         Assert.Equal("http://secure.example:443", kde["HttpsProxy"]!.GetValue<string>());
     }
@@ -191,7 +182,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, [Dead], previous);
 
-        Assert.NotNull(target);
         Assert.True(JsonNode.DeepEquals(Field(previous, "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
@@ -202,7 +192,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(0, ""), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
@@ -211,7 +200,6 @@ public sealed class StaleProxyValuesTests
     [InlineData("127.0.0.1:8080", "corp.example:80", "corp.example:80")]
     [InlineData("127.0.0.1:8080", "http=corp.example:80;https=secure.example:443", "http=corp.example:80;https=secure.example:443")]
     [InlineData("127.0.0.1:8080", "http=corp.example:80;https=secure.example:443;ftp=ftp.example:21", "http=corp.example:80;https=secure.example:443")]
-    [InlineData("ftp=ftp.example:21;127.0.0.1:8080", null, "ftp=ftp.example:21")]
     public void R12_a_stale_unnamed_windows_entry_takes_the_previous_unnamed_entry_or_the_named_ones_it_covered(
         string proxyServer,
         string? previousProxyServer,
@@ -222,7 +210,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         var expectedEnable = expected.Length == 0 ? 0 : 1;
         Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(expectedEnable, expected), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
@@ -234,7 +221,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, [Own, Dead], null);
 
-        Assert.NotNull(target);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Http").Enabled);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
         Assert.Equal([Dead, Own], target.ReplacedEndpoints);
@@ -250,7 +236,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
-        Assert.NotNull(target);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
     }
 
@@ -259,7 +244,7 @@ public sealed class StaleProxyValuesTests
     {
         var current = Mac(MacService("Wi-Fi", Corporate, AtOwn with { Enabled = false }));
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Theory]
@@ -269,7 +254,7 @@ public sealed class StaleProxyValuesTests
     {
         var current = WindowsSnapshot(proxyEnable, "http=127.0.0.1:8080;https=127.0.0.1:8080", autoConfigUrl);
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Fact]
@@ -277,14 +262,14 @@ public sealed class StaleProxyValuesTests
     {
         var current = Linux(null, Kde("0", "http://127.0.0.1:8080", "http://127.0.0.1:8080"));
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertKept(current, StaleProxyValues.Replace(current, OwnOnly, null));
     }
 
     [Theory]
     [InlineData("unknown-backend")]
     [InlineData("missing-field")]
     [InlineData("not-json")]
-    public void R18_an_unexpected_capture_is_left_unchanged_instead_of_failing_the_start(string kind)
+    public void R18_an_unexpected_capture_is_kept_and_reported_as_not_cleaned_instead_of_failing_the_start(string kind)
     {
         var service = MacService("Wi-Fi", Other, AtOwn);
         service.Remove("HttpsPort");
@@ -295,7 +280,128 @@ public sealed class StaleProxyValuesTests
             _ => "not json"
         };
 
-        Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
+        AssertNotCleaned(current, StaleProxyValues.Replace(current, OwnOnly, null));
+    }
+
+    [Fact]
+    public void A_stale_named_windows_entry_without_a_previous_named_one_takes_the_previous_unnamed_address()
+    {
+        var current = WindowsSnapshot(1, "http=user.example:80;https=127.0.0.1:8080");
+        var previous = WindowsSnapshot(1, "corp.example:3128");
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        AssertWindowsValues(WindowsSnapshot(1, "http=user.example:80;https=corp.example:3128"), target.Snapshot);
+    }
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(1, "http://pac.example/proxy.pac")]
+    public void An_inactive_previous_windows_proxy_is_not_copied_back(int previousEnable, string? previousAutoConfigUrl)
+    {
+        var current = WindowsSnapshot(1, "http=corp.example:80;https=127.0.0.1:8080");
+        var previous = WindowsSnapshot(previousEnable, "http=old.example:80;https=leftover.example:443", previousAutoConfigUrl);
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        AssertWindowsValues(WindowsSnapshot(1, "http=corp.example:80"), target.Snapshot);
+    }
+
+    [Fact]
+    public void An_inactive_previous_unnamed_windows_entry_is_not_copied_back_and_the_proxy_turns_off()
+    {
+        var current = WindowsSnapshot(1, "127.0.0.1:8080");
+        var previous = WindowsSnapshot(0, "leftover.example:3128");
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        AssertWindowsValues(WindowsSnapshot(0, ""), target.Snapshot);
+    }
+
+    [Theory]
+    [InlineData("ftp=ftp.example:21;127.0.0.1:8080", "ftp=ftp.example:21")]
+    [InlineData("socks=socks.example:1080;http=127.0.0.1:8080;https=127.0.0.1:8080", "socks=socks.example:1080")]
+    public void A_windows_proxy_left_with_no_http_or_https_entry_is_turned_off_as_titaniums_remove_does(string proxyServer, string expected)
+    {
+        var current = WindowsSnapshot(1, proxyServer);
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, null);
+
+        AssertWindowsValues(WindowsSnapshot(0, expected), target.Snapshot);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("auto")]
+    public void An_inactive_previous_gnome_proxy_is_not_copied_back_and_both_stale_protocols_turn_the_mode_off(string previousMode)
+    {
+        var current = Linux(Gnome("manual", "127.0.0.1", 8080, "127.0.0.1", 8080));
+        var previous = Linux(Gnome(previousMode, "old.example", 80, "leftover.example", 443));
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        var gnome = Field(target.Snapshot, "_gnome")!;
+        Assert.Equal("none", gnome["Mode"]!.GetValue<string>());
+        Assert.Equal("", gnome["HttpHost"]!.GetValue<string>());
+        Assert.Equal("", gnome["HttpsHost"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void An_inactive_previous_gnome_host_is_not_copied_into_a_manual_proxy_that_stays_on()
+    {
+        var current = Linux(Gnome("manual", "corp.example", 80, "127.0.0.1", 8080));
+        var previous = Linux(Gnome("none", "old.example", 80, "leftover.example", 443));
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        var gnome = Field(target.Snapshot, "_gnome")!;
+        Assert.Equal("manual", gnome["Mode"]!.GetValue<string>());
+        Assert.Equal("corp.example", gnome["HttpHost"]!.GetValue<string>());
+        Assert.Equal("", gnome["HttpsHost"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("2")]
+    public void An_inactive_previous_kde_proxy_is_not_copied_back_and_both_stale_protocols_turn_the_type_off(string previousType)
+    {
+        var current = Linux(null, Kde("1", "http://127.0.0.1:8080", "http://127.0.0.1:8080"));
+        var previous = Linux(null, Kde(previousType, "http://old.example:80", "http://leftover.example:443"));
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        var kde = Field(target.Snapshot, "_kde")!;
+        Assert.Equal("0", kde["ProxyType"]!.GetValue<string>());
+        Assert.Equal("", kde["HttpProxy"]!.GetValue<string>());
+        Assert.Equal("", kde["HttpsProxy"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void A_switched_off_previous_mac_proxy_is_restored_switched_off()
+    {
+        var current = Mac(MacService("Wi-Fi", Other, AtOwn));
+        var previous = Mac(MacService("Wi-Fi", Corporate, Secure with { Enabled = false }));
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, previous);
+
+        Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
+        Assert.Equal(Other, MacProxyOf(target.Snapshot, "Wi-Fi", "Http"));
+    }
+
+    [Theory]
+    [InlineData("type-load")]
+    [InlineData("missing-method")]
+    public void R18_a_windows_capture_titanium_can_no_longer_re_encode_does_not_fail_the_start(string kind)
+    {
+        var current = WindowsSnapshot(1, "http=corp.example:80;https=127.0.0.1:8080");
+        Exception failure = kind == "type-load"
+            ? new TypeLoadException("Titanium.Web.Proxy.Helpers.ProxyInfo")
+            : new MissingMethodException("Titanium.Web.Proxy.Helpers.ProxyInfo", ".ctor");
+
+        var target = StaleProxyValues.Replace(current, OwnOnly, null, () => throw failure);
+
+        AssertNotCleaned(current, target);
+        Assert.Same(failure, target.CleanFailure);
     }
 
     [Fact]
@@ -305,7 +411,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         Assert.False(MacProxyOf(target.Snapshot, "Wi-Fi", "Https").Enabled);
     }
 
@@ -316,7 +421,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(1, "http=corp.example:80"), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
@@ -327,7 +431,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
-        Assert.NotNull(target);
         var kde = Field(target.Snapshot, "_kde")!;
         Assert.Equal("", kde["HttpsProxy"]!.GetValue<string>());
         Assert.Equal("1", kde["ProxyType"]!.GetValue<string>());
@@ -341,7 +444,6 @@ public sealed class StaleProxyValuesTests
 
         var target = StaleProxyValues.Replace(current, [lan], null);
 
-        Assert.NotNull(target);
         Assert.Equal([lan], target.ReplacedEndpoints);
     }
 
@@ -357,5 +459,25 @@ public sealed class StaleProxyValuesTests
     public void The_stale_set_holds_the_previous_endpoint_and_the_own_endpoint()
     {
         Assert.Equal([Dead, Own], StaleProxyValues.Endpoints(Own, "127.0.0.1:9"));
+    }
+
+    /// <summary>Asserts the Windows <c>originalValues</c> of two snapshots are equal, derived fields included.</summary>
+    private static void AssertWindowsValues(string expected, string actual) =>
+        Assert.Equal(Field(expected, "originalValues")!.ToJsonString(), Field(actual, "originalValues")!.ToJsonString());
+
+    /// <summary>Asserts <paramref name="target" /> is the capture as taken, with nothing stale found and no failure.</summary>
+    private static void AssertKept(string current, RestoreTarget target)
+    {
+        Assert.Equal(current, target.Snapshot);
+        Assert.Empty(target.ReplacedEndpoints);
+        Assert.Null(target.CleanFailure);
+    }
+
+    /// <summary>Asserts <paramref name="target" /> is the capture as taken because cleaning failed.</summary>
+    private static void AssertNotCleaned(string current, RestoreTarget target)
+    {
+        Assert.Equal(current, target.Snapshot);
+        Assert.Empty(target.ReplacedEndpoints);
+        Assert.NotNull(target.CleanFailure);
     }
 }

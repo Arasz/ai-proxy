@@ -9,4 +9,10 @@ public sealed record RestoreTarget(string Snapshot, IReadOnlyList<IPEndPoint> Re
 {
     /// <summary>True when at least one captured value pointed at a stale endpoint.</summary>
     public bool ReplacedStaleValues => ReplacedEndpoints.Count > 0;
+
+    /// <summary>Why the capture could not be checked for stale values and was kept as taken; null when the check ran.</summary>
+    public Exception? CleanFailure { get; init; }
+
+    /// <summary>Why the cleaned settings could not be loaded for restore, so a fresh capture was kept instead; null when they loaded.</summary>
+    public Exception? LoadFailure { get; init; }
 }

@@ -145,7 +145,7 @@ public sealed class TitaniumProxyServiceTests
         {
             OwnedEndpoint = "corporate.example:8080",
             FailRestore = true,
-            Target = new RestoreTarget("cleaned-settings", [dead])
+            StaleValuesAt = [dead]
         };
         await using var service = CreateService(registrar, 0, directory.Path, loggerProvider: logs);
 
@@ -175,7 +175,47 @@ public sealed class TitaniumProxyServiceTests
 
         Assert.Equal([new IPEndPoint(IPAddress.Loopback, service.Address.Port)], registrar.TargetRequest?.StaleEndpoints);
         Assert.Null(registrar.TargetRequest?.PreviousSnapshot);
-        Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1317);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1317 or 1318 or 1319);
+    }
+
+    [Fact]
+    public async Task A_capture_that_could_not_be_cleaned_is_reported_and_saved_as_captured()
+    {
+        using var directory = new TemporaryDirectory();
+        var logs = new RecordingLoggerProvider();
+        var failure = new InvalidOperationException("The captured system proxy snapshot has an unexpected shape.");
+        var registrar = new RecordingSystemProxyRegistrar { FailRestore = true, CleanFailure = failure };
+        await using var service = CreateService(registrar, 0, directory.Path, loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        var warning = Assert.Single(logs.Entries, entry => entry.EventId == 1318);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Same(failure, warning.Exception);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1317 or 1319);
+        using var reopened = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.Equal("prior-system-proxy-settings", reopened.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public async Task A_cleaned_capture_the_backend_could_not_load_is_reported_and_the_raw_capture_is_saved()
+    {
+        using var directory = new TemporaryDirectory();
+        var logs = new RecordingLoggerProvider();
+        var failure = new MissingFieldException("MacOsSystemProxyBackend", "_original");
+        var registrar = new RecordingSystemProxyRegistrar { FailRestore = true, LoadFailure = failure };
+        await using var service = CreateService(registrar, 0, directory.Path, loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        var warning = Assert.Single(logs.Entries, entry => entry.EventId == 1319);
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Same(failure, warning.Exception);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1317 or 1318);
+        using var reopened = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.Equal("prior-system-proxy-settings", reopened.PreviousSettingsSnapshot);
     }
 
     [Fact]
@@ -509,8 +549,14 @@ public sealed class TitaniumProxyServiceTests
 
         public bool RestoreFindsOwnership { get; init; } = true;
 
-        /// <summary>What <see cref="CaptureRestoreTarget" /> returns, or null for the unchanged prior settings.</summary>
-        public RestoreTarget? Target { get; init; }
+        /// <summary>The endpoints the system settings still point at; a capture replaces those it is asked to check.</summary>
+        public IPEndPoint[] StaleValuesAt { get; init; } = [];
+
+        /// <summary>Why cleaning the capture failed, or null when it ran.</summary>
+        public Exception? CleanFailure { get; init; }
+
+        /// <summary>Why loading the cleaned capture failed, or null when it loaded.</summary>
+        public Exception? LoadFailure { get; init; }
 
         /// <summary>The arguments of the last <see cref="CaptureRestoreTarget" /> call, or null before one.</summary>
         public TargetCall? TargetRequest { get; private set; }
@@ -525,7 +571,13 @@ public sealed class TitaniumProxyServiceTests
         {
             events?.Add("capture");
             TargetRequest = new TargetCall(staleEndpoints.ToArray(), previousSnapshot);
-            return Target ?? new RestoreTarget("prior-system-proxy-settings", []);
+            if (CleanFailure is not null || LoadFailure is not null)
+            {
+                return new RestoreTarget("prior-system-proxy-settings", []) { CleanFailure = CleanFailure, LoadFailure = LoadFailure };
+            }
+
+            var replaced = staleEndpoints.Where(StaleValuesAt.Contains).ToArray();
+            return new RestoreTarget(replaced.Length > 0 ? "cleaned-settings" : "prior-system-proxy-settings", replaced);
         }
 
         public bool IsOwned(string endpoint) => endpoint == OwnedEndpoint;

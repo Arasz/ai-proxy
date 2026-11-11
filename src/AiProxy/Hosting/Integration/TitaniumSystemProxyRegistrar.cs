@@ -33,15 +33,32 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server, ISystemProx
     public RestoreTarget CaptureRestoreTarget(IReadOnlyCollection<IPEndPoint> staleEndpoints, string? previousSnapshot)
     {
         var captured = platform.Capture();
-        var target = StaleProxyValues.Replace(captured, staleEndpoints, previousSnapshot) ?? new RestoreTarget(captured, []);
+        var target = StaleProxyValues.Replace(captured, staleEndpoints, previousSnapshot);
         if (target.ReplacedStaleValues)
         {
-            // Titanium restores what its backend holds after a failed set and on exit, so the backend must hold the cleaned settings too.
-            platform.Load(target.Snapshot);
+            target = Load(target);
         }
 
         _previousSettingsSnapshot = target.Snapshot;
         return target;
+    }
+
+    /// <summary>
+    ///     Loads <paramref name="target" /> into the backend, since Titanium restores what its backend holds after a failed set and on exit.
+    ///     When that fails, the backend is re-armed with a fresh capture, as a start did before stale values were cleaned.
+    /// </summary>
+    private RestoreTarget Load(RestoreTarget target)
+    {
+        try
+        {
+            platform.Load(target.Snapshot);
+            return target;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            platform.Disarm();
+            return new RestoreTarget(platform.Capture(), []) { LoadFailure = exception };
+        }
     }
 
     /// <inheritdoc />

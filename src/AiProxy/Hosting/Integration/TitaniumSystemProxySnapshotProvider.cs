@@ -14,6 +14,12 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const string UnnamedProtocol = "";
 
+    /// <summary>The type name of Titanium's macOS backend, as a snapshot records it.</summary>
+    internal const string MacBackendType = "Titanium.Web.Proxy.Helpers.MacOsSystemProxyBackend";
+
+    /// <summary>The protocol prefixes of a macOS service's proxy fields, such as <c>HttpsEnabled</c>.</summary>
+    internal static readonly string[] MacProtocols = ["Http", "Https"];
+
     /// <inheritdoc />
     public string Capture()
     {
@@ -297,7 +303,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     {
         var root = JsonNode.Parse(snapshot);
         if (root?["backendType"] is not JsonValue type || !type.TryGetValue<string>(out var backendType) ||
-            backendType != "Titanium.Web.Proxy.Helpers.MacOsSystemProxyBackend" ||
+            backendType != MacBackendType ||
             root["values"]?["_original"] is not JsonValue original || !original.TryGetValue<string>(out var services) ||
             JsonNode.Parse(services) is not JsonArray entries)
         {
@@ -306,7 +312,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
         foreach (var entry in entries.OfType<JsonObject>())
         {
-            foreach (var protocol in (string[])["Http", "Https"])
+            foreach (var protocol in MacProtocols)
             {
                 if (entry[$"{protocol}Enabled"] is JsonValue enabled && enabled.TryGetValue<bool>(out var on) && !on)
                 {

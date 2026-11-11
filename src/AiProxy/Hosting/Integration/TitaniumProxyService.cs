@@ -216,6 +216,16 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             Log.StaleValuesReplaced(_logger, string.Join(", ", target.ReplacedEndpoints));
         }
 
+        if (target.CleanFailure is { } cleanFailure)
+        {
+            Log.StaleValuesNotChecked(_logger, cleanFailure);
+        }
+
+        if (target.LoadFailure is { } loadFailure)
+        {
+            Log.CleanedValuesNotLoaded(_logger, loadFailure);
+        }
+
         marker.Write(endpoint, target.Snapshot);
         string appliedSettingsSnapshot;
         try
@@ -499,6 +509,14 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         /// <summary>Values still pointing at ai-proxy were replaced in the settings saved for restore.</summary>
         [LoggerMessage(EventId = 1317, Level = LogLevel.Warning, Message = "The system proxy still pointed at ai-proxy at {Endpoints}; those values will be restored to the settings saved before that run, or turned off")]
         public static partial void StaleValuesReplaced(ILogger logger, string endpoints);
+
+        /// <summary>The captured settings could not be checked for values still pointing at ai-proxy.</summary>
+        [LoggerMessage(EventId = 1318, Level = LogLevel.Warning, Message = "The system proxy settings could not be checked for values still pointing at ai-proxy; saved them as captured, so a stale value among them is restored as it is")]
+        public static partial void StaleValuesNotChecked(ILogger logger, Exception exception);
+
+        /// <summary>The cleaned settings could not be loaded into Titanium's backend.</summary>
+        [LoggerMessage(EventId = 1319, Level = LogLevel.Warning, Message = "The system proxy settings cleaned of values pointing at ai-proxy could not be loaded for restore; saved the settings as captured instead, so those values are restored as they are")]
+        public static partial void CleanedValuesNotLoaded(ILogger logger, Exception exception);
 
         /// <summary>The guard session could not be reached.</summary>
         [LoggerMessage(EventId = 1303, Level = LogLevel.Warning, Message = "The system proxy guard could not be reached; it has probably ended")]
