@@ -404,7 +404,7 @@ public sealed partial class ProviderRequestInspector(
 
         exchange.GainRule = rule;
         exchange.GainMethod = method;
-        exchange.GainLayer = rule is GainLabels.Rules.Unchanged or GainLabels.Rules.CcrPlanFailed or GainLabels.Rules.CcrTool ? GainLabels.Unknown : GainLabels.Layers.ToolResult;
+        exchange.GainLayer = GainLabels.Layers.Of(rule);
         exchange.GainPipeline = compression.Compresses && !passthrough ? GainLabels.Pipelines.Content : GainLabels.Pipelines.Passthrough;
         exchange.GainAt = time.GetUtcNow();
         try

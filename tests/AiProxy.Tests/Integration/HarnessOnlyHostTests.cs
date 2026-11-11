@@ -168,7 +168,8 @@ public sealed class HarnessOnlyHostTests : IDisposable
         Assert.Equal(zstd, received.BodyBytes);
         Assert.Equal("zstd", received.Headers["Content-Encoding"]);
         var row = await OnlyHistoryAsync(proxy);
-        Assert.Equal(("/project/codex", "openai", GainLabels.Rules.Unchanged, GainLabels.Pipelines.Passthrough), (row.Project, row.Provider, row.Rule, row.Pipeline));
+        Assert.Equal(("/project/codex", "openai", GainLabels.Rules.Unchanged, GainLabels.Layers.None, GainLabels.Pipelines.Passthrough),
+            (row.Project, row.Provider, row.Rule, row.Layer, row.Pipeline));
         Assert.Equal((json.LongLength, json.LongLength), (row.Totals.OriginalCharacters, row.Totals.ForwardedCharacters));
         Assert.Equal(json, Assert.Single(await ReadCapturedBodiesAsync(proxy)));
         Assert.Equal((200L, 50L, (long?)null, 800L, (string?)null), await ReadUsageAsync(proxy));
@@ -188,7 +189,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(body, Assert.Single(upstream.Requests).BodyBytes);
         var row = await OnlyHistoryAsync(proxy);
-        Assert.Equal(("/project/plain", GainLabels.Rules.Unchanged, GainLabels.Pipelines.Passthrough), (row.Project, row.Rule, row.Pipeline));
+        Assert.Equal(("/project/plain", GainLabels.Rules.Unchanged, GainLabels.Layers.None, GainLabels.Pipelines.Passthrough), (row.Project, row.Rule, row.Layer, row.Pipeline));
     }
 
     [Fact]

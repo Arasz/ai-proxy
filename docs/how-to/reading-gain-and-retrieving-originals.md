@@ -67,7 +67,8 @@ counts in N. The balance is an estimate from the sizes sent, not a provider-bill
 is why the Method line still says net billed savings are unavailable; the Follow-up bytes are the exact length of the body sent.
 
 Follow-ups appear in the summary and in the `--by-method`, `--by-rule`, `--by-layer` and `--by-pipeline`
-attribution views, under the path of the request that caused them, and follow the project, date
+attribution views, under the method, rule and pipeline of the request that caused them and the
+layer `retrieval` (as recalls do), and follow the project, date
 and provider filters. The `--daily`, `--weekly` and `--monthly` buckets list requests only, so
 their follow-up figures are zero. A follow-up is stamped with the time its request started, and it
 is recorded only after the provider accepts it; a refused or failed follow-up records nothing.
@@ -76,7 +77,14 @@ Capture does not need to be on.
 A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
 inspect, such as a body over 8 MB or a chunked body, are not counted). A request whose only change is
 the `proxy_retrieve` definition is recorded under the rule `ccr.tool`; its tool tokens appear in the
-Tool column and its net is negative. Only model calls count in the totals
+Tool column and its net is negative.
+
+`--by-layer` groups by where the change applied: `tool_result` (the proxy reduced tool output),
+`ccr_tool` (the only change is the `proxy_retrieve` definition), `none` (forwarded unchanged,
+including a request refused because the retrieval ledger was unavailable), and `retrieval` (recalls
+and follow-ups). Rows recorded before 0.28.2 keep the layer they were written with: `unknown` for
+unchanged, refused and `ccr.tool` requests, and their request's layer for recalls and follow-ups.
+`--by-rule` still tells those requests apart. Only model calls count in the totals
 and percentages: `POST` to `/v1/messages` (Anthropic), the chat completions, completions, responses and
 messages endpoints (OpenAI-style hosts, OpenRouter) and `generateContent` / `streamGenerateContent` (Gemini).
 Other calls to a provider host, such as Claude Code telemetry, are recorded as **other traffic** and shown
