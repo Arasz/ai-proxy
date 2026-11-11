@@ -175,29 +175,57 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         Directory.CreateDirectory(_home);
         var scriptPath = Path.Combine(_home, "slow-command");
         var pidPath = Path.Combine(_home, "child.pid");
-        var output = writesOutput ? "while :; do printf '%1024s\\n' x; done" : "sleep 30";
+        var readingPath = Path.Combine(_home, "child.reading");
+        // 256 KiB is more than any pipe buffer holds, so the marker only appears once the reader drains output.
+        var output = writesOutput
+            ? """
+              i=0
+              while [ $i -lt 256 ]; do printf '%1023s\n' x; i=$((i+1)); done
+              : > "$2"
+              while :; do printf '%1023s\n' x; done
+              """
+            : "sleep 30";
         var script = $$"""
                      #!/bin/sh
-                     printf '%s\n' "$$" > "$1"
+                     printf '%s\n' "$$" > "$1.tmp" && mv "$1.tmp" "$1"
                      {{output}}
                      """;
         await File.WriteAllTextAsync(scriptPath, script, CancellationToken.None);
         File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
         using var cancellation = new CancellationTokenSource();
-        var run = RunAsync(scriptPath, [pidPath], cancellationToken: cancellation.Token);
+        var run = RunAsync(scriptPath, [pidPath, readingPath], cancellationToken: cancellation.Token);
+        try
+        {
+            await WaitForFileAsync(pidPath, run);
+            Assert.True(File.Exists(pidPath), "The fixture command did not publish its PID before the timeout.");
+            if (writesOutput)
+            {
+                await WaitForFileAsync(readingPath, run);
+                Assert.True(File.Exists(readingPath), "The fixture output was not being read before the timeout.");
+            }
+
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+
+            var childId = int.Parse(await File.ReadAllTextAsync(pidPath, CancellationToken.None));
+            Assert.True(HasExited(childId), $"certutil test process {childId} was left running after cancellation.");
+        }
+        finally
+        {
+            cancellation.Cancel();
+            await ((Task)run).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    /// <summary>Waits up to five seconds for a fixture file, returning early when the command ends.</summary>
+    private static async Task WaitForFileAsync(string path, Task run)
+    {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
-        while (!File.Exists(pidPath) && !run.IsCompleted && DateTimeOffset.UtcNow < deadline)
+        while (!File.Exists(path) && !run.IsCompleted && DateTimeOffset.UtcNow < deadline)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
         }
-
-        Assert.True(File.Exists(pidPath), "The fixture command did not publish its PID before the timeout.");
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
-
-        var childId = int.Parse(await File.ReadAllTextAsync(pidPath, CancellationToken.None));
-        Assert.True(HasExited(childId), $"certutil test process {childId} was left running after cancellation.");
     }
 
     [SupportedOSPlatform("linux")]

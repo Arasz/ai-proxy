@@ -33,13 +33,22 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     /// <inheritdoc />
     public void Set(ExplicitProxyEndPoint endPoint)
     {
-        _endpoint = new IPEndPoint(endPoint.IpAddress, endPoint.Port).ToString();
+        Prepare(endPoint);
         var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, BypassSettings());
         if (!result.Succeeded)
         {
             server.TryRestoreOriginalProxySettings();
             throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
         }
+    }
+
+    internal string? PreviousSettingsSnapshot => _previousSettingsSnapshot;
+
+    /// <summary>Records the endpoint <see cref="Restore" /> checks ownership against, capturing a snapshot when none was taken yet.</summary>
+    internal void Prepare(ExplicitProxyEndPoint endPoint)
+    {
+        _previousSettingsSnapshot ??= SnapshotProvider.Capture();
+        _endpoint = new IPEndPoint(endPoint.IpAddress, endPoint.Port).ToString();
     }
 
     /// <summary>Adds the loopback hosts to the system bypass list, so local calls never loop back into the proxy.</summary>
@@ -55,14 +64,22 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     }
 
     /// <inheritdoc />
-    public void Restore()
+    public bool Restore()
     {
         if (_endpoint is null || _previousSettingsSnapshot is null)
         {
             throw new InvalidOperationException("The system proxy recovery snapshot is unavailable.");
         }
 
-        SnapshotProvider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot).GetAwaiter().GetResult();
+        var provider = SnapshotProvider;
+        if (provider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot).GetAwaiter().GetResult())
+        {
+            return true;
+        }
+
+        // Someone changed the settings since; Server.Stop and process exit must not restore the stale snapshot over them.
+        provider.Disarm();
+        return false;
     }
 
     /// <inheritdoc />

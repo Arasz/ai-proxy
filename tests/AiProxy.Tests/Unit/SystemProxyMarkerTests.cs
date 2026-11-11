@@ -44,7 +44,7 @@ public sealed class SystemProxyMarkerTests
     }
 
     [Fact]
-    public async Task A_torn_json_marker_is_rejected_instead_of_treated_as_a_legacy_endpoint()
+    public async Task A_torn_json_marker_from_an_interrupted_write_does_not_block_the_next_owner()
     {
         using var directory = new TemporaryDirectory();
         Directory.CreateDirectory(directory.Path);
@@ -52,10 +52,72 @@ public sealed class SystemProxyMarkerTests
         const string tornRecord = "{\"endpoint\":\"127.0.0.1:9090\"";
         await File.WriteAllTextAsync(path, tornRecord, TestContext.Current.CancellationToken);
 
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        Assert.True(marker.DiscardedTornRecord);
+        Assert.False(marker.PreviousRunDied);
+        Assert.Null(marker.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public async Task A_complete_json_record_with_an_invalid_endpoint_is_still_rejected()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, SystemProxyMarker.FileName);
+        const string corrupt = "{\"endpoint\":\"not an endpoint\"}";
+        await File.WriteAllTextAsync(path, corrupt, TestContext.Current.CancellationToken);
+
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System));
 
-        Assert.Equal(tornRecord, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+        Assert.Equal(corrupt, await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_record_rewritten_with_a_shorter_one_leaves_no_trailing_bytes()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), new string('x', 4096));
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9091), "short");
+        }
+
+        using var next = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.False(next.DiscardedTornRecord);
+        Assert.Equal("127.0.0.1:9091", next.PreviousEndpoint);
+        Assert.Equal("short", next.PreviousSettingsSnapshot);
+    }
+
+    [Fact]
+    public async Task The_marker_file_is_private_to_the_current_user_on_windows()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows ACLs apply only on Windows.");
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, SystemProxyMarker.FileName);
+        await File.WriteAllTextAsync(path, "", TestContext.Current.CancellationToken);
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        var security = new FileInfo(path).GetAccessControl();
+        var rules = security.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .ToArray();
+        var user = System.Security.Principal.WindowsIdentity.GetCurrent().User;
+
+        Assert.True(security.AreAccessRulesProtected, "The marker must not inherit the directory's access rules.");
+        Assert.NotEmpty(rules);
+        foreach (var rule in rules)
+        {
+            Assert.Equal(user, rule.IdentityReference);
+        }
     }
 
     [Fact]

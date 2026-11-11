@@ -16,15 +16,37 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     /// <inheritdoc />
     public string Capture()
     {
+        CaptureOriginalSettings(GetBackend(server));
+        return Read();
+    }
+
+    /// <summary>Serializes the values the backend would restore now, without reading the system settings.</summary>
+    internal string Read()
+    {
         var backend = GetBackend(server);
-        CaptureOriginalSettings(backend);
-        var fields = SnapshotFieldNames()
-            .ToDictionary(name => name, name => ReadField(backend, name), StringComparer.Ordinal);
-        var values = fields.ToDictionary(
-            pair => pair.Key,
-            pair => SystemProxySnapshotCodec.Write(pair.Value, GetField(backend, pair.Key).FieldType),
+        var values = SnapshotFieldNames().ToDictionary(
+            name => name,
+            name => SystemProxySnapshotCodec.Write(ReadField(backend, name), GetField(backend, name).FieldType),
             StringComparer.Ordinal);
         return JsonSerializer.Serialize(new SnapshotDocument(1, backend.GetType().FullName!, values), JsonOptions);
+    }
+
+    /// <summary>True while the backend holds settings that stopping or exiting the server would restore.</summary>
+    internal bool IsArmed => OperatingSystem.IsWindows()
+        ? ReadField(GetBackend(server), "originalValues") is not null
+        : ReadField(GetBackend(server), "_hasSnapshot") is true;
+
+    /// <summary>Drops the backend's saved settings, so stopping or exiting the server restores nothing.</summary>
+    internal void Disarm()
+    {
+        var backend = GetBackend(server);
+        if (OperatingSystem.IsWindows())
+        {
+            GetField(backend, "originalValues").SetValue(backend, null);
+            return;
+        }
+
+        GetField(backend, "_hasSnapshot").SetValue(backend, false);
     }
 
     /// <inheritdoc />
@@ -77,29 +99,19 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     /// <inheritdoc />
     public bool IsOwned(string endpoint, string snapshot)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return IsOwned(endpoint);
-        }
-
         if (!IPEndPoint.TryParse(endpoint, out var endpointAddress))
         {
             return false;
         }
 
-        var originalProxyOverride = ReadOriginalWindowsProxyOverride(snapshot);
-        var originalProxyServer = ReadOriginalWindowsProxyServer(snapshot);
-        var expectedProxyOverride = TitaniumSystemProxyRegistrar.BypassSettings().BuildProxyOverride(originalProxyOverride);
-        var current = ReadWindowsProxyInfo(GetBackend(server));
-        return WindowsProxyIsOwned(
-            current.ProxyEnable,
-            current.AutoConfigUrl,
-            current.ProxyServer,
-            current.ProxyOverride,
-            originalProxyServer,
-            originalProxyOverride,
-            endpointAddress.ToString(),
-            expectedProxyOverride);
+        if (!OperatingSystem.IsWindows())
+        {
+            return UnixProxyIsOwned(GetStaleLocalProxyProtocols(GetBackend(server), endpointAddress.Port));
+        }
+
+        var original = ReadOriginalWindowsProxyInfo(snapshot);
+        var expectedProxyOverride = TitaniumSystemProxyRegistrar.BypassSettings().BuildProxyOverride(original.ProxyOverride);
+        return WindowsProxyIsOwned(ReadWindowsProxyInfo(GetBackend(server)), original, endpointAddress.ToString(), expectedProxyOverride);
     }
 
     internal static bool WindowsProxyIsActive(int? proxyEnable, string? autoConfigUrl)
@@ -107,33 +119,47 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return proxyEnable == 1 && string.IsNullOrWhiteSpace(autoConfigUrl);
     }
 
-    internal static bool WindowsProxyIsOwned(
-        int? proxyEnable,
-        string? autoConfigUrl,
-        string? proxyServer,
-        string? proxyOverride,
-        string? originalProxyServer,
-        string? originalProxyOverride,
-        string endpoint,
-        string expectedProxyOverride)
+    /// <summary>ai-proxy always sets HTTP and HTTPS together, so a single protocol still pointing at it means the other was changed.</summary>
+    internal static bool UnixProxyIsOwned(ProxyProtocolType owned) => owned == ProxyProtocolType.AllHttp;
+
+    /// <summary>
+    ///     True when every value is either what ai-proxy set or what the snapshot holds, and at least one is still ai-proxy's,
+    ///     so a restore (or a retry of a partly applied one) never overwrites a change made by someone else.
+    /// </summary>
+    internal static bool WindowsProxyIsOwned(WindowsProxyInfo current, WindowsProxyInfo original, string endpoint, string expectedProxyOverride)
     {
-        if (!WindowsProxyIsActive(proxyEnable, autoConfigUrl) || !IPEndPoint.TryParse(endpoint, out var expected))
+        if (!IPEndPoint.TryParse(endpoint, out var expected))
         {
             return false;
         }
 
-        var protocols = ParseProxyServer(proxyServer);
-        var originalProtocols = ParseProxyServer(originalProxyServer);
+        var protocols = ParseProxyServer(current.ProxyServer);
+        var originalProtocols = ParseProxyServer(original.ProxyServer);
         var httpOwned = ProxyMatches(protocols, "http", expected);
         var httpsOwned = ProxyMatches(protocols, "https", expected);
-        var otherProtocolsMatchSnapshot =
-            (httpOwned || SameProxy(protocols, originalProtocols, "http")) &&
-            (httpsOwned || SameProxy(protocols, originalProtocols, "https"));
+        var proxyOverride = current.ProxyOverride ?? string.Empty;
+        var originalProxyOverride = original.ProxyOverride ?? string.Empty;
+        var overrideOwned = string.Equals(proxyOverride, expectedProxyOverride, StringComparison.Ordinal) &&
+                            !string.Equals(expectedProxyOverride, originalProxyOverride, StringComparison.Ordinal);
 
-        return (httpOwned || httpsOwned) &&
-               otherProtocolsMatchSnapshot &&
-               (string.Equals(proxyOverride ?? string.Empty, expectedProxyOverride, StringComparison.Ordinal) ||
-                string.Equals(proxyOverride ?? string.Empty, originalProxyOverride ?? string.Empty, StringComparison.Ordinal));
+        var unchangedByOthers =
+            (current.ProxyEnable == 1 || current.ProxyEnable == original.ProxyEnable) &&
+            (string.IsNullOrWhiteSpace(current.AutoConfigUrl) || string.Equals(current.AutoConfigUrl, original.AutoConfigUrl, StringComparison.Ordinal)) &&
+            (httpOwned || SameProxy(protocols, originalProtocols, "http")) &&
+            (httpsOwned || SameProxy(protocols, originalProtocols, "https")) &&
+            OtherProtocolsUnchanged(protocols, originalProtocols) &&
+            (string.Equals(proxyOverride, expectedProxyOverride, StringComparison.Ordinal) ||
+             string.Equals(proxyOverride, originalProxyOverride, StringComparison.Ordinal));
+
+        return unchangedByOthers && (httpOwned || httpsOwned || overrideOwned);
+    }
+
+    /// <summary>Titanium drops non-HTTP entries when it sets the proxy, so each remaining one must still be the snapshot's.</summary>
+    private static bool OtherProtocolsUnchanged(IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> original)
+    {
+        return current.Keys
+            .Where(protocol => !protocol.Equals("http", StringComparison.OrdinalIgnoreCase) && !protocol.Equals("https", StringComparison.OrdinalIgnoreCase))
+            .All(protocol => SameProxy(current, original, protocol));
     }
 
     private static Dictionary<string, string> ParseProxyServer(string? proxyServer)
@@ -164,37 +190,40 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return address.Equals(expected.Address) && uri.Port == expected.Port;
     }
 
-    private static (int? ProxyEnable, string? AutoConfigUrl, string? ProxyServer, string? ProxyOverride) ReadWindowsProxyInfo(object backend)
+    private static WindowsProxyInfo ReadWindowsProxyInfo(object backend)
     {
         var readCurrent = backend.GetType().GetMethod("GetProxyInfoFromRegistry", BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("The installed Windows proxy backend cannot verify proxy ownership.");
         var current = readCurrent.Invoke(null, null)
             ?? throw new InvalidOperationException("The current Windows proxy settings could not be read.");
-        return (
+        return new WindowsProxyInfo(
             current.GetType().GetProperty("ProxyEnable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(current) as int?,
             current.GetType().GetProperty("AutoConfigUrl", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(current) as string,
             current.GetType().GetProperty("ProxyServer", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(current) as string,
             current.GetType().GetProperty("ProxyOverride", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(current) as string);
     }
 
-    private static string? ReadOriginalWindowsProxyOverride(string snapshot)
-    {
-        return ReadOriginalWindowsProxyProperty(snapshot, "ProxyOverride");
-    }
-
-    private static string? ReadOriginalWindowsProxyServer(string snapshot)
-    {
-        return ReadOriginalWindowsProxyProperty(snapshot, "ProxyServer");
-    }
-
-    private static string? ReadOriginalWindowsProxyProperty(string snapshot, string property)
+    private static WindowsProxyInfo ReadOriginalWindowsProxyInfo(string snapshot)
     {
         using var document = JsonDocument.Parse(snapshot);
         var value = document.RootElement.GetProperty("values").GetProperty("originalValues");
         using var original = JsonDocument.Parse(value.GetString() ?? "null");
-        return original.RootElement.ValueKind == JsonValueKind.Object && original.RootElement.TryGetProperty(property, out var valueNode)
-            ? valueNode.GetString()
-            : null;
+        if (original.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return new WindowsProxyInfo(null, null, null, null);
+        }
+
+        var root = original.RootElement;
+        return new WindowsProxyInfo(
+            root.TryGetProperty("ProxyEnable", out var enable) && enable.ValueKind == JsonValueKind.Number ? enable.GetInt32() : null,
+            StringProperty(root, "AutoConfigUrl"),
+            StringProperty(root, "ProxyServer"),
+            StringProperty(root, "ProxyOverride"));
+    }
+
+    private static string? StringProperty(JsonElement element, string property)
+    {
+        return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     }
 
     private static ProxyProtocolType GetStaleLocalProxyProtocols(object backend, int port)
@@ -218,7 +247,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
     private static bool HasOwnedProtocols(ProxyProtocolType protocols) => protocols != ProxyProtocolType.None;
 
-    /// <inheritdoc />
+    /// <summary>Loads a saved snapshot into this server's backend, so its restore writes those settings.</summary>
     internal void HydrateSnapshot(string snapshot)
     {
         var document = JsonSerializer.Deserialize<SnapshotDocument>(snapshot, JsonOptions)
@@ -306,3 +335,6 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
     private sealed record SnapshotDocument(int Version, string BackendType, Dictionary<string, string> Values);
 }
+
+/// <summary>The WinINET proxy values Titanium reads from and restores to the registry.</summary>
+internal sealed record WindowsProxyInfo(int? ProxyEnable, string? AutoConfigUrl, string? ProxyServer, string? ProxyOverride);

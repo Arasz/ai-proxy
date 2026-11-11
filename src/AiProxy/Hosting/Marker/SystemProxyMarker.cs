@@ -1,4 +1,7 @@
 using System.Net;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Hosting.Proxy;
@@ -21,12 +24,13 @@ public sealed class SystemProxyMarker : IDisposable
     private readonly string _path;
     private readonly FileStream _stream;
 
-    private SystemProxyMarker(FileStream stream, string path, string? previousEndpoint, string? previousSettingsSnapshot)
+    private SystemProxyMarker(FileStream stream, string path, MarkerRecord record)
     {
         _stream = stream;
         _path = path;
-        PreviousEndpoint = previousEndpoint;
-        PreviousSettingsSnapshot = previousSettingsSnapshot;
+        PreviousEndpoint = record.Endpoint;
+        PreviousSettingsSnapshot = record.PreviousSettingsSnapshot;
+        DiscardedTornRecord = record.Torn;
     }
 
     /// <summary>The endpoint the file still named when it was taken, or null when it was empty.</summary>
@@ -34,6 +38,9 @@ public sealed class SystemProxyMarker : IDisposable
 
     /// <summary>The serialized system proxy settings that preceded the previous run, when available.</summary>
     public string? PreviousSettingsSnapshot { get; }
+
+    /// <summary>True when the file held a record cut short by an interrupted write, which never preceded a system proxy change.</summary>
+    public bool DiscardedTornRecord { get; }
 
     /// <summary>True when the file still named an endpoint, so an earlier run ended with the system proxy set.</summary>
     public bool PreviousRunDied => PreviousEndpoint is not null;
@@ -56,7 +63,7 @@ public sealed class SystemProxyMarker : IDisposable
             {
                 stream = OpenMarker(path);
                 var record = ReadRecord(stream);
-                var marker = new SystemProxyMarker(stream, path, record.Endpoint, record.PreviousSettingsSnapshot);
+                var marker = new SystemProxyMarker(stream, path, record);
                 stream = null;
                 return marker;
             }
@@ -80,13 +87,16 @@ public sealed class SystemProxyMarker : IDisposable
         }
     }
 
-    /// <summary>Records the proxy endpoint and the system settings that must be restored after a crash.</summary>
+    /// <summary>
+    ///     Records the proxy endpoint and the system settings that must be restored after a crash, durably, before the proxy is set.
+    ///     An interrupted write leaves a prefix of the JSON object, which the next owner discards as torn.
+    /// </summary>
     public void Write(IPEndPoint endPoint, string? previousSettingsSnapshot = null)
     {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(new MarkerRecord(endPoint.ToString(), previousSettingsSnapshot), JsonOptions);
         _stream.SetLength(0);
         _stream.Position = 0;
-        var record = new MarkerRecord(endPoint.ToString(), previousSettingsSnapshot);
-        JsonSerializer.Serialize(_stream, record, JsonOptions);
+        _stream.Write(bytes);
         _stream.Flush(true);
     }
 
@@ -109,7 +119,7 @@ public sealed class SystemProxyMarker : IDisposable
     {
         if (stream.Length == 0)
         {
-            return new MarkerRecord(null, null);
+            return MarkerRecord.Empty;
         }
 
         var text = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true).ReadToEnd().Trim();
@@ -136,6 +146,12 @@ public sealed class SystemProxyMarker : IDisposable
                 return new MarkerRecord(text, null);
             }
 
+            // Write flushes the whole record before the system proxy is set, so a cut-short record never had a proxy change behind it.
+            if (text.StartsWith('{') && !text.EndsWith('}'))
+            {
+                return MarkerRecord.Empty with { Torn = true };
+            }
+
             throw new InvalidDataException("The system proxy marker is malformed.", exception);
         }
     }
@@ -144,7 +160,18 @@ public sealed class SystemProxyMarker : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
+            var windowsStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, LockShare);
+            try
+            {
+                // The path-based call opens its own WRITE_DAC handle, which the held share mode does not block.
+                new FileInfo(path).SetAccessControl(CurrentUserOnly());
+                return windowsStream;
+            }
+            catch
+            {
+                windowsStream.Dispose();
+                throw;
+            }
         }
 
         var stream = new FileStream(path, new FileStreamOptions
@@ -166,5 +193,21 @@ public sealed class SystemProxyMarker : IDisposable
         }
     }
 
-    private sealed record MarkerRecord(string? Endpoint, string? PreviousSettingsSnapshot);
+    [SupportedOSPlatform("windows")]
+    private static FileSecurity CurrentUserOnly()
+    {
+        var user = WindowsIdentity.GetCurrent().User
+                   ?? throw new InvalidOperationException("The current Windows user has no security identifier.");
+        var security = new FileSecurity();
+        security.SetAccessRuleProtection(true, false);
+        security.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow));
+        return security;
+    }
+
+    private sealed record MarkerRecord(string? Endpoint, string? PreviousSettingsSnapshot)
+    {
+        public static MarkerRecord Empty { get; } = new(null, null);
+
+        public bool Torn { get; init; }
+    }
 }

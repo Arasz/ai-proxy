@@ -1,6 +1,9 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using AiProxy.Hosting.Integration;
 using Titanium.Web.Proxy;
+using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Tests.Unit;
 
@@ -15,11 +18,7 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
         var snapshot = provider.Capture();
         using var document = JsonDocument.Parse(snapshot);
 
-        using var recoveryServer = new ProxyServer(false);
-        var recoveryProvider = new TitaniumSystemProxySnapshotProvider(recoveryServer);
-        recoveryProvider.HydrateSnapshot(snapshot);
-        var currentServer = new ProxyServer(false);
-        using (currentServer)
+        using (var currentServer = new ProxyServer(false))
         {
             var currentSnapshot = new TitaniumSystemProxySnapshotProvider(currentServer).Capture();
             Assert.True(TitaniumSystemProxySnapshotProvider.SnapshotsMatch(snapshot, currentSnapshot));
@@ -28,6 +27,69 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
         Assert.Equal(1, document.RootElement.GetProperty("version").GetInt32());
         Assert.False(string.IsNullOrWhiteSpace(document.RootElement.GetProperty("backendType").GetString()));
         Assert.NotEmpty(document.RootElement.GetProperty("values").EnumerateObject());
+    }
+
+    [Fact]
+    public void Hydrate_loads_the_saved_values_into_a_fresh_backend()
+    {
+        using var server = new ProxyServer(false);
+        var snapshot = new TitaniumSystemProxySnapshotProvider(server).Capture();
+        using var recoveryServer = new ProxyServer(false);
+        var recoveryProvider = new TitaniumSystemProxySnapshotProvider(recoveryServer);
+        Assert.False(TitaniumSystemProxySnapshotProvider.SnapshotsMatch(snapshot, recoveryProvider.Read()), "A fresh backend must start without the saved values.");
+
+        recoveryProvider.HydrateSnapshot(snapshot);
+
+        Assert.True(TitaniumSystemProxySnapshotProvider.SnapshotsMatch(snapshot, recoveryProvider.Read()));
+        Assert.True(recoveryProvider.IsArmed);
+    }
+
+    [Fact]
+    public void Disarm_drops_the_backend_snapshot_so_stopping_the_server_restores_nothing()
+    {
+        using var server = new ProxyServer(false);
+        var provider = new TitaniumSystemProxySnapshotProvider(server);
+        provider.Capture();
+        Assert.True(provider.IsArmed);
+
+        provider.Disarm();
+
+        Assert.False(provider.IsArmed);
+    }
+
+    [Fact]
+    public void A_restore_after_set_without_capture_skips_a_proxy_it_no_longer_owns_and_disarms_titanium()
+    {
+        using var server = new ProxyServer(false);
+        var registrar = new TitaniumSystemProxyRegistrar(server);
+        var unused = new ExplicitProxyEndPoint(IPAddress.Loopback, UnusedPort());
+        registrar.Prepare(unused);
+
+        var restored = registrar.Restore();
+
+        Assert.False(restored);
+        Assert.False(new TitaniumSystemProxySnapshotProvider(server).IsArmed);
+    }
+
+    [Fact]
+    public void Prepare_keeps_a_snapshot_captured_before_it()
+    {
+        using var server = new ProxyServer(false);
+        var registrar = new TitaniumSystemProxyRegistrar(server);
+        var captured = registrar.Capture();
+
+        registrar.Prepare(new ExplicitProxyEndPoint(IPAddress.Loopback, UnusedPort()));
+
+        Assert.Same(captured, registrar.PreviousSettingsSnapshot);
+    }
+
+    private static int UnusedPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 
     [Fact]

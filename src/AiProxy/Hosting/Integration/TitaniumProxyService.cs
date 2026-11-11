@@ -196,17 +196,14 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ArgumentNullException.ThrowIfNull(_endPoint);
 
         var marker = _marker;
+        if (marker.DiscardedTornRecord)
+        {
+            Log.TornMarkerDiscarded(_logger);
+        }
+
         if (marker.PreviousRunDied)
         {
-            Log.PreviousRunDied(_logger, marker.PreviousEndpoint);
-            if (marker.PreviousSettingsSnapshot is not null)
-            {
-                await new SystemProxyRecovery(_systemProxyRegistrar).RestoreIfOwned(marker);
-            }
-            else
-            {
-                await _systemProxyRegistrar.ClearAsync();
-            }
+            await RecoverPreviousRunAsync(marker);
         }
 
         var previousSettingsSnapshot = _systemProxyRegistrar.Capture();
@@ -234,6 +231,35 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         }
     }
 
+    /// <summary>Puts back what a crashed run left, but only while its settings are still current.</summary>
+    private async Task RecoverPreviousRunAsync(SystemProxyMarker marker)
+    {
+        Log.PreviousRunDied(_logger, marker.PreviousEndpoint);
+        if (marker.PreviousSettingsSnapshot is not null)
+        {
+            if (await new SystemProxyRecovery(_systemProxyRegistrar).RestoreIfOwned(marker))
+            {
+                Log.PreviousSettingsRestored(_logger, marker.PreviousEndpoint);
+            }
+            else
+            {
+                Log.PreviousProxyNoLongerOwned(_logger, marker.PreviousEndpoint);
+            }
+
+            return;
+        }
+
+        if (marker.PreviousEndpoint is { } endpoint && _systemProxyRegistrar.IsOwned(endpoint))
+        {
+            await _systemProxyRegistrar.ClearAsync();
+            Log.PreviousProxyCleared(_logger, endpoint);
+        }
+        else
+        {
+            Log.PreviousProxyNoLongerOwned(_logger, marker.PreviousEndpoint);
+        }
+    }
+
     private void ReleaseSystemProxy()
     {
         var restored = true;
@@ -242,7 +268,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             _systemProxySet = false;
             try
             {
-                _systemProxyRegistrar.Restore();
+                if (!_systemProxyRegistrar.Restore())
+                {
+                    Log.RestoreSkipped(_logger);
+                }
             }
             catch (Exception exception)
             {
@@ -429,8 +458,23 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         [LoggerMessage(EventId = 1301, Level = LogLevel.Information, Message = "AI proxy listening at {ProxyAddress}")]
         public static partial void Started(ILogger logger, Uri proxyAddress);
 
-        [LoggerMessage(EventId = 1302, Level = LogLevel.Warning, Message = "A previous ai-proxy run ended with the system proxy set to {Endpoint}; clearing it before setting it again. A proxy configured before that run is not restored")]
+        [LoggerMessage(EventId = 1302, Level = LogLevel.Warning, Message = "A previous ai-proxy run ended with the system proxy set to {Endpoint}; checking whether it still owns the system proxy before setting it again")]
         public static partial void PreviousRunDied(ILogger logger, string? endpoint);
+
+        [LoggerMessage(EventId = 1312, Level = LogLevel.Information, Message = "Restored the system proxy settings saved before the previous ai-proxy run at {Endpoint}")]
+        public static partial void PreviousSettingsRestored(ILogger logger, string? endpoint);
+
+        [LoggerMessage(EventId = 1313, Level = LogLevel.Warning, Message = "The system proxy no longer matches what the previous ai-proxy run at {Endpoint} set; left the current settings untouched")]
+        public static partial void PreviousProxyNoLongerOwned(ILogger logger, string? endpoint);
+
+        [LoggerMessage(EventId = 1314, Level = LogLevel.Warning, Message = "Cleared the system proxy the previous ai-proxy run left at {Endpoint}; that run kept no snapshot, so a proxy configured before it is not restored")]
+        public static partial void PreviousProxyCleared(ILogger logger, string endpoint);
+
+        [LoggerMessage(EventId = 1315, Level = LogLevel.Warning, Message = "The system proxy changed while ai-proxy ran; left the current settings untouched instead of restoring the earlier ones")]
+        public static partial void RestoreSkipped(ILogger logger);
+
+        [LoggerMessage(EventId = 1316, Level = LogLevel.Warning, Message = "The system proxy marker held a record cut short by an interrupted write; discarded it, since that run never set the system proxy")]
+        public static partial void TornMarkerDiscarded(ILogger logger);
 
         [LoggerMessage(EventId = 1303, Level = LogLevel.Warning, Message = "The system proxy guard could not be reached; it has probably ended")]
         public static partial void GuardUnreachable(ILogger logger, Exception exception);
