@@ -37,11 +37,11 @@ system proxy settings or user-root trust are outside this routing path.
 
 ## Compression
 
-Compression stays off unless enabled, because it changes provider request bodies.
+Compression is on by default. It changes provider request bodies, so set `PROXY__COMPRESSION__ENABLED=false` to turn it off.
 
 | Variable | What it is |
 |---|---|
-| `PROXY__COMPRESSION__ENABLED` | `true` turns request compression on. Anything else, or unset, leaves it off. |
+| `PROXY__COMPRESSION__ENABLED` | Request compression. The default is `true`; `false` turns it off. |
 | `PROXY__COMPRESSION__DATABASE` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
 | `PROXY__COMPRESSION__MINIMUM` | A minimum size applied to every content kind, checked against the whole tool result. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
 | `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
@@ -86,13 +86,16 @@ object of how many microseconds each step took. The stages are the proxy's own (
 
 Usage is read from Anthropic Messages JSON and streams, and OpenAI Responses JSON and streams.
 Anthropic stream usage folds `message_start` and `message_delta`; OpenAI stream usage uses the
-terminal Responses event. OpenAI Chat Completions `prompt_tokens` and `completion_tokens` are not
+terminal Responses event. For OpenAI Responses, `input_tokens` in the row is the provider's
+`input_tokens` minus its `input_tokens_details.cached_tokens` (stored as `cache_read_input_tokens`),
+because the provider's figure includes the cached tokens; Anthropic's `input_tokens` is stored as reported. OpenAI Chat Completions `prompt_tokens` and `completion_tokens` are not
 mapped because their cached-token accounting differs from Anthropic's.
 
 When the upstream exposes an identifier, `capture_response.response_message_id` stores the
 Anthropic JSON message ID or `message_start.message.id`, an OpenAI JSON top-level `id`, a Chat
 Completions chunk's top-level `id`, or the nested Responses ID. For Responses streams the last
-terminal event's ID wins. Older `capture.db` files gain this nullable column without losing rows.
+terminal event's ID wins. The column is null when the response exposes no ID, and also when a JSON
+response was over 4 MiB on the wire: that body is dropped unread, so no ID is taken from it. Older `capture.db` files gain this nullable column without losing rows.
 
 The response body is not stored, and neither are response headers. The proxy copies the body as
 it streams past to the client, never holding it back, reads the usage once the response is
@@ -107,7 +110,7 @@ cannot be read they are empty and `usage_error` says why:
 | `encoding:<name>` | The body used a content encoding the proxy does not decode. |
 | `decode-failed` | The body did not decode, or a gzip, zlib-deflate or br body was cut short. A raw-deflate body carries no trailer, so one cut short is read as far as it goes and usually comes out `malformed`. |
 | `malformed` | The body was not JSON, or a stream broke before any usage was read. |
-| `no-usage` | The body was readable and carried no Anthropic usage, such as an error response. |
+| `no-usage` | The body was readable and carried no usage the proxy recognizes: no Anthropic Messages `usage`, or no OpenAI Responses `usage` (`input_tokens`, `output_tokens`, `input_tokens_details.cached_tokens`), such as an error response. |
 | `truncated` | A stream ended inside an event. The counts read before it are kept, so the output count may be the early one from `message_start`. |
 
 An upstream that drops a stream midway still gets a row, with the bytes that passed and

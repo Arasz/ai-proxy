@@ -1,7 +1,8 @@
 # Turning on the compression stage
 
 The stage reduces the tool output in a request before the provider sees it, and keeps what
-it dropped. It is off until you turn it on, because it changes what the provider is sent.
+it dropped. It is on by default and changes what the provider is sent; set
+`PROXY__COMPRESSION__ENABLED=false` to turn it off.
 
 ## What it does to a request
 
