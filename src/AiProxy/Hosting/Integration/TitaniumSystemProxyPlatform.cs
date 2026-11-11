@@ -11,23 +11,35 @@ public sealed class TitaniumSystemProxyPlatform(ProxyServer server) : ISystemPro
     public string Capture() => new TitaniumSystemProxySnapshotProvider(server).Capture();
 
     /// <inheritdoc />
-    public string Apply(ExplicitProxyEndPoint endPoint)
+    public string Apply(ExplicitProxyEndPoint endPoint) =>
+        ApplyWith(
+            endPoint,
+            target => server.TrySetAsSystemProxy(target, ProxyProtocolType.AllHttp, TitaniumSystemProxyRegistrar.BypassSettings()),
+            () => server.TryRestoreOriginalProxySettings(),
+            TitaniumSystemProxySnapshotProvider.CaptureCurrentSettings);
+
+    /// <summary>Sets the system proxy with <paramref name="trySet" /> and returns <paramref name="readBack" />'s settings; calls <paramref name="restore" /> on any failure.</summary>
+    internal static string ApplyWith(
+        ExplicitProxyEndPoint endPoint,
+        Func<ExplicitProxyEndPoint, SystemProxyChangeResult> trySet,
+        Action restore,
+        Func<string> readBack)
     {
-        var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, TitaniumSystemProxyRegistrar.BypassSettings());
+        var result = trySet(endPoint);
         if (!result.Succeeded)
         {
-            server.TryRestoreOriginalProxySettings();
+            restore();
             throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
         }
 
         try
         {
             // Read back through the same reader restore verification uses, so ownership checks compare like with like.
-            return TitaniumSystemProxySnapshotProvider.CaptureCurrentSettings();
+            return readBack();
         }
         catch (Exception exception)
         {
-            server.TryRestoreOriginalProxySettings();
+            restore();
             throw new InvalidOperationException($"The system proxy was set but could not be read back: {exception.Message}", exception);
         }
     }
@@ -35,6 +47,9 @@ public sealed class TitaniumSystemProxyPlatform(ProxyServer server) : ISystemPro
     /// <inheritdoc />
     public bool RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot) =>
         new TitaniumSystemProxySnapshotProvider(server).RestoreIfOwned(endpoint, snapshot, appliedSnapshot).GetAwaiter().GetResult();
+
+    /// <inheritdoc />
+    public void Load(string snapshot) => new TitaniumSystemProxySnapshotProvider(server).HydrateSnapshot(snapshot);
 
     /// <inheritdoc />
     public void Disarm() => new TitaniumSystemProxySnapshotProvider(server).Disarm();

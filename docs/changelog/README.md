@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.28.6](0.28.6-stale-proxy-restore-target.md) | A start no longer saves a system proxy value still pointing at an ai-proxy endpoint as the one to restore; it takes the earlier saved value or turns that protocol off (warning 1317). | [#125](https://github.com/Arasz/ai-proxy/pull/125) |
 | [0.28.5](0.28.5-restore-prior-proxy.md) | After a crash, the next start or the guard restores the system proxy settings ai-proxy replaced, only while they still point at ai-proxy. | [#122](https://github.com/Arasz/ai-proxy/pull/122) |
 | [0.28.4](0.28.4-gain-layer-rulings.md) | Non-model traffic is `none`, in-request recalls take pipeline `ccr`, and the first start relabels old `unknown` gain rows. | [#124](https://github.com/Arasz/ai-proxy/pull/124) |
 | [0.28.2](0.28.2-gain-layer-labels.md) | `ai-proxy gain --by-layer` names every layer (`none`, `ccr_tool`, `tool_result`, `retrieval`) instead of filing most requests under `unknown`. | [#123](https://github.com/Arasz/ai-proxy/pull/123) |
