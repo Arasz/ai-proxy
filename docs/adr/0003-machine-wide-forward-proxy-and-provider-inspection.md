@@ -31,9 +31,12 @@ continues through the proxy without HTTPS body inspection. A forced kill leaves 
 the active endpoint and a private snapshot of the previous settings. The guard process (the same
 executable, `--guard-system-proxy`) and the next start restore that snapshot only while the HTTP(S)
 proxy still matches the recorded ai-proxy endpoint. Windows also checks the active manual proxy
-values and bypass list. An external settings change is left in place. Recovery verifies the whole
+values and bypass list, accepting a partly restored state so recovery can retry; macOS and Linux
+require both HTTP and HTTPS to still point at ai-proxy. An external settings change is left in
+place, and a shutdown that finds one disarms Titanium's own restore. Recovery verifies the whole
 snapshot after restoring; a mismatch keeps the marker for a later retry. Normal shutdown uses the
 same verification, and a partially failed startup keeps its marker for recovery on the next run.
+See [lifecycle](../reference/lifecycle.md#crash-recovery) for the log events.
 The marker is held exclusively while the proxy is set, so a second instance cannot race recovery.
 
 ## Dependency provenance

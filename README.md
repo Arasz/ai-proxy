@@ -27,7 +27,9 @@ servers and other tools continue to work without exposing their HTTPS contents t
 Clients that ignore the operating system proxy, or do not trust the user's root certificates,
 will connect directly or reject inspected provider HTTPS requests.
 
-When ai-proxy stops cleanly, it restores the operating system's previous proxy settings. The
+When ai-proxy stops, it restores the operating system's previous proxy settings; after a crash, a
+guard process or the next start restores them, unless you have changed the proxy since (see
+[lifecycle](docs/reference/lifecycle.md#crash-recovery)). The
 listener binds to loopback at `127.0.0.1:8080` (set `PROXY__PORT` to change the port); it is not exposed to the local network.
 
 The proxy forwards the caller's credentials unchanged. It has no provider-owned API keys.

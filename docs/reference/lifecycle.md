@@ -45,11 +45,28 @@ the proxy port alone, because a port cannot identify an ai-proxy owner.
 
 When system-proxy integration is enabled, ai-proxy writes a private marker before changing the
 current user's HTTP and HTTPS proxy. The marker stores the prior platform settings so a guard
-process or the next start can restore them after a crash. Recovery runs only while the proxy
-still matches the endpoint recorded by ai-proxy. Windows also checks the manual proxy values and
-bypass list. Settings changed by another app are left alone.
+process or the next start can restore them after a crash. Recovery runs only while ai-proxy
+still owns the settings. Settings changed by another app are left alone.
+
+- **Windows:** every manual proxy value, the PAC URL and the bypass list must hold either the value
+  ai-proxy set or the saved value, and at least one must still be ai-proxy's. A restore that stopped
+  partway can therefore be retried. An FTP or SOCKS entry that differs from the saved one counts as
+  an outside change.
+- **macOS and Linux:** both the HTTP and the HTTPS proxy must still point at the recorded endpoint.
+  The bypass list is not compared.
+
+At startup the log names the outcome: 1312 when the saved settings were restored, 1313 when they
+were left alone because the settings changed, and 1314 when a marker from an older version (endpoint
+only, no saved settings) was found and the proxy was cleared. An older marker is cleared only while
+the proxy still points at its endpoint.
 
 After restoration, ai-proxy reads the current settings again and compares them with the saved
 snapshot. A mismatch keeps the marker and reports the failure so a later start can retry. Normal
-shutdown uses the same ownership check and exact snapshot verification. If setting the proxy
-fails partway through startup, ai-proxy leaves the marker so the next start can retry recovery.
+shutdown uses the same ownership check. When the settings changed while ai-proxy ran, shutdown
+restores nothing, logs 1315, and turns off Titanium's own restore so stopping or exiting cannot
+overwrite the newer settings. If setting the proxy fails partway through startup, ai-proxy leaves
+the marker so the next start can retry recovery.
+
+The marker is written in a single flushed write before the proxy is set. A record cut short by a
+crash during that write is discarded with warning 1316, because the proxy was never changed behind
+it. On Windows the marker carries an access list that allows only the current user.

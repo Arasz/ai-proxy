@@ -482,7 +482,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         [LoggerMessage(EventId = 1304, Level = LogLevel.Warning, Message = "The system proxy guard ended while ai-proxy was still running; a forced kill would now leave the system proxy set until the next start")]
         public static partial void GuardExited(ILogger logger);
 
-        [LoggerMessage(EventId = 1305, Level = LogLevel.Error, Message = "The system proxy could not be restored; the marker stays, so the guard or the next start clears it")]
+        [LoggerMessage(EventId = 1305, Level = LogLevel.Error, Message = "The system proxy could not be restored; the marker stays, so the guard or the next start can retry the restore")]
         public static partial void RestoreFailed(ILogger logger, Exception exception);
 
         [LoggerMessage(EventId = 1306, Level = LogLevel.Warning, Message = "The upstream {ProviderHost} closed its connection before the end of a chunked response; closing the client connection so the client sees the failure")]
