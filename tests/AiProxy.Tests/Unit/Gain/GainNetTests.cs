@@ -39,7 +39,7 @@ public sealed class GainNetTests
     [Fact]
     public void A_built_report_sums_tool_cost_with_requests_and_retrieval_with_recalls()
     {
-        var request = new GainHistoryEntry("r1", Now, "/p", "anthropic", "POST", "ccr.tool", GainLabels.Unknown, GainLabels.Pipelines.Ccr,
+        var request = new GainHistoryEntry("r1", Now, "/p", "anthropic", "POST", "ccr.tool", GainLabels.Layers.CcrTool,GainLabels.Pipelines.Ccr,
             new GainTotals(1, EstimatedOriginalTokens: 4_000, EstimatedForwardedTokens: 3_000, EstimatedSavedTokens: 1_000, EstimatedToolTokens: 200));
         var recall = new GainRecallEvent(
             new GainRecall(Now, "preview", "/p", GainLabels.Attributions.Caller, "whole", 1_000, 400, null),
@@ -68,7 +68,7 @@ public sealed class GainNetTests
     [Fact]
     public void A_built_report_sums_follow_ups_into_the_summary_and_their_path()
     {
-        var request = new GainHistoryEntry("r1", Now, "/p", "anthropic", "POST", "ccr.tool", GainLabels.Unknown, GainLabels.Pipelines.Ccr,
+        var request = new GainHistoryEntry("r1", Now, "/p", "anthropic", "POST", "ccr.tool", GainLabels.Layers.CcrTool,GainLabels.Pipelines.Ccr,
             GainReportBuilder.RequestTotals(4_000, 3_000, 4_000, 3_000));
         var path = new GainPath("POST", "ccr.tool", GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr);
         var followUp = new GainFollowUpEvent(new GainFollowUp(Now, "/p", 1, 2_890, 3_000, 1_000), path);

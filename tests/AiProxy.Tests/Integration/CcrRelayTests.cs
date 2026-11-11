@@ -323,7 +323,7 @@ public sealed class CcrRelayTests : IDisposable
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         var row = Assert.Single(gain!.History);
         Assert.Equal("ccr.tool", row.Rule);
-        Assert.Equal(GainLabels.Unknown, row.Layer);
+        Assert.Equal(GainLabels.Layers.CcrTool, row.Layer);
         Assert.Equal(0, gain.Summary.EstimatedSavedTokens);
         Assert.True(gain.Summary.EstimatedToolTokens > 0);
         Assert.Equal(-gain.Summary.EstimatedToolTokens, gain.Summary.EstimatedNetTokens);
@@ -473,6 +473,25 @@ public sealed class CcrRelayTests : IDisposable
         var recall = Assert.Single(gain!.Recalls);
         Assert.Equal(Id, recall.PreviewId);
         Assert.Equal("lines", recall.Mode);
+    }
+
+    [Fact]
+    public async Task A_recall_and_its_follow_up_are_attributed_to_the_retrieval_layer()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+{}
+
+        var layers = (await GainAsync(proxy)).Attributions.Where(static row => row.Dimension == "layer").ToArray();
+        var retrieval = Assert.Single(layers, static row => row.Name == GainLabels.Layers.Retrieval).Totals;
+        Assert.True(retrieval.EstimatedRetrievedTokens > 0);
+        Assert.True(retrieval.EstimatedFollowUpTokens > 0);
+        Assert.DoesNotContain(layers, static row => row.Name == GainLabels.Unknown);
     }
 
     [Fact]

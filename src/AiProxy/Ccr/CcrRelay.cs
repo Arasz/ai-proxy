@@ -362,7 +362,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
                         exchange.GainProject is null ? GainLabels.Unknown : GainLabels.Attributions.Caller, mode, answer.Text.Length,
                         GainReportBuilder.Tokens(answer.Text.Length), answer.Error), exchange.Dialect.ToString().ToLowerInvariant(),
-                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation);
+                    exchange.GainMethod, exchange.GainRule, GainLabels.Layers.Retrieval, exchange.GainPipeline, _cancellation);
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
             {
@@ -377,7 +377,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 var characters = Encoding.UTF8.GetCharCount(followUp);
                 await relay.Gain.FollowUpAsync(new GainFollowUp(exchange.GainAt, exchange.GainProject, loop.Answered, characters, followUp.Length,
                         GainReportBuilder.Tokens(characters)), exchange.Dialect.ToString().ToLowerInvariant(),
-                    exchange.GainMethod, exchange.GainRule, exchange.GainLayer, exchange.GainPipeline, _cancellation);
+                    exchange.GainMethod, exchange.GainRule, GainLabels.Layers.Retrieval, exchange.GainPipeline, _cancellation);
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)
             {

@@ -26,7 +26,23 @@ public static class GainLabels
     public static class Layers
     {
         public const string ToolResult = "tool_result";
+
+        /// <summary>The layer of recalls and of the follow-ups that answer them.</summary>
         public const string Retrieval = "retrieval";
+
+        /// <summary>The layer of a request the proxy did not change, whether it forwarded or refused it.</summary>
+        public const string None = "none";
+
+        /// <summary>The layer of a request whose only change is the injected <c>proxy_retrieve</c> tool.</summary>
+        public const string CcrTool = "ccr_tool";
+
+        /// <summary>Returns the layer of a request recorded under <paramref name="rule"/>.</summary>
+        public static string Of(string rule) => rule switch
+        {
+            Rules.Unchanged or Rules.CcrPlanFailed => None,
+            Rules.CcrTool => CcrTool,
+            _ => ToolResult
+        };
     }
 
     /// <summary>Which pipeline handled the request.</summary>
