@@ -32,6 +32,7 @@ public sealed class GuardCommand(
         }
     }
 
+    /// <summary>Takes the marker and, when the owner died, restores or clears the system proxy before deleting the marker.</summary>
     private async Task ClearUnderLock()
     {
         SystemProxyMarker marker;
@@ -71,6 +72,7 @@ public sealed class GuardCommand(
         }
     }
 
+    /// <summary>Writes to standard error, ignoring a terminal that has gone away.</summary>
     private static void TryReport(string message)
     {
         try

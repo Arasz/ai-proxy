@@ -47,6 +47,7 @@ internal static class UnixProxySettings
                appliedValues.Any(pair => originalValues.GetValueOrDefault(pair.Key) != pair.Value);
     }
 
+    /// <summary>Flattens the compared fields of a snapshot into path-to-JSON pairs.</summary>
     private static Dictionary<string, string> Values(string snapshot)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -62,6 +63,7 @@ internal static class UnixProxySettings
         return values;
     }
 
+    /// <summary>Adds each leaf value under its path, so values are compared one by one.</summary>
     private static void Flatten(string path, JsonNode? node, Dictionary<string, string> values)
     {
         switch (node)

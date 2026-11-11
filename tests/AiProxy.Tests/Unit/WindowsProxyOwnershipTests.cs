@@ -70,6 +70,21 @@ public sealed class WindowsProxyOwnershipTests
             "localhost;127.0.0.1;::1"));
     }
 
+    [Theory]
+    [InlineData("http=127.0.0.1:8080;https=127.0.0.1:8080", true)]
+    [InlineData("corp.example:80", true)]
+    [InlineData("http=corp.example:80;https=127.0.0.1:8080", true)]
+    [InlineData("other.example:3128", false)]
+    [InlineData("http=127.0.0.1:8080;https=127.0.0.1:8080;other.example:3128", false)]
+    public void An_unnamed_default_proxy_entry_is_compared_for_http_and_https(string proxyServer, bool expected)
+    {
+        Assert.Equal(expected, TitaniumSystemProxySnapshotProvider.WindowsProxyIsOwned(
+            new WindowsProxyInfo(1, null, proxyServer, "localhost;127.0.0.1;::1"),
+            new WindowsProxyInfo(1, null, "corp.example:80", ""),
+            "127.0.0.1:8080",
+            "localhost;127.0.0.1;::1"));
+    }
+
     [Fact]
     public void Fully_restored_settings_are_not_owned()
     {

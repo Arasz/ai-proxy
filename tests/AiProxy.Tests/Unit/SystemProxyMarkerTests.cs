@@ -282,6 +282,41 @@ public sealed class SystemProxyMarkerTests
     }
 
     [Fact]
+    public async Task A_first_record_cut_right_after_a_brace_inside_its_snapshot_is_still_discarded_as_torn()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, SystemProxyMarker.FileName);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "{\"values\":{\"proxy\":\"corp.example:80\"},\"version\":1}");
+        }
+
+        var record = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+        var cut = record[..(record.IndexOf('}') + 1)];
+        Assert.NotEqual(record, cut);
+        await File.WriteAllTextAsync(path, cut, TestContext.Current.CancellationToken);
+
+        using var next = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+
+        Assert.True(next.DiscardedTornRecord);
+        Assert.False(next.PreviousRunDied);
+    }
+
+    [Fact]
+    public async Task A_complete_record_with_broken_json_is_still_rejected()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory.Path, SystemProxyMarker.FileName),
+            "{\"endpoint\":\"127.0.0.1:9090\",\"previousSettingsSnapshot\":before}",
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System));
+    }
+
+    [Fact]
     public async Task Applied_settings_need_a_record_written_by_this_hold()
     {
         using var directory = new TemporaryDirectory();

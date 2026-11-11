@@ -61,14 +61,71 @@ public sealed class TitaniumSystemProxySnapshotProviderTests
     public void A_restore_after_set_without_capture_skips_a_proxy_it_no_longer_owns_and_disarms_titanium()
     {
         using var server = new ProxyServer(false);
-        var registrar = new TitaniumSystemProxyRegistrar(server);
-        var unused = new ExplicitProxyEndPoint(IPAddress.Loopback, UnusedPort());
-        registrar.Prepare(unused);
+        var platform = new FakePlatform();
+        var registrar = new TitaniumSystemProxyRegistrar(server, platform);
+        registrar.Set(new ExplicitProxyEndPoint(IPAddress.Loopback, 9090));
+        platform.Owned = false;
 
         var restored = registrar.Restore();
 
         Assert.False(restored);
-        Assert.False(new TitaniumSystemProxySnapshotProvider(server).IsArmed);
+        Assert.True(platform.Disarmed);
+        Assert.Equal(1, platform.Captures);
+        Assert.Null(platform.Restored);
+    }
+
+    [Fact]
+    public void A_shutdown_restore_checks_ownership_against_the_settings_set_applied()
+    {
+        using var server = new ProxyServer(false);
+        var platform = new FakePlatform();
+        var registrar = new TitaniumSystemProxyRegistrar(server, platform);
+        registrar.Set(new ExplicitProxyEndPoint(IPAddress.Loopback, 9090));
+
+        var restored = registrar.Restore();
+
+        Assert.True(restored);
+        Assert.False(platform.Disarmed);
+        Assert.Equal(new RestoreCall("127.0.0.1:9090", "captured-1", "applied-127.0.0.1:9090"), platform.Restored);
+    }
+
+    private sealed record RestoreCall(string Endpoint, string Snapshot, string? AppliedSnapshot);
+
+    /// <summary>Stands in for the operating system, so registrar tests never change real proxy settings.</summary>
+    private sealed class FakePlatform : ISystemProxyPlatform
+    {
+        /// <summary>Whether a restore still finds ai-proxy's settings in place.</summary>
+        public bool Owned { get; set; } = true;
+
+        /// <summary>How many snapshots were captured.</summary>
+        public int Captures { get; private set; }
+
+        /// <summary>True once the saved settings were dropped.</summary>
+        public bool Disarmed { get; private set; }
+
+        /// <summary>The arguments of the restore that ran, or null when none did.</summary>
+        public RestoreCall? Restored { get; private set; }
+
+        /// <inheritdoc />
+        public string Capture() => $"captured-{++Captures}";
+
+        /// <inheritdoc />
+        public string Apply(ExplicitProxyEndPoint endPoint) => $"applied-{endPoint.IpAddress}:{endPoint.Port}";
+
+        /// <inheritdoc />
+        public bool RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot)
+        {
+            if (!Owned)
+            {
+                return false;
+            }
+
+            Restored = new RestoreCall(endpoint, snapshot, appliedSnapshot);
+            return true;
+        }
+
+        /// <inheritdoc />
+        public void Disarm() => Disarmed = true;
     }
 
     [Fact]

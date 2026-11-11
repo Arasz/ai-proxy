@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using AiProxy.Hosting.Integration;
 
 namespace AiProxy.Tests.Integration;
@@ -176,15 +177,8 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         var scriptPath = Path.Combine(_home, "slow-command");
         var pidPath = Path.Combine(_home, "child.pid");
         var readingPath = Path.Combine(_home, "child.reading");
-        // 256 KiB is more than any pipe buffer holds, so the marker only appears once the reader drains output.
-        var output = writesOutput
-            ? """
-              i=0
-              while [ $i -lt 256 ]; do printf '%1023s\n' x; i=$((i+1)); done
-              : > "$2"
-              while :; do printf '%1023s\n' x; done
-              """
-            : "sleep 30";
+        // The reader, not the writer, creates the reading marker once it has consumed output.
+        var output = writesOutput ? "while :; do printf '%1023s\\n' x; done" : "sleep 30";
         var script = $$"""
                      #!/bin/sh
                      printf '%s\n' "$$" > "$1.tmp" && mv "$1.tmp" "$1"
@@ -194,7 +188,7 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         File.SetUnixFileMode(scriptPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 
         using var cancellation = new CancellationTokenSource();
-        var run = RunAsync(scriptPath, [pidPath, readingPath], cancellationToken: cancellation.Token);
+        var run = RunAsync(scriptPath, [pidPath], cancellationToken: cancellation.Token, readingPath: readingPath);
         try
         {
             await WaitForFileAsync(pidPath, run);
@@ -256,8 +250,16 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         }
     }
 
-    /// <summary>Runs a test command and reaps it before propagating cancellation.</summary>
-    private static async Task<int> RunAsync(string executable, IReadOnlyList<string> arguments, bool allowFailure = false, CancellationToken cancellationToken = default)
+    /// <summary>
+    ///     Runs a test command and reaps it before propagating cancellation; <paramref name="readingPath" />, when given,
+    ///     is created once standard output has been read.
+    /// </summary>
+    private static async Task<int> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        bool allowFailure = false,
+        CancellationToken cancellationToken = default,
+        string? readingPath = null)
     {
         var start = new ProcessStartInfo(executable) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var argument in arguments)
@@ -267,7 +269,7 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {executable}.");
         var token = cancellationToken.CanBeCanceled ? cancellationToken : TestContext.Current.CancellationToken;
-        var stdout = process.StandardOutput.ReadToEndAsync(token);
+        var stdout = ReadOutputAsync(process.StandardOutput, readingPath, token);
         var stderr = process.StandardError.ReadToEndAsync(token);
         try
         {
@@ -298,5 +300,23 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
         }
 
         return process.ExitCode;
+    }
+
+    /// <summary>Reads output to its end, creating <paramref name="readingPath" /> after the first chunk has been consumed.</summary>
+    private static async Task<string> ReadOutputAsync(StreamReader reader, string? readingPath, CancellationToken cancellationToken)
+    {
+        var output = new StringBuilder();
+        var buffer = new char[4096];
+        int read;
+        while ((read = await reader.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            output.Append(buffer, 0, read);
+            if (readingPath is not null && !File.Exists(readingPath))
+            {
+                await File.WriteAllBytesAsync(readingPath, [], CancellationToken.None);
+            }
+        }
+
+        return output.ToString();
     }
 }

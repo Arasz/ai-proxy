@@ -26,6 +26,7 @@ public sealed class SystemProxyMarker : IDisposable
     private readonly FileStream _stream;
     private MarkerRecord? _written;
 
+    /// <summary>Holds the locked marker file and the record it held when taken.</summary>
     private SystemProxyMarker(FileStream stream, string path, MarkerRecord record)
     {
         _stream = stream;
@@ -144,6 +145,7 @@ public sealed class SystemProxyMarker : IDisposable
         _stream.Dispose();
     }
 
+    /// <summary>Reads the record left by the previous holder, recovering endpoint-only, torn and partly extended records.</summary>
     private static MarkerRecord ReadRecord(FileStream stream)
     {
         if (stream.Length == 0)
@@ -181,12 +183,42 @@ public sealed class SystemProxyMarker : IDisposable
             }
 
             // Write flushes the whole record before the system proxy is set, so a cut-short record never had a proxy change behind it.
-            if (text.StartsWith('{') && !text.EndsWith('}'))
+            if (IsCutShort(text))
             {
                 return MarkerRecord.Empty with { Torn = true };
             }
 
             throw new InvalidDataException("The system proxy marker is malformed.", exception);
+        }
+    }
+
+    /// <summary>
+    ///     True when the text is valid JSON that stops before its top-level object closes, wherever the cut fell
+    ///     (a brace inside a string value included); text with an invalid token is malformed, not cut short.
+    /// </summary>
+    private static bool IsCutShort(string text)
+    {
+        var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(text), isFinalBlock: false, state: default);
+        try
+        {
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return false;
+            }
+
+            while (reader.Read())
+            {
+                if (reader.CurrentDepth == 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
@@ -230,6 +262,7 @@ public sealed class SystemProxyMarker : IDisposable
         }
     }
 
+    /// <summary>Opens and locks the marker file, readable only by the current user.</summary>
     private static FileStream OpenMarker(string path)
     {
         if (OperatingSystem.IsWindows())
@@ -267,6 +300,7 @@ public sealed class SystemProxyMarker : IDisposable
         }
     }
 
+    /// <summary>An access list that grants only the current Windows user.</summary>
     [SupportedOSPlatform("windows")]
     private static FileSecurity CurrentUserOnly()
     {
@@ -284,8 +318,10 @@ public sealed class SystemProxyMarker : IDisposable
         string? PreviousSettingsSnapshot,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AppliedSettingsSnapshot = null)
     {
+        /// <summary>No record: the previous holder exited cleanly.</summary>
         public static MarkerRecord Empty { get; } = new(null, null);
 
+        /// <summary>True when the record was cut short and discarded; never written to the file.</summary>
         [JsonIgnore]
         public bool Torn { get; init; }
     }

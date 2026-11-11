@@ -45,8 +45,10 @@ the proxy port alone, because a port cannot identify an ai-proxy owner.
 
 When system-proxy integration is enabled, ai-proxy writes a private marker before changing the
 current user's HTTP and HTTPS proxy. The marker stores the prior platform settings so a guard
-process or the next start can restore them after a crash. Recovery runs only while ai-proxy
-still owns the settings. Settings changed by another app are left alone.
+process or the next start can restore them after a crash. Recovery runs only while the ownership
+check below finds the settings still ai-proxy's. A change another app made is left alone when that
+check can see it; a change it cannot see, such as a value set back to exactly what ai-proxy or the
+saved settings hold, is restored over.
 
 - **Windows:** every manual proxy value, the PAC URL and the bypass list must hold either the value
   ai-proxy set or the saved value, and at least one must still be ai-proxy's. A restore that stopped
@@ -70,10 +72,24 @@ the proxy still points at its endpoint.
 
 After restoration, ai-proxy reads the current settings again and compares them with the saved
 snapshot. A mismatch keeps the marker and reports the failure so a later start can retry. Normal
-shutdown uses the same ownership check. When the settings changed while ai-proxy ran, shutdown
-restores nothing, logs 1315, and turns off Titanium's own restore so stopping or exiting cannot
-overwrite the newer settings. If setting the proxy fails partway through startup, ai-proxy leaves
-the marker so the next start can retry recovery.
+shutdown uses the same ownership check. When that check finds the settings changed while ai-proxy
+ran, shutdown restores nothing, logs 1315, and turns off Titanium's own restore so stopping or
+exiting cannot overwrite the newer settings. A change the check cannot see is restored over, as in
+crash recovery.
+
+If setting the proxy fails partway through startup, Titanium tries to put the saved settings back
+itself, and ai-proxy leaves the marker so the next start can retry recovery. On Windows that retry works
+for any mix of saved and applied values. On macOS and Linux the next start retries automatically
+whenever the marker holds the applied settings (a restore cut short at shutdown or during
+recovery), and also whenever HTTP and HTTPS both still point at the recorded endpoint. It does not
+retry, and logs 1313, when only one of them still points there and the marker has no applied
+settings: a startup that failed between HTTP and HTTPS, a marker from an older version, a crash
+between setting the proxy and recording what was applied, or a Linux desktop without GNOME or KDE
+settings. In those cases, put the proxy back by hand: in macOS System Settings under Network,
+Details, Proxies (or `networksetup -setwebproxystate <service> off` and
+`networksetup -setsecurewebproxystate <service> off`), and on GNOME with
+`gsettings set org.gnome.system.proxy mode 'none'` or your previous values. Do this before the
+next start, because a start that skips recovery saves the settings it finds as the ones to restore.
 
 The marker is written in a single flushed write before the proxy is set. A record cut short by a
 crash during that write is discarded with warning 1316, because the proxy was never changed behind

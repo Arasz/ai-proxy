@@ -12,6 +12,7 @@ namespace AiProxy.Hosting.Integration;
 public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : ISystemProxySnapshotProvider
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const string UnnamedProtocol = "";
 
     /// <inheritdoc />
     public string Capture()
@@ -78,6 +79,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return Task.FromResult(true);
     }
 
+    /// <summary>Returns whether HTTP or HTTPS still points at a local proxy on <paramref name="endpoint" />'s port, for markers without saved settings.</summary>
     public bool IsOwned(string endpoint)
     {
         if (!IPEndPoint.TryParse(endpoint, out var endpointAddress))
@@ -118,6 +120,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return WindowsProxyIsOwned(ReadWindowsProxyInfo(GetBackend(server)), original, endpointAddress.ToString(), expectedProxyOverride);
     }
 
+    /// <summary>True when a manual proxy is on and no PAC file overrides it.</summary>
     internal static bool WindowsProxyIsActive(int? proxyEnable, string? autoConfigUrl)
     {
         return proxyEnable == 1 && string.IsNullOrWhiteSpace(autoConfigUrl);
@@ -180,15 +183,38 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
             .All(protocol => SameProxy(current, original, protocol));
     }
 
+    /// <summary>
+    ///     Maps each WinINET entry to its protocol. An unnamed <c>host:port</c> entry is kept under the empty key and, as in
+    ///     Titanium, also stands for HTTP and HTTPS wherever no named entry sets them.
+    /// </summary>
     private static Dictionary<string, string> ParseProxyServer(string? proxyServer)
     {
-        return (proxyServer ?? string.Empty)
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(value => value.Split('=', 2, StringSplitOptions.TrimEntries))
-            .Where(parts => parts.Length == 2)
-            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
+        var protocols = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string? unnamed = null;
+        foreach (var entry in (proxyServer ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = entry.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2)
+            {
+                protocols[parts[0]] = parts[1];
+            }
+            else
+            {
+                unnamed = entry;
+            }
+        }
+
+        if (unnamed is not null)
+        {
+            protocols[UnnamedProtocol] = unnamed;
+            protocols.TryAdd("http", unnamed);
+            protocols.TryAdd("https", unnamed);
+        }
+
+        return protocols;
     }
 
+    /// <summary>True when both settings hold the same entry for <paramref name="protocol" />.</summary>
     private static bool SameProxy(
         IReadOnlyDictionary<string, string> current,
         IReadOnlyDictionary<string, string> original,
@@ -197,6 +223,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return string.Equals(current.GetValueOrDefault(protocol), original.GetValueOrDefault(protocol), StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>True when the entry for <paramref name="protocol" /> points at <paramref name="expected" />.</summary>
     private static bool ProxyMatches(IReadOnlyDictionary<string, string> protocols, string protocol, IPEndPoint expected)
     {
         if (!protocols.TryGetValue(protocol, out var value) || !Uri.TryCreate($"http://{value}", UriKind.Absolute, out var uri) ||
@@ -208,6 +235,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return address.Equals(expected.Address) && uri.Port == expected.Port;
     }
 
+    /// <summary>Reads the current WinINET values through Titanium's registry reader.</summary>
     private static WindowsProxyInfo ReadWindowsProxyInfo(object backend)
     {
         var readCurrent = backend.GetType().GetMethod("GetProxyInfoFromRegistry", BindingFlags.Static | BindingFlags.NonPublic)
@@ -221,6 +249,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
             current.GetType().GetProperty("ProxyOverride", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(current) as string);
     }
 
+    /// <summary>Reads the WinINET values saved in a snapshot.</summary>
     private static WindowsProxyInfo ReadOriginalWindowsProxyInfo(string snapshot)
     {
         using var document = JsonDocument.Parse(snapshot);
@@ -239,11 +268,13 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
             StringProperty(root, "ProxyOverride"));
     }
 
+    /// <summary>The string value of <paramref name="property" />, or null when it is missing or not a string.</summary>
     private static string? StringProperty(JsonElement element, string property)
     {
         return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     }
 
+    /// <summary>Asks the backend which protocols still point at a local proxy on <paramref name="port" />.</summary>
     private static ProxyProtocolType GetStaleLocalProxyProtocols(object backend, int port)
     {
         var method = backend.GetType().GetMethod("GetStaleLocalProxyProtocols", BindingFlags.Instance | BindingFlags.Public)
@@ -252,6 +283,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return result is null ? ProxyProtocolType.None : (ProxyProtocolType)Convert.ToInt32(result);
     }
 
+    /// <summary>True when two serialized snapshots hold the same values.</summary>
     internal static bool SnapshotsMatch(string expected, string actual)
     {
         return JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual));
@@ -264,6 +296,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return new TitaniumSystemProxySnapshotProvider(verificationServer).Capture();
     }
 
+    /// <summary>True when at least one protocol still points at the proxy.</summary>
     private static bool HasOwnedProtocols(ProxyProtocolType protocols) => protocols != ProxyProtocolType.None;
 
     /// <summary>Loads a saved snapshot into this server's backend, so its restore writes those settings.</summary>
@@ -295,6 +328,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
     }
 
+    /// <summary>The Titanium platform backend behind <paramref name="proxyServer" />.</summary>
     private static object GetBackend(ProxyServer proxyServer)
     {
         var property = typeof(ProxyServer).GetProperty("SystemProxySettingsManager", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -303,6 +337,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
             ?? throw new InvalidOperationException("System proxy settings are not supported on this platform.");
     }
 
+    /// <summary>Makes the backend save the current settings without changing them.</summary>
     private static void CaptureOriginalSettings(object backend)
     {
         if (OperatingSystem.IsWindows())
@@ -324,6 +359,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         ensureSnapshot.Invoke(backend, null);
     }
 
+    /// <summary>The backend fields that hold this platform's saved settings.</summary>
     private static string[] SnapshotFieldNames()
     {
         if (OperatingSystem.IsWindows())
@@ -344,14 +380,17 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         throw new PlatformNotSupportedException("Crash-safe system proxy restoration is not supported on this platform.");
     }
 
+    /// <summary>Reads a private backend field.</summary>
     private static object? ReadField(object backend, string name) => GetField(backend, name).GetValue(backend);
 
+    /// <summary>Finds a private backend field, failing when Titanium no longer has it.</summary>
     private static FieldInfo GetField(object backend, string name)
     {
         return backend.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException($"The installed Titanium proxy backend no longer exposes snapshot field {name}.");
     }
 
+    /// <summary>The serialized snapshot: format version, backend type and each field as JSON.</summary>
     private sealed record SnapshotDocument(int Version, string BackendType, Dictionary<string, string> Values);
 }
 

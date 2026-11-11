@@ -94,7 +94,11 @@ mapped because their cached-token accounting differs from Anthropic's.
 When the upstream exposes an identifier, `capture_response.response_message_id` stores the
 Anthropic JSON message ID or `message_start.message.id`, an OpenAI JSON top-level `id`, a Chat
 Completions chunk's top-level `id`, or the nested Responses ID. For Responses streams the last
-terminal event's ID wins. The column is null when the response exposes no ID, and also when a JSON
+terminal event's ID wins when that event is kept whole. A plain event stream keeps only its first and last
+64 KiB, so a terminal event that starts before the kept tail loses its start: its usage is still
+read from the kept end, but its ID is not, and the stored ID stays the earlier one (from
+`response.created`) or null. A stream with a `response.created` event and no terminal event keeps
+the `response.created` ID. The column is null when the response exposes no ID, and also when a JSON
 response was over 4 MiB on the wire: that body is dropped unread, so no ID is taken from it. Older `capture.db` files gain this nullable column without losing rows.
 
 The response body is not stored, and neither are response headers. The proxy copies the body as

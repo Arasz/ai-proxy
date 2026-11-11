@@ -7,18 +7,25 @@ namespace AiProxy.Hosting.Integration;
 
 /// <summary>Uses Titanium's platform integrations to change and restore system proxy settings.</summary>
 /// <param name="server">The running proxy server whose system proxy settings are changed.</param>
-public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemProxyRegistrar
+/// <param name="platform">The operating-system side that captures, applies, restores and disarms the settings.</param>
+public sealed class TitaniumSystemProxyRegistrar(ProxyServer server, ISystemProxyPlatform platform) : ISystemProxyRegistrar
 {
     private string? _previousSettingsSnapshot;
     private string? _endpoint;
     private string? _appliedSettingsSnapshot;
 
+    /// <summary>Changes the real system proxy through <paramref name="server" />'s platform backend.</summary>
+    public TitaniumSystemProxyRegistrar(ProxyServer server) : this(server, new TitaniumSystemProxyPlatform(server))
+    {
+    }
+
+    /// <summary>A snapshot provider over the server's backend, for ownership checks.</summary>
     private TitaniumSystemProxySnapshotProvider SnapshotProvider => new(server);
 
     /// <inheritdoc />
     public string Capture()
     {
-        _previousSettingsSnapshot = SnapshotProvider.Capture();
+        _previousSettingsSnapshot = platform.Capture();
         return _previousSettingsSnapshot;
     }
 
@@ -36,33 +43,17 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     public string Set(ExplicitProxyEndPoint endPoint)
     {
         Prepare(endPoint);
-        var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, BypassSettings());
-        if (!result.Succeeded)
-        {
-            server.TryRestoreOriginalProxySettings();
-            throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
-        }
-
-        try
-        {
-            // Read back through the same reader restore verification uses, so ownership checks compare like with like.
-            _appliedSettingsSnapshot = TitaniumSystemProxySnapshotProvider.CaptureCurrentSettings();
-        }
-        catch (Exception exception)
-        {
-            server.TryRestoreOriginalProxySettings();
-            throw new InvalidOperationException($"The system proxy was set but could not be read back: {exception.Message}", exception);
-        }
-
+        _appliedSettingsSnapshot = platform.Apply(endPoint);
         return _appliedSettingsSnapshot;
     }
 
+    /// <summary>The snapshot captured before the proxy was set, or null before the first capture.</summary>
     internal string? PreviousSettingsSnapshot => _previousSettingsSnapshot;
 
     /// <summary>Records the endpoint <see cref="Restore" /> checks ownership against, capturing a snapshot when none was taken yet.</summary>
     internal void Prepare(ExplicitProxyEndPoint endPoint)
     {
-        _previousSettingsSnapshot ??= SnapshotProvider.Capture();
+        _previousSettingsSnapshot ??= platform.Capture();
         _endpoint = new IPEndPoint(endPoint.IpAddress, endPoint.Port).ToString();
     }
 
@@ -86,14 +77,13 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
             throw new InvalidOperationException("The system proxy recovery snapshot is unavailable.");
         }
 
-        var provider = SnapshotProvider;
-        if (provider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot, _appliedSettingsSnapshot).GetAwaiter().GetResult())
+        if (platform.RestoreIfOwned(_endpoint, _previousSettingsSnapshot, _appliedSettingsSnapshot))
         {
             return true;
         }
 
         // Someone changed the settings since; Server.Stop and process exit must not restore the stale snapshot over them.
-        provider.Disarm();
+        platform.Disarm();
         return false;
     }
 

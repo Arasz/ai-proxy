@@ -56,8 +56,8 @@ jobs:
         run: New-Item -ItemType Directory -Force .nupkg-local | Out-Null
       # The system proxy marker, ownership, recovery and guard classes use stubs and temp directories only (no real proxy settings, no HOME);
       # build.yml runs them on Linux alone, so this is where their Windows file locking and ACL paths execute.
-      # Minimum: 36 RestartTests + 12 StopStatusTests + 17 SystemProxyMarkerTests + 24 WindowsProxyOwnershipTests
-      # + 3 SystemProxyRecoveryTests + 12 GuardCommandTests = 104 on every OS (the platform skip off Windows still counts as run).
+      # Minimum: 36 RestartTests + 12 StopStatusTests + 19 SystemProxyMarkerTests + 29 WindowsProxyOwnershipTests
+      # + 3 SystemProxyRecoveryTests + 12 GuardCommandTests = 111 on every OS (the platform skip off Windows still counts as run).
       - name: Run isolated native lifecycle tests
         run: >-
           dotnet test --project tests/AiProxy.Tests --configuration Release --nologo
@@ -67,4 +67,4 @@ jobs:
           --filter-class 'AiProxy.Tests.Unit.WindowsProxyOwnershipTests'
           --filter-class 'AiProxy.Tests.Unit.SystemProxyRecoveryTests'
           --filter-class 'AiProxy.Tests.Unit.GuardCommandTests'
-          --minimum-expected-tests 104
+          --minimum-expected-tests 111

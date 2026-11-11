@@ -65,9 +65,7 @@ public sealed class TitaniumProxyServiceTests
         using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
         Assert.True(marker.PreviousRunDied);
         Assert.Equal("prior-system-proxy-settings", marker.PreviousSettingsSnapshot);
-        var listener = new TcpListener(IPAddress.Loopback, port);
-        listener.Start();
-        listener.Stop();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -285,7 +283,7 @@ public sealed class TitaniumProxyServiceTests
         Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
         using var reopened = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -326,7 +324,7 @@ public sealed class TitaniumProxyServiceTests
         Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.False(File.Exists(MarkerPath(directory)));
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -345,7 +343,7 @@ public sealed class TitaniumProxyServiceTests
         Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.True(new FileInfo(MarkerPath(directory)).Length > 0);
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
