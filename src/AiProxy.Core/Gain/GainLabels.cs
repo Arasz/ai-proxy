@@ -30,7 +30,7 @@ public static class GainLabels
         /// <summary>The layer of recalls and of the follow-ups that answer them.</summary>
         public const string Retrieval = "retrieval";
 
-        /// <summary>The layer of a request the proxy forwarded unchanged.</summary>
+        /// <summary>The layer of a request the proxy did not change, whether it forwarded or refused it.</summary>
         public const string None = "none";
 
         /// <summary>The layer of a request whose only change is the injected <c>proxy_retrieve</c> tool.</summary>

@@ -82,7 +82,9 @@ Tool column and its net is negative.
 `--by-layer` groups by where the change applied: `tool_result` (the proxy reduced tool output),
 `ccr_tool` (the only change is the `proxy_retrieve` definition), `none` (forwarded unchanged,
 including a request refused because the retrieval ledger was unavailable), and `retrieval` (recalls
-and follow-ups). Rows recorded before 0.28.2 keep the layer they were written with: `unknown` for
+and follow-ups). Because retrieval costs sit under `retrieval`, `--layer tool_result` shows what
+reduction saved without what reading the originals back cost; use the summary or `--by-rule` for that
+net. Rows recorded before 0.28.2 keep the layer they were written with: `unknown` for
 unchanged, refused and `ccr.tool` requests, and their request's layer for recalls and follow-ups.
 `--by-rule` still tells those requests apart. Only model calls count in the totals
 and percentages: `POST` to `/v1/messages` (Anthropic), the chat completions, completions, responses and
