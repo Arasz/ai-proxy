@@ -39,7 +39,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken)
     {
         return WriteAsync(connection => InsertAsync(connection, new GainEventInput(Kinds.Other, entry.Id, entry.At, entry.Project, entry.Provider,
-            entry.Method, GainLabels.Rules.OtherTraffic, GainLabels.Unknown, GainLabels.Pipelines.Passthrough, JsonSerializer.Serialize(entry)), null, cancellationToken),
+            entry.Method, GainLabels.Rules.OtherTraffic, GainLabels.Layers.None, GainLabels.Pipelines.Passthrough, JsonSerializer.Serialize(entry)), null, cancellationToken),
             WritePath.Request, cancellationToken);
     }
 
@@ -199,6 +199,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         }
 
         await connection.ExecuteAsync(new CommandDefinition(Sql.Schema, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition(Sql.NameLayers, cancellationToken: cancellationToken));
         _initialized = true;
     }
 
@@ -231,6 +232,17 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                      CREATE INDEX IF NOT EXISTS gain_at ON gain_event(at);
                                      CREATE INDEX IF NOT EXISTS gain_project_at ON gain_event(project,at);
                                      """;
+
+        /// <summary>Gives rows written before named layers the layer and pipeline current writes use; a no-op once applied.</summary>
+        public const string NameLayers = $"""
+                                          UPDATE gain_event SET layer = '{GainLabels.Layers.Retrieval}',pipeline = '{GainLabels.Pipelines.Ccr}'
+                                          WHERE kind IN ('{Kinds.Recall}','{Kinds.FollowUp}') AND (layer <> '{GainLabels.Layers.Retrieval}' OR pipeline <> '{GainLabels.Pipelines.Ccr}');
+                                          UPDATE gain_event SET layer = CASE
+                                              WHEN kind = '{Kinds.Other}' OR rule IN ('{GainLabels.Rules.Unchanged}','{GainLabels.Rules.CcrPlanFailed}') THEN '{GainLabels.Layers.None}'
+                                              WHEN rule = '{GainLabels.Rules.CcrTool}' THEN '{GainLabels.Layers.CcrTool}'
+                                              ELSE '{GainLabels.Layers.ToolResult}' END
+                                          WHERE layer = '{GainLabels.Unknown}';
+                                          """;
 
         public const string Insert = """
                                      INSERT INTO gain_event(kind,id,at,project,provider,method,rule,layer,pipeline,payload)

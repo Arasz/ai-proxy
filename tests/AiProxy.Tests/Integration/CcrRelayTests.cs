@@ -495,6 +495,24 @@ public sealed class CcrRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task A_recall_and_its_follow_up_are_attributed_to_the_ccr_pipeline()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)),
+            Sse.Message("msg_2", "end_turn", 6, Sse.Text("answer")));
+        await using var proxy = await StartProxyAsync();
+
+        using (await SendAsync(proxy, upstream, StatelessRequest()))
+{}
+
+        var pipelines = (await GainAsync(proxy)).Attributions.Where(static row => row.Dimension == "pipeline").ToArray();
+        var ccr = Assert.Single(pipelines, static row => row.Name == GainLabels.Pipelines.Ccr).Totals;
+        Assert.Equal((0L, 1L, 1L), (ccr.Requests, ccr.Recalls, ccr.FollowUps));
+        Assert.Equal(1, Assert.Single(pipelines, static row => row.Name == GainLabels.Pipelines.Content).Totals.Requests);
+    }
+
+    [Fact]
     public async Task A_stateless_follow_up_records_the_bytes_of_the_body_it_sent_upstream()
     {
         await using var upstream = await FakeUpstream.StartAsync();
