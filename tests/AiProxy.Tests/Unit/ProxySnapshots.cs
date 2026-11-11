@@ -68,7 +68,7 @@ internal static class ProxySnapshots
         });
 
     /// <summary>A Windows snapshot encoded from Titanium's own <c>ProxyInfo</c>, derived fields included.</summary>
-    public static string Windows(int? proxyEnable, string? proxyServer, string? autoConfigUrl = null, string? proxyOverride = "<local>")
+    public static string WindowsSnapshot(int? proxyEnable, string? proxyServer, string? autoConfigUrl = null, string? proxyOverride = "<local>")
     {
         var type = typeof(ProxyServer).Assembly.GetType("Titanium.Web.Proxy.Helpers.ProxyInfo", true)!;
         var info = Activator.CreateInstance(

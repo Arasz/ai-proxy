@@ -57,13 +57,13 @@ public sealed class StaleProxyValuesTests
     [Fact]
     public void R3_a_stale_previous_windows_entry_is_not_copied_back()
     {
-        var current = Windows(1, "http=127.0.0.1:8080;https=127.0.0.1:8080");
-        var previous = Windows(1, "http=127.0.0.1:8080;https=secure.example:443");
+        var current = WindowsSnapshot(1, "http=127.0.0.1:8080;https=127.0.0.1:8080");
+        var previous = WindowsSnapshot(1, "http=127.0.0.1:8080;https=secure.example:443");
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
         Assert.NotNull(target);
-        Assert.True(JsonNode.DeepEquals(Field(Windows(1, "https=secure.example:443"), "originalValues"), Field(target.Snapshot, "originalValues")));
+        Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(1, "https=secure.example:443"), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
     [Fact]
@@ -186,8 +186,8 @@ public sealed class StaleProxyValuesTests
     [Fact]
     public void R10_a_stale_windows_https_entry_takes_the_previous_one_with_titaniums_derived_fields()
     {
-        var current = Windows(1, "http=corp.example:80;https=127.0.0.1:9");
-        var previous = Windows(1, "http=corp.example:80;https=secure.example:443");
+        var current = WindowsSnapshot(1, "http=corp.example:80;https=127.0.0.1:9");
+        var previous = WindowsSnapshot(1, "http=corp.example:80;https=secure.example:443");
 
         var target = StaleProxyValues.Replace(current, [Dead], previous);
 
@@ -198,12 +198,12 @@ public sealed class StaleProxyValuesTests
     [Fact]
     public void R11_windows_with_every_entry_stale_and_no_previous_snapshot_is_turned_off()
     {
-        var current = Windows(1, "http=127.0.0.1:8080;https=127.0.0.1:8080");
+        var current = WindowsSnapshot(1, "http=127.0.0.1:8080;https=127.0.0.1:8080");
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
         Assert.NotNull(target);
-        Assert.True(JsonNode.DeepEquals(Field(Windows(0, ""), "originalValues"), Field(target.Snapshot, "originalValues")));
+        Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(0, ""), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
     [Theory]
@@ -217,14 +217,14 @@ public sealed class StaleProxyValuesTests
         string? previousProxyServer,
         string expected)
     {
-        var current = Windows(1, proxyServer);
-        var previous = previousProxyServer is null ? null : Windows(1, previousProxyServer);
+        var current = WindowsSnapshot(1, proxyServer);
+        var previous = previousProxyServer is null ? null : WindowsSnapshot(1, previousProxyServer);
 
         var target = StaleProxyValues.Replace(current, OwnOnly, previous);
 
         Assert.NotNull(target);
         var expectedEnable = expected.Length == 0 ? 0 : 1;
-        Assert.True(JsonNode.DeepEquals(Field(Windows(expectedEnable, expected), "originalValues"), Field(target.Snapshot, "originalValues")));
+        Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(expectedEnable, expected), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
     [Fact]
@@ -267,7 +267,7 @@ public sealed class StaleProxyValuesTests
     [InlineData(1, "http://pac.example/proxy.pac")]
     public void R16_an_inactive_windows_proxy_left_pointing_at_a_stale_endpoint_is_inert(int proxyEnable, string? autoConfigUrl)
     {
-        var current = Windows(proxyEnable, "http=127.0.0.1:8080;https=127.0.0.1:8080", autoConfigUrl);
+        var current = WindowsSnapshot(proxyEnable, "http=127.0.0.1:8080;https=127.0.0.1:8080", autoConfigUrl);
 
         Assert.Null(StaleProxyValues.Replace(current, OwnOnly, null));
     }
@@ -312,12 +312,12 @@ public sealed class StaleProxyValuesTests
     [Fact]
     public void A_windows_entry_at_the_ipv6_loopback_on_the_stale_port_points_at_the_stale_endpoint()
     {
-        var current = Windows(1, "http=corp.example:80;https=[::1]:8080");
+        var current = WindowsSnapshot(1, "http=corp.example:80;https=[::1]:8080");
 
         var target = StaleProxyValues.Replace(current, OwnOnly, null);
 
         Assert.NotNull(target);
-        Assert.True(JsonNode.DeepEquals(Field(Windows(1, "http=corp.example:80"), "originalValues"), Field(target.Snapshot, "originalValues")));
+        Assert.True(JsonNode.DeepEquals(Field(WindowsSnapshot(1, "http=corp.example:80"), "originalValues"), Field(target.Snapshot, "originalValues")));
     }
 
     [Fact]
