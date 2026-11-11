@@ -462,6 +462,67 @@ public sealed class GainStoreTests
         Assert.Equal(new GainOtherTraffic(), report.OtherTraffic);
     }
 
+    [Fact]
+    public async Task Non_model_traffic_is_recorded_under_the_none_layer()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z")));
+        await store.RecordOtherAsync(new GainOtherEntry("other", DateTimeOffset.Parse("2026-11-01T10:30Z"), "/a", "anthropic", "POST", 1_000), TestContext.Current.CancellationToken);
+
+        var none = await store.QueryAsync(new GainQuery(Layer: GainLabels.Layers.None), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new GainOtherTraffic(1, 1_000), none.OtherTraffic);
+    }
+
+    [Fact]
+    public async Task Opening_a_ledger_written_before_named_layers_rederives_every_unknown_layer_and_retrieval_path()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "gain.db");
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-02T12:00Z"));
+        var old = new SqliteGainStore(new GainStoreOptions(path), clock);
+        var cancellation = TestContext.Current.CancellationToken;
+        await old.RecordAsync(OldEntry("unchanged", GainLabels.Rules.Unchanged, GainLabels.Unknown), [], cancellation);
+        await old.RecordAsync(OldEntry("refused", GainLabels.Rules.CcrPlanFailed, GainLabels.Unknown),
+            [new GainFailure(clock.GetUtcNow(), "refused", "/a", "ccr-plan", "Failure")], cancellation);
+        await old.RecordAsync(OldEntry("tool", GainLabels.Rules.CcrTool, GainLabels.Unknown), [], cancellation);
+        await old.RecordAsync(OldEntry("reduced", "json.minify", GainLabels.Layers.ToolResult), [], cancellation);
+        await old.RecallAsync(new GainRecall(clock.GetUtcNow(), "preview", "/a", "caller", "whole", 289, 100, null),
+            "anthropic", "POST", "json.minify", GainLabels.Layers.ToolResult, GainLabels.Pipelines.Content, cancellation);
+        await old.FollowUpAsync(new GainFollowUp(clock.GetUtcNow(), "/a", 1, 578, 578, 200),
+            "anthropic", "POST", GainLabels.Rules.Unchanged, GainLabels.Unknown, GainLabels.Pipelines.Content, cancellation);
+        await old.RecordOtherAsync(new GainOtherEntry("other", clock.GetUtcNow(), "/a", "anthropic", "POST", 70), cancellation);
+        await using (var connection = new SqliteConnection($"Data Source={path}"))
+        {
+            await connection.OpenAsync(cancellation);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE gain_event SET layer = 'unknown' WHERE kind = 'other'";
+            Assert.Equal(1, await command.ExecuteNonQueryAsync(cancellation));
+        }
+
+        await new SqliteGainStore(new GainStoreOptions(path), clock).QueryAsync(new GainQuery(), cancellation);
+        var store = new SqliteGainStore(new GainStoreOptions(path), clock);
+        var report = await store.QueryAsync(new GainQuery(), cancellation);
+
+        var layers = report.Attributions.Where(static row => row.Dimension == "layer").ToDictionary(static row => row.Name,static row => row.Totals);
+        Assert.Equal([GainLabels.Layers.CcrTool, GainLabels.Layers.None, GainLabels.Layers.Retrieval, GainLabels.Layers.ToolResult], layers.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(2, layers[GainLabels.Layers.None].Requests);
+        Assert.Equal(1, layers[GainLabels.Layers.CcrTool].Requests);
+        Assert.Equal(1, layers[GainLabels.Layers.ToolResult].Requests);
+        Assert.Equal((0L, 1L, 1L),(layers[GainLabels.Layers.Retrieval].Requests, layers[GainLabels.Layers.Retrieval].Recalls, layers[GainLabels.Layers.Retrieval].FollowUps));
+        var ccr = Assert.Single(report.Attributions, static row => row is { Dimension: "pipeline", Name: GainLabels.Pipelines.Ccr }).Totals;
+        Assert.Equal((0L, 1L, 1L),(ccr.Requests, ccr.Recalls, ccr.FollowUps));
+        var none = await store.QueryAsync(new GainQuery(Layer: GainLabels.Layers.None), cancellation);
+        Assert.Equal("refused", Assert.Single(none.Failures).RequestId);
+        Assert.Equal(new GainOtherTraffic(1, 70), none.OtherTraffic);
+
+        GainHistoryEntry OldEntry(string id, string rule, string layer)
+        {
+            return new GainHistoryEntry(id, clock.GetUtcNow(), "/a", "anthropic", "POST", rule, layer, GainLabels.Pipelines.Content,
+                GainReportBuilder.RequestTotals(289, 100, 289, 100));
+        }
+    }
+
     private static GainHistoryEntry Entry(string id, string at, string project, string rule, long original, long forwarded)
     {
         return new GainHistoryEntry(id, DateTimeOffset.Parse(at), project, "anthropic", "POST", rule, "tool_result", "content",
