@@ -10,6 +10,20 @@ public sealed class TitaniumSystemProxyPlatformTests
     private static readonly ExplicitProxyEndPoint EndPoint = new(IPAddress.Loopback, 18080, false);
 
     [Fact]
+    public void Load_makes_the_snapshot_what_the_servers_backend_would_restore()
+    {
+        using var captureServer = new ProxyServer(false);
+        var snapshot = new TitaniumSystemProxySnapshotProvider(captureServer).Capture();
+        using var server = new ProxyServer(false);
+        var provider = new TitaniumSystemProxySnapshotProvider(server);
+
+        new TitaniumSystemProxyPlatform(server).Load(snapshot);
+
+        Assert.True(provider.IsArmed);
+        Assert.True(TitaniumSystemProxySnapshotProvider.SnapshotsMatch(snapshot, provider.Read()));
+    }
+
+    [Fact]
     public void ApplyWith_returns_the_read_back_settings_and_keeps_them_when_setting_succeeds()
     {
         var calls = new Calls();

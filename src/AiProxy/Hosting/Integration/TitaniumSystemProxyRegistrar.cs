@@ -30,6 +30,21 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server, ISystemProx
     }
 
     /// <inheritdoc />
+    public RestoreTarget CaptureRestoreTarget(IReadOnlyCollection<IPEndPoint> staleEndpoints, string? previousSnapshot)
+    {
+        var captured = platform.Capture();
+        var target = StaleProxyValues.Replace(captured, staleEndpoints, previousSnapshot) ?? new RestoreTarget(captured, []);
+        if (target.ReplacedStaleValues)
+        {
+            // Titanium restores what its backend holds after a failed set and on exit, so the backend must hold the cleaned settings too.
+            platform.Load(target.Snapshot);
+        }
+
+        _previousSettingsSnapshot = target.Snapshot;
+        return target;
+    }
+
+    /// <inheritdoc />
     public bool IsOwned(string endpoint) => SnapshotProvider.IsOwned(endpoint);
 
     /// <inheritdoc />

@@ -14,6 +14,9 @@ public interface ISystemProxyPlatform
     /// <summary>Restores <paramref name="snapshot" /> only while the settings still belong to the run that applied <paramref name="appliedSnapshot" />.</summary>
     bool RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot);
 
+    /// <summary>Makes <paramref name="snapshot" /> the settings a failed set, a restore, or stopping the server puts back.</summary>
+    void Load(string snapshot);
+
     /// <summary>Drops the saved settings, so stopping or exiting the server restores nothing.</summary>
     void Disarm();
 }

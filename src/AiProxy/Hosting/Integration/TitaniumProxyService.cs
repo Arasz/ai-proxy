@@ -207,8 +207,16 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             await RecoverPreviousRunAsync(marker);
         }
 
-        var previousSettingsSnapshot = _systemProxyRegistrar.Capture();
-        marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint.Port), previousSettingsSnapshot);
+        var endpoint = new IPEndPoint(_options.ListenAddress, _endPoint.Port);
+        var target = _systemProxyRegistrar.CaptureRestoreTarget(
+            StaleProxyValues.Endpoints(endpoint, marker.PreviousEndpoint),
+            marker.PreviousSettingsSnapshot);
+        if (target.ReplacedStaleValues)
+        {
+            Log.StaleValuesReplaced(_logger, string.Join(", ", target.ReplacedEndpoints));
+        }
+
+        marker.Write(endpoint, target.Snapshot);
         string appliedSettingsSnapshot;
         try
         {
@@ -487,6 +495,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         /// <summary>A marker record cut short by an interrupted write was discarded.</summary>
         [LoggerMessage(EventId = 1316, Level = LogLevel.Warning, Message = "The system proxy marker held a record cut short by an interrupted write; discarded it, since that run never set the system proxy")]
         public static partial void TornMarkerDiscarded(ILogger logger);
+
+        /// <summary>Values still pointing at ai-proxy were replaced in the settings saved for restore.</summary>
+        [LoggerMessage(EventId = 1317, Level = LogLevel.Warning, Message = "The system proxy still pointed at ai-proxy at {Endpoints}; those values will be restored to the settings saved before that run, or turned off")]
+        public static partial void StaleValuesReplaced(ILogger logger, string endpoints);
 
         /// <summary>The guard session could not be reached.</summary>
         [LoggerMessage(EventId = 1303, Level = LogLevel.Warning, Message = "The system proxy guard could not be reached; it has probably ended")]

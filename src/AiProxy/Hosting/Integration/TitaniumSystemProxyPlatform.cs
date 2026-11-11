@@ -49,5 +49,8 @@ public sealed class TitaniumSystemProxyPlatform(ProxyServer server) : ISystemPro
         new TitaniumSystemProxySnapshotProvider(server).RestoreIfOwned(endpoint, snapshot, appliedSnapshot).GetAwaiter().GetResult();
 
     /// <inheritdoc />
+    public void Load(string snapshot) => new TitaniumSystemProxySnapshotProvider(server).HydrateSnapshot(snapshot);
+
+    /// <inheritdoc />
     public void Disarm() => new TitaniumSystemProxySnapshotProvider(server).Disarm();
 }

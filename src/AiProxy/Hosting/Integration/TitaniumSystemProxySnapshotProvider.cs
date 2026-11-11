@@ -283,10 +283,41 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return result is null ? ProxyProtocolType.None : (ProxyProtocolType)Convert.ToInt32(result);
     }
 
-    /// <summary>True when two serialized snapshots hold the same values.</summary>
+    /// <summary>True when two serialized snapshots hold the same values, ignoring where a switched-off macOS proxy points.</summary>
     internal static bool SnapshotsMatch(string expected, string actual)
     {
-        return JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual));
+        return JsonNode.DeepEquals(Comparable(expected), Comparable(actual));
+    }
+
+    /// <summary>
+    ///     Parses a snapshot for comparison. macOS restores a switched-off proxy by turning its switch off only, leaving the host and
+    ///     port as they were, so those are dropped from every macOS entry whose switch is off.
+    /// </summary>
+    private static JsonNode? Comparable(string snapshot)
+    {
+        var root = JsonNode.Parse(snapshot);
+        if (root?["backendType"] is not JsonValue type || !type.TryGetValue<string>(out var backendType) ||
+            backendType != "Titanium.Web.Proxy.Helpers.MacOsSystemProxyBackend" ||
+            root["values"]?["_original"] is not JsonValue original || !original.TryGetValue<string>(out var services) ||
+            JsonNode.Parse(services) is not JsonArray entries)
+        {
+            return root;
+        }
+
+        foreach (var entry in entries.OfType<JsonObject>())
+        {
+            foreach (var protocol in (string[])["Http", "Https"])
+            {
+                if (entry[$"{protocol}Enabled"] is JsonValue enabled && enabled.TryGetValue<bool>(out var on) && !on)
+                {
+                    entry.Remove($"{protocol}Host");
+                    entry.Remove($"{protocol}Port");
+                }
+            }
+        }
+
+        root["values"]!["_original"] = entries.ToJsonString();
+        return root;
     }
 
     /// <summary>Reads the system settings now in effect through a short-lived server, leaving no snapshot armed in a long-lived one.</summary>
