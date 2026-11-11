@@ -7,6 +7,7 @@ using AiProxy.Hosting;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Titanium.Web.Proxy.Models;
 using ProviderRequestInspector = AiProxy.Hosting.Integration.ProviderRequestInspector;
@@ -60,9 +61,11 @@ public sealed class TitaniumProxyServiceTests
         Assert.NotEqual(0, port);
 
         Assert.Equal(0, registrar.RestoreCount);
-        var listener = new TcpListener(IPAddress.Loopback, port);
-        listener.Start();
-        listener.Stop();
+        Assert.True(File.Exists(MarkerPath(directory)), "A failed system-proxy set must retain its pre-set snapshot for recovery.");
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.True(marker.PreviousRunDied);
+        Assert.Equal("prior-system-proxy-settings", marker.PreviousSettingsSnapshot);
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -72,12 +75,150 @@ public sealed class TitaniumProxyServiceTests
         Directory.CreateDirectory(directory.Path);
         await File.WriteAllTextAsync(MarkerPath(directory), "127.0.0.1:9", TestContext.Current.CancellationToken);
         var events = new List<string>();
-        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events));
+        var logs = new RecordingLoggerProvider();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "127.0.0.1:9" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
 
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["clear", "set", "launch", "restore", "restored"], events);
+        Assert.Equal(["clear", "capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1314);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1312 or 1313);
+    }
+
+    [Fact]
+    public async Task A_stale_endpoint_only_marker_keeps_a_proxy_set_since_and_restores_it_on_shutdown()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(MarkerPath(directory), "127.0.0.1:9", TestContext.Current.CancellationToken);
+        var events = new List<string>();
+        var logs = new RecordingLoggerProvider();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "corporate.example:8080" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1313);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1314);
+    }
+
+    [Fact]
+    public async Task A_crashed_owner_snapshot_is_left_alone_and_reported_when_the_settings_changed_since()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "exact-prior-settings");
+        }
+
+        var events = new List<string>();
+        var logs = new RecordingLoggerProvider();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "corporate.example:8080" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1313);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1312 or 1314);
+    }
+
+    [Fact]
+    public async Task A_shutdown_that_finds_the_settings_changed_reports_the_skipped_restore()
+    {
+        using var directory = new TemporaryDirectory();
+        var events = new List<string>();
+        var logs = new RecordingLoggerProvider();
+        var registrar = new RecordingSystemProxyRegistrar(events) { RestoreFindsOwnership = false };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
+        await service.StartAsync(TestContext.Current.CancellationToken);
+
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1315);
+        Assert.False(File.Exists(MarkerPath(directory)));
+    }
+
+    [Fact]
+    public async Task A_torn_marker_from_an_interrupted_write_is_reported_and_does_not_block_startup()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(MarkerPath(directory), "{\"endpoint\":\"127.0.0.1:9090\"", TestContext.Current.CancellationToken);
+        var events = new List<string>();
+        var logs = new RecordingLoggerProvider();
+        await using var service = CreateService(new RecordingSystemProxyRegistrar(events), 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1316);
+    }
+
+    [Fact]
+    public async Task A_crashed_owner_snapshot_is_restored_before_the_new_proxy_captures_settings()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "exact-prior-settings");
+        }
+
+        var events = new List<string>();
+        var logs = new RecordingLoggerProvider();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "127.0.0.1:9090" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events), loggerProvider: logs);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["restore-snapshot:exact-prior-settings", "capture", "set", "launch", "restore", "restored"], events);
+        Assert.Contains(logs.Entries, entry => entry.EventId == 1312);
+        Assert.DoesNotContain(logs.Entries, entry => entry.EventId is 1313 or 1314);
+    }
+
+    [Fact]
+    public async Task A_crashed_owner_that_recorded_its_applied_settings_hands_them_to_the_restore()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "exact-prior-settings");
+            marker.RecordApplied("exact-applied-settings");
+        }
+
+        var events = new List<string>();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "127.0.0.1:9090" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events));
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["restore-snapshot:exact-prior-settings", "restore-applied:exact-applied-settings"], events.Take(2));
+    }
+
+    [Fact]
+    public async Task The_settings_applied_by_set_are_recorded_for_crash_recovery()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var service = CreateService(new RecordingSystemProxyRegistrar { FailRestore = true }, 0, directory.Path);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.Equal("prior-system-proxy-settings", marker.PreviousSettingsSnapshot);
+        Assert.Equal("applied-system-proxy-settings", marker.AppliedSettingsSnapshot);
     }
 
     [Fact]
@@ -120,7 +261,7 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore", "restored"], events);
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
     }
 
@@ -139,10 +280,10 @@ public sealed class TitaniumProxyServiceTests
         var port = service.Address.Port;
         Assert.NotEqual(0, port);
 
-        Assert.Equal(["set", "launch", "restore"], events);
+        Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.False(File.Exists(MarkerPath(directory)));
         using var reopened = new FileStream(MarkerPath(directory), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -180,10 +321,10 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore", "restored"], events);
+        Assert.Equal(["capture", "set", "launch", "restore", "restored"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.False(File.Exists(MarkerPath(directory)));
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -199,10 +340,10 @@ public sealed class TitaniumProxyServiceTests
 
         await service.StopAsync(CancellationToken.None);
 
-        Assert.Equal(["set", "launch", "restore"], events);
+        Assert.Equal(["capture", "set", "launch", "restore"], events);
         Assert.Equal(1, launcher.DisposeCount);
         Assert.True(new FileInfo(MarkerPath(directory)).Length > 0);
-        new TcpListener(IPAddress.Loopback, port).Start();
+        Assert.False(service.Server.ProxyRunning, "The listener must be released.");
     }
 
     [Fact]
@@ -275,7 +416,8 @@ public sealed class TitaniumProxyServiceTests
         string dataDirectory,
         ISystemProxyGuardLauncher? launcher = null,
         TimeSpan? markerWait = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        RecordingLoggerProvider? loggerProvider = null)
     {
         return new TitaniumProxyService(
             registrar,
@@ -283,7 +425,7 @@ public sealed class TitaniumProxyServiceTests
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             launcher ?? new RecordingGuardLauncher([]),
-            NullLoggerFactory.Instance,
+            loggerProvider is null ? NullLoggerFactory.Instance : new LoggerFactory([loggerProvider]),
             markerWait ?? TimeSpan.FromSeconds(1),
             timeProvider ?? TimeProvider.System);
     }
@@ -296,9 +438,41 @@ public sealed class TitaniumProxyServiceTests
 
         public ExplicitProxyEndPoint? EndPoint { get; private set; }
 
+        public string? OwnedEndpoint { get; set; }
+
         public int RestoreCount { get; private set; }
 
-        public void Set(ExplicitProxyEndPoint endPoint)
+        public bool RestoreFindsOwnership { get; init; } = true;
+
+        public string Capture()
+        {
+            events?.Add("capture");
+            return "prior-system-proxy-settings";
+        }
+
+        public bool IsOwned(string endpoint) => endpoint == OwnedEndpoint;
+
+        public bool IsOwned(string endpoint, string snapshot, string? appliedSnapshot) => endpoint == OwnedEndpoint;
+
+        public Task<bool> RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot)
+        {
+            if (endpoint != OwnedEndpoint)
+            {
+                return Task.FromResult(false);
+            }
+
+            events?.Add($"restore-snapshot:{snapshot}");
+            if (appliedSnapshot is not null)
+            {
+                events?.Add($"restore-applied:{appliedSnapshot}");
+            }
+
+            OwnedEndpoint = null;
+            RestoreCount++;
+            return Task.FromResult(true);
+        }
+
+        public string Set(ExplicitProxyEndPoint endPoint)
         {
             if (FailSet)
             {
@@ -307,9 +481,11 @@ public sealed class TitaniumProxyServiceTests
 
             events?.Add("set");
             EndPoint = endPoint;
+            OwnedEndpoint = $"{endPoint.IpAddress}:{endPoint.Port}";
+            return "applied-system-proxy-settings";
         }
 
-        public void Restore()
+        public bool Restore()
         {
             events?.Add("restore");
             RestoreCount++;
@@ -317,6 +493,8 @@ public sealed class TitaniumProxyServiceTests
             {
                 throw new InvalidOperationException("networksetup failed");
             }
+
+            return RestoreFindsOwnership;
         }
 
         /// <inheritdoc />

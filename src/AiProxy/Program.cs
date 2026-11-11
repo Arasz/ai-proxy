@@ -4,6 +4,7 @@ using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Integration;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
+using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.Network;
 
 var route = EntryPoint.Route(args);
@@ -18,7 +19,10 @@ if (route == EntryRoute.Guard)
     CertificateManager.SuppressInteractiveRootStoreMutations = true;
     using var input = new StreamReader(Console.OpenStandardInput());
     var lockWait = TimeSpan.FromSeconds(5);
-    var guardCommand = new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait, TimeProvider.System);
+    using var proxyServer = new ProxyServer(false);
+    var registrar = new TitaniumSystemProxyRegistrar(proxyServer);
+    var recovery = new SystemProxyRecovery(registrar);
+    var guardCommand = new GuardCommand(args[1], TitaniumSystemProxyRegistrar.ClearSystemProxy, lockWait, TimeProvider.System, recovery.RestoreIfOwned, registrar.IsOwned);
     return await guardCommand.Run(input);
 }
 
