@@ -52,8 +52,16 @@ still owns the settings. Settings changed by another app are left alone.
   ai-proxy set or the saved value, and at least one must still be ai-proxy's. A restore that stopped
   partway can therefore be retried. An FTP or SOCKS entry that differs from the saved one counts as
   an outside change.
-- **macOS and Linux:** both the HTTP and the HTTPS proxy must still point at the recorded endpoint.
-  The bypass list is not compared.
+- **macOS and Linux:** right after setting the proxy, ai-proxy reads the settings back and adds them
+  to the marker. Each value the platform restores (HTTP and HTTPS proxy, their on/off state, the
+  bypass list, and on macOS the SOCKS and PAC settings of every network service) must then hold
+  either the value ai-proxy applied or the saved one, and at least one must still be ai-proxy's.
+  A restore that stopped between HTTP and HTTPS is retried, while an outside change to any value,
+  the bypass list included, is left alone. The process environment is not compared. A marker
+  without the applied settings (written by an older version, or by a run that crashed before it
+  recorded them) falls back to the older rule: HTTP and HTTPS must both still point at the
+  recorded endpoint. So does a Linux desktop with neither GNOME nor KDE settings, where the applied
+  settings record no system value.
 
 At startup the log names the outcome: 1312 when the saved settings were restored, 1313 when they
 were left alone because the settings changed, and 1314 when a marker from an older version (endpoint
@@ -69,4 +77,6 @@ the marker so the next start can retry recovery.
 
 The marker is written in a single flushed write before the proxy is set. A record cut short by a
 crash during that write is discarded with warning 1316, because the proxy was never changed behind
-it. On Windows the marker carries an access list that allows only the current user.
+it. The applied settings are added after the proxy is set by rewriting the record in place, so the
+longer record starts with the shorter one. A crash during that second write leaves the endpoint and
+saved settings readable, and recovery uses the older rule. On Windows the marker carries an access list that allows only the current user.

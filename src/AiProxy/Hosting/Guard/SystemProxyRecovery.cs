@@ -16,6 +16,6 @@ public sealed class SystemProxyRecovery(ISystemProxySnapshotProvider snapshotPro
             return false;
         }
 
-        return await snapshotProvider.RestoreIfOwned(endpoint, previous);
+        return await snapshotProvider.RestoreIfOwned(endpoint, previous, marker.AppliedSettingsSnapshot);
     }
 }

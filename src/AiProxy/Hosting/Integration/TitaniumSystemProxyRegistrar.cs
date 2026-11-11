@@ -11,6 +11,7 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
 {
     private string? _previousSettingsSnapshot;
     private string? _endpoint;
+    private string? _appliedSettingsSnapshot;
 
     private TitaniumSystemProxySnapshotProvider SnapshotProvider => new(server);
 
@@ -25,13 +26,14 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
     public bool IsOwned(string endpoint) => SnapshotProvider.IsOwned(endpoint);
 
     /// <inheritdoc />
-    public bool IsOwned(string endpoint, string snapshot) => SnapshotProvider.IsOwned(endpoint, snapshot);
+    public bool IsOwned(string endpoint, string snapshot, string? appliedSnapshot) => SnapshotProvider.IsOwned(endpoint, snapshot, appliedSnapshot);
 
     /// <inheritdoc />
-    public Task<bool> RestoreIfOwned(string endpoint, string snapshot) => SnapshotProvider.RestoreIfOwned(endpoint, snapshot);
+    public Task<bool> RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot) =>
+        SnapshotProvider.RestoreIfOwned(endpoint, snapshot, appliedSnapshot);
 
     /// <inheritdoc />
-    public void Set(ExplicitProxyEndPoint endPoint)
+    public string Set(ExplicitProxyEndPoint endPoint)
     {
         Prepare(endPoint);
         var result = server.TrySetAsSystemProxy(endPoint, ProxyProtocolType.AllHttp, BypassSettings());
@@ -40,6 +42,19 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
             server.TryRestoreOriginalProxySettings();
             throw new InvalidOperationException($"The system proxy could not be set to ai-proxy: {result.Message}");
         }
+
+        try
+        {
+            // Read back through the same reader restore verification uses, so ownership checks compare like with like.
+            _appliedSettingsSnapshot = TitaniumSystemProxySnapshotProvider.CaptureCurrentSettings();
+        }
+        catch (Exception exception)
+        {
+            server.TryRestoreOriginalProxySettings();
+            throw new InvalidOperationException($"The system proxy was set but could not be read back: {exception.Message}", exception);
+        }
+
+        return _appliedSettingsSnapshot;
     }
 
     internal string? PreviousSettingsSnapshot => _previousSettingsSnapshot;
@@ -72,7 +87,7 @@ public sealed class TitaniumSystemProxyRegistrar(ProxyServer server) : ISystemPr
         }
 
         var provider = SnapshotProvider;
-        if (provider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot).GetAwaiter().GetResult())
+        if (provider.RestoreIfOwned(_endpoint, _previousSettingsSnapshot, _appliedSettingsSnapshot).GetAwaiter().GetResult())
         {
             return true;
         }

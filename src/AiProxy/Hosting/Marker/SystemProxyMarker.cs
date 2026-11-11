@@ -4,6 +4,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AiProxy.Hosting.Proxy;
 
 namespace AiProxy.Hosting.Marker;
@@ -23,6 +24,7 @@ public sealed class SystemProxyMarker : IDisposable
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _path;
     private readonly FileStream _stream;
+    private MarkerRecord? _written;
 
     private SystemProxyMarker(FileStream stream, string path, MarkerRecord record)
     {
@@ -30,6 +32,7 @@ public sealed class SystemProxyMarker : IDisposable
         _path = path;
         PreviousEndpoint = record.Endpoint;
         PreviousSettingsSnapshot = record.PreviousSettingsSnapshot;
+        AppliedSettingsSnapshot = record.AppliedSettingsSnapshot;
         DiscardedTornRecord = record.Torn;
     }
 
@@ -38,6 +41,9 @@ public sealed class SystemProxyMarker : IDisposable
 
     /// <summary>The serialized system proxy settings that preceded the previous run, when available.</summary>
     public string? PreviousSettingsSnapshot { get; }
+
+    /// <summary>The serialized settings the previous run applied, when it recorded them after setting the proxy.</summary>
+    public string? AppliedSettingsSnapshot { get; }
 
     /// <summary>True when the file held a record cut short by an interrupted write, which never preceded a system proxy change.</summary>
     public bool DiscardedTornRecord { get; }
@@ -93,16 +99,39 @@ public sealed class SystemProxyMarker : IDisposable
     /// </summary>
     public void Write(IPEndPoint endPoint, string? previousSettingsSnapshot = null)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(new MarkerRecord(endPoint.ToString(), previousSettingsSnapshot), JsonOptions);
+        var record = new MarkerRecord(endPoint.ToString(), previousSettingsSnapshot);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(record, JsonOptions);
         _stream.SetLength(0);
         _stream.Position = 0;
         _stream.Write(bytes);
         _stream.Flush(true);
+        _written = record;
+    }
+
+    /// <summary>
+    ///     Adds the settings ai-proxy applied to the record this hold wrote, without emptying the file first:
+    ///     the new record extends the old one, so an interrupted write leaves the old record's fields readable.
+    /// </summary>
+    public void RecordApplied(string appliedSettingsSnapshot)
+    {
+        if (_written is null)
+        {
+            throw new InvalidOperationException("The system proxy marker has no record to add the applied settings to.");
+        }
+
+        var record = _written with { AppliedSettingsSnapshot = appliedSettingsSnapshot };
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(record, JsonOptions);
+        _stream.Position = 0;
+        _stream.Write(bytes);
+        _stream.SetLength(bytes.Length);
+        _stream.Flush(true);
+        _written = record;
     }
 
     /// <summary>Empties the file and keeps the hold, recording that the system proxy no longer needs clearing.</summary>
     public void Truncate()
     {
+        _written = null;
         _stream.SetLength(0);
         _stream.Flush();
     }
@@ -146,6 +175,11 @@ public sealed class SystemProxyMarker : IDisposable
                 return new MarkerRecord(text, null);
             }
 
+            if (RecordBeforeApplied(text) is { } recorded)
+            {
+                return recorded;
+            }
+
             // Write flushes the whole record before the system proxy is set, so a cut-short record never had a proxy change behind it.
             if (text.StartsWith('{') && !text.EndsWith('}'))
             {
@@ -153,6 +187,46 @@ public sealed class SystemProxyMarker : IDisposable
             }
 
             throw new InvalidDataException("The system proxy marker is malformed.", exception);
+        }
+    }
+
+    /// <summary>
+    ///     Recovers the complete record a cut-short <see cref="RecordApplied" /> was extending: the text up to the applied field
+    ///     (or a cut inside its name) must close into a record that already named its endpoint and previous settings.
+    /// </summary>
+    private static MarkerRecord? RecordBeforeApplied(string text)
+    {
+        const string AppliedField = ",\"appliedSettingsSnapshot\"";
+        var start = text.IndexOf(AppliedField, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            start = Enumerable.Range(1, AppliedField.Length - 1)
+                .Where(length => text.EndsWith(AppliedField[..length], StringComparison.Ordinal))
+                .Select(length => text.Length - length)
+                .DefaultIfEmpty(-1)
+                .First();
+        }
+
+        if (start < 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var head = text[..start] + "}";
+            using var document = JsonDocument.Parse(head);
+            if (!document.RootElement.TryGetProperty("previousSettingsSnapshot", out _))
+            {
+                return null;
+            }
+
+            var record = document.Deserialize<MarkerRecord>(JsonOptions);
+            return record?.Endpoint is { } endpoint && IPEndPoint.TryParse(endpoint, out _) && record.AppliedSettingsSnapshot is null ? record : null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -204,10 +278,15 @@ public sealed class SystemProxyMarker : IDisposable
         return security;
     }
 
-    private sealed record MarkerRecord(string? Endpoint, string? PreviousSettingsSnapshot)
+    /// <summary>The applied settings come last and are omitted until known, so recording them only extends the earlier record.</summary>
+    private sealed record MarkerRecord(
+        string? Endpoint,
+        string? PreviousSettingsSnapshot,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AppliedSettingsSnapshot = null)
     {
         public static MarkerRecord Empty { get; } = new(null, null);
 
+        [JsonIgnore]
         public bool Torn { get; init; }
     }
 }

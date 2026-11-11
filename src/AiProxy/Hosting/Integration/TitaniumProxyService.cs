@@ -208,9 +208,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         var previousSettingsSnapshot = _systemProxyRegistrar.Capture();
         marker.Write(new IPEndPoint(_options.ListenAddress, _endPoint.Port), previousSettingsSnapshot);
+        string appliedSettingsSnapshot;
         try
         {
-            _systemProxyRegistrar.Set(_endPoint);
+            appliedSettingsSnapshot = _systemProxyRegistrar.Set(_endPoint);
         }
         catch
         {
@@ -222,6 +223,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _systemProxySet = true;
         try
         {
+            marker.RecordApplied(appliedSettingsSnapshot);
             _guard = _guardLauncher.Launch(_options.DataDirectory, () => Log.GuardExited(_logger));
         }
         catch

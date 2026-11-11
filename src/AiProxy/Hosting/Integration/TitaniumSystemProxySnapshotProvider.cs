@@ -50,15 +50,15 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <inheritdoc />
-    public Task<bool> RestoreIfOwned(string endpoint, string snapshot)
+    public Task<bool> RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot)
     {
-        if (!IsOwned(endpoint, snapshot))
+        if (!IsOwned(endpoint, snapshot, appliedSnapshot))
         {
             return Task.FromResult(false);
         }
 
         HydrateSnapshot(snapshot);
-        if (!IsOwned(endpoint, snapshot))
+        if (!IsOwned(endpoint, snapshot, appliedSnapshot))
         {
             return Task.FromResult(false);
         }
@@ -97,7 +97,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <inheritdoc />
-    public bool IsOwned(string endpoint, string snapshot)
+    public bool IsOwned(string endpoint, string snapshot, string? appliedSnapshot)
     {
         if (!IPEndPoint.TryParse(endpoint, out var endpointAddress))
         {
@@ -106,7 +106,11 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
         if (!OperatingSystem.IsWindows())
         {
-            return UnixProxyIsOwned(GetStaleLocalProxyProtocols(GetBackend(server), endpointAddress.Port));
+            return UnixProxyIsOwned(
+                snapshot,
+                appliedSnapshot,
+                CaptureCurrentSettings,
+                () => GetStaleLocalProxyProtocols(GetBackend(server), endpointAddress.Port));
         }
 
         var original = ReadOriginalWindowsProxyInfo(snapshot);
@@ -121,6 +125,20 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
 
     /// <summary>ai-proxy always sets HTTP and HTTPS together, so a single protocol still pointing at it means the other was changed.</summary>
     internal static bool UnixProxyIsOwned(ProxyProtocolType owned) => owned == ProxyProtocolType.AllHttp;
+
+    /// <summary>
+    ///     With the settings ai-proxy applied, each value must be ai-proxy's or the original's, so a partly applied restore can be retried;
+    ///     without them (an older marker, or a crash before they were recorded), HTTP and HTTPS must both still point at the proxy.
+    /// </summary>
+    internal static bool UnixProxyIsOwned(string original, string? applied, Func<string> currentSettings, Func<ProxyProtocolType> ownedProtocols)
+    {
+        if (applied is null || !UnixProxySettings.Differ(applied, original))
+        {
+            return UnixProxyIsOwned(ownedProtocols());
+        }
+
+        return UnixProxySettings.IsOwned(currentSettings(), applied, original);
+    }
 
     /// <summary>
     ///     True when every value is either what ai-proxy set or what the snapshot holds, and at least one is still ai-proxy's,
@@ -239,7 +257,8 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
         return JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual));
     }
 
-    private static string CaptureCurrentSettings()
+    /// <summary>Reads the system settings now in effect through a short-lived server, leaving no snapshot armed in a long-lived one.</summary>
+    internal static string CaptureCurrentSettings()
     {
         using var verificationServer = new ProxyServer(false);
         return new TitaniumSystemProxySnapshotProvider(verificationServer).Capture();

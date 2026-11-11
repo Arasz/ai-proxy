@@ -189,6 +189,41 @@ public sealed class TitaniumProxyServiceTests
     }
 
     [Fact]
+    public async Task A_crashed_owner_that_recorded_its_applied_settings_hands_them_to_the_restore()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            marker.Write(new IPEndPoint(IPAddress.Loopback, 9090), "exact-prior-settings");
+            marker.RecordApplied("exact-applied-settings");
+        }
+
+        var events = new List<string>();
+        var registrar = new RecordingSystemProxyRegistrar(events) { OwnedEndpoint = "127.0.0.1:9090" };
+        await using var service = CreateService(registrar, 0, directory.Path, new RecordingGuardLauncher(events));
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.Equal(["restore-snapshot:exact-prior-settings", "restore-applied:exact-applied-settings"], events.Take(2));
+    }
+
+    [Fact]
+    public async Task The_settings_applied_by_set_are_recorded_for_crash_recovery()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var service = CreateService(new RecordingSystemProxyRegistrar { FailRestore = true }, 0, directory.Path);
+
+        await service.StartAsync(TestContext.Current.CancellationToken);
+        await service.StopAsync(CancellationToken.None);
+
+        using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
+        Assert.Equal("prior-system-proxy-settings", marker.PreviousSettingsSnapshot);
+        Assert.Equal("applied-system-proxy-settings", marker.AppliedSettingsSnapshot);
+    }
+
+    [Fact]
     public async Task A_start_without_a_marker_does_not_clear_and_holds_the_marker()
     {
         using var directory = new TemporaryDirectory();
@@ -419,9 +454,9 @@ public sealed class TitaniumProxyServiceTests
 
         public bool IsOwned(string endpoint) => endpoint == OwnedEndpoint;
 
-        public bool IsOwned(string endpoint, string snapshot) => endpoint == OwnedEndpoint;
+        public bool IsOwned(string endpoint, string snapshot, string? appliedSnapshot) => endpoint == OwnedEndpoint;
 
-        public Task<bool> RestoreIfOwned(string endpoint, string snapshot)
+        public Task<bool> RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot)
         {
             if (endpoint != OwnedEndpoint)
             {
@@ -429,12 +464,17 @@ public sealed class TitaniumProxyServiceTests
             }
 
             events?.Add($"restore-snapshot:{snapshot}");
+            if (appliedSnapshot is not null)
+            {
+                events?.Add($"restore-applied:{appliedSnapshot}");
+            }
+
             OwnedEndpoint = null;
             RestoreCount++;
             return Task.FromResult(true);
         }
 
-        public void Set(ExplicitProxyEndPoint endPoint)
+        public string Set(ExplicitProxyEndPoint endPoint)
         {
             if (FailSet)
             {
@@ -444,6 +484,7 @@ public sealed class TitaniumProxyServiceTests
             events?.Add("set");
             EndPoint = endPoint;
             OwnedEndpoint = $"{endPoint.IpAddress}:{endPoint.Port}";
+            return "applied-system-proxy-settings";
         }
 
         public bool Restore()

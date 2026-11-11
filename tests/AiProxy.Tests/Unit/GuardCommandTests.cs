@@ -222,6 +222,28 @@ public sealed class GuardCommandTests
         return Path.Combine(directory.Path, SystemProxyMarker.FileName);
     }
 
+    [Fact]
+    public async Task A_parent_that_died_after_recording_its_applied_settings_hands_them_to_the_restore()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        using (var owner = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System))
+        {
+            owner.Write(new IPEndPoint(IPAddress.Loopback, 9090), "previous");
+            owner.RecordApplied("applied");
+        }
+
+        var snapshotProvider = new GuardSnapshotProvider { Current = "127.0.0.1:9090" };
+        var recovery = new SystemProxyRecovery(snapshotProvider);
+        var command = new GuardCommand(directory.Path, () => Task.CompletedTask, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned);
+
+        var exitCode = await command.Run(new StringReader(""));
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("applied", snapshotProvider.Applied);
+        Assert.Equal("previous", snapshotProvider.Restored);
+    }
+
     private static async Task LeaveMarker(TemporaryDirectory directory)
     {
         Directory.CreateDirectory(directory.Path);
@@ -235,14 +257,17 @@ public sealed class GuardCommandTests
 
         public string? Restored { get; private set; }
 
+        public string? Applied { get; private set; }
+
         public string Capture() => Current;
 
         public bool IsOwned(string endpoint) => string.Equals(Current, endpoint, StringComparison.Ordinal);
 
-        public bool IsOwned(string endpoint, string snapshot) => IsOwned(endpoint);
+        public bool IsOwned(string endpoint, string snapshot, string? appliedSnapshot) => IsOwned(endpoint);
 
-        public Task<bool> RestoreIfOwned(string endpoint, string snapshot)
+        public Task<bool> RestoreIfOwned(string endpoint, string snapshot, string? appliedSnapshot)
         {
+            Applied = appliedSnapshot;
             if (!string.Equals(Current, endpoint, StringComparison.Ordinal))
             {
                 return Task.FromResult(false);
