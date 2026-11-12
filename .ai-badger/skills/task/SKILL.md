@@ -16,15 +16,14 @@ scope: default
 metadata:
   hermes:
     tags: [task, orchestration, delegation, worktree]
-    related_skills: [create-task-spec, commit-reminder, test-economy, multi-agent-communication]
+    related_skills: [create-task-spec, decision-record, commit-reminder, test-economy, multi-agent-communication]
 ---
 
 # task orchestration skill
 
-Runs one backlog task as a separated, token-tracked unit of work. High-leverage thinking —
-planning and the final quality gate — is delegated to a high-reasoning model; implementation
-models do the hands-on work; the orchestrating session integrates and tracks everything so a
-dead session can be resumed.
+Runs one backlog task as a separated, token-tracked unit of work. Planning and the final
+quality gate go to a high-reasoning model, hands-on work to implementation models; the
+orchestrating session integrates and tracks everything so a dead session can be resumed.
 
 **All project specifics come from `.ai-badger/config.json`** — never hardcode a build command,
 a persona name, or a repository. Tracking data lives in `.ai-badger/task-tracking/` (gitignored).
@@ -46,12 +45,12 @@ derive the loop after analyze — a best-effort match of loop to scope.
 
 ### Low-effort loop
 
-prepare → analyze → plan → plan review → implementation → review implementation →
-apply fixes → pr → gates → close task → reflect → merge
+prepare → analyze → plan → plan review → decision record → implementation →
+review implementation → apply fixes → pr → gates → close task → reflect → merge
 
 ### High-effort loop
 
-prepare → analyze → plan (MoE) → plan review (MoE) → implementation →
+prepare → analyze → plan (MoE) → plan review (MoE) → decision record → implementation →
 review implementation (MoE) → apply fixes → QA: test quality & coverage → pr →
 gates → close task → reflect → merge
 
@@ -69,6 +68,8 @@ Integration step: required in the high-effort variant. The plan carries a join s
 
 **plan review (MoE)** — High-effort: MoE panel (3 experts, subject-matched). At least one expert
 different from plan authoring.
+
+**decision record** — Feature or behaviour change: commit a `decision-record` before code.
 
 **implementation** — Code phase per persona routing. TDD mandatory.
 
@@ -88,8 +89,8 @@ full-suite run.
 
 **close task** — Close tracking, remove clean worktree, update state files.
 
-**reflect** — Check memory, semantica, session history. Distil durable facts. Promote to shared
-context.
+**reflect** — Check memory, `query_decisions`, session history. Distil durable facts. Promote to
+shared context.
 
 **merge** — Final PR merge.
 
@@ -99,8 +100,8 @@ context.
 
     {repo-alias}-{key}
 
-- **repo-alias:** Constant per repo. Examples: `jsaa`, `aib`, `air`, `ahp`. Determined by checking
-  `config.json`'s `sourceControl.repoAlias`, memory, or deriving from repo name.
+- **repo-alias:** Constant per repo (`jsaa`, `aib`): `config.json`'s `sourceControl.repoAlias`,
+  memory, or derived from the repo name.
 - **key:** 5 words conveying purpose. Hyphenated lowercase slug.
 
 Example: `aib-default-loop`.
@@ -314,11 +315,10 @@ Exit: merged, state updated, tracking closed.
 4. Close tracking: `python3 .ai-badger/skills/task/scripts/task_tracker.py finish <taskId>`. This
    also removes the task's worktree — **unless it still holds work that exists nowhere else** (see
    `references/tracking-visibility.md` when it refuses).
-5. **Reflect.** Examine what was learned during this task. Check AiRaccoon memory for the
-   current workspace, query semantica entries if available, and review the session history.
-   Distil: what should be remembered as durable facts? Write any cross-task learnings to
-   memory. Promote high-value entries to shared context if applicable. Record decisions in
-   semantica.
+5. **Reflect.** Check AiRaccoon memory and the session history. Run `query_decisions` with `selector.taskIds` set to
+   the taskId to confirm the pre-implementation decision exists; never record it again. Call
+   `transition_decision` to accepted if the outcome held, else to rejected. Write durable facts: `add_memory`.
+   Promote high-value entries to shared.
 6. Ask the user to grade the skill 0–5: `python3 .ai-badger/skills/task/scripts/task_tracker.py grade <taskId> <0-5>`
    (skip/leave unset if autonomous).
 7. Report the task's token cost and recommend `/compact` or a fresh session before the next
@@ -363,6 +363,6 @@ machine-run gates that close the task.
 - [ ] Task-ID derived per the `{repo-alias}-{key}` formula and is unique
 - [ ] Task `loop` (low or high) was determined before implementation began
 - [ ] High-effort tasks ran QA test quality & coverage step
-- [ ] `reflect` step examined memory, semantica, and session history for learnings
+- [ ] `reflect` ran `query_decisions` for the task, then `transition_decision`
 - [ ] `finish` left no worktree with unmerged or uncommitted work — `keptBecause` empty or resolved
 - [ ] Token cost reported and compact/fresh-session advice given (or the auto-continue condition held)

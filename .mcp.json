@@ -9,15 +9,6 @@
         "*"
       ]
     },
-    "semantica": {
-      "command": "${HOME}/.local/bin/semantica-mcp",
-      "env": {
-        "SEMANTICA_DISABLE_PROGRESS": "1"
-      },
-      "tools": [
-        "*"
-      ]
-    },
     "playwright": {
       "command": "npx",
       "args": [

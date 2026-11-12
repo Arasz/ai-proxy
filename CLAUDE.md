@@ -6,7 +6,7 @@ A local proxy that detects the LLM provider dialect of an inbound request, forwa
 
 > Domain: Gives AI coding agents one local endpoint to point at: the proxy decides which provider the request belongs to, relays it with the caller's own credential, and carries other agent traffic (an MCP server such as ai-raccoon) to its own upstream without altering it.
 > Stacks: dotnet, github, changelog
-> Scaffolded by ai-badger 0.215.0. Source of truth for this file: `.ai-badger/CLAUDE.md`.
+> Scaffolded by ai-badger 0.219.0. Source of truth for this file: `.ai-badger/CLAUDE.md`.
 
 ## Commands
 
@@ -67,16 +67,7 @@ isolate in-progress notes and consolidate on finish; `share_memory` promotes dur
 facts. Keep the docs directory searchable: check `get_watch_status`, then `add_watch`
 (projectId + absolute path) when no watch exists.
 
-<!-- semantica MCP tools -->
-## MCP Tools: semantica
-
-Semantica is the project knowledge graph. It complements AiRaccoon: AiRaccoon answers
-"what do we know?"; Semantica answers "how are things connected?" and "why was this
-decision made?".
-
-Start with `get_graph_summary` for orientation. Record architectural decisions with
-`record_decision`. Drill into specifics with `query_decisions`, `find_precedents`, or
-`get_causal_chain`. Each tool's own description covers the rest.
+Decision tools before 2.6.1 commit but Claude Code rejects the reply (null fields marked required): do not retry — verify and continue with `ai-raccoon decisions task register|record|get|query|export|preview`.
 
 <!-- Playwright MCP tools -->
 ## MCP Tools: playwright
@@ -103,6 +94,7 @@ No project `.mcp.json` (worktree sessions) → use the CLI twin `task_graph_cli.
 
 Each rule's full text is `.ai-badger/invariants/<name>.md`.
 
+- **Write to the user in Simplified Technical English** (`simplified-technical-english`) — When you write a response, a report, a status update, a question or a hand-back to the user, use the `simplified-technical-english` skill.
 - **Announce parallel work** (`announce-parallel-work`) — When another agent session shares the project, announce started work, opened PRs, review requests and merges on the project bus — read `multi-agent-communication` when parallel work is active.
 - **Diagrams default to Archify** (`archify-diagrams`) — Author architecture, workflow, sequence, data-flow and lifecycle diagrams with the `archify` skill when it is installed.
 - **Ask if a simpler shape would do** (`ask-if-simpler`) — Before calling any design or change finished, ask whether it is over-engineered and what the simpler version would look like.
@@ -114,8 +106,6 @@ Each rule's full text is `.ai-badger/invariants/<name>.md`.
 - **Final output schema separation** (`final-output-schema-separation`) — Keep free-form reasoning separate from the final output schema and emit the schema last so the output is auditable and machine-checkable.
 - **Grounded feedback** (`grounded-feedback`) — Every correction must cite failing checks, compiler output, validator output, or source evidence before proposing a new patch.
 - **Guard clauses over hand-rolled null checks** (`guard-clauses`) — Prefer a dedicated guard/throw-helper for argument validation over hand-rolled `x ?? throw ...` or ad hoc `if (x == null) throw` blocks — a guard reads as intent, not boilerplate, and keeps the exception type/message consistent across the codebase.
-- **No null checks on values that cannot be null** (`no-redundant-null-checks`) — With nullable analysis on, never guard a non-nullable value (`string` cannot be null, `string?` can): no `ArgumentNullException.ThrowIfNull(x)` for a parameter typed `string`, only for `string?` or input from an untyped boundary.
-- **Primary constructors, always** (`primary-constructors`) — Declare C# constructor parameters as a primary constructor rather than a classic constructor that copies arguments into fields.
 - **Measure only when the measurement pays** (`measure-when-it-pays`) — Run your own benchmark or experiment when the time it costs is repaid by the decision it settles, and not otherwise.
 - **Minimal comments** (`minimal-comments`) — Write a doc comment as the 1-3 line contract an editor shows on hover — what the thing is and how to use it — and never let a PR, issue or ticket reference appear anywhere in it.
 - **Let git write git's own storage** (`never-hand-edit-the-git-dir`) — Write a git dir through `git config`, `git remote` and `git branch --set-upstream-to`, each of which takes the config lock and rewrites only the key it was given.
@@ -129,6 +119,7 @@ Each rule's full text is `.ai-badger/invariants/<name>.md`.
 - **Done means proven** (`proof-of-done`) — Every unit of planned work carries its acceptance criteria and the gate that checks them, named before the work starts.
 - **A check you have not seen fail is not a check** (`prove-the-check-fails`) — Put the defect a gate, test or acceptance criterion exists to catch in front of it, watch it go red, take the defect away and watch it go green — a check that has only ever passed is indistinguishable from one whose comparison can produce a single answer that looks like success.
 - **Reasoning scaffolding minimization** (`reasoning-scaffolding-minimization`) — Avoid step-by-step CoT plans on modern reasoning models unless the task is genuine symbolic reasoning; state the goal and constraints instead of narrating the process.
+- **Record the decision before you build it** (`record-decisions`) — Every change that adds a feature or meaningfully changes how something works gets a decision record before implementation starts, written with the `decision-record` skill in the format this project already keeps: its ADR log, its spec framework, or both as a linked pair.
 - **Screaming architecture** (`screaming-architecture`) — Organize folders and modules by domain/business concept, not by generic technical bucket.
 - **Small commits, early draft PR** (`small-commits-early-draft-pr`) — Commit one coherent work package at a time and push often.
 - **Route state transitions through a state machine** (`state-transitions-through-a-machine`) — Where a domain object has explicit states, make the declared transitions the only way it moves between them, and record what triggered each move.
