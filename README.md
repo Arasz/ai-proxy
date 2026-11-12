@@ -111,7 +111,8 @@ ai-proxy harness claude -- --model sonnet
 The launcher checks that the proxy is reachable, sets `HTTP_PROXY`, `HTTPS_PROXY`,
 `NO_PROXY` and `NODE_EXTRA_CA_CERTS` for the child, and adds `X-Ai-Proxy-Project` with the
 current directory to `ANTHROPIC_CUSTOM_HEADERS`. It preserves other custom headers and
-existing proxy bypass entries. Claude keeps its terminal input and output, arguments, and
+existing proxy bypass entries, and adds loopback and the cloud metadata address
+(`169.254.169.254`) to `NO_PROXY`. Claude keeps its terminal input and output, arguments, and
 exit status. The parent shell's environment stays unchanged.
 
 The defaults are `http://127.0.0.1:8080` (or the port in `PROXY__PORT`) and

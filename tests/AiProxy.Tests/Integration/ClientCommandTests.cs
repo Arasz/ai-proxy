@@ -96,7 +96,7 @@ public sealed class ClientCommandTests
         Assert.Contains("Other: preserved", result.Output, StringComparison.Ordinal);
         Assert.Contains($"X-Ai-Proxy-Project: {Environment.CurrentDirectory}", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("stale", result.Output, StringComparison.Ordinal);
-        Assert.Contains("example.test,localhost,127.0.0.1,::1", result.Output, StringComparison.Ordinal);
+        Assert.Contains("example.test,localhost,127.0.0.1,::1,169.254.169.254,169.254.0.0/16\n", result.Output, StringComparison.Ordinal);
         Assert.Equal(arguments.Select(static argument => $"arg:<{argument}>"),
             result.Output.Split('\n').Where(static line => line.StartsWith("arg:<", StringComparison.Ordinal)));
     }

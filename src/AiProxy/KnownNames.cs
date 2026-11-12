@@ -34,7 +34,7 @@ internal static class KnownNames
         public const string RootPath = "/";
         public const string ProxyUrlFormat = "http://127.0.0.1:{0}";
         public const string LoopbackHosts = "localhost;127.0.0.1;[::1]";
-        public const string LoopbackBypass = "localhost,127.0.0.1,::1";
+        public const string LocalBypass = "localhost,127.0.0.1,::1,169.254.169.254,169.254.0.0/16";
         public static readonly FrozenSet<string> Protocols = ["http", "https"];
     }
 

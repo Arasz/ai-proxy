@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.29.1](0.29.1-harness-bypass-metadata-ip.md) | `ai-proxy harness` adds the cloud metadata address (`169.254.169.254`, `169.254.0.0/16`) to the child's `NO_PROXY`, so metadata probes no longer wait 20 s on the proxy and log a 504 failure. | [#127](https://github.com/Arasz/ai-proxy/pull/127) |
 | [0.29.0](0.29.0-dotnet-11-runtime-async.md) | Targets .NET 11 (the tool needs the .NET 11 runtime), compiles with Runtime Async, and updates packages including Titanium.Web.Proxy 8.0.2. | [#126](https://github.com/Arasz/ai-proxy/pull/126) |
 | [0.28.6](0.28.6-stale-proxy-restore-target.md) | A start no longer saves a system proxy value still pointing at an ai-proxy endpoint as the one to restore; it takes the earlier saved value or turns that protocol off (warning 1317). | [#125](https://github.com/Arasz/ai-proxy/pull/125) |
 | [0.28.5](0.28.5-restore-prior-proxy.md) | After a crash, the next start or the guard restores the system proxy settings ai-proxy replaced, only while they still point at ai-proxy. | [#122](https://github.com/Arasz/ai-proxy/pull/122) |
