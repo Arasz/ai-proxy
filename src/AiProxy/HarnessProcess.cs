@@ -74,7 +74,7 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
             start.Environment.TryGetValue(KnownNames.EnvironmentVariables.NoProxy, out var upperBypass);
             start.Environment.TryGetValue(KnownNames.EnvironmentVariables.LowerNoProxy, out var lowerBypass);
             start.Environment.TryGetValue(KnownNames.EnvironmentVariables.AnthropicCustomHeaders, out var customHeaders);
-            var bypass = string.Join(',', new[] { upperBypass, lowerBypass, KnownNames.Network.LoopbackBypass }
+            var bypass = string.Join(',', new[] { upperBypass, lowerBypass, KnownNames.Network.LocalBypass }
                 .Where(static value => !string.IsNullOrWhiteSpace(value)));
             start.Environment[KnownNames.EnvironmentVariables.NoProxy] = bypass;
             start.Environment[KnownNames.EnvironmentVariables.LowerNoProxy] = bypass;
