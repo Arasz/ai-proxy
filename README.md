@@ -44,7 +44,7 @@ see [reading gain and retrieving originals](docs/how-to/reading-gain-and-retriev
 
 ## Install
 
-Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), then install the tool:
+Install the [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0), then install the tool:
 
 ```bash
 dotnet tool install --global ai-proxy
