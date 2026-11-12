@@ -8,4 +8,4 @@
             <NativeCopyLocalItems Remove="@(UnusedTreeSitterNative)"/>
         </ItemGroup>
     </Target>
-</Project>
+<!-- Runtime Async: the runtime, not compiler-built state machines, suspends and resumes async methods. netstandard2.0 (the source generator) cannot run it. --><PropertyGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETCoreApp'"><Features>$(Features);runtime-async=on</Features></PropertyGroup></Project>
