@@ -3,6 +3,15 @@
   "next": "Owner live smoke of 0.27.0 Codex chatgpt.com recording; quoted-echo references build (high loop, default shape); #24 restore system proxy after crash, NSS cleanup, capture message id.",
   "completedTasks": [
     {
+      "taskId": "aip-gain-per-harness-aph-shortcut",
+      "date": "2026-11-06",
+      "title": "gain per harness and aph shortcut (0.28.0, 0.28.1)",
+      "pr": 120,
+      "version": "0.28.1",
+      "summary": "gain blocks claude/codex/other from provider (GainHarness); ai-proxy shortcut writes aph beside ai-proxy; hardening in 0.28.1.",
+      "hasNotes": false
+    },
+    {
       "taskId": "aip-record-codex-chatgpt-subscription-traffic",
       "date": "2026-11-06",
       "title": "Record Codex chatgpt.com traffic for harness sessions (0.27.0)",
