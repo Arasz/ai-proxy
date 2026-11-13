@@ -33,3 +33,6 @@ __pycache__/
 **/TestResults/
 *.trx
 *.coverage
+
+# Backups written by scaffold and config refresh tools
+*.bak-*
