@@ -1,6 +1,6 @@
 # 0014 - Gain tables fit the screen and count each rule
 
-Status: Proposed (owner request 2026-11-18)
+Status: Accepted (owner request 2026-11-18)
 
 ## Context
 

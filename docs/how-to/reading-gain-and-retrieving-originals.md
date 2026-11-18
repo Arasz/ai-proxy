@@ -14,11 +14,12 @@ by rebinding a domain name. Set `AllowedHosts` if you move it to another address
 
 ## See what the proxy saved
 
-`ai-proxy gain` prints a block for each of `claude`, `codex` and `other` that has data. The harness comes from
+`ai-proxy gain` prints one table with a row for each of `claude`, `codex` and `other` that has data,
+and a `total` row when there is more than one. The harness comes from
 the provider, because the ledger does not record the client: Anthropic is `claude`, OpenAI is
 `codex`, and everything else is `other`. A script calling the Anthropic API therefore counts as
 `claude`. A retrieval with no known provider also lands in `other`, so that block can show recalls
-with zero requests. `other` also lists non-model traffic such as telemetry. `--format json` has the
+with zero requests. Non-model traffic such as telemetry is a line under the table. `--format json` has the
 same split in `harnesses`, next to the overall `summary`.
 
 ```bash
@@ -31,20 +32,24 @@ ai-proxy gain --watch         # live view, Ctrl+C exits
 ```
 
 Token counts are estimates at 2.89 characters per token. Saved and Net cover the first request only;
-the Follow-up column and the billed balance below add what the proxy's own follow-up requests cost.
+the Follow column and the billed balance below add what the proxy's own follow-up requests cost.
 Character and byte counts are measured. The summary, bucket and attribution tables show the gross
 figure and what it cost:
 
 | Column | Meaning |
 | --- | --- |
+| Req, Orig, Fwd | Requests, original tokens, forwarded tokens. |
 | Saved | Original minus forwarded, without the injected `proxy_retrieve` definition. |
-| Retrieved | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
-| Tool | The `proxy_retrieve` definition the proxy added to requests that carry tools. |
-| Follow-up | The body of every follow-up request the proxy sent upstream to answer a `proxy_retrieve` call inside your request. |
+| Recall | What `proxy_retrieve` and `retrieve_original` calls read back (listed under `--recalls`). |
+| Tool | The `proxy_retrieve` definition the proxy added to requests that carry tools. Not a summary column: the Method line under the table gives its tokens. |
+| Follow | The body of every follow-up request the proxy sent upstream to answer a `proxy_retrieve` call inside your request. |
 | Net | Saved minus retrieved minus tool. Negative when the cost is larger than the saving. |
-| Saved % and Net % | Saved and net as a share of the original tokens, to one decimal. |
+| Saved% and Net% | Saved and net as a share of the original tokens, to one decimal. |
 
-The summary headers drop the word "tokens"; the bucket and attribution tables still spell it out.
+The summary and attribution headers are short and drop the word "tokens". Saved, Net and the
+percentages are green when positive, red when negative and grey when zero; colour is off when the
+output is not a terminal or `NO_COLOR` is set. `--history`, `--recalls` and `--failures` show the
+last 8 characters of an id, the last folder of the project and the time without the year.
 Table numbers under 10,000 are exact, with thousands separators. Larger ones show one decimal of K,
 M or B (`523.8K`, `261.2M`), so the summary fits an 80-column terminal and no number splits across
 lines. `--format csv` and `--format json` keep exact raw values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
@@ -76,8 +81,14 @@ Capture does not need to be on.
 
 A request the proxy inspected but left unchanged still counts, with zero saved (requests it does not
 inspect, such as a body over 8 MB or a chunked body, are not counted). A request whose only change is
-the `proxy_retrieve` definition is recorded under the rule `ccr.tool`; its tool tokens appear in the
-Tool column and its net is negative.
+the `proxy_retrieve` definition is recorded under the rule `ccr.tool`; its tool tokens appear on the
+Method line and its net is negative.
+
+`--by-rule` has one row per rule. The proxy records the rules a request used as one path such as
+`below-minimum,json.compact,ccr.preview`, and the request counts under each rule in it. The rows
+therefore overlap and do not add up to the total: a row says what the requests that used the rule
+saved, not that rule's own share. `--rule json.compact` matches every request whose path contains
+`json.compact`, and so does `--reset --rule`.
 
 `--by-layer` groups by where the change applied: `tool_result` (the proxy reduced tool output),
 `ccr_tool` (the only change is the `proxy_retrieve` definition), `none` (forwarded unchanged,
