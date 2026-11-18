@@ -188,8 +188,15 @@ public sealed class GainView
             return GainLabels.Unknown;
         }
 
-        var name = project.TrimEnd('/', '\\').Split('/', '\\')[^1];
+        char[] separators = IsWindowsPath(project) ? ['/', '\\'] : ['/'];
+        var name = project.TrimEnd(separators).Split(separators)[^1];
         return name.Length == 0 ? project : name;
+    }
+
+    /// <summary>A drive path (<c>C:\</c>) or a UNC path (<c>\\server</c>); only these split on backslashes.</summary>
+    private static bool IsWindowsPath(string path)
+    {
+        return path.StartsWith(@"\\", StringComparison.Ordinal) || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] is '\\' or '/');
     }
 
     private static string ShortStamp(DateTimeOffset value)
@@ -256,12 +263,12 @@ public sealed class GainView
     /// <summary>One decimal, capped at 999% either way so a wild ratio cannot widen the table.</summary>
     private static string Percent(decimal value)
     {
-        if (value >= 1000)
+        if (value > 999m)
         {
             return ">999%";
         }
 
-        if (value <= -1000)
+        if (value < -999m)
         {
             return "<-999%";
         }

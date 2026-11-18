@@ -161,6 +161,17 @@ public sealed class GainViewLayoutTests
     }
 
     [Fact]
+    public void A_percentage_just_beyond_999_is_capped()
+    {
+        var h = new GainAttribution("harness", "h", new GainTotals(1, EstimatedOriginalTokens: 1_000, EstimatedForwardedTokens: 1_500, EstimatedSavedTokens: -500, EstimatedRetrievedTokens: 9_499));
+        var output = Render(new GainSettings(), Report() with { Harnesses = [h] });
+
+        var row = Assert.Single(output.Split('\n'), static l => l.StartsWith("│ h ", StringComparison.Ordinal));
+        Assert.Contains("<-999%", row, StringComparison.Ordinal);
+        Assert.DoesNotContain("-999.9%", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Plain_cells_do_not_expand_emoji_codes_or_markup()
     {
         var report = Report() with
@@ -187,6 +198,18 @@ public sealed class GainViewLayoutTests
 
         Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
         Assert.DoesNotContain("work", output, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/work/team\\app", "team\\app")]
+    [InlineData("\\\\server\\share\\app\\", "app")]
+    public void A_unix_path_keeps_backslashes_and_a_unc_path_splits_on_them(string project, string folder)
+    {
+        var report = Report() with { History = [new GainHistoryEntry(Guid, At, project, "anthropic", "POST", "r", "l", "p", new GainTotals(1))] };
+
+        var output = Render(new GainSettings { History = true }, report);
+
+        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
     }
 
     [Theory]

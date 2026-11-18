@@ -55,6 +55,8 @@ public sealed class GainCommandTests
         var exit = await new CliApplication(fixture.Runtime).RunAsync(args, TestContext.Current.CancellationToken);
         Assert.Equal(0, exit);
         Assert.Contains(expected, fixture.Console.Output);
+        Assert.DoesNotContain("request-one", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("preview-one", fixture.Console.Output, StringComparison.Ordinal);
         Assert.Single(fixture.Handler.Uris);
         if (option == "--history")
         {
