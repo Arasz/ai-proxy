@@ -213,6 +213,23 @@ public sealed class GainStoreTests
         Assert.DoesNotContain(report.History, row => row.Id == "old");
     }
 
+    [Theory]
+    [InlineData("json.compact,ccr.preview", new[] { "below" })]
+    [InlineData("json.compact", new string[0])]
+    public async Task Reset_with_a_comma_rule_matches_the_exact_path_and_without_one_matches_a_member(string rule, string[] remaining)
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-01T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        await store.RecordAsync(Entry("exact", "2026-11-01T10:00Z", "/a", "json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("below", "2026-11-01T10:00Z", "/a", "below-minimum,json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
+
+        await store.ResetAsync(new GainQuery(Rule: rule), TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+        Assert.Equal(remaining, report.History.Select(static row => row.Id).ToArray());
+    }
+
     [Fact]
     public async Task A_request_path_write_gives_up_quickly_when_another_process_holds_the_database()
     {

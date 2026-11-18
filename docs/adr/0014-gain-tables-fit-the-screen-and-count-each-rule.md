@@ -24,7 +24,8 @@ The store keeps one rule string per request. It does not keep the tokens each ru
    are unchanged.
 2. **`--rule X` matches a member of the path**, not the whole string, so the filter and the table
    name the same thing. `--reset --rule X` deletes the same rows the filter shows, so it also removes
-   requests where `X` ran together with other rules.
+   requests where `X` ran together with other rules. A value with a comma (an old full path) still
+   matches only that exact path, so a reset written for 0.29 does not grow.
 3. **One summary table, one row per harness**, plus a `total` row when more than one harness has
    traffic. Short headers. The table fits in 80 columns. Other traffic stays a line under it.
 4. **Colour by sign.** Saved, net and percent cells are green when positive, red when negative and

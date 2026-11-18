@@ -49,7 +49,8 @@ figure and what it cost:
 The summary and attribution headers are short and drop the word "tokens". Saved, Net and the
 percentages are green when positive, red when negative and grey when zero; colour is off when the
 output is not a terminal or `NO_COLOR` is set. `--history`, `--recalls` and `--failures` show the
-last 8 characters of an id, the last folder of the project and the time without the year.
+last 8 characters of an id and the time without the year; `--history` and `--recalls` show the last
+folder of the project. A percentage beyond 999 shows as `>999%` or `<-999%`.
 Table numbers under 10,000 are exact, with thousands separators. Larger ones show one decimal of K,
 M or B (`523.8K`, `261.2M`), so the summary fits an 80-column terminal and no number splits across
 lines. `--format csv` and `--format json` keep exact raw values. The JSON totals add `estimatedToolTokens`, `estimatedNetTokens`, `savedPercent` and
@@ -88,7 +89,9 @@ Method line and its net is negative.
 `below-minimum,json.compact,ccr.preview`, and the request counts under each rule in it. The rows
 therefore overlap and do not add up to the total: a row says what the requests that used the rule
 saved, not that rule's own share. `--rule json.compact` matches every request whose path contains
-`json.compact`, and so does `--reset --rule`.
+`json.compact`. `ai-proxy gain --reset --rule json.compact` deletes the statistics of those whole
+requests, including the ones where `json.compact` ran with other rules. A value with a comma, such
+as `json.compact,ccr.preview`, matches only that exact path.
 
 `--by-layer` groups by where the change applied: `tool_result` (the proxy reduced tool output),
 `ccr_tool` (the only change is the `proxy_retrieve` definition), `none` (forwarded unchanged,

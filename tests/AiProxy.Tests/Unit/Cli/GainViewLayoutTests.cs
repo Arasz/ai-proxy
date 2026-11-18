@@ -148,4 +148,58 @@ public sealed class GainViewLayoutTests
         Assert.Contains("\u001b[38;5;9m-7", output, StringComparison.Ordinal);
         Assert.Contains("\u001b[38;5;8m0", output, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Extreme_percentages_are_capped_so_the_summary_row_stays_whole_at_width_80()
+    {
+        var h = new GainAttribution("harness", "h", new GainTotals(1, EstimatedOriginalTokens: 1_000, EstimatedForwardedTokens: 1_500, EstimatedSavedTokens: -500, EstimatedRetrievedTokens: 99_500));
+        var output = Render(new GainSettings(), Report() with { Harnesses = [h] });
+
+        var row = Assert.Single(output.Split('\n'), static l => l.StartsWith("│ h ", StringComparison.Ordinal));
+        Assert.Contains("-100.0K", row, StringComparison.Ordinal);
+        Assert.Contains("<-999%", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Plain_cells_do_not_expand_emoji_codes_or_markup()
+    {
+        var report = Report() with
+        {
+            Attributions = [new("rule", "x[red]", new GainTotals(1, EstimatedSavedTokens: 5))],
+            History = [new GainHistoryEntry(Guid, At, "/a/:birthday_cake:", "anthropic", "POST", "r", "l", "p", new GainTotals(1))]
+        };
+
+        var output = Render(new GainSettings { ByRule = true, History = true }, report);
+
+        Assert.Contains(":birthday_cake:", output, StringComparison.Ordinal);
+        Assert.Contains("x[red]", output, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("C:\\work\\app\\", "app")]
+    [InlineData("/a/b/", "b")]
+    [InlineData("C:\\work\\app", "app")]
+    public void The_project_shows_its_last_folder_for_either_separator(string project, string folder)
+    {
+        var report = Report() with { History = [new GainHistoryEntry(Guid, At, project, "anthropic", "POST", "r", "l", "p", new GainTotals(1))] };
+
+        var output = Render(new GainSettings { History = true }, report);
+
+        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("work", output, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(5, -7)]
+    [InlineData(7, 5)]
+    public void The_net_cell_colour_follows_the_net_value_not_the_saved_value(long saved, long net)
+    {
+        var rule = new GainAttribution("rule", "r", new GainTotals(1, EstimatedSavedTokens: saved, EstimatedToolTokens: saved - net));
+        var output = Render(new GainSettings { ByRule = true }, Report() with { Attributions = [rule] }, ansi: true);
+
+        var code = net < 0 ? "38;5;9m" : "38;5;2m";
+        var savedCode = saved < 0 ? "38;5;9m" : "38;5;2m";
+        Assert.Contains($"\u001b[{code}{net}\u001b[0m", output, StringComparison.Ordinal);
+        Assert.Contains($"\u001b[{savedCode}{saved}\u001b[0m", output, StringComparison.Ordinal);
+    }
 }

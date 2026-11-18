@@ -59,11 +59,14 @@ public sealed class GainCommandTests
         if (option == "--history")
         {
             fixture.Output.GetStringBuilder().Clear();
-            await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "json"], TestContext.Current.CancellationToken);
-            Assert.Contains("\"request-one\"", fixture.Output.ToString());
+            Assert.Equal(0, await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "json"], TestContext.Current.CancellationToken));
+            using var json = JsonDocument.Parse(fixture.Output.ToString());
+            Assert.Equal("request-one", json.RootElement.GetProperty("history")[0].GetProperty("id").GetString());
             fixture.Output.GetStringBuilder().Clear();
-            await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "csv"], TestContext.Current.CancellationToken);
-            Assert.Contains("request-one", fixture.Output.ToString());
+            Assert.Equal(0, await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "csv"], TestContext.Current.CancellationToken));
+            var csv = fixture.Output.ToString();
+            Assert.False(csv.StartsWith('{'));
+            Assert.Contains(csv.Split('\n').Skip(1), static line => line.Contains("request-one", StringComparison.Ordinal));
         }
     }
 

@@ -160,17 +160,17 @@ public sealed class GainView
         return new Markup($"[bold]{Markup.Escape(text)}[/]\n");
     }
 
-    private static Markup Plain(string value)
+    private static IRenderable Plain(string value)
     {
-        return new Markup(Markup.Escape(value));
+        return new Text(value);
     }
 
-    private static Markup Signed(long value)
+    private static IRenderable Signed(long value)
     {
         return Signed(value, Compact(value));
     }
 
-    private static Markup Signed(decimal value, string text)
+    private static IRenderable Signed(decimal value, string text)
     {
         var colour = value > 0 ? "green" : value < 0 ? "red" : "grey";
         return new Markup($"[{colour}]{Markup.Escape(text)}[/]");
@@ -188,7 +188,7 @@ public sealed class GainView
             return GainLabels.Unknown;
         }
 
-        var name = Path.GetFileName(project.TrimEnd('/', '\\'));
+        var name = project.TrimEnd('/', '\\').Split('/', '\\')[^1];
         return name.Length == 0 ? project : name;
     }
 
@@ -253,8 +253,19 @@ public sealed class GainView
         return value.ToString("N0", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>One decimal, capped at 999% either way so a wild ratio cannot widen the table.</summary>
     private static string Percent(decimal value)
     {
+        if (value >= 1000)
+        {
+            return ">999%";
+        }
+
+        if (value <= -1000)
+        {
+            return "<-999%";
+        }
+
         return value.ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 

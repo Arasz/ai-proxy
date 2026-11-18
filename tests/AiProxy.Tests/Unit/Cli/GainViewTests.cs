@@ -78,7 +78,7 @@ public sealed class GainViewTests
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
         Assert.Contains("Saved%", fixture.Console.Output, StringComparison.Ordinal);
-        Assert.Contains("all", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.Contains(fixture.Console.Output.Split('\n'), static line => line.StartsWith("│ all", StringComparison.Ordinal));
     }
 
     [Fact]

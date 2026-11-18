@@ -269,7 +269,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         public const string Predicate = """
                                         (@Project IS NULL OR project = @Project) AND (@From IS NULL OR at >= @From) AND (@To IS NULL OR at < @To)
                                         AND (@Provider IS NULL OR provider = @Provider) AND (@Method IS NULL OR method = @Method)
-                                        AND (@Rule IS NULL OR instr(',' || rule || ',', ',' || @Rule || ',') > 0) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
+                                        AND (@Rule IS NULL OR rule = @Rule OR (instr(@Rule, ',') = 0 AND instr(',' || rule || ',', ',' || @Rule || ',') > 0)) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
                                         """;
 
         private const string SumJson = """
