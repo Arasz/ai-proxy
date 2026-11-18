@@ -21,7 +21,7 @@ public sealed class GainViewLayoutTests
             [new GainHistoryEntry(Guid, At, "/Users/someone/RiderProjects/a-very-long-project-name/src", "anthropic", "POST", LongRule, "tool_result", "content", totals)],
             [new GainBucket(At, totals)], [new GainBucket(At, totals)], [new GainBucket(At, totals)],
             [new GainAttribution("rule", LongRule, totals), new GainAttribution("rule", "neg", negative), new GainAttribution("method", "POST", totals)],
-            [new GainFailure(At, Guid, null, "compression", "boom")], [recall], [],
+            [new GainFailure(At, Guid, null, "compression", new string('e', 200))], [recall], [],
             new GainOtherTraffic(3, 1_234_567_890), [new("harness", "claude", totals), new("harness", "codex", negative), new("harness", "other", new GainTotals(1))]);
     }
 
@@ -71,7 +71,15 @@ public sealed class GainViewLayoutTests
         Assert.Contains("claude", output, StringComparison.Ordinal);
         Assert.Contains("codex", output, StringComparison.Ordinal);
         Assert.Contains("total", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("-claude--", output, StringComparison.Ordinal);
+        var lines = output.Split('\n');
+        var header = Array.FindIndex(lines, static l => l.Contains("Harness", StringComparison.Ordinal) && l.Contains("Net%", StringComparison.Ordinal));
+        Assert.Equal(1, lines.Count(static l => l.Contains("Harness", StringComparison.Ordinal) && l.Contains("Net%", StringComparison.Ordinal)));
+        var bottom = Array.FindIndex(lines, header, static l => l.StartsWith('╰'));
+        var rows = lines[header..bottom];
+        foreach (var name in new[] { "claude", "codex", "total" })
+        {
+            Assert.Single(rows, l => l.StartsWith("│ " + name, StringComparison.Ordinal));
+        }
         Assert.Contains("Other traffic: 3 requests, 1.2B bytes", output, StringComparison.Ordinal);
     }
 
@@ -112,5 +120,32 @@ public sealed class GainViewLayoutTests
 
         Assert.Contains("\u001b[38;5;9m-5", negative, StringComparison.Ordinal);
         Assert.Contains("\u001b[38;5;2m5", positive, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Markup_characters_in_data_render_literally()
+    {
+        var report = Report() with
+        {
+            Attributions = [new("rule", "x[red]", new GainTotals(1, EstimatedSavedTokens: 5))],
+            History = [new GainHistoryEntry(Guid, At, "/a/b[c", "anthropic", "POST", "r", "l", "p", new GainTotals(1))],
+            Failures = [new GainFailure(At, Guid, null, "s", "a[b")]
+        };
+
+        var output = Render(new GainSettings { ByRule = true, History = true, Failures = true }, report);
+
+        Assert.Contains("x[red]", output, StringComparison.Ordinal);
+        Assert.Contains("b[c", output, StringComparison.Ordinal);
+        Assert.Contains("a[b", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_zero_cell_is_grey_and_a_negative_net_with_zero_saved_is_red()
+    {
+        var harness = new GainAttribution("harness", "h", new GainTotals(1, EstimatedSavedTokens: 0, EstimatedToolTokens: 7));
+        var output = Render(new GainSettings(), Report() with { Harnesses = [harness] }, ansi: true);
+
+        Assert.Contains("\u001b[38;5;9m-7", output, StringComparison.Ordinal);
+        Assert.Contains("\u001b[38;5;8m0", output, StringComparison.Ordinal);
     }
 }

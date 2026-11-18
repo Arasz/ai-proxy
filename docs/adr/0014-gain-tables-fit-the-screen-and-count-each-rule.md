@@ -23,11 +23,12 @@ The store keeps one rule string per request. It does not keep the tokens each ru
    rows overlap and do not sum to the summary. The view says so under the table. Other dimensions
    are unchanged.
 2. **`--rule X` matches a member of the path**, not the whole string, so the filter and the table
-   name the same thing.
+   name the same thing. `--reset --rule X` deletes the same rows the filter shows, so it also removes
+   requests where `X` ran together with other rules.
 3. **One summary table, one row per harness**, plus a `total` row when more than one harness has
    traffic. Short headers. The table fits in 80 columns. Other traffic stays a line under it.
 4. **Colour by sign.** Saved, net and percent cells are green when positive, red when negative and
-   dim when zero. Headers are bold. Spectre drops colour when the output is not a terminal or
+   grey when zero. Headers are bold. Spectre drops colour when the output is not a terminal or
    `NO_COLOR` is set.
 5. **Shortened identifiers in tables.** Request and preview ids show their last 8 characters, the
    project shows its last folder name, and times drop the year. `--format json` and `--format csv`

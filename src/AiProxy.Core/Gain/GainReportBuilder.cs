@@ -7,7 +7,7 @@ public static class GainReportBuilder
 
     private static readonly Dimension[] Dimensions =
     [
-        new("method", static path => path.Method), new("rule", static path => path.Rule),
+        new("method", static path => path.Method), new(GainLabels.Dimensions.Rule, static path => path.Rule),
         new("layer", static path => path.Layer), new("pipeline", static path => path.Pipeline)
     ];
 
@@ -81,7 +81,7 @@ public static class GainReportBuilder
     /// <summary>One dimension's rows, largest saving first. A rule row naming a comma path counts under each member rule.</summary>
     public static IReadOnlyList<GainAttribution> Attribute(string dimension, IEnumerable<GainAttribution> rows)
     {
-        var named = dimension == "rule"
+        var named = dimension == GainLabels.Dimensions.Rule
             ? rows.SelectMany(static row => RuleMembers(row.Name).Select(member => (Name: member, row.Totals)))
             : rows.Select(static row => (row.Name, row.Totals));
         return named.GroupBy(static row => row.Name, StringComparer.Ordinal)
@@ -106,7 +106,7 @@ public static class GainReportBuilder
 
     private static IEnumerable<string> RuleMembers(string path)
     {
-        var members = path.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
+        var members = path.Split(',', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
         return members.Length == 0 ? [path] : members;
     }
 

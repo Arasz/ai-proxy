@@ -56,6 +56,15 @@ public sealed class GainCommandTests
         Assert.Equal(0, exit);
         Assert.Contains(expected, fixture.Console.Output);
         Assert.Single(fixture.Handler.Uris);
+        if (option == "--history")
+        {
+            fixture.Output.GetStringBuilder().Clear();
+            await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "json"], TestContext.Current.CancellationToken);
+            Assert.Contains("\"request-one\"", fixture.Output.ToString());
+            fixture.Output.GetStringBuilder().Clear();
+            await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "csv"], TestContext.Current.CancellationToken);
+            Assert.Contains("request-one", fixture.Output.ToString());
+        }
     }
 
     [Fact]

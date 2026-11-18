@@ -74,7 +74,7 @@ public sealed class GainView
 
         if (settings.ByRule || settings.Pipeline is not null)
         {
-            dimensions.Add("rule");
+            dimensions.Add(GainLabels.Dimensions.Rule);
         }
 
         if (settings.ByLayer || settings.Pipeline is not null)
@@ -92,7 +92,7 @@ public sealed class GainView
             views.Add(Title($"By {dimension}"));
             views.Add(Table([new("Name"), new("Req", true), new("Saved", true), new("Net", true), new("Recalls", true)], report.Attributions.Where(row => row.Dimension == dimension)
                 .Select(static row => new[] { Plain(row.Name), Plain(Compact(row.Totals.Requests)), Signed(row.Totals.EstimatedSavedTokens), Signed(row.Totals.EstimatedNetTokens), Plain(Compact(row.Totals.Recalls)) })));
-            if (dimension == "rule")
+            if (dimension == GainLabels.Dimensions.Rule)
             {
                 views.Add(new Markup("[dim]A request that used several rules counts under each, so rows overlap and do not add up to the total.[/]\n"));
             }
@@ -151,31 +151,6 @@ public sealed class GainView
         views.Add(Table([new("Start (UTC)"), new("Req", true), new("Saved", true), new("Retrieved", true), new("Net", true)],
             buckets.Select(static row => new[] { Plain(Stamp(row.Start)), Plain(Compact(row.Totals.Requests)), Signed(row.Totals.EstimatedSavedTokens), Plain(Compact(row.Totals.EstimatedRetrievedTokens)), Signed(row.Totals.EstimatedNetTokens) })));
     }
-
-    /// <summary>A table; <paramref name="tight"/> drops the right padding so the ten summary columns still fit an 80-column terminal.</summary>
-    private static Table Table(string[] columns, IEnumerable<string[]> rows, bool tight = false)
-    {
-        var table = new Table().Border(TableBorder.Rounded);
-        foreach (var column in columns)
-        {
-            table.AddColumn(new TableColumn(new Text(column)) { Padding = tight ? new Padding(1, 0, 0, 0) : new Padding(1, 0, 1, 0) });
-        }
-
-        var any = false;
-        foreach (var row in rows)
-        {
-            table.AddRow(row.Select(value => (IRenderable)new Text(value)).ToArray());
-            any = true;
-        }
-
-        if (!any)
-        {
-            table.AddRow(columns.Select((_, index) => (IRenderable)new Text(index == 0 ? "No records" : "")).ToArray());
-        }
-
-        return table;
-    }
-
 
     /// <summary>A table column; numbers align right.</summary>
     private sealed record Column(string Header, bool Right = false);
