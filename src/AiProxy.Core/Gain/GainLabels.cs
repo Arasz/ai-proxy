@@ -9,6 +9,12 @@ public static class GainLabels
     /// <summary>The method a recall made through the API is recorded under.</summary>
     public const string RetrieveOriginal = "retrieve_original";
 
+    /// <summary>The attribution dimension names.</summary>
+    public static class Dimensions
+    {
+        public const string Rule = "rule";
+    }
+
     /// <summary>The rule of a request the proxy did not change.</summary>
     public static class Rules
     {

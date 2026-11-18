@@ -24,15 +24,15 @@ public sealed class GainViewTests
         Assert.Equal(0, exit);
         var output = fixture.Console.Output;
         Assert.Contains("(tokens)", output, StringComparison.Ordinal);
-        Assert.Contains("Saved %", output, StringComparison.Ordinal);
-        Assert.Contains("Net %", output, StringComparison.Ordinal);
+        Assert.Contains("Saved%", output, StringComparison.Ordinal);
+        Assert.Contains("Net%", output, StringComparison.Ordinal);
         Assert.Contains("650", output, StringComparison.Ordinal);
         Assert.Contains("10.0%", output, StringComparison.Ordinal);
         Assert.Contains("6.5%", output, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Gain_prints_one_block_per_harness_with_other_traffic_under_other()
+    public async Task Gain_prints_one_row_per_harness_and_a_total_with_other_traffic_below()
     {
         using var fixture = new GainCommandTests.Fixture();
         fixture.Console.Profile.Width = 240;
@@ -45,13 +45,13 @@ public sealed class GainViewTests
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
         var output = fixture.Console.Output;
-        var positions = new[] { "-claude---", "7,001", "-codex---", "7,002", "-other---", "Other traffic: 179 requests" }.Select(text => output.IndexOf(text, StringComparison.Ordinal)).ToArray();
+        var positions = new[] { "claude", "7,001", "codex", "7,002", "total", "Other traffic: 179 requests" }.Select(text => output.IndexOf(text, StringComparison.Ordinal)).ToArray();
         Assert.DoesNotContain(-1, positions);
         Assert.Equal(positions.Order(), positions);
     }
 
     [Fact]
-    public async Task A_model_other_block_and_other_traffic_share_one_heading()
+    public async Task A_model_other_harness_is_one_row_beside_the_other_traffic_line()
     {
         using var fixture = new GainCommandTests.Fixture();
         fixture.Console.Profile.Width = 240;
@@ -63,7 +63,7 @@ public sealed class GainViewTests
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
-        Assert.Single(fixture.Console.Output.Split('\n'), static line => line.StartsWith("-other-", StringComparison.Ordinal));
+        Assert.Single(fixture.Console.Output.Split('\n'), static line => line.Contains("│ other", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -77,8 +77,8 @@ public sealed class GainViewTests
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
-        Assert.Contains("Saved %", fixture.Console.Output, StringComparison.Ordinal);
-        Assert.DoesNotContain("-other-", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.Contains("Saved%", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.Contains(fixture.Console.Output.Split('\n'), static line => line.StartsWith("│ all", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class GainViewTests
         fixture.Handler.Report = fixture.Handler.Report with { OtherTraffic = new GainOtherTraffic(179, 123_456) };
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
-        Assert.Contains("Other traffic: 179 requests, 123,456 bytes", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.Contains("Other traffic: 179 requests, 123.5K bytes", fixture.Console.Output, StringComparison.Ordinal);
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "csv"], TestContext.Current.CancellationToken);
         var csv = fixture.Output.ToString();
@@ -111,7 +111,7 @@ public sealed class GainViewTests
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
         var output = fixture.Console.Output;
-        Assert.Contains("Follow-up", output, StringComparison.Ordinal);
+        Assert.Contains("Follow", output, StringComparison.Ordinal);
         Assert.Contains("Billed balance (all requests): 2,500 tokens", output, StringComparison.Ordinal);
         Assert.Contains("follow-ups measured on 3 of 5 requests", output, StringComparison.Ordinal);
     }
@@ -202,7 +202,7 @@ public sealed class GainViewTests
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
         var output = fixture.Console.Output;
-        foreach (var value in new[] { "4,593", "261.2M", "250.4M", "10.8M", "523.8K", "24.0K", "10.2M", "4.1%", "3.9%" })
+        foreach (var value in new[] { "4,593", "261.2M", "250.4M", "10.8M", "523.8K", "10.2M", "4.1%", "3.9%" })
         {
             Assert.Contains(value, output, StringComparison.Ordinal);
         }

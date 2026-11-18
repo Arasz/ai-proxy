@@ -183,12 +183,13 @@ public sealed class GainStoreTests
         Assert.Equal(DateTimeOffset.Parse("2026-10-26T00:00:00Z"), Assert.Single(report.Weekly).Start);
         Assert.Equal(DateTimeOffset.Parse("2026-10-01T00:00:00Z"), Assert.Single(report.Monthly).Start);
         Assert.Equal("a", Assert.Single(report.History).Id);
-        foreach (var dimension in report.Attributions.GroupBy(static row => row.Dimension))
+        // Rule rows overlap by design (ADR 0014): a request counts under each rule it used.
+        foreach (var dimension in report.Attributions.Where(static row => row.Dimension != "rule").GroupBy(static row => row.Dimension))
         {
             Assert.Equal(report.Summary.EstimatedSavedTokens, dimension.Sum(static row => row.Totals.EstimatedSavedTokens));
         }
 
-        Assert.Equal("json,log", Assert.Single(report.Attributions, static row => row.Dimension == "rule").Name);
+        Assert.Equal(["json", "log"], report.Attributions.Where(static row => row.Dimension == "rule").Select(static row => row.Name).Order());
         var injected = await store.QueryAsync(new GainQuery("' OR 1=1 --"), TestContext.Current.CancellationToken);
         Assert.Equal(0, injected.Summary.Requests);
         Assert.Equal(2.89m, report.Measurement.CharactersPerToken);
@@ -210,6 +211,23 @@ public sealed class GainStoreTests
         var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
         Assert.Equal(2, report.Summary.Requests);
         Assert.DoesNotContain(report.History, row => row.Id == "old");
+    }
+
+    [Theory]
+    [InlineData("json.compact,ccr.preview", new[] { "below" })]
+    [InlineData("json.compact", new string[0])]
+    public async Task Reset_with_a_comma_rule_matches_the_exact_path_and_without_one_matches_a_member(string rule, string[] remaining)
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-01T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        await store.RecordAsync(Entry("exact", "2026-11-01T10:00Z", "/a", "json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
+        await store.RecordAsync(Entry("below", "2026-11-01T10:00Z", "/a", "below-minimum,json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
+
+        await store.ResetAsync(new GainQuery(Rule: rule), TestContext.Current.CancellationToken);
+
+        var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
+        Assert.Equal(remaining, report.History.Select(static row => row.Id).ToArray());
     }
 
     [Fact]

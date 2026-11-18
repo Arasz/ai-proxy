@@ -26,14 +26,14 @@ public sealed class GainCommandTests
 
     [Theory]
     [InlineData("", "estimated initial-request")]
-    [InlineData("--history", "request-one")]
+    [InlineData("--history", "uest-one")]
     [InlineData("--daily", "Daily (UTC)")]
     [InlineData("--weekly", "Weekly (Monday UTC)")]
     [InlineData("--monthly", "Monthly (UTC)")]
     [InlineData("--all", "Monthly (UTC)")]
     [InlineData("--graph", "Daily savings")]
     [InlineData("--failures", "failed-stage")]
-    [InlineData("--recalls", "preview-one")]
+    [InlineData("--recalls", "view-one")]
     [InlineData("--by-method", "POST")]
     [InlineData("--by-rule", "code-rule")]
     [InlineData("--by-layer", "tool-result")]
@@ -55,7 +55,21 @@ public sealed class GainCommandTests
         var exit = await new CliApplication(fixture.Runtime).RunAsync(args, TestContext.Current.CancellationToken);
         Assert.Equal(0, exit);
         Assert.Contains(expected, fixture.Console.Output);
+        Assert.DoesNotContain("request-one", fixture.Console.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("preview-one", fixture.Console.Output, StringComparison.Ordinal);
         Assert.Single(fixture.Handler.Uris);
+        if (option == "--history")
+        {
+            fixture.Output.GetStringBuilder().Clear();
+            Assert.Equal(0, await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "json"], TestContext.Current.CancellationToken));
+            using var json = JsonDocument.Parse(fixture.Output.ToString());
+            Assert.Equal("request-one", json.RootElement.GetProperty("history")[0].GetProperty("id").GetString());
+            fixture.Output.GetStringBuilder().Clear();
+            Assert.Equal(0, await new CliApplication(fixture.Runtime).RunAsync(["gain", "--history", "-f", "csv"], TestContext.Current.CancellationToken));
+            var csv = fixture.Output.ToString();
+            Assert.False(csv.StartsWith('{'));
+            Assert.Contains(csv.Split('\n').Skip(1), static line => line.Contains("request-one", StringComparison.Ordinal));
+        }
     }
 
     [Fact]

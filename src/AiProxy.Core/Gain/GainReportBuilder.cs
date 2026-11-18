@@ -7,7 +7,7 @@ public static class GainReportBuilder
 
     private static readonly Dimension[] Dimensions =
     [
-        new("method", static path => path.Method), new("rule", static path => path.Rule),
+        new("method", static path => path.Method), new(GainLabels.Dimensions.Rule, static path => path.Rule),
         new("layer", static path => path.Layer), new("pipeline", static path => path.Pipeline)
     ];
 
@@ -56,13 +56,10 @@ public static class GainReportBuilder
             .Concat(recallEvents.Select(static recallEvent => new Attributed(recallEvent.Path, RecallTotals(recallEvent.Recall))))
             .Concat(followUps.Select(static followUp => new Attributed(followUp.Path, FollowUpTotals(followUp.FollowUp))))
             .ToArray();
-        var attributions = new List<GainAttribution>();
-        foreach (var (dimension, key) in Dimensions)
-        {
-            attributions.AddRange(attributed.GroupBy(row => key(row.Path), StringComparer.Ordinal)
-                .OrderBy(static group => group.Key, StringComparer.Ordinal)
-                .Select(group => new GainAttribution(dimension, group.Key, Sum(group.Select(static row => row.Totals)))));
-        }
+        var attributions = Dimensions.SelectMany(dimension => Attribute(dimension.Name, attributed
+                .GroupBy(row => dimension.Key(row.Path), StringComparer.Ordinal)
+                .Select(group => new GainAttribution(dimension.Name, group.Key, Sum(group.Select(static row => row.Totals))))))
+            .ToArray();
 
         return new GainReport(1, now, query, new GainMeasurement(), summary,
             requests.OrderByDescending(static row => row.At).ThenBy(static row => row.Id, StringComparer.Ordinal).Take(query.HistoryLimit).ToArray(),
@@ -81,6 +78,19 @@ public static class GainReportBuilder
             ], otherTraffic ?? new GainOtherTraffic());
     }
 
+    /// <summary>One dimension's rows, largest saving first. A rule row naming a comma path counts under each member rule.</summary>
+    public static IReadOnlyList<GainAttribution> Attribute(string dimension, IEnumerable<GainAttribution> rows)
+    {
+        var named = dimension == GainLabels.Dimensions.Rule
+            ? rows.SelectMany(static row => RuleMembers(row.Name).Select(member => (Name: member, row.Totals)))
+            : rows.Select(static row => (row.Name, row.Totals));
+        return named.GroupBy(static row => row.Name, StringComparer.Ordinal)
+            .Select(group => new GainAttribution(dimension, group.Key, Sum(group.Select(static row => row.Totals))))
+            .OrderByDescending(static row => row.Totals.EstimatedSavedTokens)
+            .ThenBy(static row => row.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public static GainTotals Sum(IEnumerable<GainTotals> rows)
     {
         return rows.Aggregate(new GainTotals(), static (sum, row) => new GainTotals(
@@ -92,6 +102,12 @@ public static class GainReportBuilder
             sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens,
             sum.FollowUps + row.FollowUps, sum.FollowUpBytes + row.FollowUpBytes, sum.EstimatedFollowUpTokens + row.EstimatedFollowUpTokens,
             sum.FollowUpMeasuredRequests + row.FollowUpMeasuredRequests));
+    }
+
+    private static IEnumerable<string> RuleMembers(string path)
+    {
+        var members = path.Split(',', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
+        return members.Length == 0 ? [path] : members;
     }
 
     private static GainTotals RecallTotals(GainRecall recall)
