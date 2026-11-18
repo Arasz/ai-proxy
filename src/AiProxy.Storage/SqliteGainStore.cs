@@ -74,10 +74,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Sql.OtherTraffic, parameters, transaction, cancellationToken: cancellationToken));
         await transaction.CommitAsync(cancellationToken);
 
-        var attributions = Attributions.SelectMany(dimension =>
-                rows.Where(row => row.View == dimension)
-                    .OrderBy(static row => row.Name, StringComparer.Ordinal)
-                    .Select(row => new GainAttribution(dimension, row.Name ?? "", row.ConvertToTotals())))
+        var attributions = Attributions.SelectMany(dimension => GainReportBuilder.Attribute(dimension,
+                rows.Where(row => row.View == dimension).Select(row => new GainAttribution(dimension, row.Name ?? "", row.ConvertToTotals()))))
             .ToArray();
         return GainReportBuilder.Build(query, time.GetUtcNow(), [], [], []) with
         {
@@ -271,7 +269,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         public const string Predicate = """
                                         (@Project IS NULL OR project = @Project) AND (@From IS NULL OR at >= @From) AND (@To IS NULL OR at < @To)
                                         AND (@Provider IS NULL OR provider = @Provider) AND (@Method IS NULL OR method = @Method)
-                                        AND (@Rule IS NULL OR rule = @Rule) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
+                                        AND (@Rule IS NULL OR instr(',' || rule || ',', ',' || @Rule || ',') > 0) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
                                         """;
 
         private const string SumJson = """

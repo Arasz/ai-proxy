@@ -8,8 +8,6 @@ namespace AiProxy.Cli;
 /// <summary>Renders server-computed statistics without recomputing accounting.</summary>
 public sealed class GainView
 {
-    private const int HeadingWidth = 24;
-
     private static readonly (decimal Unit, string Name)[] Units = [(1_000m, "K"), (1_000_000m, "M"), (1_000_000_000m, "B")];
 
     public IRenderable Render(GainReport report, GainSettings settings)
@@ -19,7 +17,8 @@ public sealed class GainView
             new Text("estimated initial-request token reductions (tokens)\n")
         };
         AddTotals(views, report);
-        views.Add(new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.\n"));
+        var toolNote = report.Summary.EstimatedToolTokens > 0 ? $" Injected tool definition: {Number(report.Summary.EstimatedToolTokens)} tokens." : "";
+        views.Add(new Text($"Method: {report.Measurement.Kind}, {report.Measurement.CharactersPerToken.ToString(CultureInfo.InvariantCulture)} chars/token. Net billed savings unavailable.{toolNote}\n"));
         if (report.Summary.FollowUpMeasuredRequests > 0)
         {
             views.Add(new Text($"Billed balance (all requests): {Number(report.Summary.EstimatedBilledBalanceTokens)} tokens (estimated from sizes sent, not provider-billed: original - forwarded - follow-up; follow-ups measured on {Number(report.Summary.FollowUpMeasuredRequests)} of {Number(report.Summary.Requests)} requests).\n"));
@@ -30,9 +29,9 @@ public sealed class GainView
         }
         if (settings.History)
         {
-            views.Add(new Text("History\n"));
-            views.Add(Table(["UTC", "Request", "Project", "Provider", "Pipeline", "Saved tokens"],
-                report.History.Select(static row => new[] { Stamp(row.At), row.Id, row.Project ?? GainLabels.Unknown, row.Provider ?? GainLabels.Unknown, row.Pipeline, Compact(row.Totals.EstimatedSavedTokens) })));
+            views.Add(Title("History"));
+            views.Add(Table([new("UTC"), new("Request"), new("Project"), new("Provider"), new("Pipeline"), new("Saved", true)],
+                report.History.Select(static row => new[] { Plain(ShortStamp(row.At)), Plain(Tail(row.Id)), Plain(Folder(row.Project)), Plain(row.Provider ?? GainLabels.Unknown), Plain(row.Pipeline), Signed(row.Totals.EstimatedSavedTokens) })));
         }
 
         if (settings.All || settings.Daily)
@@ -52,7 +51,7 @@ public sealed class GainView
 
         if (settings.Graph)
         {
-            views.Add(new Text("Daily savings (estimated tokens)\n"));
+            views.Add(Title("Daily savings (estimated tokens)"));
             var maximum = report.Daily.Count == 0 ? 1m : Math.Max(1m, report.Daily.Max(row => Math.Abs((decimal)row.Totals.EstimatedSavedTokens)));
             foreach (var row in report.Daily)
             {
@@ -90,72 +89,67 @@ public sealed class GainView
 
         foreach (var dimension in dimensions)
         {
-            views.Add(new Text($"By {dimension}\n"));
-            views.Add(Table(["Name", "Requests", "Saved tokens", "Net tokens", "Recalls"], report.Attributions.Where(row => row.Dimension == dimension)
-                .Select(static row => new[] { row.Name, Compact(row.Totals.Requests), Compact(row.Totals.EstimatedSavedTokens), Compact(row.Totals.EstimatedNetTokens), Compact(row.Totals.Recalls) })));
+            views.Add(Title($"By {dimension}"));
+            views.Add(Table([new("Name"), new("Req", true), new("Saved", true), new("Net", true), new("Recalls", true)], report.Attributions.Where(row => row.Dimension == dimension)
+                .Select(static row => new[] { Plain(row.Name), Plain(Compact(row.Totals.Requests)), Signed(row.Totals.EstimatedSavedTokens), Signed(row.Totals.EstimatedNetTokens), Plain(Compact(row.Totals.Recalls)) })));
+            if (dimension == "rule")
+            {
+                views.Add(new Markup("[dim]A request that used several rules counts under each, so rows overlap and do not add up to the total.[/]\n"));
+            }
         }
 
         if (settings.Failures)
         {
-            views.Add(new Text("Failures\n"));
-            views.Add(Table(["UTC", "Request", "Stage", "Error"], report.Failures.Select(static row => new[] { Stamp(row.At), row.RequestId, row.Stage, row.Error })));
+            views.Add(Title("Failures"));
+            views.Add(Table([new("UTC"), new("Request"), new("Stage"), new("Error")],
+                report.Failures.Select(static row => new[] { Plain(ShortStamp(row.At)), Plain(Tail(row.RequestId)), Plain(row.Stage), Plain(row.Error) })));
         }
 
         if (settings.Recalls)
         {
-            views.Add(new Text("Recalls (caller attribution; origins may be unknown)\n"));
-            views.Add(Table(["UTC", "Preview", "Project", "Mode", "Tokens", "Error"],
-                report.Recalls.Select(static row => new[] { Stamp(row.At), row.PreviewId, row.Project ?? GainLabels.Unknown, row.Mode, Compact(row.EstimatedTokens), row.Error ?? "" })));
+            views.Add(Title("Recalls (caller attribution; origins may be unknown)"));
+            views.Add(Table([new("UTC"), new("Preview"), new("Project"), new("Mode"), new("Tokens", true), new("Error")],
+                report.Recalls.Select(static row => new[] { Plain(ShortStamp(row.At)), Plain(Tail(row.PreviewId)), Plain(Folder(row.Project)), Plain(row.Mode), Plain(Compact(row.EstimatedTokens)), Plain(row.Error ?? "") })));
         }
 
         return new Rows(views);
     }
 
-    /// <summary>One block per harness, or the single summary table of a report from a proxy that sends no harness totals.</summary>
+    /// <summary>One summary table, one row per harness plus a total row; a report without harness rows gets one row named all.</summary>
     private static void AddTotals(List<IRenderable> views, GainReport report)
     {
         var harnesses = report.Harnesses ?? [];
-        if (harnesses.Count == 0)
+        var rows = harnesses.Count == 0
+            ? [SummaryRow("all", report.Summary)]
+            : harnesses.Select(static harness => SummaryRow(harness.Name, harness.Totals)).ToList();
+        if (harnesses.Count > 1)
         {
-            views.Add(Summary(report.Summary));
+            rows.Add(SummaryRow("total", report.Summary));
         }
 
-        foreach (var harness in harnesses)
-        {
-            views.Add(Heading(harness.Name));
-            views.Add(Summary(harness.Totals));
-        }
-
+        views.Add(Table([new("Harness"), new("Req", true), new("Orig", true), new("Fwd", true), new("Saved", true), new("Recall", true),
+            new("Follow", true), new("Net", true), new("Saved%", true), new("Net%", true)], rows, tight: true));
         if (report.OtherTraffic is { } other)
         {
-            if (harnesses.Count > 0 && harnesses.All(static harness => harness.Name != GainHarness.Other))
-            {
-                views.Add(Heading(GainHarness.Other));
-            }
-
-            views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Number(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
+            views.Add(new Text($"Other traffic: {Number(other.Requests)} requests, {Compact(other.Bytes)} bytes (telemetry and non-model calls; not counted above).\n"));
         }
     }
 
-    private static Text Heading(string name)
+    private static IRenderable[] SummaryRow(string name, GainTotals totals)
     {
-        return new Text($"-{name}".PadRight(HeadingWidth, '-'));
-    }
-
-    private static Table Summary(GainTotals totals)
-    {
-        return Table(["Requests", "Original", "Forwarded", "Saved", "Retrieved", "Tool", "Follow-up", "Net", "Saved %", "Net %"],
+        return
         [
-            [Compact(totals.Requests), Compact(totals.EstimatedOriginalTokens), Compact(totals.EstimatedForwardedTokens), Compact(totals.EstimatedSavedTokens), Compact(totals.EstimatedRetrievedTokens),
-                Compact(totals.EstimatedToolTokens), Compact(totals.EstimatedFollowUpTokens), Compact(totals.EstimatedNetTokens), Percent(totals.SavedPercent), Percent(totals.NetPercent)]
-        ], tight: true);
+            Plain(name), Plain(Compact(totals.Requests)), Plain(Compact(totals.EstimatedOriginalTokens)), Plain(Compact(totals.EstimatedForwardedTokens)),
+            Signed(totals.EstimatedSavedTokens), Plain(Compact(totals.EstimatedRetrievedTokens)), Plain(Compact(totals.EstimatedFollowUpTokens)),
+            Signed(totals.EstimatedNetTokens), Signed(totals.SavedPercent, Percent(totals.SavedPercent)), Signed(totals.NetPercent, Percent(totals.NetPercent))
+        ];
     }
 
     private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
     {
-        views.Add(new Text($"{title}\n"));
-        views.Add(Table(["Start (UTC)", "Requests", "Saved tokens", "Retrieved tokens", "Net tokens"],
-            buckets.Select(static row => new[] { Stamp(row.Start), Compact(row.Totals.Requests), Compact(row.Totals.EstimatedSavedTokens), Compact(row.Totals.EstimatedRetrievedTokens), Compact(row.Totals.EstimatedNetTokens) })));
+        views.Add(Title(title));
+        views.Add(Table([new("Start (UTC)"), new("Req", true), new("Saved", true), new("Retrieved", true), new("Net", true)],
+            buckets.Select(static row => new[] { Plain(Stamp(row.Start)), Plain(Compact(row.Totals.Requests)), Signed(row.Totals.EstimatedSavedTokens), Plain(Compact(row.Totals.EstimatedRetrievedTokens)), Signed(row.Totals.EstimatedNetTokens) })));
     }
 
     /// <summary>A table; <paramref name="tight"/> drops the right padding so the ten summary columns still fit an 80-column terminal.</summary>
@@ -171,6 +165,80 @@ public sealed class GainView
         foreach (var row in rows)
         {
             table.AddRow(row.Select(value => (IRenderable)new Text(value)).ToArray());
+            any = true;
+        }
+
+        if (!any)
+        {
+            table.AddRow(columns.Select((_, index) => (IRenderable)new Text(index == 0 ? "No records" : "")).ToArray());
+        }
+
+        return table;
+    }
+
+
+    /// <summary>A table column; numbers align right.</summary>
+    private sealed record Column(string Header, bool Right = false);
+
+    private static Markup Title(string text)
+    {
+        return new Markup($"[bold]{Markup.Escape(text)}[/]\n");
+    }
+
+    private static Markup Plain(string value)
+    {
+        return new Markup(Markup.Escape(value));
+    }
+
+    private static Markup Signed(long value)
+    {
+        return Signed(value, Compact(value));
+    }
+
+    private static Markup Signed(decimal value, string text)
+    {
+        var colour = value > 0 ? "green" : value < 0 ? "red" : "grey";
+        return new Markup($"[{colour}]{Markup.Escape(text)}[/]");
+    }
+
+    private static string Tail(string value)
+    {
+        return value.Length <= 8 ? value : value[^8..];
+    }
+
+    private static string Folder(string? project)
+    {
+        if (project is null)
+        {
+            return GainLabels.Unknown;
+        }
+
+        var name = Path.GetFileName(project.TrimEnd('/', '\\'));
+        return name.Length == 0 ? project : name;
+    }
+
+    private static string ShortStamp(DateTimeOffset value)
+    {
+        return value.UtcDateTime.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>A table; <paramref name="tight"/> drops the right padding so the ten summary columns fit an 80-column terminal.</summary>
+    private static Table Table(Column[] columns, IEnumerable<IRenderable[]> rows, bool tight = false)
+    {
+        var table = new Table().Border(TableBorder.Rounded);
+        foreach (var column in columns)
+        {
+            table.AddColumn(new TableColumn(new Markup($"[bold]{Markup.Escape(column.Header)}[/]"))
+            {
+                Padding = tight ? new Padding(1, 0, 0, 0) : new Padding(1, 0, 1, 0),
+                Alignment = column.Right ? Justify.Right : Justify.Left
+            });
+        }
+
+        var any = false;
+        foreach (var row in rows)
+        {
+            table.AddRow(row);
             any = true;
         }
 
