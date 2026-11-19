@@ -1,7 +1,15 @@
 {
-  "lastUpdated": "2026-11-06",
+  "lastUpdated": "2026-11-18T12:39:31+00:00",
   "next": "Owner live smoke of 0.27.0 Codex chatgpt.com recording; quoted-echo references build (high loop, default shape); #24 restore system proxy after crash, NSS cleanup, capture message id.",
   "completedTasks": [
+    {
+      "taskId": "aip-gain-tables-fit-colour-per-rule",
+      "title": "Gain UI: fit tables on 80 columns, sign colours, one by-rule row per rule",
+      "pr": 130,
+      "merge": "24a9483",
+      "version": "0.30.0",
+      "finished": "2026-11-18"
+    },
     {
       "taskId": "aip-gain-per-harness-aph-shortcut",
       "date": "2026-11-06",
