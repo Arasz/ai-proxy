@@ -30,6 +30,7 @@ public static class GainHarness
 
     private static string OfOpenAiHost(string? host)
     {
+        host = host?.TrimEnd('.');
         return host switch
         {
             null or "" => OpenAiHostUnknown,

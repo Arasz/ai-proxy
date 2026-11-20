@@ -64,12 +64,6 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         var parameters = query.ToSqlParameters();
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
             Sql.Aggregate, parameters, transaction, cancellationToken: cancellationToken))).ToArray();
-        // Read untyped: with no rows SQLite reports every column as a blob, which no typed row can materialize.
-        var harnessRows = (await connection.QueryAsync(new CommandDefinition(
-            Sql.Harness, parameters, transaction, cancellationToken: cancellationToken)))
-            .Cast<IDictionary<string, object?>>()
-            .Select(static row => new HarnessRow(row["Name"] as string, row["Host"] as string ?? "", (string)row["Totals"]!))
-            .ToArray();
         var history = await DetailsAsync<GainHistoryEntry>(connection, transaction, parameters, Kinds.Request,
             Sql.History, cancellationToken);
         var failures = await DetailsAsync<GainFailure>(connection, transaction, parameters, Kinds.Failure,
@@ -94,7 +88,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Failures = failures,
             Recalls = recalls,
             OtherTraffic = other,
-            Harnesses = GainReportBuilder.Harnesses(harnessRows.Select(static row => new GainProviderTotals(row.Name, row.ConvertToTotals(), row.Host.Length == 0 ? null : row.Host)))
+            Harnesses = GainReportBuilder.Harnesses(rows.Where(static row => row.View == "provider")
+                .Select(static row => new GainProviderTotals(row.Name, row.ConvertToTotals(), row.Host.Length == 0 ? null : row.Host)))
         };
     }
 
@@ -206,15 +201,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record HarnessRow(string? Name, string Host, string Totals)
-    {
-        public GainTotals ConvertToTotals()
-        {
-            return JsonSerializer.Deserialize<GainTotals>(Totals) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
-        }
-    }
-
-    private sealed record AggregateRow(string View, long Start, string? Name, string Totals)
+    private sealed record AggregateRow(string View, long Start, string? Name, string Host, string Totals)
     {
         public GainTotals ConvertToTotals()
         {
@@ -305,15 +292,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                            'FollowUpMeasuredRequests',COALESCE(SUM(json_extract(totals,'$.FollowUpMeasuredRequests')),0))
                                        """;
 
-        /// <summary>One row per provider and request host; only request rows carry a host, so follow-ups and recalls group under an empty host.</summary>
-        public const string Harness = $"""
-                                       WITH metrics AS ({MetricsSelect})
-                                       SELECT provider AS Name,host AS Host,{SumJson}AS Totals FROM metrics GROUP BY provider,host
-                                       """;
-
         private const string MetricsSelect = $"""
                                               SELECT kind,at,provider,method,rule,layer,pipeline,
-                                                  COALESCE(CASE kind WHEN 'request' THEN json_extract(payload,'$.Host') END,'') AS host,
+                                                  COALESCE(json_extract(payload,'$.Host'),'') AS host,
                                                   CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
                                                       WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
                                                           'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
@@ -324,15 +305,16 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
         public const string Aggregate = $"""
                                          WITH metrics AS ({MetricsSelect})
-                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
+                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
                                              '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
                                              '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
                                          FROM metrics
-                                         UNION ALL SELECT 'daily',at - at % 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
-                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
-                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
-                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
+                                         UNION ALL SELECT 'daily',at - at % 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
+                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,'',{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
                                          GROUP BY dimension,Name
+                                         UNION ALL SELECT 'provider',0,provider,host,{SumJson}FROM metrics GROUP BY provider,host
                                          """;
     }
 

@@ -78,14 +78,19 @@ tell the two apart, because both use the OpenAI dialect.
    |---|---|---|
    | `anthropic` | any | `claude` |
    | `openai` | `chatgpt.com` | `codex` |
-   | `openai` | `openrouter.ai` | `openrouter` |
-   | `openai` | `api.openai.com` | `openai` |
+   | `openai` | `openrouter.ai` or a subdomain such as `eu.openrouter.ai` | `openrouter` |
+   | `openai` | `api.openai.com` or a regional `*.api.openai.com` | `openai` |
+   | `openai` | any other host | `other` |
    | anything else | any | `other` |
 
-3. Rows written before this change have no host. An `openai` row without a host shows as
+   Host matching ignores case and a trailing dot. A look-alike such as `evilopenrouter.ai` is
+   `other`, not `openrouter`.
+3. Follow-up and recall rows carry the host of the request they belong to, so they count under the
+   same harness as that request.
+4. Rows written before this change have no host. An `openai` row without a host shows as
    `openai (host unknown)`, not `codex`. Old rows are not rewritten, because the ledger never kept
    the host and guessing it from tokens would be a guess presented as data.
 
 Positive: pi traffic on OpenRouter gets its own row, and the `codex` row counts only Codex. Negative:
 the history before the change stays in one mixed row under a new name. The summary table can grow
-to five harness rows plus `total`, and decision 3 above still requires it to fit in 80 columns.
+to six harness rows plus `total`, and decision 3 above still requires it to fit in 80 columns.

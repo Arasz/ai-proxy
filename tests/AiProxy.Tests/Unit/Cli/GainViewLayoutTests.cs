@@ -84,6 +84,22 @@ public sealed class GainViewLayoutTests
     }
 
     [Fact]
+    public void All_six_harness_rows_and_the_total_fit_in_80_columns_without_wrapping_a_label()
+    {
+        var totals = new GainTotals(1234, EstimatedOriginalTokens: 261_175_524, EstimatedForwardedTokens: 250_443_158, EstimatedSavedTokens: 10_756_350);
+        var harnesses = GainHarness.Names.Select(name => new GainAttribution("harness", name, totals)).ToArray();
+
+        var output = Render(new GainSettings(), Report() with { Harnesses = harnesses });
+
+        var lines = output.Split('\n').Select(static l => l.TrimEnd('\r')).ToArray();
+        Assert.All(lines, line => Assert.True(line.Length <= 80, $"{line.Length}: {line}"));
+        foreach (var name in GainHarness.Names.Append("total"))
+        {
+            Assert.Single(lines, l => l.StartsWith('│') && l.Split('│')[1].Trim() == name);
+        }
+    }
+
+    [Fact]
     public void A_report_without_harness_rows_shows_one_row_named_all()
     {
         var output = Render(new GainSettings(), Report() with { Harnesses = [] });

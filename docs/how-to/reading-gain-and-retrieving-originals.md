@@ -17,10 +17,10 @@ by rebinding a domain name. Set `AllowedHosts` if you move it to another address
 `ai-proxy gain` prints one table with a row for each harness that has data, and a `total` row when
 there is more than one. The harness comes from the provider and the request host, because the
 ledger does not record the client: Anthropic is `claude`; OpenAI-dialect traffic to `chatgpt.com`
-is `codex`, to `openrouter.ai` is `openrouter`, and to `api.openai.com` is `openai`; everything
-else is `other`. A script calling the Anthropic API therefore counts as `claude`. Rows written
+is `codex`, to `openrouter.ai` or a subdomain such as `eu.openrouter.ai` is `openrouter`, and to
+`api.openai.com` or a regional `*.api.openai.com` is `openai`; any other host is `other`. A script calling the Anthropic API therefore counts as `claude`. Rows written
 before 0.31.0 have no host, so their OpenAI traffic shows as `openai (host unknown)`, a mix of
-Codex and OpenRouter that is not split afterwards. A retrieval with no known provider also lands
+Codex, OpenRouter and OpenAI API traffic that is not split afterwards. A retrieval with no known provider also lands
 in `other`, so that block can show recalls with zero requests. Non-model traffic such as telemetry is a line under the table. `--format json` has the
 same split in `harnesses`, next to the overall `summary`.
 

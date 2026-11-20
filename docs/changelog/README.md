@@ -18,7 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.31.0](0.31.0-gain-harness-by-host.md) | `ai-proxy gain` names the harness from provider and host, so OpenRouter traffic is `openrouter` and not `codex`; older OpenAI rows show as `openai (host unknown)`. | - |
+| [0.31.0](0.31.0-gain-harness-by-host.md) | `ai-proxy gain` names the harness from provider and host, so OpenRouter traffic is `openrouter` and not `codex`; older OpenAI rows show as `openai (host unknown)`. | [#134](https://github.com/Arasz/ai-proxy/pull/134) |
 | [0.30.0](0.30.0-gain-tables-fit-and-per-rule.md) | `ai-proxy gain` fits 80 columns with one summary row per harness, colours saved and net by sign, and `--by-rule` has one row per rule. | [#130](https://github.com/Arasz/ai-proxy/pull/130) |
 | [0.29.1](0.29.1-harness-bypass-metadata-ip.md) | `ai-proxy harness` adds the cloud metadata address (`169.254.169.254`, `169.254.0.0/16`) to the child's `NO_PROXY`, so metadata probes no longer wait 20 s on the proxy and log a 504 failure. | [#127](https://github.com/Arasz/ai-proxy/pull/127) |
 | [0.29.0](0.29.0-dotnet-11-runtime-async.md) | Targets .NET 11 (the tool needs the .NET 11 runtime), compiles with Runtime Async, and updates packages including Titanium.Web.Proxy 8.0.2. | [#126](https://github.com/Arasz/ai-proxy/pull/126) |

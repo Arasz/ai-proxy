@@ -213,7 +213,8 @@ public sealed class GainView
             table.AddColumn(new TableColumn(new Markup($"[bold]{Markup.Escape(column.Header)}[/]"))
             {
                 Padding = tight ? new Padding(1, 0, 0, 0) : new Padding(1, 0, 1, 0),
-                Alignment = column.Right ? Justify.Right : Justify.Left
+                Alignment = column.Right ? Justify.Right : Justify.Left,
+                NoWrap = tight && !column.Right
             });
         }
 
