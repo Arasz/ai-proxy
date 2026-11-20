@@ -11,6 +11,9 @@ public sealed class CapturedExchange
 {
     public string GainId { get; } = Guid.CreateVersion7().ToString();
     public string? GainProject { get; init; }
+    /// <summary>The request host, recorded on the ledger row so the harness can be told from provider and host.</summary>
+    public string? Host { get; init; }
+
     public string GainRule { get; set; } = "unknown";
     public string GainMethod { get; set; } = "POST";
     public string GainLayer { get; set; } = "unknown";

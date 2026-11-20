@@ -398,6 +398,25 @@ public sealed class GainStoreTests
     }
 
     [Fact]
+    public async Task A_report_shows_a_row_without_a_host_beside_a_row_with_one()
+    {
+        using var directory = new TemporaryDirectory();
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-11-20T12:00Z"));
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), clock);
+        var token = TestContext.Current.CancellationToken;
+        var totals = GainReportBuilder.RequestTotals(1_000, 900, 1_000, 900);
+        await store.RecordAsync(new GainHistoryEntry("old", clock.GetUtcNow(), "/p", "openai", "POST", "r", "l", "p", totals), [], token);
+        await store.RecordAsync(new GainHistoryEntry("new", clock.GetUtcNow(), "/p", "openai", "POST", "r", "l", "p", totals, "openrouter.ai"), [], token);
+
+        var report = await store.QueryAsync(new GainQuery(), token);
+
+        Assert.Equal(["openrouter", "openai (host unknown)"], report.Harnesses!.Select(static row => row.Name));
+        Assert.All(report.Harnesses!, static row => Assert.Equal(1, row.Totals.Requests));
+        Assert.Equal("openrouter.ai", report.History.Single(static entry => entry.Id == "new").Host);
+        Assert.Null(report.History.Single(static entry => entry.Id == "old").Host);
+    }
+
+    [Fact]
     public async Task Harness_totals_come_from_the_provider_column_and_count_recalls_and_follow_ups()
     {
         using var directory = new TemporaryDirectory();
@@ -418,10 +437,10 @@ public sealed class GainStoreTests
         var report = await store.QueryAsync(new GainQuery(), token);
 
         var harnesses = report.Harnesses!.ToDictionary(static row => row.Name, static row => row.Totals);
-        Assert.Equal(["claude", "codex", "other"], report.Harnesses!.Select(static row => row.Name));
+        Assert.Equal(["claude", "openai (host unknown)", "other"], report.Harnesses!.Select(static row => row.Name));
         Assert.Equal(1, harnesses["claude"].Recalls);
-        Assert.Equal(2, harnesses["codex"].Requests);
-        Assert.Equal(1, harnesses["codex"].FollowUps);
+        Assert.Equal(2, harnesses["openai (host unknown)"].Requests);
+        Assert.Equal(1, harnesses["openai (host unknown)"].FollowUps);
         Assert.Equal(2, harnesses["other"].Requests);
         Assert.Equal(1, harnesses["other"].Recalls);
         Assert.Equal(report.Summary, GainReportBuilder.Sum(harnesses.Values));

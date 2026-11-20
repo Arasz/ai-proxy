@@ -84,13 +84,14 @@ public sealed record GainHistoryEntry(
     string Rule,
     string Layer,
     string Pipeline,
-    GainTotals Totals);
+    GainTotals Totals,
+    string? Host = null);
 
 /// <summary>Totals assigned once within one attribution dimension.</summary>
 public sealed record GainAttribution(string Dimension, string Name, GainTotals Totals);
 
 /// <summary>The totals of one provider; a null provider is one the ledger does not know.</summary>
-public sealed record GainProviderTotals(string? Provider, GainTotals Totals);
+public sealed record GainProviderTotals(string? Provider, GainTotals Totals, string? Host = null);
 
 /// <summary>The method, rule, layer and pipeline an event is attributed to.</summary>
 public sealed record GainPath(string Method, string Rule, string Layer, string Pipeline);

@@ -96,6 +96,7 @@ public sealed partial class ProviderRequestInspector(
         {
             Dialect = dialect,
             GainProject = project,
+            Host = host,
             IsModelCall = ProviderEndpoints.IsModelCall(dialect, request.Method, request.RequestUri.AbsolutePath)
         };
         var captureId = Guid.CreateVersion7().ToString("N");
@@ -411,7 +412,7 @@ public sealed partial class ProviderRequestInspector(
         {
             await gain.RecordAsync(new GainHistoryEntry(exchange.GainId, exchange.GainAt, exchange.GainProject,
                     exchange.Dialect.ToString().ToLowerInvariant(), method, rule, exchange.GainLayer, exchange.GainPipeline,
-                    GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length, toolCharacters)),
+                    GainReportBuilder.RequestTotals(Encoding.UTF8.GetCharCount(original), Encoding.UTF8.GetCharCount(forwarded), original.Length, forwarded.Length, toolCharacters), exchange.Host),
                 exchange.GainFailures, CancellationToken.None);
         }
         catch (Exception exception)

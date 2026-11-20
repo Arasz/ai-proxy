@@ -29,6 +29,7 @@ public sealed class GainTrafficTests
         Assert.Equal(1, report!.Summary.Requests);
         Assert.Equal(0, report.Summary.EstimatedSavedTokens);
         Assert.Equal("/project/a", Assert.Single(report.History).Project);
+        Assert.Equal(upstream.BaseAddress.Host, report.History.Single().Host);
         Assert.DoesNotContain(Assert.Single(upstream.Requests).Headers.Keys, key => key.Equals("X-Ai-Proxy-Project", StringComparison.OrdinalIgnoreCase));
     }
 
