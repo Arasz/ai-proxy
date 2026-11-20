@@ -17,7 +17,7 @@ public sealed class CliApplication(GainRuntime runtime)
 
     private static readonly FrozenSet<string> Commands = new[]
     {
-        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, ShortcutCommand.Command, McpServerProcess.Command, HarnessProcess.Command
+        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, ReplayCommand.Command, ShortcutCommand.Command, McpServerProcess.Command, HarnessProcess.Command
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static bool IsCommandInvocation(string[] args)
@@ -90,6 +90,9 @@ public sealed class CliApplication(GainRuntime runtime)
             config.AddCommand<GainCommand>(GainCommand.Command)
                 .WithData(runtime)
                 .WithDescription("Show estimated initial-request token reductions and history.");
+            config.AddCommand<ReplayCommand>(ReplayCommand.Command)
+                .WithData(runtime)
+                .WithDescription("Replay stored requests through the compression pipeline and show what it would save.");
             config.AddCommand<DoctorCommand>(DoctorCommand.Command)
                 .WithData(runtime)
                 .WithDescription("Check the setup without changing anything.");

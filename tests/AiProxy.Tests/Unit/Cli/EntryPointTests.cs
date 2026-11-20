@@ -38,6 +38,7 @@ public sealed class EntryPointTests
     [InlineData("gain")]
     [InlineData("stop")]
     [InlineData("shortcut")]
+    [InlineData("replay|--json")]
     [InlineData("status")]
     [InlineData("status|-f|json")]
     [InlineData("stop|--data-directory|x")]
