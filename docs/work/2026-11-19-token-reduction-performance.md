@@ -147,3 +147,11 @@ exists: changing a tool result can break a cached prefix. There is no provider b
 - CCR break-even: the recall loop rounds (F5) suggest some previews are retrieved in full. A per-preview check (saved vs follow-up per CCR request) would show which kinds of tool output repay the preview.
 - The gap 2026-11-14 to 2026-11-17 has no rows: proxy off, or rows reset? Not checked.
 - F12: read the report builder to confirm how the tool definition enters the balance.
+
+### Status of these items on 2026-11-21
+
+- 11-13 (F7), the 11-14 to 11-17 gap and F12 are closed in [2026-11-20-gain-open-items.md](2026-11-20-gain-open-items.md): the balance followed the follow-up rate, not a release; no rows were deleted; F12 is confirmed from `GainReportBuilder`.
+- Codex (F9) is answered in [2026-11-20-token-return-vs-rtk.md](2026-11-20-token-return-vs-rtk.md) F3: Codex on chatgpt.com is record-only by ADR 0012, and part of the "codex" row was OpenRouter traffic (split by host in 0.31.0).
+- CCR break-even is measured per floor in [2026-11-21-replay-baseline.md](2026-11-21-replay-baseline.md) and the ADR 0015 replay grid, with recall applied as a 0.29 to 0.90 bound.
+- Still open: provider-billed numbers. Capture has recorded billed `usage` since 2026-11-20 19:32 UTC; the one-week read is due about 2026-11-27.
+
