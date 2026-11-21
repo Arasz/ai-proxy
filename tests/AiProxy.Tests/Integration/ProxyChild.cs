@@ -9,6 +9,10 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
     private readonly ConcurrentQueue<string> _output = new();
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Process Process => process;
+
+    /// <summary>The throwaway home directory the child ran under.</summary>
+    public string Home { get; private init; } = "";
+
     public string Output => string.Join("\n", _output);
 
     public async ValueTask DisposeAsync()
@@ -30,12 +34,17 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
     }
 
     /// <summary>Starts the executable with exactly <paramref name="arguments" /> and an isolated environment.</summary>
-    public static ProxyChild StartWith(string directory, string[] arguments, bool ephemeral = true, IReadOnlyDictionary<string, string?>? environment = null)
+    public static ProxyChild StartWith(string directory, string[] arguments, bool ephemeral = true, IReadOnlyDictionary<string, string?>? environment = null, string? workingDirectory = null)
     {
         var start = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
         };
+        if (workingDirectory is not null)
+        {
+            start.WorkingDirectory = workingDirectory;
+        }
+
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
         foreach (var argument in arguments)
         {
@@ -60,7 +69,7 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
         }
 
         var process = new Process { StartInfo = start };
-        var child = new ProxyChild(process);
+        var child = new ProxyChild(process) { Home = home };
         process.OutputDataReceived += (_, args) => child.Record(args.Data);
         process.ErrorDataReceived += (_, args) => child.Record(args.Data);
         Assert.True(process.Start());
@@ -83,9 +92,9 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
         }
     }
 
-    public async Task ExitAsync()
+    public async Task ExitAsync(TimeSpan? within = null)
     {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var deadline = new CancellationTokenSource(within ?? TimeSpan.FromSeconds(10));
         await process.WaitForExitAsync(deadline.Token);
     }
 

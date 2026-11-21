@@ -7,7 +7,7 @@ namespace AiProxy.Cli;
 
 /// <summary>Which instance to describe and how to print it.</summary>
 [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-public sealed class StatusSettings : CommandSettings
+public sealed class StatusSettings : OptionValueSettings
 {
     [CommandOption("--data-directory <PATH>")]
     [Description("The proxy's data directory (defaults to Proxy__DataDirectory, then ~/.ai-proxy).")]

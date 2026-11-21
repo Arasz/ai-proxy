@@ -6,7 +6,7 @@ namespace AiProxy.Cli;
 
 /// <summary>Which instance to stop: the one owning this data directory.</summary>
 [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-public sealed class StopSettings : CommandSettings
+public sealed class StopSettings : OptionValueSettings
 {
     [CommandOption("--data-directory <PATH>")]
     [Description("The proxy's data directory (defaults to Proxy__DataDirectory, then ~/.ai-proxy).")]

@@ -12,16 +12,13 @@ public enum EntryRoute
     Command,
     /// <summary>Start the proxy.</summary>
     Serve,
-    /// <summary>Print usage and exit 2.</summary>
+    /// <summary>Reject the command line: print the parse error and the usage, start nothing.</summary>
     Usage
 }
 
 /// <summary>Decides which mode a command line selects, before anything starts.</summary>
 public static class EntryPoint
 {
-    /// <summary>Exit code for an unrecognised command line.</summary>
-    public const int UsageExitCode = 2;
-
     /// <summary>The usage text for the start mode.</summary>
     public const string StartUsage = "Start: ai-proxy [--restart] [--key=value | --key value ...]\n  --restart  Gracefully replace the owned proxy instance, waiting for its exit.\n  --version  Print the product version.\nStop:   ai-proxy stop [--data-directory <path>]\nStatus: ai-proxy status [--data-directory <path>] [-f text|json]  (exit 3 when nothing runs)";
 

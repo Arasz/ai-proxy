@@ -9,7 +9,7 @@ namespace AiProxy.Cli;
 
 /// <summary>What to replay and how to print it.</summary>
 [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-public sealed class ReplaySettings : CommandSettings
+public sealed class ReplaySettings : OptionValueSettings
 {
     public const string BothSources = "both";
     public const string ContentSource = "content";
