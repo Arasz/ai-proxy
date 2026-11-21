@@ -57,7 +57,7 @@ public static class McpServerProcess
                 await pending.ReleaseAfterAsync(context.JsonRpcMessage, () => next(context, token)).ConfigureAwait(false);
             }))
             .WithStreamServerTransport(input, new BufferedStream(Console.OpenStandardOutput()))
-            .WithTools<RetrievalTools>();
+            .WithTools([RetrievalTools.CreateTool()]);
         using var host = builder.Build();
         await host.RunAsync(cancellationToken).ConfigureAwait(false);
         return 0;

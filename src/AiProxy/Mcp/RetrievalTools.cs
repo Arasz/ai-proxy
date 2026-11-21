@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Text.Json;
+using AiProxy.Ccr;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -39,6 +41,16 @@ public sealed class RetrievalTools(IProxyClient client, McpServerOptions options
         {
             return Failed("The proxy retrieval API timed out. Check that ai-proxy is running and retry the retrieval.");
         }
+    }
+
+    /// <summary>The tool as the server publishes it: its input schema is the one the proxy API enforces.</summary>
+    public static McpServerTool CreateTool()
+    {
+        var method = typeof(RetrievalTools).GetMethod(nameof(RetrieveOriginal))!;
+        var tool = McpServerTool.Create(method, static context => ActivatorUtilities.CreateInstance<RetrievalTools>(context.Services!));
+        using var schema = JsonDocument.Parse(RetrievalArgumentSchema.Text);
+        tool.ProtocolTool.InputSchema = schema.RootElement.Clone();
+        return tool;
     }
 
     private static CallToolResult Failed(string text)

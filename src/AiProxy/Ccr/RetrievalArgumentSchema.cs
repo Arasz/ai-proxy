@@ -13,6 +13,8 @@ public sealed class RetrievalArgumentSchema : IToolArgumentSchema
 
     private static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.List };
 
+    private static readonly JsonElement Properties = JsonDocument.Parse(Text).RootElement.GetProperty("properties");
+
     private static readonly JsonSchema Schema = JsonSchema.FromText(Text);
 
     /// <inheritdoc />
@@ -24,9 +26,22 @@ public sealed class RetrievalArgumentSchema : IToolArgumentSchema
 
     private static string Describe(EvaluationResults results)
     {
-        var failure = results.Details?.FirstOrDefault(static detail => detail.Errors is { Count: > 0 }) ?? results;
+        var failing = results.Details?.Where(static detail => detail.Errors is { Count: > 0 }).ToArray() ?? [];
+        var failure = failing.FirstOrDefault(static detail => detail.InstanceLocation.ToString().Length > 0) ?? failing.FirstOrDefault() ?? results;
         var location = failure.InstanceLocation.ToString();
         var message = failure.Errors?.Values.FirstOrDefault() ?? "The arguments do not follow the tool's schema.";
-        return location.Length == 0 ? message : $"{location}: {message}";
+        var allowed = AllowedValues(location);
+        return location.Length == 0 ? message : $"{location}: {message}{allowed}";
+    }
+
+    private static string AllowedValues(string location)
+    {
+        var name = location.TrimStart('/');
+        if (!Properties.TryGetProperty(name, out var property) || !property.TryGetProperty("enum", out var values))
+        {
+            return "";
+        }
+
+        return $" Allowed values: {string.Join(", ", values.EnumerateArray().Select(static value => value.GetString()))}.";
     }
 }
