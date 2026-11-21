@@ -19,12 +19,18 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
     /// <param name="cancellationToken">The request's token.</param>
     public async ValueTask<CcrPreview?> PreviewAsync(string original, string reduced, CcrMode mode, CancellationToken cancellationToken)
     {
-        if (mode == CcrMode.Off || options.TokensOf(reduced.Length) < options.MinimumTokens)
+        var reducedTokens = options.TokensOf(reduced.Length);
+        if (mode == CcrMode.Off || reducedTokens < options.MinimumTokens)
         {
             return null;
         }
 
-        var preview = builders().Build(original, options);
+        if (options.SkipsPreview(original, reducedTokens))
+        {
+            return null;
+        }
+
+        var preview = builders().Build(original, options, reducedTokens);
         if (preview is null || mode != CcrMode.Thread)
         {
             return preview;

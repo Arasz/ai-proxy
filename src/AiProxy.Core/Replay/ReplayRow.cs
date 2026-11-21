@@ -45,6 +45,9 @@ public enum ReplayOutcome
 /// <param name="PreviewId">The preview id the region went out as, or null when it did not become a preview.</param>
 public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int ReducedTokens, int ForwardedTokens, string? PreviewId = null)
 {
+    /// <summary>Whether the region is a numbered read or a diff that reached the preview floor and was sent as the reducers left it.</summary>
+    public bool Skipped { get; init; }
+
     /// <summary>The estimated tokens the reducers removed.</summary>
     public int ReducerSaved => OriginalTokens - ReducedTokens;
 

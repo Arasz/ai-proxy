@@ -72,12 +72,15 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
 
 ### Size-scaled previews
 
-8. The budget is `min(1500, floor(0.4 x reduced tokens))`, where reduced tokens are the estimated
-   tokens of the region after its reducers.
-9. The floor and the budget are both computed on the reduced text, and the floor is checked once.
-   The reduced text is a pure function of the region's bytes, so the preview stays byte-stable
-   across turns, as ADR 0005 requires for stateless re-previews (0005, "Cache placement", the
-   stateless paragraph, and the pure-function rule under "Preview format").
+8. The budget is `min(1500, floor(0.4 x original tokens))`, where original tokens are the estimated
+   tokens of the region as the client sent it, before its reducers.
+9. The floor is checked once, on the reduced text. The budget comes from the original text, not the
+   reduced text. The reduced text depends on whether the reducers succeed (a failed reducer leaves
+   the original in place), so a budget taken from it would change the preview bytes for the same
+   original and break prompt-cache stability across turns, as ADR 0005 requires for stateless
+   re-previews (0005, "Cache placement", the stateless paragraph, and the pure-function rule under
+   "Preview format"). The floor, the "preview must be shorter than the reduced text" rule and the
+   minimum saving are yes-or-no decisions on the reduced text and do not change the preview bytes.
 10. The builder returns null when the preview is not shorter than the reduced text. The region
     then goes out as its reducers left it.
 11. A preview is also not made when it saves less than a minimum per send. That minimum is sized
@@ -92,9 +95,10 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
       are consecutive. Any start number counts, so a read with an offset is caught too.
     - a diff: within the first 50 or so lines, a line that starts with `diff --git `, or a line
       starting `--- ` followed by one starting `+++ ` and then one starting `@@ -`.
-13. The check runs on the region text after the reducers (the code view included) and before the
-    preview builder. It applies only below an upper size band that replay sets. Above that band a
-    read or diff is previewed as before, because the saving outgrows a follow-up.
+13. The check runs on the region's original text, before the reducers, so a read the code view rewrites is
+    still recognised; the reducers still run. The preview is the only thing skipped. The skip applies only
+    below an upper size band (`SkipUnderTokens`, measured on the reduced text) that replay sets. The default is 0, which switches the skip off, until the tune step sets a finite band. Above that
+    band a read or diff is previewed as before, because the saving outgrows a follow-up.
 14. The skip goes by shape, not by tool name. `ToolCallFiles` names a path only for a read call
     with exactly one path argument (`src/AiProxy.Core/Content/ToolCallFiles.cs:118-157`), and most
     diffs come from `Bash`, so a tool-name rule would miss both.
@@ -123,16 +127,51 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
 
 ## Numbers
 
-The tune step fills this table from the replay grid and attaches the replay output to the PR.
+The tune step filled this table from the replay grid.
 
 | Setting | ADR 0005 value | Value | Source |
 |---|---|---|---|
-| `MinimumTokens` | 3,000 | set by the tune step | replay grid, point 15 |
+| `MinimumTokens` | 3,000 | 1,000 | replay grid, point 15 |
 | Budget cap | 1,500 | 1,500 | this ADR |
 | Budget share | none | 0.4 | this ADR, point 18 |
-| Minimum saving per send | none | set by the tune step | point 11 |
-| Skip upper band | none | set by the tune step | point 13 |
+| Minimum saving per send | none | 0 | point 11, grid below |
+| Skip upper band | none | 6,000 | replay grid, point 13 |
 | Numbered-read lines checked (k) | none | set by the tune step | point 12 |
+
+### Replay grid
+
+Snapshot of `~/.ai-proxy` taken 2026-11-21 01:41 UTC, window since 2026-11-06, commit `cd0d2e8`,
+Apple M4. Net is the preview saving minus follow-ups per preview id times 10,500 tokens, at a
+follow-up rate of 0.29 and of 0.90. Sizes are estimated tokens.
+
+| floor | skip under | rows | rows w/ preview | ids | preview saving | skipped | net @0.29 | net @0.90 | ids losing @0.29 | ids losing @0.90 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3,000 | 0 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 1,500 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 3,000 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 6,000 | 2,036 | 658 | 294 | 5,922,777 | 89 | 5,027,547 | 3,144,477 | 88 | 203 |
+| 1,500 | 6,000 | 2,036 | 945 | 689 | 12,794,117 | 165 | 10,696,112 | 6,283,067 | 320 | 537 |
+| 1,000 | 0 | 2,036 | 1,169 | 1,163 | 16,717,452 | 0 | 13,176,117 | 5,727,102 | 626 | 960 |
+| 1,000 | 1,500 | 2,036 | 1,162 | 1,127 | 16,661,915 | 73 | 13,230,200 | 6,011,765 | 594 | 924 |
+| 1,000 | 3,000 | 2,036 | 1,141 | 1,079 | 16,560,939 | 149 | 13,275,384 | 6,364,389 | 556 | 876 |
+| 1,000 | 6,000 | 2,036 | 1,098 | 1,030 | 16,299,008 | 238 | 13,162,658 | 6,565,508 | 537 | 832 |
+| 1,000 | 12,000 | 2,036 | 1,074 | 1,007 | 16,041,022 | 281 | 12,974,707 | 6,524,872 | 537 | 824 |
+| 1,000 | 25,000 | 2,036 | 1,065 | 1,000 | 15,820,485 | 295 | 12,775,485 | 6,370,485 | 537 | 824 |
+| 750 | 6,000 | 2,036 | 1,224 | 1,321 | 18,686,289 | 265 | 14,663,844 | 6,202,839 | 735 | 1,084 |
+| 500 | 0 | 2,036 | 1,415 | 1,811 | 20,229,224 | 0 | 14,714,729 | 3,115,274 | 1,119 | 1,547 |
+| 500 | 1,500 | 2,036 | 1,404 | 1,746 | 20,143,978 | 141 | 14,827,408 | 3,644,278 | 1,059 | 1,482 |
+| 500 | 3,000 | 2,036 | 1,387 | 1,698 | 20,043,002 | 217 | 14,872,592 | 3,996,902 | 1,021 | 1,434 |
+| 500 | 6,000 | 2,036 | 1,348 | 1,649 | 19,781,071 | 306 | 14,759,866 | 4,198,021 | 1,002 | 1,390 |
+| 300 | 0 | 2,036 | 1,590 | 2,407 | 21,347,997 | 0 | 14,018,682 | -1,398,153 | 1,654 | 2,127 |
+| 300 | 1,500 | 2,036 | 1,577 | 2,328 | 21,250,592 | 193 | 14,161,832 | -749,008 | 1,581 | 2,048 |
+| 300 | 3,000 | 2,036 | 1,560 | 2,280 | 21,149,616 | 269 | 14,207,016 | -396,384 | 1,543 | 2,000 |
+| 300 | 6,000 | 2,036 | 1,523 | 2,231 | 20,887,685 | 358 | 14,094,290 | -195,265 | 1,524 | 1,956 |
+
+Rule applied: a setting needs positive net at both rates; of those, the highest worst-case net
+wins. Floor 1,000 with skip band 6,000 gives +6,565,508 at 0.90 and +13,162,658 at 0.29. The
+earlier default, floor 3,000 with the skip off, gives +2,943,358 and +5,140,273. Floor 300 is
+rejected: its net is negative at 0.90. The minimum saving per send stays 0, because a preview's
+lifetime saving depends on future sends, and the stateless proxy cannot see them.
 
 ## Consequences
 

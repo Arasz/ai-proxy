@@ -38,7 +38,7 @@ public sealed class ContentCompressionPipelineCodeViewTests
         }));
     }
 
-    private static ContentCompressionPipeline Build(MemoryOriginalStore store)
+    private static ContentCompressionPipeline Build(MemoryOriginalStore store, CcrOptions? options = null)
     {
         return new ContentCompressionPipeline(
             new ToolOutputRegionFinder(),
@@ -48,12 +48,17 @@ public sealed class ContentCompressionPipelineCodeViewTests
             new NullContentStore(),
             CompressionOptions.WithMinimum(1),
             TimeProvider.System,
-            new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+            new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), options ?? CcrOptions.Default));
     }
 
     private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrMode mode, params ReadFile[] files)
     {
-        return Build(store).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
+        return CompressAsync(store, CcrOptions.Default, mode, files);
+    }
+
+    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrOptions options, CcrMode mode, params ReadFile[] files)
+    {
+        return Build(store, options).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
     }
 
     private static string[] ToolResults(CompressionResult result)
@@ -152,6 +157,35 @@ public sealed class ContentCompressionPipelineCodeViewTests
         var second = await CompressAsync(new MemoryOriginalStore(), CcrMode.Stateless, new ReadFile("src/Example.cs", First));
 
         Assert.Equal(first.Body.ToArray(), second.Body.ToArray());
+    }
+
+    private static string NumberedLargeFile()
+    {
+        var lines = $"using System;\n\npublic sealed class Large\n{{\n{string.Concat(Enumerable.Range(1, 400).Select(index => $"    // Member {index} keeps this comment.\n    public int Value{index} => {index};\n"))}}}\n".TrimEnd('\n').Split('\n');
+        return string.Join("\n", lines.Select((line, index) => $"{index + 1,6}\t{line}"));
+    }
+
+    [Fact]
+    public async Task A_numbered_read_the_view_rewrites_is_still_not_previewed()
+    {
+        var read = NumberedLargeFile();
+
+        var result = await CompressAsync(new MemoryOriginalStore(), CcrOptions.Default with { SkipUnderTokens = 100_000 }, CcrMode.Stateless, new ReadFile("src/Large.cs", read));
+
+        var sent = ToolResults(result)[0];
+        Assert.DoesNotContain(CcrPreview.Marker, sent, StringComparison.Ordinal);
+        Assert.Contains(CcrView.Marker, sent, StringComparison.Ordinal);
+        Assert.True(sent.Length < read.Length / 2);
+    }
+
+    [Fact]
+    public async Task The_same_numbered_read_is_previewed_when_the_skip_is_switched_off()
+    {
+        var read = NumberedLargeFile();
+
+        var result = await CompressAsync(new MemoryOriginalStore(), CcrOptions.Default with { SkipUnderTokens = 0 }, CcrMode.Stateless, new ReadFile("src/Large.cs", read));
+
+        Assert.StartsWith(CcrPreview.Marker, ToolResults(result)[0], StringComparison.Ordinal);
     }
 
     private sealed record ReadFile(string Path, string Text);

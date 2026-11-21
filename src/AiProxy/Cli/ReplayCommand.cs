@@ -20,7 +20,7 @@ public sealed class ReplayCommand : AsyncCommand<ReplaySettings>
         }
 
         var home = ProxyDataDirectory.FromEnvironment(settings.Home);
-        using var runner = ReplayRunner.Create(home, settings.Minimum, new ConfigurationBuilder().AddEnvironmentVariables().Build());
+        using var runner = ReplayRunner.Create(home, settings.Minimum, settings.BudgetShare, settings.MinimumSaving, settings.SkipUnder, new ConfigurationBuilder().AddEnvironmentVariables().Build());
         var run = await runner.RunAsync(settings.Sources, settings.SinceTime, settings.IncludeEncoded, cancellationToken).ConfigureAwait(false);
         var view = new ReplayView(home, settings, run);
         if (settings.Json)

@@ -16,6 +16,7 @@ namespace AiProxy.Tests.Unit.Replay;
 public sealed class ReplayCommandTests : IDisposable
 {
     private static readonly string Output = string.Join("\n", Enumerable.Range(1, 120).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+    private static readonly string NumberedOutput = string.Join("\n", Output.Split('\n').Select((line, index) => $"{index + 1,6}\t{line}"));
     private static readonly DateTimeOffset Stamp = DateTimeOffset.Parse("2026-11-10T12:00:00Z");
 
     private readonly GainCommandTests.Fixture _fixture = new();
@@ -164,8 +165,8 @@ public sealed class ReplayCommandTests : IDisposable
         Assert.Equal(1, low.GetProperty("rowsWithPreview").GetInt32());
         var preview = Assert.Single(low.GetProperty("previews").EnumerateArray());
         Assert.Equal(1, preview.GetProperty("sends").GetInt32());
-        Assert.Equal(426, preview.GetProperty("savedTokens").GetInt64());
-        Assert.Equal(426, low.GetProperty("savedTokens").GetInt64());
+        Assert.Equal(1169, preview.GetProperty("savedTokens").GetInt64());
+        Assert.Equal(1169, low.GetProperty("savedTokens").GetInt64());
     }
 
     [Fact]
@@ -289,7 +290,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Each_kind_reports_its_blocks_and_its_reducer_and_preview_savings_separately()
     {
         // Pretty JSON: 11,492 characters = 3,976 tokens, which the reducers compact to 4,171 characters = 1,443 tokens, under the 1,500 floor.
-        // Build log: 5,543 characters = 1,917 tokens, which no reducer shrinks and the preview takes to 1,491 tokens.
+        // Build log: 5,543 characters = 1,917 tokens, which no reducer shrinks and the preview takes to 748 tokens (budget share 0.4 of 1,917).
         WriteCapture(TwoToolBody(PrettyJson, Output));
 
         var result = await ReplayAsync("--minimum", "1500");
@@ -297,12 +298,12 @@ public sealed class ReplayCommandTests : IDisposable
         var kinds = result.GetProperty("kinds").EnumerateArray().ToArray();
         Assert.Equal(2, kinds.Length);
         AssertKind(kinds[0], "Json", 1, 0, 3976, 2533, 0, 1443);
-        AssertKind(kinds[1], "Prose", 1, 1, 1917, 0, 426, 1491);
+        AssertKind(kinds[1], "Prose", 1, 1, 1917, 0, 1169, 748);
         Assert.Equal(2533, result.GetProperty("reducerSavedTokens").GetInt64());
-        Assert.Equal(426, result.GetProperty("previewSavedTokens").GetInt64());
-        Assert.Equal(2959, result.GetProperty("savedTokens").GetInt64());
+        Assert.Equal(1169, result.GetProperty("previewSavedTokens").GetInt64());
+        Assert.Equal(3702, result.GetProperty("savedTokens").GetInt64());
         var preview = Assert.Single(result.GetProperty("previews").EnumerateArray());
-        Assert.Equal(426, preview.GetProperty("savedTokens").GetInt64());
+        Assert.Equal(1169, preview.GetProperty("savedTokens").GetInt64());
     }
 
     private static void AssertKind(JsonElement kind, string name, int seen, int previewed, long original, long reducerSaved, long previewSaved, long forwarded)
@@ -394,7 +395,7 @@ public sealed class ReplayCommandTests : IDisposable
         Assert.Equal(0, left.GetProperty("savedTokens").GetInt64());
         Assert.Equal(0, included.GetProperty("rowsEncoded").GetInt32());
         Assert.Equal(1, included.GetProperty("rowsReplayed").GetInt32());
-        Assert.Equal(426, included.GetProperty("savedTokens").GetInt64());
+        Assert.Equal(1169, included.GetProperty("savedTokens").GetInt64());
     }
 
     [Fact]
@@ -407,6 +408,94 @@ public sealed class ReplayCommandTests : IDisposable
 
         var hosts = result.GetProperty("hosts").EnumerateArray().Select(host => (host.GetProperty("host").GetString(), host.GetProperty("rows").GetInt32())).ToArray();
         Assert.Equal([("api.openai.com", 2), ("unknown", 1)], hosts);
+    }
+
+    [Fact]
+    public async Task A_numbered_read_is_counted_as_skipped_and_not_previewed()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "300", "--skip-under", "100000");
+
+        Assert.Equal(1, result.GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(1, Assert.Single(result.GetProperty("kinds").EnumerateArray()).GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(0, result.GetProperty("rowsWithPreview").GetInt32());
+        Assert.Empty(result.GetProperty("previews").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task With_the_skip_off_the_same_read_is_previewed_and_the_band_is_printed()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "300", "--skip-under", "0");
+
+        Assert.Equal(0, result.GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(0, result.GetProperty("skipUnder").GetInt32());
+        Assert.Equal(1, result.GetProperty("rowsWithPreview").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_numbered_read_under_the_minimum_is_not_counted_as_skipped()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "99999", "--skip-under", "100000");
+
+        Assert.Equal(0, result.GetProperty("blocksSkipped").GetInt32());
+    }
+
+    [Fact]
+    public async Task The_budget_share_option_reaches_the_pipeline_so_a_smaller_share_saves_more()
+    {
+        WriteCapture(ToolBody(Output));
+
+        var standard = await ReplayAsync("--minimum", "300");
+        var small = await ReplayAsync("--minimum", "300", "--budget-share", "0.1");
+
+        Assert.Equal(1169, standard.GetProperty("savedTokens").GetInt64());
+        Assert.True(small.GetProperty("savedTokens").GetInt64() > 1169);
+    }
+
+    [Fact]
+    public async Task The_minimum_saving_option_reaches_the_pipeline_so_a_large_one_sends_the_reduced_text()
+    {
+        WriteCapture(ToolBody(Output));
+
+        var standard = await ReplayAsync("--minimum", "300");
+        var strict = await ReplayAsync("--minimum", "300", "--minimum-saving", "1170");
+
+        Assert.Equal(1, standard.GetProperty("rowsWithPreview").GetInt32());
+        Assert.Equal(0, strict.GetProperty("rowsWithPreview").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("--budget-share", "0")]
+    [InlineData("--budget-share", "1.01")]
+    [InlineData("--minimum-saving", "-1")]
+    public async Task A_budget_share_outside_zero_to_one_or_a_negative_minimum_saving_is_refused(string option, string value)
+    {
+        var code = await new CliApplication(_fixture.Runtime).RunAsync(["replay", "--home", _home.Path, option, value], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, code);
+    }
+
+    [Theory]
+    [InlineData("--budget-share", "1")]
+    [InlineData("--minimum-saving", "0")]
+    public async Task A_budget_share_of_one_and_a_zero_minimum_saving_are_accepted(string option, string value)
+    {
+        WriteCapture(ToolBody(Output));
+
+        await ReplayAsync("--minimum", "300", option, value);
+    }
+
+    [Fact]
+    public async Task A_negative_skip_band_is_refused()
+    {
+        var code = await new CliApplication(_fixture.Runtime).RunAsync(["replay", "--home", _home.Path, "--skip-under", "-1"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, code);
     }
 
     [Fact]
@@ -424,8 +513,8 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task The_engine_binds_its_compression_settings_from_configuration_like_the_proxy_host()
     {
         var body = ReadBody("src/Example.cs", CodeFile);
-        using var defaults = ReplayEngine.Create(99999, new ConfigurationBuilder().Build());
-        using var noViews = ReplayEngine.Create(99999, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Proxy:Compression:CodeViews"] = "false" }).Build());
+        using var defaults = ReplayEngine.Create(99999, null, null, null, new ConfigurationBuilder().Build());
+        using var noViews = ReplayEngine.Create(99999, null, null, null, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Proxy:Compression:CodeViews"] = "false" }).Build());
 
         var withViews = Assert.Single((await defaults.ReplayAsync(body, TestContext.Current.CancellationToken)).Blocks);
         var withoutViews = Assert.Single((await noViews.ReplayAsync(body, TestContext.Current.CancellationToken)).Blocks);

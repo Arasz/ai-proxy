@@ -27,10 +27,19 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
 
     /// <summary>Builds the engine from the proxy's own service registrations, with the CCR minimum replaced when one is given.</summary>
     /// <param name="minimumTokens">The preview floor in estimated tokens, or null for the proxy's own.</param>
+    /// <param name="budgetShare">The share of original tokens a preview may hold, or null for the proxy's own.</param>
+    /// <param name="minimumSavingTokens">The least a preview must save, or null for the proxy's own.</param>
+    /// <param name="skipUnderTokens">The skip band for numbered reads and diffs in estimated tokens, or null for the proxy's own.</param>
     /// <param name="configuration">The configuration the compression settings are bound from, as the proxy host binds them.</param>
-    public static ReplayEngine Create(int? minimumTokens, IConfiguration configuration)
+    public static ReplayEngine Create(int? minimumTokens, decimal? budgetShare, int? minimumSavingTokens, int? skipUnderTokens, IConfiguration configuration)
     {
-        var ccr = minimumTokens is { } minimum ? CcrOptions.Default with { MinimumTokens = minimum } : CcrOptions.Default;
+        var ccr = CcrOptions.Default with
+        {
+            MinimumTokens = minimumTokens ?? CcrOptions.Default.MinimumTokens,
+            BudgetShare = budgetShare ?? CcrOptions.Default.BudgetShare,
+            MinimumSavingTokens = minimumSavingTokens ?? CcrOptions.Default.MinimumSavingTokens,
+            SkipUnderTokens = skipUnderTokens ?? CcrOptions.Default.SkipUnderTokens
+        };
         var settings = ProxySettings.Load(configuration).Compression;
         var withoutPreviews = Build(settings, ccr with { MinimumTokens = int.MaxValue });
         var withPreviews = Build(settings, ccr);
@@ -130,7 +139,12 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         var id = forwarded.Text == reduced.Text
             ? null
             : originals.Where(pair => pair.Value == original.Text).Select(static pair => pair.Key).FirstOrDefault() ?? "unidentified";
-        return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded), id);
+        return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded), id) { Skipped = id is null && WasSkipped(original, Tokens(reduced)) };
+    }
+
+    private bool WasSkipped(ContentRegion original, int reducedTokens)
+    {
+        return reducedTokens >= options.MinimumTokens && options.SkipsPreview(original.Text, reducedTokens);
     }
 
     private int Tokens(ContentRegion region)

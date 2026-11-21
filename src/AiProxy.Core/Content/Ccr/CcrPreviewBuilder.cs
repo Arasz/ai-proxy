@@ -17,18 +17,15 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     private int _overlayRoom;
     private bool[] _shown = [];
 
-    /// <summary>Returns a preview, or null for a small region, an existing preview, or insufficient budget.</summary>
-    public CcrPreview? Build(string original, CcrOptions options)
+    /// <summary>Returns a preview, or null for an existing preview, insufficient budget, or a preview that does not save enough.</summary>
+    /// <param name="original">The region's text as the client sent it.</param>
+    /// <param name="options">The CCR numbers.</param>
+    /// <param name="reducedTokens">The region's estimated tokens after its reducers; the saving is measured on it; the budget comes from the original.</param>
+    public CcrPreview? Build(string original, CcrOptions options, int reducedTokens)
     {
         try
         {
-            if (options.TokensOf(original.Length) < options.MinimumTokens
-                || CcrPreview.IsIn(original))
-            {
-                return null;
-            }
-
-            if (!Initialize(original, options))
+            if (CcrPreview.IsIn(original) || !Initialize(original, options, reducedTokens))
             {
                 return null;
             }
@@ -36,7 +33,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
             var signalSpent = SelectSignals((int)(_lineRoom * options.SignalShare));
             SelectHeadAndTail(_lineRoom - signalSpent, options.HeadShare);
             AssembleBody();
-            return Finish();
+            return SavesEnough(Finish(), options, reducedTokens);
         }
         finally
         {
@@ -44,12 +41,23 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         }
     }
 
-    private bool Initialize(string original, CcrOptions options)
+    private static CcrPreview? SavesEnough(CcrPreview? preview, CcrOptions options, int reducedTokens)
+    {
+        if (preview is null)
+        {
+            return null;
+        }
+
+        var saving = reducedTokens - options.TokensOf(preview.Text.Length);
+        return saving > 0 && saving >= options.MinimumSavingTokens ? preview : null;
+    }
+
+    private bool Initialize(string original, CcrOptions options, int reducedTokens)
     {
         _id = CcrText.IdOf(original);
         _lines = CcrText.LinesOf(original);
         _shown = new bool[_lines.Length];
-        _budget = options.CharactersOf(options.BudgetTokens);
+        _budget = options.CharactersOf(options.BudgetFor(options.TokensOf(original.Length)));
         _gapCost = Gap(_lines.Length, _lines.Length).Length + 1;
         _overlayRoom = (int)(_budget * options.OverlayShare);
         _lineRoom = _budget - (Header(_lines.Length).Length + 1) - _overlayRoom - _gapCost;

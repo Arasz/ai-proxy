@@ -19,6 +19,18 @@ public sealed class ReplaySettings : CommandSettings
     [Description("The smallest region, in estimated tokens, that becomes a preview (default: the proxy's own).")]
     public int? Minimum { get; init; }
 
+    [CommandOption("--budget-share <SHARE>")]
+    [Description("The share of a region's reduced tokens a preview may hold, above 0 and at most 1 (default: the proxy's own).")]
+    public decimal? BudgetShare { get; init; }
+
+    [CommandOption("--minimum-saving <TOKENS>")]
+    [Description("The least a preview must save over the reduced text, in estimated tokens (default: the proxy's own).")]
+    public int? MinimumSaving { get; init; }
+
+    [CommandOption("--skip-under <TOKENS>")]
+    [Description("A numbered read or a diff whose reduced text is under this many estimated tokens is not previewed; 0 turns the skip off (default: the proxy's own).")]
+    public int? SkipUnder { get; init; }
+
     [CommandOption("--since <DATE>")]
     [Description("Replay only requests from this date or time on (UTC).")]
     public string? Since { get; init; }
@@ -58,6 +70,15 @@ public sealed class ReplaySettings : CommandSettings
             RuleFor(static settings => settings.Minimum)
                 .Must(static minimum => minimum is null or > 0)
                 .WithMessage("The minimum must be a positive number of tokens.");
+            RuleFor(static settings => settings.BudgetShare)
+                .Must(static share => share is null or > 0 and <= 1)
+                .WithMessage("The budget share must be above 0 and at most 1.");
+            RuleFor(static settings => settings.MinimumSaving)
+                .Must(static saving => saving is null or >= 0)
+                .WithMessage("The minimum saving must not be negative.");
+            RuleFor(static settings => settings.SkipUnder)
+                .Must(static skip => skip is null or >= 0)
+                .WithMessage("The skip band must not be negative.");
             RuleFor(static settings => settings.Source)
                 .Must(static source => source is BothSources or ContentSource or CaptureSource)
                 .WithMessage("The source must be content, capture or both.");

@@ -23,6 +23,9 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
             home,
             since = settings.SinceTime,
             minimum = settings.Minimum,
+            budgetShare = settings.BudgetShare,
+            minimumSaving = settings.MinimumSaving,
+            skipUnder = settings.SkipUnder,
             source = settings.Source,
             includeEncoded = settings.IncludeEncoded,
             coverage = run.Coverage,
@@ -39,6 +42,7 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
             gainRequests = run.GainRequests,
             reducerSavedTokens = report.ReducerSavedTokens,
             previewSavedTokens = report.PreviewSavedTokens,
+            blocksSkipped = report.BlocksSkipped,
             savedTokens = report.SavedTokens,
             hosts = report.Hosts.Select(static host => new { host = host.Host, rows = host.Rows }),
             kinds = report.Kinds.Select(static kind => new
@@ -46,6 +50,7 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
                 kind = kind.Kind.ToString(),
                 blocksSeen = kind.BlocksSeen,
                 blocksPreviewed = kind.BlocksPreviewed,
+                blocksSkipped = kind.BlocksSkipped,
                 originalTokens = kind.OriginalTokens,
                 reducerSavedTokens = kind.ReducerSavedTokens,
                 previewSavedTokens = kind.PreviewSavedTokens,
@@ -83,14 +88,14 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
 
 
         var kinds = new Table().AddColumn("Kind");
-        foreach (var heading in new[] { "Seen", "Previewed", "Original", "Reducers", "Previews", "Forwarded" })
+        foreach (var heading in new[] { "Seen", "Previewed", "Skipped", "Original", "Reducers", "Previews", "Forwarded" })
         {
             kinds.AddColumn(new TableColumn(heading).RightAligned());
         }
 
         foreach (var kind in report.Kinds)
         {
-            kinds.AddRow(kind.Kind.ToString(), Number(kind.BlocksSeen), Number(kind.BlocksPreviewed), Number(kind.OriginalTokens), Number(kind.ReducerSavedTokens), Number(kind.PreviewSavedTokens), Number(kind.ForwardedTokens));
+            kinds.AddRow(kind.Kind.ToString(), Number(kind.BlocksSeen), Number(kind.BlocksPreviewed), Number(kind.BlocksSkipped), Number(kind.OriginalTokens), Number(kind.ReducerSavedTokens), Number(kind.PreviewSavedTokens), Number(kind.ForwardedTokens));
         }
 
         console.Write(kinds);

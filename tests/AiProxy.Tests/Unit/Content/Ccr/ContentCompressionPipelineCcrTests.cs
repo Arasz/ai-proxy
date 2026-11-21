@@ -42,12 +42,39 @@ public sealed class ContentCompressionPipelineCcrTests
             new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
     }
 
+    private static ContentCompressionPipeline Build(ICompressionHandler handler)
+    {
+        return new ContentCompressionPipeline(
+            new ToolOutputRegionFinder(),
+            new ContentDecompositor(),
+            new CompressionExecutor(new ContentRouter([handler], new PassThroughCompressionHandler())),
+            new ContentCompositor(),
+            new NullContentStore(),
+            CompressionOptions.Default,
+            TimeProvider.System,
+            new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
+    }
+
     private static string[] ToolResults(CompressionResult result)
     {
         using var document = JsonDocument.Parse(result.Body);
         return document.RootElement.GetProperty("messages")[0].GetProperty("content").EnumerateArray()
             .Select(block => block.GetProperty("content").GetString()!)
             .ToArray();
+    }
+
+    [Fact]
+    public async Task The_same_original_gets_the_same_preview_bytes_whether_its_reducer_succeeds_or_throws()
+    {
+        var original = string.Join("\n", Enumerable.Range(1, 370).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+        var request = new CompressionRequest(Body(original), "application/json", Dialect.Anthropic) { Ccr = CcrMode.Stateless };
+
+        var reduced = await Build(new EveryOtherLine()).CompressAsync(request, CancellationToken.None);
+        var failed = await Build(new Throwing()).CompressAsync(request, CancellationToken.None);
+
+        Assert.StartsWith(CcrPreview.Marker, ToolResults(reduced)[0], StringComparison.Ordinal);
+        Assert.Single(failed.PartFailures);
+        Assert.Equal(ToolResults(failed)[0], ToolResults(reduced)[0]);
     }
 
     [Fact]
@@ -123,6 +150,32 @@ public sealed class ContentCompressionPipelineCcrTests
         public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
         {
             return ValueTask.FromResult<ContentRecord?>(null);
+        }
+    }
+
+    private sealed class EveryOtherLine : ICompressionHandler
+    {
+        public bool CanHandle(ContentType type)
+        {
+            return true;
+        }
+
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(new HandledContent(string.Join("\n", part.Text.Split('\n').Where(static (_, index) => index % 2 == 0)), "every-other-line"));
+        }
+    }
+
+    private sealed class Throwing : ICompressionHandler
+    {
+        public bool CanHandle(ContentType type)
+        {
+            return true;
+        }
+
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("the reducer failed");
         }
     }
 }
