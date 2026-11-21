@@ -25,6 +25,52 @@ public sealed class ClientBoundaryTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void A_client_type_reaches_storage_through_another_type_only_by_way_of_the_offline_replay_reader()
+    {
+        var assembly = typeof(RetrievalTools).Assembly;
+        var clientTypes = assembly.GetTypes().Where(IsClientType).ToArray();
+
+        var violations = clientTypes.SelectMany(client => HopViolations(client, assembly)).Distinct().Order().ToArray();
+
+        Assert.NotEmpty(clientTypes);
+        Assert.Empty(violations);
+    }
+
+    private static IEnumerable<string> HopViolations(Type client, Assembly assembly)
+    {
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        var called = TypesUsedBy(client, all).SelectMany(Flatten).Where(type => type.Assembly == assembly && !IsClientType(type)).Select(static type => type.IsGenericType ? type.GetGenericTypeDefinition() : type).Distinct();
+        foreach (var hop in called.SelectMany(WithNested))
+        {
+            foreach (var storage in TypesUsedBy(hop, all).SelectMany(Flatten).Where(IsForbidden).Where(storage => !IsOfflineReplayAccess(hop, storage)))
+            {
+                yield return $"{client.FullName} reaches {storage.FullName} through {hop.FullName}";
+            }
+        }
+    }
+
+    /// <summary>ADR 0015 offline exception: only <c>AiProxy.Replay</c> may use the read-only reader and the rows it returns.</summary>
+    private static bool IsOfflineReplayAccess(Type hop, Type storage)
+    {
+        var root = hop;
+        while (root.DeclaringType is not null)
+        {
+            root = root.DeclaringType;
+        }
+
+        return root.Namespace == "AiProxy.Replay" && storage.FullName is "AiProxy.Storage.ReplayReader" or "AiProxy.Storage.StoredBody";
+    }
+
+    private static IEnumerable<Type> WithNested(Type type)
+    {
+        yield return type;
+        foreach (var nested in type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).SelectMany(WithNested))
+        {
+            yield return nested;
+        }
+    }
+
     private static bool IsClientType(Type type)
     {
         var root = type;

@@ -40,18 +40,35 @@ The owner switched capture on 2026-11-20, so full request bodies are now being k
    because `gain` is one flat command (`src/AiProxy/Cli/CliApplication.cs:90`).
 2. Replay runs every request with `CcrMode.Stateless`. In that mode `CcrPreviewer.KeepAsync`
    returns before it touches the store (`CcrPreviewer.cs:44`), and replay passes a store that keeps
-   nothing.
+   nothing. Each request runs twice, both stateless: once with the preview floor out of reach, to
+   measure what the reducers (code views included) remove, and once with the floor under test.
+   What the second run removes on top is the preview saving; a region is previewed only when its
+   text differs between the two runs. Both savings are reported, per content kind, in separate
+   columns.
 3. It opens `capture.db`, `content.db` and `gain.db` with `Mode=ReadOnly`. It reads
    `capture_request` bodies (zstd bodies decoded) and `content_request.original`. Replay never
    writes to any of them.
-4. Flags: `--minimum`, `--budget-share`, `--skip-shapes on|off`, `--since`.
+4. The shipped flags are `--minimum`, `--since`, `--source content|capture|both`, `--home`,
+   `--include-encoded` and `--json`. `--budget-share` and the skip flag are added with the
+   size-scaled preview and skip steps.
 5. It prints its denominators before any result: rows read, undecodable, not JSON, no tool output
    region, previewed. It also prints the capture row count beside the gain request count for the
-   same window, so a reader sees how much of the traffic the replay covers.
+   same window, so a reader sees how much of the traffic the replay covers. `content.db` holds
+   only the requests the pipeline changed, so a sample without capture rows cannot show the
+   requests a lower floor would newly preview; replay labels such a sample `coverage:
+   "content-only"` and warns. Bodies with a content encoding are left out by default because the
+   proxy never compresses them (`--include-encoded` adds them).
 6. Saved tokens are counted per preview id over its lifetime: the saving of one id is summed over
-   every replayed request that sends it. A stateless client re-sends each old tool result, so one
+   every replayed request that sends it, using the preview saving only (what the reducers remove
+   is reported apart, per kind). A stateless client re-sends each old tool result, so one
    preview saves on every later turn (token return record F6).
 7. Replay cannot see recall. It applies the measured follow-up rates as a prior (point 15).
+
+**Offline exception.** [ADR 0006](0006-one-tool-with-local-gain-and-retrieval-clients.md) keeps the
+clients away from storage. Replay is offline and reads the databases directly, so it is the one
+exception: only the namespace `AiProxy.Replay` may reach `AiProxy.Storage`, and only through the
+read-only `ReplayReader` (which opens every file with `SqliteOpenMode.ReadOnly`) and the rows it
+returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other way.
 
 ### Size-scaled previews
 

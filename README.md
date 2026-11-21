@@ -52,6 +52,7 @@ Something off? `ai-proxy doctor` checks the setup and changes nothing.
 
 ## What's new
 
+- `ai-proxy replay` runs stored requests through today's compression pipeline, read-only, and prints the saving per content kind (0.32.0). [Release notes](docs/changelog/0.32.0-replay-command.md)
 - `ai-proxy gain` names the harness from provider and host: OpenRouter traffic is `openrouter`, not `codex` (0.31.0). [Release notes](docs/changelog/0.31.0-gain-harness-by-host.md)
 - Targets .NET 11 and compiles with Runtime Async; `ai-proxy harness` keeps cloud metadata probes off the proxy (0.29.x). [Release notes](docs/changelog/0.29.1-harness-bypass-metadata-ip.md)
 - A crash no longer leaves the system pointing at a dead proxy: the guard or the next start restores the settings ai-proxy replaced (0.28.5, 0.28.6). [Release notes](docs/changelog/0.28.6-stale-proxy-restore-target.md)
