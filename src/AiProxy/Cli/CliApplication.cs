@@ -64,6 +64,14 @@ public sealed class CliApplication(GainRuntime runtime)
         return args.Any(argument => argument is "-h" or "-?" or "--help") && (args.Length == 0 || !Commands.Contains(args[0]));
     }
 
+    /// <summary>Reports a command line that is neither a command nor valid start options: the parse error, then the usage, both on stderr.</summary>
+    public static async Task<int> RunRejectedAsync(string[] args)
+    {
+        var code = await RunProcessAsync(args).ConfigureAwait(false);
+        await Console.Error.WriteLineAsync($"Not understood: {string.Join(' ', args)}\n{EntryPoint.StartUsage}").ConfigureAwait(false);
+        return code;
+    }
+
     public static async Task<int> RunProcessAsync(string[] args)
     {
         using var cancellation = new CancellationTokenSource();

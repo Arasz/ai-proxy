@@ -8,7 +8,7 @@ namespace AiProxy.Cli;
 
 /// <summary>Views and filters for the proxy's gain report.</summary>
 [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-public sealed class GainSettings : CommandSettings
+public sealed class GainSettings : OptionValueSettings
 {
     [CommandOption("-p|--project")]
     [Description("Filter to the current project directory.")]

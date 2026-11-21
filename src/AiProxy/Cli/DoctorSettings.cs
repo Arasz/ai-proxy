@@ -9,7 +9,7 @@ namespace AiProxy.Cli;
 
 /// <summary>Where the setup check looks: the proxy's API and listener, its data directory, and the host to probe.</summary>
 [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-public sealed class DoctorSettings : CommandSettings
+public sealed class DoctorSettings : OptionValueSettings
 {
     public const string DefaultHost = "api.anthropic.com";
 

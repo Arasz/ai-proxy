@@ -26,9 +26,14 @@ if (route == EntryRoute.Guard)
     return await guardCommand.Run(input);
 }
 
-if (CliApplication.IsCommandInvocation(args))
+if (route == EntryRoute.Command)
 {
     return await CliApplication.RunProcessAsync(args);
+}
+
+if (route == EntryRoute.Usage)
+{
+    return await CliApplication.RunRejectedAsync(args);
 }
 
 var markerOwnerSearch = new MarkerOwnerSearch();
