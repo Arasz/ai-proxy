@@ -61,7 +61,7 @@ public sealed class RetrievalLoop(IRetrievalRound first)
     };
 
     /// <summary>A loop over Anthropic Messages rounds.</summary>
-    public RetrievalLoop() : this(RetrievalRound.First())
+    public RetrievalLoop() : this(RetrievalRound.First(CcrMode.Stateless))
     {
     }
 

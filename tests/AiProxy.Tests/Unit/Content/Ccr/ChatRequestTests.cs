@@ -65,7 +65,7 @@ public sealed class ChatRequestTests
     {
         var body = Body();
 
-        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body)));
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
 
         using var document = JsonDocument.Parse(prepared);
         var tools = document.RootElement.GetProperty("tools");
@@ -86,7 +86,7 @@ public sealed class ChatRequestTests
 
         var prepared = ChatRequest.Prepare(Encoding.UTF8.GetBytes(already));
 
-        Assert.Equal(already, Encoding.UTF8.GetString(prepared));
+        Assert.Equal(already, Encoding.UTF8.GetString(prepared!));
     }
 
     [Fact]
@@ -94,11 +94,52 @@ public sealed class ChatRequestTests
     {
         var body = Body(",\"stream_options\":{\"include_usage\":false,\"other\":1}");
 
-        using var document = JsonDocument.Parse(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body)));
+        using var document = JsonDocument.Parse(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
 
         var options = document.RootElement.GetProperty("stream_options");
         Assert.True(options.GetProperty("include_usage").GetBoolean());
         Assert.Equal(1, options.GetProperty("other").GetInt32());
         Assert.Equal(2, document.RootElement.GetProperty("tools").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(",\"n\":null", true)]
+    [InlineData(",\"n\":\"2\"", false)]
+    [InlineData(",\"n\":2.5", false)]
+    [InlineData(",\"tool_choice\":null", true)]
+    [InlineData(",\"tool_choice\":{\"function\":null}", false)]
+    [InlineData(",\"tool_choice\":{\"function\":{\"name\":5}}", false)]
+    [InlineData(",\"tool_choice\":{\"function\":{\"name\":null}}", false)]
+    [InlineData(",\"stream_options\":null", true)]
+    [InlineData(",\"stream_options\":{\"include_usage\":null}", true)]
+    public void A_null_or_wrongly_typed_field_never_throws_and_qualifies_only_when_the_loop_can_serve_it(string extra, bool qualifies)
+    {
+        Assert.Equal(qualifies, Read(Body(extra)).Qualifies);
+    }
+
+    [Fact]
+    public void A_model_that_is_not_a_string_does_not_qualify()
+    {
+        Assert.False(Read("""{"model":5,"stream":true,"tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""").Qualifies);
+    }
+
+    [Theory]
+    [InlineData("""{"model":"deepseek/x","stream":true,"tools":[],"messages":[]}""")]
+    [InlineData("""{"model":"deepseek/x","stream":true,"messages":[]}""")]
+    [InlineData("""{"model":"deepseek/x","stream":true,"tools":[{"type":"function","function":{"name":"read"}}]""")]
+    public void Prepare_returns_null_when_it_cannot_append_the_tool(string body)
+    {
+        Assert.Null(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+    }
+
+    [Fact]
+    public void Prepare_reports_only_the_characters_of_the_tool_it_appended_not_the_usage_option()
+    {
+        var body = Encoding.UTF8.GetBytes(Body());
+
+        Assert.NotNull(ChatRequest.Prepare(body, out var appended));
+        Assert.Equal(CcrRetrieval.ChatDefinition.Length + 1, appended);
+        Assert.NotNull(ChatRequest.Prepare(Encoding.UTF8.GetBytes(Body(tools: $"[{Tool},{CcrRetrieval.ChatDefinition}]")), out var none));
+        Assert.Equal(0, none);
     }
 }

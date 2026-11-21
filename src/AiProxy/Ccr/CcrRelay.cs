@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
+using AiProxy.Configuration;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Ccr.Loop;
@@ -27,7 +28,8 @@ namespace AiProxy.Ccr;
 /// <param name="gain">Where each retrieval is recorded.</param>
 /// <param name="time">The clock of the headers deadline and of the recall records.</param>
 /// <param name="parser">Reads the arguments of each <c>proxy_retrieve</c> call.</param>
-public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore gain, TimeProvider time, CcrRetrievalParser parser) : IDisposable
+/// <param name="settings">The operator settings; the keep-alive interval comes from them.</param>
+public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> retrievers, CcrOptions options, ILogger<CcrRelay> logger, IGainStore gain, TimeProvider time, CcrRetrievalParser parser, CcrSettings settings) : IDisposable
 {
     /// <summary>The header naming the id the original request is kept under.</summary>
     public const string ContentIdHeader = "x-ai-proxy-content-id";
@@ -37,9 +39,6 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
     private const string EventStream = "text/event-stream";
     private const string Chunked = "chunked";
-
-    /// <summary>How often the client gets a <c>ping</c> while a follow-up has not answered yet.</summary>
-    public static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(5);
 
     private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -82,7 +81,11 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             exchange.Response = ResponseBuffer.For(EventStream, null);
         }
 
-        IRetrievalRound firstRound = plan.Chat ? ChatRound.First(plan.ChatUsage) : RetrievalRound.First();
+        IRetrievalRound firstRound = plan.Wire switch
+        {
+            CcrWire.Chat => ChatRound.First(plan.ClientUsage),
+            _ => RetrievalRound.First(plan.Mode)
+        };
         using var deadline = new CancellationTokenSource(HeadersDeadline, time);
         HttpResponseMessage response;
         try
@@ -106,7 +109,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         var answer = ClientResponse(response, exchange.ContentId);
         var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
-        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time, parser), exchange, headers, request.RequestUri, body, plan, originals, firstRound);
+        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time, parser, settings.KeepAliveInterval), exchange, headers, request.RequestUri, body, plan, originals, firstRound);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), true);
     }
 
@@ -157,7 +160,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private sealed record ForwardedHeader(string Name, string Value);
 
     /// <summary>What a conversation reads and writes through.</summary>
-    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore Gain, TimeProvider Time, CcrRetrievalParser Parser);
+    private sealed record RelayServices(IOriginalStore Store, Func<CcrRetriever> Retrievers, CcrOptions Options, ILogger Logger, HttpClient Http, IGainStore Gain, TimeProvider Time, CcrRetrievalParser Parser, TimeSpan KeepAlive);
 
     /// <summary>One client response across its upstream rounds.</summary>
     private sealed class Conversation(
@@ -286,6 +289,17 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         private async Task ReleaseAsync(RetrievalLoop loop)
         {
+            if (plan.Wire == CcrWire.Chat && loop.Round.Lossy)
+            {
+                await WriteFailureAsync(loop.Failure(Messages.LossyMessage));
+                return;
+            }
+
+            if (loop.Round.ToolCalls.Count(static call => call.IsRetrieval) is > 0 and var dropped)
+            {
+                Log.RetrievalDropped(relay.Logger, uri.Host, dropped);
+            }
+
             if (!await LinkAsync(loop).ConfigureAwait(false))
             {
                 await WriteFailureAsync(loop.Failure(Messages.ThreadNotRecorded));
@@ -301,9 +315,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private async Task<byte[]> FollowUpAsync(RetrievalLoop loop, byte[] forwarded)
         {
             var results = loop.ToolResults(await AnswerAsync(loop).ConfigureAwait(false));
-            var followUp = plan.Mode == CcrMode.Thread
-                ? loop.Round.ThreadFollowUp(forwarded, results)
-                : loop.Round.StatelessFollowUp(forwarded, results);
+            var followUp = loop.Round.FollowUp(forwarded, results);
             loop.NextRound();
             return followUp;
         }
@@ -421,7 +433,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private async Task<HttpResponseMessage> SendWithPingsAsync(byte[] followUp)
         {
             var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, _cancellation);
-            while (await Task.WhenAny(sending, Task.Delay(PingInterval, _cancellation)).ConfigureAwait(false) != sending)
+            while (await Task.WhenAny(sending, Task.Delay(relay.KeepAlive, _cancellation)).ConfigureAwait(false) != sending)
             {
                 await WriteAsync(_loop.Round.KeepAlive);
             }
@@ -502,6 +514,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         [LoggerMessage(EventId = 1607, Level = LogLevel.Warning, Message = "{ProviderHost} refused a retrieval follow-up with {StatusCode}: {Error}")]
         public static partial void FollowUpRefused(ILogger logger, string providerHost, int statusCode, string error);
+
+        [LoggerMessage(EventId = 1614, Level = LogLevel.Warning, Message = "The response from {ProviderHost} ended without a tool stop; {Calls} proxy_retrieve call(s) were dropped and the client calls released")]
+        public static partial void RetrievalDropped(ILogger logger, string providerHost, int calls);
 
         [LoggerMessage(EventId = 1608, Level = LogLevel.Warning, Message = "The stream from {ProviderHost} ended before message_stop in round {Round}; the client got an error event")]
         public static partial void StreamCutOff(ILogger logger, string providerHost, int round);

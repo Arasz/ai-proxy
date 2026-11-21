@@ -22,10 +22,18 @@ public sealed class CcrChatPlanTests
         var plan = await DecideAsync(Stream);
 
         Assert.True(plan.Relays);
-        Assert.True(plan.Chat);
+        Assert.Equal(CcrWire.Chat, plan.Wire);
         Assert.Equal(CcrMode.Stateless, plan.Mode);
-        Assert.False(plan.ChatUsage);
-        Assert.True((await DecideAsync(Stream.Replace("\"stream\":true", "\"stream\":true,\"stream_options\":{\"include_usage\":true}", StringComparison.Ordinal))).ChatUsage);
+        Assert.False(plan.ClientUsage);
+        Assert.True((await DecideAsync(Stream.Replace("\"stream\":true", "\"stream\":true,\"stream_options\":{\"include_usage\":true}", StringComparison.Ordinal))).ClientUsage);
+    }
+
+    [Fact]
+    public void Anthropic_plans_are_on_the_messages_wire()
+    {
+        Assert.Equal(CcrWire.Messages, CcrPlan.Stateless.Wire);
+        Assert.Equal(CcrWire.Messages, CcrPlan.Create.Wire);
+        Assert.Equal(CcrWire.Messages, CcrPlan.Continue("m").Wire);
     }
 
     [Fact]
@@ -52,7 +60,7 @@ public sealed class CcrChatPlanTests
     {
         Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, path: "/api/v1/embeddings"));
         Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, method: "GET"));
-        Assert.True((await DecideAsync(Stream, path: "/v1/chat/completions/")).Chat);
+        Assert.Equal(CcrWire.Chat, (await DecideAsync(Stream, path: "/v1/chat/completions/")).Wire);
     }
 
     [Fact]

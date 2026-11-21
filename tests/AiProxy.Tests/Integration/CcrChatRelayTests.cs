@@ -102,11 +102,32 @@ public sealed class CcrChatRelayTests : IDisposable
         };
     }
 
-    private Task<ProxyHost> StartProxyAsync(bool chatHost = true)
+    private Task<ProxyHost> StartProxyAsync(bool chatHost = true, RecordingLoggerProvider? logs = null, string? keepAlive = null)
     {
-        return ProxyHost.StartAsync(
-            new Dictionary<string, string> { ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = _databasePath },
-            providerHosts: new LoopbackProviderHosts(Dialect.OpenAi, chatHost));
+        var settings = new Dictionary<string, string> { ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = _databasePath };
+        if (keepAlive is not null)
+        {
+            settings["Proxy:Ccr:KeepAliveInterval"] = keepAlive;
+        }
+
+        return ProxyHost.StartAsync(settings, providerHosts: new LoopbackProviderHosts(Dialect.OpenAi, chatHost), logging: logs);
+    }
+
+    private static JsonNode[] ChunksOf(string client)
+    {
+        return client.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Where(static block => block.StartsWith("data: ", StringComparison.Ordinal))
+            .Select(static block => block["data: ".Length..]).Where(static data => data != "[DONE]").Select(Json).ToArray();
+    }
+
+    private static string ArgumentsOnly(int index, string fragment)
+    {
+        return ChatSse.Chunk("gen-1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["function"] = new JsonObject { ["arguments"] = fragment } }) }, null, null);
+    }
+
+    private static string Finished(params string[] chunks)
+    {
+        return ChatSse.Chunk("gen-1", new JsonObject { ["role"] = "assistant", ["content"] = "" }, null, null) + string.Concat(chunks)
+               + ChatSse.Chunk("gen-1", null, null, ChatSse.Usage(4)) + "data: [DONE]\n\n";
     }
 
     private static async Task<string> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
@@ -340,5 +361,182 @@ public sealed class CcrChatRelayTests : IDisposable
         Assert.Equal(1, report.Summary.FollowUps);
         Assert.Equal(1, report.Summary.Recalls);
         Assert.Equal([GainHarness.Of("openai", "127.0.0.1")], report.Harnesses!.Select(static row => row.Name));
+    }
+
+    [Fact]
+    public async Task Text_and_a_tool_calls_finish_in_one_chunk_never_show_the_client_a_mid_stream_finish()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var both = new JsonObject { ["content"] = "reading", ["tool_calls"] = Calls((0, "call_r", CcrRetrieval.Name, Retrieve))["tool_calls"]!.DeepClone() };
+        upstream.Handler = Script(Finished(ChatSse.Chunk("gen-1", both, "tool_calls", null)), Round("answer", null, "stop", 6));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        var finishes = ChunksOf(client).SelectMany(static chunk => chunk["choices"]!.AsArray()).Select(static choice => choice!["finish_reason"]?.GetValue<string>()).Where(static finish => finish is not null).ToArray();
+        Assert.Equal(["stop"], finishes);
+        Assert.Contains("reading", client, StringComparison.Ordinal);
+        Assert.Contains("answer", client, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_follow_up_that_errors_mid_stream_gives_the_client_one_error_and_one_done()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(
+            Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "tool_calls", 4),
+            ChatSse.Chunk("gen-2", ChatSse.Text("part"), null, null) + "data: {\"error\":{\"message\":\"late boom\",\"code\":500}}\n\ndata: [DONE]\n\n");
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Contains("part", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "late boom"));
+        Assert.Equal(1, Count(client, "[DONE]"));
+        Assert.EndsWith("data: [DONE]\n\n", client, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_stop_with_no_tools_is_released_after_one_upstream_request()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Round("hello", null, "stop", 3));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Single(upstream.Requests);
+        Assert.Contains("hello", client, StringComparison.Ordinal);
+        Assert.Contains("\"finish_reason\":\"stop\"", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "[DONE]"));
+    }
+
+    [Fact]
+    public async Task Parallel_calls_interleaved_on_two_indexes_are_joined_and_each_gets_a_tool_reply()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var half = Retrieve.Length / 2;
+        upstream.Handler = Script(
+            Finished(
+                ChatSse.Chunk("gen-1", Calls((0, "call_r", CcrRetrieval.Name, "")), null, null),
+                ChatSse.Chunk("gen-1", Calls((1, "call_c", "read", "{\"p\":")), null, null),
+                ArgumentsOnly(0, Retrieve[..half]),
+                ArgumentsOnly(1, "1}"),
+                ArgumentsOnly(0, Retrieve[half..]),
+                ChatSse.Chunk("gen-1", new JsonObject(), "tool_calls", null)),
+            Round("answer", null, "stop", 6));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Contains("answer", client, StringComparison.Ordinal);
+        var messages = Json(upstream.Requests[1].Body)["messages"]!.AsArray();
+        var calls = messages[3]!["tool_calls"]!.AsArray();
+        Assert.Equal(Retrieve, calls[0]!["function"]!["arguments"]!.GetValue<string>());
+        Assert.Equal("{\"p\":1}", calls[1]!["function"]!["arguments"]!.GetValue<string>());
+        Assert.Equal(["call_r", "call_c"], messages.Skip(4).Select(static tool => tool!["tool_call_id"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task A_lossy_round_ends_with_an_error_chunk_and_one_done()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Round("", Calls((0, "", CcrRetrieval.Name, Retrieve)), "tool_calls", 4));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Single(upstream.Requests);
+        Assert.Contains("could not rebuild", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "[DONE]"));
+        Assert.EndsWith("data: [DONE]\n\n", client, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_choice_with_an_index_other_than_zero_makes_the_round_lossy()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        const string Second = """data: {"id":"gen-1","object":"chat.completion.chunk","choices":[{"index":1,"delta":{"content":"x"},"finish_reason":null}]}""" + "\n\n";
+        upstream.Handler = Script(Finished(ChatSse.Chunk("gen-1", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), null, null), Second, ChatSse.Chunk("gen-1", new JsonObject(), "tool_calls", null)), Round("answer", null, "stop", 6));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Single(upstream.Requests);
+        Assert.Contains("could not rebuild", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "[DONE]"));
+    }
+
+    [Fact]
+    public async Task A_proxy_retrieve_call_at_a_stop_finish_is_answered()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "stop", 4), Round("answer", null, "stop", 6));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Equal(2, upstream.Requests.Count);
+        Assert.Contains("answer", client, StringComparison.Ordinal);
+        Assert.DoesNotContain(CcrRetrieval.Name, client, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task At_a_length_finish_the_client_call_is_released_proxy_retrieve_is_dropped_and_the_drop_is_logged()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve), (1, "call_c", "read", "{}")), "length", 4));
+        var logs = new RecordingLoggerProvider();
+        await using var proxy = await StartProxyAsync(logs: logs);
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Single(upstream.Requests);
+        Assert.Contains("call_c", client, StringComparison.Ordinal);
+        Assert.DoesNotContain(CcrRetrieval.Name, client, StringComparison.Ordinal);
+        Assert.DoesNotContain("call_r", client, StringComparison.Ordinal);
+        Assert.Contains("\"finish_reason\":\"length\"", client, StringComparison.Ordinal);
+        Assert.Contains(logs.Entries, static entry => entry.EventId == 1614);
+    }
+
+    [Fact]
+    public async Task A_call_without_an_id_or_name_never_reaches_the_client()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        upstream.Handler = Script(Round("", Calls((0, "", "read", "{}")), "tool_calls", 4));
+        await using var proxy = await StartProxyAsync();
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.DoesNotContain("\"name\":\"read\"", client, StringComparison.Ordinal);
+        Assert.Contains("could not rebuild", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "[DONE]"));
+    }
+
+    [Fact]
+    public async Task A_slow_follow_up_gets_comment_keep_alives_and_never_a_ping_event()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        var calls = 0;
+        upstream.Handler = async (_, context) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                await context.Response.WriteAsync(Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "tool_calls", 4));
+                return;
+            }
+
+            await Task.Delay(700, TestContext.Current.CancellationToken);
+            await context.Response.WriteAsync(Round("answer", null, "stop", 6));
+        };
+        await using var proxy = await StartProxyAsync(keepAlive: "00:00:00.100");
+
+        var client = await SendAsync(proxy, upstream, Request());
+
+        Assert.Contains(": keep-alive\n\n", client, StringComparison.Ordinal);
+        Assert.DoesNotContain("event: ping", client, StringComparison.Ordinal);
+        Assert.Contains("answer", client, StringComparison.Ordinal);
+        Assert.Equal(1, Count(client, "[DONE]"));
     }
 }

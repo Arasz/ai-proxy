@@ -20,17 +20,27 @@ public enum CcrAction
     Refuse
 }
 
+/// <summary>The wire format of the request and its streamed answer.</summary>
+public enum CcrWire
+{
+    /// <summary>Anthropic Messages.</summary>
+    Messages,
+
+    /// <summary>OpenAI-style Chat Completions.</summary>
+    Chat
+}
+
 /// <summary>The plan for one provider request; build it with the factories.</summary>
 /// <param name="Action">What the proxy does.</param>
 /// <param name="Mode">The CCR mode the pipeline previews with.</param>
 /// <param name="ContinueFrom">The message a relayed <c>continue</c> follows; empty otherwise.</param>
 public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom)
 {
-    /// <summary>Whether the request is Chat Completions, answered by the chat round.</summary>
-    public bool Chat { get; private init; }
+    /// <summary>The wire format, which picks the round that reads the stream.</summary>
+    public CcrWire Wire { get; private init; } = CcrWire.Messages;
 
-    /// <summary>Whether the Chat Completions client asked for a usage chunk; the proxy asks the upstream either way.</summary>
-    public bool ChatUsage { get; private init; }
+    /// <summary>Whether a Chat Completions client asked for a usage chunk; the proxy asks the upstream either way.</summary>
+    public bool ClientUsage { get; private init; }
 
     /// <summary>The only path CCR acts on: the Anthropic Messages API, shared with <see cref="ProviderEndpoints.AnthropicMessagesPath" />.</summary>
     public const string MessagesPath = ProviderEndpoints.AnthropicMessagesPath;
@@ -53,7 +63,7 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     /// <summary>Relay a stateless Chat Completions request.</summary>
     public static CcrPlan ChatStateless(bool clientUsage)
     {
-        return new CcrPlan(CcrAction.RelayWithTool, CcrMode.Stateless, "") { Chat = true, ChatUsage = clientUsage };
+        return new CcrPlan(CcrAction.RelayWithTool, CcrMode.Stateless, "") { Wire = CcrWire.Chat, ClientUsage = clientUsage };
     }
 
     /// <summary>Whether the proxy answers the client itself.</summary>

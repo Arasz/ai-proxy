@@ -12,18 +12,23 @@ namespace AiProxy.Core.Content.Ccr.Loop;
 /// <param name="dropRole">Whether the <c>role</c> of the first delta is dropped: a follow-up round continues the client's message.</param>
 /// <param name="clientUsage">Whether the client asked for a usage chunk.</param>
 /// <param name="clientId">The chunk id the client sees; empty until the first chunk of the first round names it.</param>
-public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) : IRetrievalRound
+/// <param name="prior">The usage of the rounds before this one, summed.</param>
+public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId, JsonObject? prior = null) : IRetrievalRound
 {
     private const string Done = "[DONE]";
     private const string ToolCallsFinish = "tool_calls";
+    private const string StopFinish = "stop";
+    private const string ReasoningDetails = "reasoning_details";
     private static readonly string[] Folded = ["role", "content", "tool_calls"];
 
-    private readonly SortedDictionary<int, Call> _calls = [];
+    private readonly List<Call> _calls = [];
+    private readonly Dictionary<int, Call> _open = [];
     private readonly StringBuilder _text = new();
     private readonly JsonObject _extras = [];
     private JsonObject _template = [];
     private JsonObject? _usage;
     private bool _split;
+    private int _lastIndex;
 
     /// <summary>The chunk id of the first upstream response: the one every chunk the client gets carries.</summary>
     public string ClientId => clientId.Length > 0 ? clientId : MessageId;
@@ -41,16 +46,16 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
     public bool Failed { get; private set; }
 
     /// <inheritdoc />
-    public bool Lossy => _split || _calls.Values.Any(static call => call.Id.Length == 0 || call.Name.Length == 0);
+    public bool Lossy => _split || _calls.Any(static call => call.Id.Length == 0 || call.Name.Length == 0);
 
     /// <inheritdoc />
-    public bool StopsForTools => FinishReason == ToolCallsFinish && _calls.Count > 0;
+    public bool StopsForTools => _calls.Count > 0 && FinishReason is ToolCallsFinish or StopFinish;
 
     /// <inheritdoc />
     public long OutputTokens => _usage?["completion_tokens"] is JsonValue value && value.TryGetValue<long>(out var tokens) ? tokens : 0;
 
     /// <inheritdoc />
-    public IReadOnlyList<ToolCall> ToolCalls => _calls.Values.Select(static call => new ToolCall(call.Id, call.Name, call.Arguments.Length == 0 ? "{}" : call.Arguments.ToString())).ToArray();
+    public IReadOnlyList<ToolCall> ToolCalls => _calls.OrderBy(static call => call.Index).Select(static call => new ToolCall(call.Id, call.Name, call.Arguments.Length == 0 ? "{}" : call.Arguments.ToString())).ToArray();
 
     /// <inheritdoc />
     public SseEvent KeepAlive => SseEvent.CommentLine;
@@ -67,6 +72,11 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
     /// <inheritdoc />
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
     {
+        if (sse.Name == SseEvent.Comment)
+        {
+            return [KeepAlive];
+        }
+
         if (sse.Data == Done)
         {
             Ended = true;
@@ -81,6 +91,11 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
         if (data["error"] is not null)
         {
             Failed = true;
+            if (data["id"] is not null && ClientId.Length > 0)
+            {
+                data["id"] = ClientId;
+            }
+
             return [Unnamed(data.ToJsonString(MessagesApi.Json))];
         }
 
@@ -105,7 +120,7 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
         {
             var chunk = Base();
             chunk["choices"] = new JsonArray();
-            chunk["usage"] = MergedUsage(outputTokens);
+            chunk["usage"] = MergedUsage();
             events.Add(Unnamed(chunk.ToJsonString(MessagesApi.Json)));
         }
 
@@ -116,17 +131,11 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
     /// <inheritdoc />
     public IRetrievalRound Next()
     {
-        return new ChatRound(true, clientUsage, ClientId);
+        return new ChatRound(true, clientUsage, ClientId, MergedUsage());
     }
 
     /// <inheritdoc />
-    public byte[] ThreadFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
-    {
-        throw new NotSupportedException("Chat Completions has no thread mode.");
-    }
-
-    /// <inheritdoc />
-    public byte[] StatelessFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
+    public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results)
     {
         if (JsonNode.Parse(forwarded) is not JsonObject request || request["messages"] is not JsonArray messages)
         {
@@ -134,7 +143,7 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
         }
 
         messages.Add(Assistant());
-        foreach (var result in toolResults)
+        foreach (var result in results)
         {
             messages.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = result.ToolUseId, ["content"] = result.Content });
         }
@@ -256,15 +265,19 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
 
     private void Hold(JsonObject delta)
     {
-        var index = delta["index"] is JsonValue position && position.TryGetValue<int>(out var number) ? number : _calls.Count;
-        if (!_calls.TryGetValue(index, out var call))
+        var index = delta["index"] is JsonValue position && position.TryGetValue<int>(out var number) ? number : _lastIndex;
+        _lastIndex = index;
+        var id = delta["id"] is JsonValue idValue && idValue.TryGetValue<string>(out var callId) ? callId : "";
+        if (!_open.TryGetValue(index, out var call) || (id.Length > 0 && call.Id.Length > 0 && call.Id != id))
         {
-            _calls[index] = call = new Call();
+            call = new Call(index);
+            _calls.Add(call);
+            _open[index] = call;
         }
 
-        if (delta["id"] is JsonValue id && id.TryGetValue<string>(out var callId) && call.Id.Length == 0)
+        if (call.Id.Length == 0)
         {
-            call.Id = callId;
+            call.Id = id;
         }
 
         if (delta["function"] is not JsonObject function)
@@ -287,21 +300,56 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
     {
         switch (value)
         {
+            case null:
+                return;
             case JsonArray items:
-                var all = _extras[name] as JsonArray ?? [];
-                foreach (var item in items)
+                if (_extras[name] is not JsonArray all)
                 {
-                    all.Add(item?.DeepClone());
+                    all = [];
+                    _extras[name] = all;
                 }
 
-                _extras[name] = all;
+                foreach (var item in items)
+                {
+                    if (name == ReasoningDetails && item is JsonObject piece && SameIndex(all, piece) is { } joined)
+                    {
+                        Join(joined, piece);
+                    }
+                    else
+                    {
+                        all.Add(item?.DeepClone());
+                    }
+                }
+
                 break;
             case JsonValue text when text.TryGetValue<string>(out var fragment):
                 _extras[name] = (_extras[name] is JsonValue before && before.TryGetValue<string>(out var earlier) ? earlier : "") + fragment;
                 break;
             default:
-                _extras[name] = value?.DeepClone();
+                _extras[name] = value.DeepClone();
                 break;
+        }
+    }
+
+    private static JsonObject? SameIndex(JsonArray all, JsonObject piece)
+    {
+        return piece["index"] is JsonValue index && index.TryGetValue<int>(out var number)
+            ? all.OfType<JsonObject>().FirstOrDefault(known => known["index"] is JsonValue other && other.TryGetValue<int>(out var otherNumber) && otherNumber == number)
+            : null;
+    }
+
+    private static void Join(JsonObject into, JsonObject piece)
+    {
+        foreach (var (name, value) in piece)
+        {
+            if (value is null || name == "index")
+            {
+                continue;
+            }
+
+            into[name] = name == "text" && value is JsonValue text && text.TryGetValue<string>(out var fragment) && into["text"] is JsonValue before && before.TryGetValue<string>(out var earlier)
+                ? earlier + fragment
+                : value.DeepClone();
         }
     }
 
@@ -313,7 +361,7 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
             message[name] = value?.DeepClone();
         }
 
-        message["tool_calls"] = new JsonArray(_calls.Values.Select(static call => (JsonNode)new JsonObject
+        message["tool_calls"] = new JsonArray(_calls.OrderBy(static call => call.Index).Select(static call => (JsonNode)new JsonObject
         {
             ["id"] = call.Id,
             ["type"] = "function",
@@ -336,20 +384,48 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId) 
         return Unnamed(chunk.ToJsonString(MessagesApi.Json));
     }
 
-    private JsonObject MergedUsage(long outputTokens)
+    private JsonObject MergedUsage()
     {
-        var usage = _usage is null ? [] : (JsonObject)_usage.DeepClone();
-        usage["completion_tokens"] = outputTokens;
-        if (usage["prompt_tokens"] is JsonValue prompt && prompt.TryGetValue<long>(out var promptTokens))
+        var total = prior is null ? [] : (JsonObject)prior.DeepClone();
+        if (_usage is not null)
         {
-            usage["total_tokens"] = promptTokens + outputTokens;
+            Sum(total, _usage);
         }
 
-        return usage;
+        return total;
     }
 
-    private sealed class Call
+    private static void Sum(JsonObject total, JsonObject part)
     {
+        foreach (var (name, value) in part)
+        {
+            switch (value)
+            {
+                case null:
+                    break;
+                case JsonObject nested:
+                    if (total[name] is not JsonObject inner)
+                    {
+                        inner = [];
+                        total[name] = inner;
+                    }
+
+                    Sum(inner, nested);
+                    break;
+                case JsonValue number when number.GetValueKind() == JsonValueKind.Number && number.TryGetValue<decimal>(out var amount):
+                    total[name] = (total[name] is JsonValue before && before.TryGetValue<decimal>(out var earlier) ? earlier : 0m) + amount;
+                    break;
+                default:
+                    total[name] = value.DeepClone();
+                    break;
+            }
+        }
+    }
+
+    private sealed class Call(int index)
+    {
+        public int Index { get; } = index;
+
         public string Id { get; set; } = "";
 
         public string Name { get; set; } = "";

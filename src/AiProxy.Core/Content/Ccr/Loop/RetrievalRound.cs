@@ -22,7 +22,8 @@ public enum MessageStart
 /// </summary>
 /// <param name="start">Whether the client sees this round's <c>message_start</c>: only the first round's.</param>
 /// <param name="nextIndex">The client block index the first block passed on gets.</param>
-public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetrievalRound
+/// <param name="mode">Whether the follow-up continues a thread or repeats the conversation.</param>
+public sealed class RetrievalRound(MessageStart start, int nextIndex, CcrMode mode) : IRetrievalRound
 {
     private readonly Dictionary<int, Block> _blocks = [];
     private readonly List<Block> _order = [];
@@ -70,15 +71,15 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetriev
         .ToArray();
 
     /// <summary>The round of the first upstream response.</summary>
-    public static RetrievalRound First()
+    public static RetrievalRound First(CcrMode mode)
     {
-        return new RetrievalRound(MessageStart.Pass, 0);
+        return new RetrievalRound(MessageStart.Pass, 0, mode);
     }
 
     /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
     public RetrievalRound Next()
     {
-        return new RetrievalRound(MessageStart.Drop, NextIndex);
+        return new RetrievalRound(MessageStart.Drop, NextIndex, mode);
     }
 
     IRetrievalRound IRetrievalRound.Next()
@@ -87,15 +88,11 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetriev
     }
 
     /// <inheritdoc />
-    public byte[] ThreadFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
+    public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results)
     {
-        return RetrievalFollowUp.Thread(forwarded, MessageId, toolResults);
-    }
-
-    /// <inheritdoc />
-    public byte[] StatelessFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
-    {
-        return RetrievalFollowUp.Stateless(forwarded, Content(), toolResults);
+        return mode == CcrMode.Thread
+            ? RetrievalFollowUp.Thread(forwarded, MessageId, results)
+            : RetrievalFollowUp.Stateless(forwarded, Content(), results);
     }
 
     /// <inheritdoc />
@@ -147,6 +144,11 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetriev
     /// <summary>Takes one upstream event and returns what the client gets now; an event it cannot read passes on as it came.</summary>
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
     {
+        if (sse.Name == SseEvent.Comment)
+        {
+            return [];
+        }
+
         if (JsonNode.Parse(sse.Data) is not JsonObject data)
         {
             return [sse];

@@ -38,11 +38,8 @@ public interface IRetrievalRound
     /// <summary>The round of the follow-up response.</summary>
     IRetrievalRound Next();
 
-    /// <summary>A thread follow-up body continuing from this response.</summary>
-    byte[] ThreadFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults);
-
-    /// <summary>A stateless follow-up body: the forwarded request plus this response and the tool results.</summary>
-    byte[] StatelessFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults);
+    /// <summary>The follow-up body: the forwarded request continued with this response and the tool results, in the mode the round was made with.</summary>
+    byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results);
 
     /// <summary>The error event the client gets when the loop fails.</summary>
     SseEvent Error(string message);
