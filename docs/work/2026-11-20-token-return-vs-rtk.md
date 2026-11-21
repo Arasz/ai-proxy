@@ -187,3 +187,14 @@ it) were not compared.
 - CCR for Chat Completions (F4) and for Codex (F3) each need a decision record first; F3 reverses
   ADR 0012.
 - 11-19 open items still open: the 11-14 to 11-17 gap, and why the balance turned positive on 11-13.
+
+### Status of these items on 2026-11-21
+
+- Capture is on since 2026-11-20 19:32 UTC and stays on; the one-week window ends about 2026-11-27. Billed usage with cache reads is in `capture_response`.
+- Replay is built (`ai-proxy replay`, 0.32.0) and the floor was set from it (0.33.0): floor 1,000 with a budget of `min(1,500, 0.4 x block)` and no previews for numbered reads and diffs under 6,000 tokens. Floor 300 was rejected because its net is negative at 0.90 follow-ups per preview. See [2026-11-21-replay-baseline.md](2026-11-21-replay-baseline.md) and the ADR 0015 grid.
+- The "codex" row is split by host (0.31.0, ADR 0014 amendment).
+- CCR for Chat Completions on OpenRouter is decided (ADR 0016) and shipped (0.34.0).
+- Codex (F3) is still open: the reversal of ADR 0012 rule 5 waits for a replay of captured chatgpt.com bodies, and capture has none yet. One Codex session through the proxy with capture on unblocks it. The switch will ship off.
+- The 11-19 items (the gap and 11-13) are closed in [2026-11-20-gain-open-items.md](2026-11-20-gain-open-items.md).
+- None of 0.31.0 to 0.34.0 runs live until the NuGet publish is approved; the live proxy is 0.30.0.
+
