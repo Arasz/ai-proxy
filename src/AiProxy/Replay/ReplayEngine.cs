@@ -56,7 +56,7 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
-        services.AddCompression(settings);
+        services.AddCompressionPipeline(settings);
         services.AddSingleton(ccr);
         services.AddSingleton<IContentStore, DiscardingContentStore>();
         services.AddSingleton<IOriginalStore, DiscardingOriginalStore>();

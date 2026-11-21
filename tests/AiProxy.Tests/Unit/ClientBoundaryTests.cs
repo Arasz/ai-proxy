@@ -37,6 +37,65 @@ public sealed class ClientBoundaryTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void No_client_root_reaches_storage_by_any_chain_of_types_even_through_the_offline_replay_pipeline()
+    {
+        var assembly = typeof(RetrievalTools).Assembly;
+        var roots = assembly.GetTypes().Where(IsBoundaryRoot).SelectMany(WithNested).ToArray();
+
+        var violations = roots.SelectMany(root => ChainViolations(root, assembly)).Distinct().Order().ToArray();
+
+        Assert.NotEmpty(roots);
+        Assert.Contains(roots, static type => type.Name == "McpCommand");
+        Assert.Contains(roots, static type => type.Name == "HarnessProcess");
+        Assert.Contains(roots, static type => type.Namespace == "AiProxy.Doctor");
+        Assert.Empty(violations);
+    }
+
+    private static bool IsBoundaryRoot(Type type)
+    {
+        return IsClientType(type) || type.Name is "McpCommand" or "HarnessProcess" || type.Namespace == "AiProxy.Doctor";
+    }
+
+    private static IEnumerable<string> ChainViolations(Type root, Assembly assembly)
+    {
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        var parents = new Dictionary<Type, Type?> { [root] = null };
+        var pending = new Queue<Type>([root]);
+        while (pending.TryDequeue(out var current))
+        {
+            foreach (var used in TypesUsedBy(current, all).SelectMany(Flatten).Select(static type => type.IsGenericType ? type.GetGenericTypeDefinition() : type).Distinct())
+            {
+                if (IsForbidden(used))
+                {
+                    if (!IsOfflineReplayAccess(current, used))
+                    {
+                        yield return $"{root.FullName} reaches {used.FullName} through {Chain(current, parents)}";
+                    }
+
+                    continue;
+                }
+
+                if (used.Assembly == assembly && parents.TryAdd(used, current))
+                {
+                    pending.Enqueue(used);
+                }
+            }
+        }
+    }
+
+    private static string Chain(Type end, Dictionary<Type, Type?> parents)
+    {
+        var names = new List<string>();
+        for (Type? step = end; step is not null; step = parents[step])
+        {
+            names.Add(step.FullName ?? step.Name);
+        }
+
+        names.Reverse();
+        return string.Join(" -> ", names);
+    }
+
     private static IEnumerable<string> HopViolations(Type client, Assembly assembly)
     {
         const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
@@ -151,6 +210,14 @@ public sealed class ClientBoundaryTests
                         foreach (var parameter in method2.GetParameters())
                         {
                             yield return parameter.ParameterType;
+                        }
+
+                        if (!method2.IsGenericMethodDefinition)
+                        {
+                            foreach (var argument in method2.GetGenericArguments())
+                            {
+                                yield return argument;
+                            }
                         }
 
                         break;

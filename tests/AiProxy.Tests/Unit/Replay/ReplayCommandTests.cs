@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AiProxy.Cli;
+using AiProxy.Core.Replay;
 using AiProxy.Replay;
 using AiProxy.Storage;
 using AiProxy.Tests.Integration;
@@ -211,6 +212,20 @@ public sealed class ReplayCommandTests : IDisposable
         command.CommandText = "DELETE FROM capture_request";
         Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
         Assert.Equal(before, Hashes());
+    }
+
+    [Fact]
+    public async Task A_replay_engine_pointed_at_a_missing_content_database_replays_and_leaves_no_file_behind()
+    {
+        var database = Db("content.db");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Proxy:Compression:Database"] = database }).Build();
+        using var engine = ReplayEngine.Create(300, null, null, null, configuration);
+
+        var row = await engine.ReplayAsync(ToolBody(Output), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ReplayOutcome.Replayed, row.Outcome);
+        Assert.False(File.Exists(database));
+        Assert.Empty(Directory.GetFiles(_home.Path));
     }
 
     [Fact]
