@@ -118,7 +118,7 @@ internal sealed partial class DrainOnEofStream(Stream inner, PendingRequests pen
 
     private static partial class Log
     {
-        [LoggerMessage(EventId = 1601, Level = LogLevel.Warning, Message = "Input closed; gave up after {Seconds}s with {Count} request(s) unanswered, ids: {Ids}")]
+        [LoggerMessage(EventId = 1615, Level = LogLevel.Warning, Message = "Input closed; gave up after {Seconds}s with {Count} request(s) unanswered, ids: {Ids}")]
         public static partial void GaveUp(ILogger logger, int count, double seconds, string ids);
     }
 }

@@ -383,4 +383,15 @@ public sealed class ChatRoundTests
 
         Assert.Equal("c1", JsonNode.Parse(Assert.Single(passed).Data)!["id"]!.GetValue<string>());
     }
+
+    /// <summary>F10: the round reads the response field <c>choices</c>; <c>ChatApi.Fields.Choices</c> is the request field <c>n</c>.</summary>
+    [Fact]
+    public async Task A_chat_round_reads_the_choices_field_not_the_request_n_field_not_endorsed()
+    {
+        Assert.Equal("n", ChatApi.Fields.Choices);
+
+        var (passed, _) = await ReadAsync(Stream(ChatSse.Chunk("c1", new JsonObject { ["content"] = "hello" }, null, null), Finish("stop")));
+
+        Assert.Contains(passed, sse => sse.Data.Contains("hello", StringComparison.Ordinal));
+    }
 }

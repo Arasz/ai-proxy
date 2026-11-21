@@ -105,4 +105,13 @@ public sealed class ToolOutputRegionFinderTests
         Assert.Equal("first", regions[0].Text);
         Assert.Equal("second", regions[1].Text);
     }
+
+    /// <summary>F7: a lone surrogate escape in a tool result makes the finder throw, so the whole request is left uncompressed.</summary>
+    [Fact]
+    public void A_lone_surrogate_escape_in_a_tool_result_throws_not_endorsed()
+    {
+        var body = Encoding.UTF8.GetBytes("""{"messages":[{"role":"tool","content":"broken \ud83d here"},{"role":"tool","content":"fine"}]}""");
+
+        Assert.ThrowsAny<InvalidOperationException>(() => Finder.Find(body).ToArray());
+    }
 }

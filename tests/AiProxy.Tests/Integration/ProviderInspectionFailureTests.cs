@@ -162,4 +162,32 @@ public sealed class ProviderInspectionFailureTests
             entries.Enqueue(new LogEntry(category, logLevel, exception));
         }
     }
+
+    /// <summary>F7: one lone surrogate in a tool result sends the whole body upstream unchanged and logs the failure.</summary>
+    [Fact]
+    public async Task A_lone_surrogate_in_a_tool_result_forwards_the_body_unchanged_not_endorsed()
+    {
+        const string broken = """{"model":"m","messages":[{"role":"tool","content":"broken \ud83d here"},{"role":"tool","content":"fine"}]}""";
+        var loggers = new RecordingLoggerFactory();
+        using var directory = new TemporaryDirectory();
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await StartProxyAsync(new FindingCompressionPipeline(), loggers, directory.Path);
+
+        using var response = await SendAsync(proxy, upstream, new StringContent(broken, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(broken, Assert.Single(upstream.Requests).Body);
+        Assert.Contains(loggers.Entries, entry =>
+            entry.Category == typeof(ProviderRequestInspector).FullName &&
+            entry is { Level: LogLevel.Warning, Exception: InvalidOperationException });
+    }
+
+    private sealed class FindingCompressionPipeline : ICompressionPipeline
+    {
+        public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
+        {
+            _ = new AiProxy.Core.Content.ToolOutputRegionFinder().Find(request.Body.ToArray()).ToArray();
+            return new MarkerCompressionPipeline().CompressAsync(request, cancellationToken);
+        }
+    }
 }

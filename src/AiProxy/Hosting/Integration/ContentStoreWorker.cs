@@ -89,11 +89,11 @@ public sealed partial class ContentStoreWorker(IContentWriter writer, IContentQu
 
     private static partial class Log
     {
-        [LoggerMessage(EventId = 1201, Level = LogLevel.Information,
+        [LoggerMessage(EventId = 1204, Level = LogLevel.Information,
             Message = "wrote {Count} compressed requests to the store")]
         public static partial void Drained(ILogger logger, int count);
 
-        [LoggerMessage(EventId = 1202, Level = LogLevel.Warning,
+        [LoggerMessage(EventId = 1205, Level = LogLevel.Warning,
             Message = "the queue job {JobId} could not be written and stays queued")]
         public static partial void JobFailed(ILogger logger, long jobId, Exception exception);
 

@@ -72,4 +72,24 @@ public sealed class ForwardProxyTests
             return new TestProxy(service, directory);
         }
     }
+
+    /// <summary>F23: the plain-HTTP pass-through forwards a header named in Connection, and TE, to the origin.</summary>
+    [Fact]
+    public async Task A_connection_named_header_and_te_reach_the_origin_not_endorsed()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await TestProxy.StartAsync();
+        using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.Address), UseProxy = true };
+        using var client = new HttpClient(handler);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(upstream.BaseAddress, "/mcp"));
+        request.Headers.TryAddWithoutValidation("Connection", "x-hop-only");
+        request.Headers.TryAddWithoutValidation("x-hop-only", "secret");
+        request.Headers.TryAddWithoutValidation("TE", "trailers");
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        var received = Assert.Single(upstream.Requests);
+        Assert.Equal("secret", received.Headers["x-hop-only"]);
+        Assert.Equal("trailers", received.Headers["te"]);
+    }
 }
