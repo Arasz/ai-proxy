@@ -104,7 +104,7 @@ public sealed class CcrPreviewBudgetTests
     [Fact]
     public async Task The_floor_is_met_at_the_boundary_of_the_reduced_text()
     {
-        var previewer = new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), Options);
+        var previewer = new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), Options with { MinimumTokens = 3_000 });
         var original = new string('x', 59) + string.Concat(Enumerable.Repeat($"\n{new string('y', 99)}", 86));
 
         Assert.Null(await previewer.PreviewAsync(original + new string('z', 10), original + new string('z', 10), CcrMode.Stateless, CancellationToken.None));

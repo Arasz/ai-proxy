@@ -36,7 +36,7 @@ public sealed record CcrOptions(
     /// <summary>The ADR 0005 and 0015 values.</summary>
     public static CcrOptions Default { get; } = new(
         GainReportBuilder.CharactersPerToken,
-        3_000,
+        1_000,
         1_500,
         0.40m,
         0,
@@ -48,7 +48,7 @@ public sealed record CcrOptions(
         240,
         10,
         TimeSpan.FromMilliseconds(250),
-        0);
+        6_000);
 
     /// <summary>The most a preview of a region of this many original tokens may hold, in estimated tokens.</summary>
     /// <param name="originalTokens">The region's estimated tokens as the client sent it; reducers do not change the budget.</param>

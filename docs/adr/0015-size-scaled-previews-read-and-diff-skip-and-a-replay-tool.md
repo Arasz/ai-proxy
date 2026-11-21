@@ -127,16 +127,51 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
 
 ## Numbers
 
-The tune step fills this table from the replay grid and attaches the replay output to the PR.
+The tune step filled this table from the replay grid.
 
 | Setting | ADR 0005 value | Value | Source |
 |---|---|---|---|
-| `MinimumTokens` | 3,000 | set by the tune step | replay grid, point 15 |
+| `MinimumTokens` | 3,000 | 1,000 | replay grid, point 15 |
 | Budget cap | 1,500 | 1,500 | this ADR |
 | Budget share | none | 0.4 | this ADR, point 18 |
-| Minimum saving per send | none | set by the tune step | point 11 |
-| Skip upper band | none | set by the tune step | point 13 |
+| Minimum saving per send | none | 0 | point 11, grid below |
+| Skip upper band | none | 6,000 | replay grid, point 13 |
 | Numbered-read lines checked (k) | none | set by the tune step | point 12 |
+
+### Replay grid
+
+Snapshot of `~/.ai-proxy` taken 2026-11-21 01:41 UTC, window since 2026-11-06, commit `cd0d2e8`,
+Apple M4. Net is the preview saving minus follow-ups per preview id times 10,500 tokens, at a
+follow-up rate of 0.29 and of 0.90. Sizes are estimated tokens.
+
+| floor | skip under | rows | rows w/ preview | ids | preview saving | skipped | net @0.29 | net @0.90 | ids losing @0.29 | ids losing @0.90 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3,000 | 0 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 1,500 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 3,000 | 2,036 | 703 | 343 | 6,184,708 | 0 | 5,140,273 | 2,943,358 | 107 | 247 |
+| 3,000 | 6,000 | 2,036 | 658 | 294 | 5,922,777 | 89 | 5,027,547 | 3,144,477 | 88 | 203 |
+| 1,500 | 6,000 | 2,036 | 945 | 689 | 12,794,117 | 165 | 10,696,112 | 6,283,067 | 320 | 537 |
+| 1,000 | 0 | 2,036 | 1,169 | 1,163 | 16,717,452 | 0 | 13,176,117 | 5,727,102 | 626 | 960 |
+| 1,000 | 1,500 | 2,036 | 1,162 | 1,127 | 16,661,915 | 73 | 13,230,200 | 6,011,765 | 594 | 924 |
+| 1,000 | 3,000 | 2,036 | 1,141 | 1,079 | 16,560,939 | 149 | 13,275,384 | 6,364,389 | 556 | 876 |
+| 1,000 | 6,000 | 2,036 | 1,098 | 1,030 | 16,299,008 | 238 | 13,162,658 | 6,565,508 | 537 | 832 |
+| 1,000 | 12,000 | 2,036 | 1,074 | 1,007 | 16,041,022 | 281 | 12,974,707 | 6,524,872 | 537 | 824 |
+| 1,000 | 25,000 | 2,036 | 1,065 | 1,000 | 15,820,485 | 295 | 12,775,485 | 6,370,485 | 537 | 824 |
+| 750 | 6,000 | 2,036 | 1,224 | 1,321 | 18,686,289 | 265 | 14,663,844 | 6,202,839 | 735 | 1,084 |
+| 500 | 0 | 2,036 | 1,415 | 1,811 | 20,229,224 | 0 | 14,714,729 | 3,115,274 | 1,119 | 1,547 |
+| 500 | 1,500 | 2,036 | 1,404 | 1,746 | 20,143,978 | 141 | 14,827,408 | 3,644,278 | 1,059 | 1,482 |
+| 500 | 3,000 | 2,036 | 1,387 | 1,698 | 20,043,002 | 217 | 14,872,592 | 3,996,902 | 1,021 | 1,434 |
+| 500 | 6,000 | 2,036 | 1,348 | 1,649 | 19,781,071 | 306 | 14,759,866 | 4,198,021 | 1,002 | 1,390 |
+| 300 | 0 | 2,036 | 1,590 | 2,407 | 21,347,997 | 0 | 14,018,682 | -1,398,153 | 1,654 | 2,127 |
+| 300 | 1,500 | 2,036 | 1,577 | 2,328 | 21,250,592 | 193 | 14,161,832 | -749,008 | 1,581 | 2,048 |
+| 300 | 3,000 | 2,036 | 1,560 | 2,280 | 21,149,616 | 269 | 14,207,016 | -396,384 | 1,543 | 2,000 |
+| 300 | 6,000 | 2,036 | 1,523 | 2,231 | 20,887,685 | 358 | 14,094,290 | -195,265 | 1,524 | 1,956 |
+
+Rule applied: a setting needs positive net at both rates; of those, the highest worst-case net
+wins. Floor 1,000 with skip band 6,000 gives +6,565,508 at 0.90 and +13,162,658 at 0.29. The
+earlier default, floor 3,000 with the skip off, gives +2,943,358 and +5,140,273. Floor 300 is
+rejected: its net is negative at 0.90. The minimum saving per send stays 0, because a preview's
+lifetime saving depends on future sends, and the stateless proxy cannot see them.
 
 ## Consequences
 

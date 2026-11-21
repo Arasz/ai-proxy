@@ -24,10 +24,10 @@ public sealed class CcrPreviewSkipTests
     }
 
     [Fact]
-    public async Task A_numbered_read_of_four_thousand_tokens_is_previewed_with_the_default_options()
+    public async Task A_numbered_read_of_eight_thousand_tokens_is_previewed_with_the_default_options()
     {
-        var read = Read(200);
-        Assert.InRange(Options.TokensOf(read.Length), 3_500, 4_500);
+        var read = Read(400);
+        Assert.InRange(Options.TokensOf(read.Length), 7_000, 9_000);
 
         Assert.NotNull(await Previewer(Options).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
     }
