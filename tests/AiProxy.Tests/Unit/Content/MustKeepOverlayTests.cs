@@ -156,4 +156,23 @@ public sealed class MustKeepOverlayTests
 
         Assert.Equal(1, result.RetainedTokens);
     }
+
+    [Fact]
+    public void A_numbered_read_keeps_its_identifiers_and_not_its_line_numbers()
+    {
+        var original = string.Join(
+            "\n",
+            Enumerable.Range(1, 1500).Select(number => $"{number,6}\tvar value{number % 7} = Pool_Handler.Acquire(CONNECTION_LIMIT);"));
+        var reduced = "the read, shortened";
+
+        var identifiers = MustKeepOverlay.Identifiers(original);
+        var result = MustKeepOverlay.Apply(reduced, original);
+
+        Assert.NotEmpty(identifiers);
+        Assert.Contains("CONNECTION_LIMIT", identifiers);
+        Assert.DoesNotContain(identifiers, token => token.All(char.IsDigit));
+        Assert.True(result.RetainedTokens > 0, "the overlay is empty");
+        var block = result.Text[result.Text.IndexOf(MustKeepOverlay.BlockLabel, StringComparison.Ordinal)..];
+        Assert.DoesNotContain(block[MustKeepOverlay.BlockLabel.Length..].Split(' '), token => token.All(char.IsDigit));
+    }
 }

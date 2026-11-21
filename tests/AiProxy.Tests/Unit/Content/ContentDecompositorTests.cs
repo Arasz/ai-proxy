@@ -153,23 +153,28 @@ public sealed class ContentDecompositorTests
         Assert.Equal(ContentType.Markdown, decomposition.Parts[0].Type);
     }
 
-    [Fact(Skip = TimingDependent.Reason)]
-    public void A_payload_of_lines_that_open_a_value_and_close_none_is_decomposed_quickly()
+    [Fact]
+    public void Looking_for_a_structure_stops_after_thirty_two_failed_attempts()
     {
-        // Looking for a JSON value that never balances costs a scan to the end of the
-        // text, so a payload of such lines costs a scan per line. The decomposer gives
-        // up looking after a few failures, and a body of a megabyte must not take
-        // minutes of one request's CPU.
-        var payload = string.Join("\n", Enumerable.Range(0, 48_000).Select(index => $"{{\"unclosed\": {index}"));
+        // Each line opens a value and closes none, so each one is a failed scan. A valid
+        // value after the thirty-second failure is left as text, which is the bound.
+        var failing = Enumerable.Range(0, 40).Select(index => $"{{\"unclosed\": {index}");
+        var payload = string.Join("\n", failing.Append("{\"valid\": true}"));
 
-        var started = DateTimeOffset.UtcNow;
         var decomposition = Decompositor.Decompose(payload, "request");
-        var elapsed = DateTimeOffset.UtcNow - started;
 
-        Assert.Single(decomposition.Parts);
-        Assert.True(
-            elapsed < TimeSpan.FromSeconds(5),
-            $"the decomposition of {payload.Length} bytes took {elapsed.TotalSeconds:F1} seconds");
+        Assert.DoesNotContain(decomposition.Parts, part => part.Type == ContentType.Json);
+    }
+
+    [Fact]
+    public void A_value_after_fewer_than_thirty_two_failed_attempts_is_still_found()
+    {
+        var failing = Enumerable.Range(0, 10).Select(index => $"{{\"unclosed\": {index}");
+        var payload = string.Join("\n", failing.Append("{\"valid\": true}"));
+
+        var decomposition = Decompositor.Decompose(payload, "request");
+
+        Assert.Contains(decomposition.Parts, part => part.Type == ContentType.Json);
     }
 
     [Fact]
