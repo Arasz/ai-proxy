@@ -1,24 +1,17 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using AiProxy.Core.Replay;
 using Microsoft.Data.Sqlite;
 
 namespace AiProxy.Storage;
-
-/// <summary>Where a replayed body was stored.</summary>
-public enum ReplaySource
-{
-    /// <summary>The original of a compressed request in <c>content.db</c>.</summary>
-    Content,
-
-    /// <summary>A captured request body in <c>capture.db</c>.</summary>
-    Capture
-}
 
 /// <summary>One stored request body, exactly as the database holds it.</summary>
 /// <param name="Source">The database it came from.</param>
 /// <param name="Id">The request id.</param>
 /// <param name="Bytes">The stored bytes; a capture body may still be zstd.</param>
-public sealed record StoredBody(ReplaySource Source, string Id, byte[] Bytes);
+/// <param name="Provider">The provider a capture row names; null for a content row.</param>
+/// <param name="Host">The host a capture row names; null for a content row.</param>
+public sealed record StoredBody(ReplaySource Source, string Id, byte[] Bytes, string? Provider = null, string? Host = null);
 
 /// <summary>Reads stored request bodies and the gain request count from the proxy's databases, which it opens read-only and never changes.</summary>
 /// <param name="directory">The proxy data directory that holds <c>content.db</c>, <c>capture.db</c> and <c>gain.db</c>.</param>
@@ -57,13 +50,14 @@ public sealed class ReplayReader(string directory)
         await using var command = connection.CreateCommand();
         command.CommandText = source == ReplaySource.Content
             ? "SELECT request_id, original FROM content_request WHERE created_at >= @Since ORDER BY created_at"
-            : "SELECT request_id, body FROM capture_request WHERE captured_at >= @Since ORDER BY captured_at";
+            : "SELECT request_id, body, provider, host FROM capture_request WHERE captured_at >= @Since ORDER BY captured_at";
         command.Parameters.AddWithValue("@Since", (since ?? DateTimeOffset.MinValue).ToUniversalTime().ToString("O"));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            var bytes = source == ReplaySource.Content ? Encoding.UTF8.GetBytes(reader.GetString(1)) : reader.GetFieldValue<byte[]>(1);
-            yield return new StoredBody(source, reader.GetString(0), bytes);
+            yield return source == ReplaySource.Content
+                ? new StoredBody(source, reader.GetString(0), Encoding.UTF8.GetBytes(reader.GetString(1)))
+                : new StoredBody(source, reader.GetString(0), reader.GetFieldValue<byte[]>(1), reader.GetString(2), reader.GetString(3));
         }
     }
 

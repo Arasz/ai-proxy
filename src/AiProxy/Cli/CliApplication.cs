@@ -15,10 +15,44 @@ public sealed class CliApplication(GainRuntime runtime)
 {
     private const int OperationCancelledReturnCode = 130;
 
-    private static readonly FrozenSet<string> Commands = new[]
-    {
-        GainCommand.Command, DoctorCommand.Command, StatusCommand.Command, StopCommand.Command, ReplayCommand.Command, ShortcutCommand.Command, McpServerProcess.Command, HarnessProcess.Command
-    }.ToFrozenSet(StringComparer.Ordinal);
+    private static readonly CommandRegistration[] Registrations =
+    [
+        new(GainCommand.Command, static (config, runtime, _) => config.AddCommand<GainCommand>(GainCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Show estimated initial-request token reductions and history.")),
+        new(ReplayCommand.Command, static (config, runtime, _) => config.AddCommand<ReplayCommand>(ReplayCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Replay stored requests through the compression pipeline and show what it would save.")),
+        new(DoctorCommand.Command, static (config, runtime, _) => config.AddCommand<DoctorCommand>(DoctorCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Check the setup without changing anything.")),
+        new(StatusCommand.Command, static (config, runtime, _) => config.AddCommand<StatusCommand>(StatusCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Show the running proxy instance (exit 3 when none runs).")),
+        new(StopCommand.Command, static (config, runtime, _) => config.AddCommand<StopCommand>(StopCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Gracefully stop the running proxy instance.")),
+        new(ShortcutCommand.Command, static (config, runtime, _) => config.AddCommand<ShortcutCommand>(ShortcutCommand.Command)
+            .WithData(runtime)
+            .WithDescription("Create or remove the aph shortcut for ai-proxy harness.")),
+        new(McpServerProcess.Command, static (config, _, _) => config.AddCommand<McpCommand>(McpServerProcess.Command)
+            .WithDescription("Run the retrieval MCP server over stdio.")),
+        new(HarnessProcess.Command, static (config, _, forwarded) =>
+        {
+            var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)
+                .WithDescription("Launch a harness executable through the running proxy.")
+                .WithExample(HarnessProcess.Command, "claude", "--model", "opus");
+            if (forwarded is not null)
+            {
+                harness.WithData(forwarded);
+            }
+        })
+    ];
+
+    private static readonly FrozenSet<string> Commands = Registrations.Select(static registration => registration.Name).ToFrozenSet(StringComparer.Ordinal);
+
+    /// <summary>The names of the commands this application registers, the same list that registers them.</summary>
+    public static IReadOnlyCollection<string> CommandNames => Commands;
 
     public static bool IsCommandInvocation(string[] args)
     {
@@ -87,32 +121,9 @@ public sealed class CliApplication(GainRuntime runtime)
             config.ConfigureConsole(runtime.Console);
             config.PropagateExceptions();
             config.Settings.StrictParsing = true;
-            config.AddCommand<GainCommand>(GainCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Show estimated initial-request token reductions and history.");
-            config.AddCommand<ReplayCommand>(ReplayCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Replay stored requests through the compression pipeline and show what it would save.");
-            config.AddCommand<DoctorCommand>(DoctorCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Check the setup without changing anything.");
-            config.AddCommand<StatusCommand>(StatusCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Show the running proxy instance (exit 3 when none runs).");
-            config.AddCommand<StopCommand>(StopCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Gracefully stop the running proxy instance.");
-            config.AddCommand<ShortcutCommand>(ShortcutCommand.Command)
-                .WithData(runtime)
-                .WithDescription("Create or remove the aph shortcut for ai-proxy harness.");
-            config.AddCommand<McpCommand>(McpServerProcess.Command)
-                .WithDescription("Run the retrieval MCP server over stdio.");
-            var harness = config.AddCommand<HarnessProcess>(HarnessProcess.Command)
-                .WithDescription("Launch a harness executable through the running proxy.")
-                .WithExample(HarnessProcess.Command, "claude", "--model", "opus");
-            if (split.Forwarded is not null)
+            foreach (var registration in Registrations)
             {
-                harness.WithData(split.Forwarded);
+                registration.Register(config, runtime, split.Forwarded);
             }
         });
         try
@@ -130,6 +141,11 @@ public sealed class CliApplication(GainRuntime runtime)
         }
     }
 }
+
+/// <summary>One console command: its name and how it is added to the command application.</summary>
+/// <param name="Name">The command name.</param>
+/// <param name="Register">Adds the command to the configurator, given the runtime and any forwarded harness arguments.</param>
+internal sealed record CommandRegistration(string Name, Action<IConfigurator, GainRuntime, string[]?> Register);
 
 /// <summary>The console, proxy client, and process context used by the CLI.</summary>
 public sealed record GainRuntime(

@@ -5,38 +5,53 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
 using AiProxy.Core.Replay;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Replay;
 
-/// <summary>Runs one stored request body through the real compression pipeline and measures each tool output region.</summary>
-/// <remarks>Nothing is kept: the pipeline runs stateless and its stores discard what they are given.</remarks>
+/// <summary>Runs one stored request body through the real compression pipeline twice and measures each tool output region.</summary>
+/// <remarks>
+///     The first run has the preview floor out of reach, so what it removes is the reducers' work, code views included. The
+///     second run has the real floor, so what it removes on top is the previews'. Nothing is kept: the pipeline runs stateless
+///     and its stores discard what they are given.
+/// </remarks>
 /// <param name="finder">Finds the tool output regions of a body.</param>
 /// <param name="decomposer">Names the kind of content a region carries.</param>
-/// <param name="pipeline">The pipeline the proxy runs.</param>
-/// <param name="options">The CCR numbers the pipeline runs with.</param>
-public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor decomposer, ICompressionPipeline pipeline, CcrOptions options) : IDisposable
+/// <param name="reducers">The pipeline with previews out of reach.</param>
+/// <param name="previews">The pipeline the proxy runs, with the floor being tested.</param>
+/// <param name="options">The CCR numbers the previews pipeline runs with.</param>
+public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor decomposer, ICompressionPipeline reducers, ICompressionPipeline previews, CcrOptions options) : IDisposable
 {
-    private IDisposable? _owner;
+    private readonly List<IDisposable> _owners = [];
 
     /// <summary>Builds the engine from the proxy's own service registrations, with the CCR minimum replaced when one is given.</summary>
     /// <param name="minimumTokens">The preview floor in estimated tokens, or null for the proxy's own.</param>
-    public static ReplayEngine Create(int? minimumTokens)
+    /// <param name="configuration">The configuration the compression settings are bound from, as the proxy host binds them.</param>
+    public static ReplayEngine Create(int? minimumTokens, IConfiguration configuration)
     {
         var ccr = minimumTokens is { } minimum ? CcrOptions.Default with { MinimumTokens = minimum } : CcrOptions.Default;
+        var settings = ProxySettings.Load(configuration).Compression;
+        var withoutPreviews = Build(settings, ccr with { MinimumTokens = int.MaxValue });
+        var withPreviews = Build(settings, ccr);
+        return new ReplayEngine(
+            withPreviews.GetRequiredService<ToolOutputRegionFinder>(),
+            withPreviews.GetRequiredService<IDecompositor>(),
+            withoutPreviews.GetRequiredService<ICompressionPipeline>(),
+            withPreviews.GetRequiredService<ICompressionPipeline>(),
+            ccr) { _owners = { withoutPreviews, withPreviews } };
+    }
+
+    private static ServiceProvider Build(CompressionSettings settings, CcrOptions ccr)
+    {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
-        services.AddCompression(new CompressionSettings());
+        services.AddCompression(settings);
         services.AddSingleton(ccr);
         services.AddSingleton<IContentStore, DiscardingContentStore>();
         services.AddSingleton<IOriginalStore, DiscardingOriginalStore>();
-        var provider = services.BuildServiceProvider();
-        return new ReplayEngine(
-            provider.GetRequiredService<ToolOutputRegionFinder>(),
-            provider.GetRequiredService<IDecompositor>(),
-            provider.GetRequiredService<ICompressionPipeline>(),
-            ccr) { _owner = provider };
+        return services.BuildServiceProvider();
     }
 
     /// <summary>Replays one decoded body.</summary>
@@ -55,21 +70,26 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
             return ReplayRow.Of(ReplayOutcome.NoToolRegion);
         }
 
-        var result = await pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Unknown) { Ccr = CcrMode.Stateless }, cancellationToken).ConfigureAwait(false);
-        var forwarded = result.Changed ? ToolOutputRegions(finder.Find(result.Body)) : regions;
-        if (forwarded.Count != regions.Count)
+        var reducedResult = await CompressAsync(reducers, body, cancellationToken).ConfigureAwait(false);
+        var previewResult = await CompressAsync(previews, body, cancellationToken).ConfigureAwait(false);
+        var reduced = RegionsAfter(reducedResult, regions);
+        var forwarded = RegionsAfter(previewResult, regions);
+        if (!Aligned(regions, reduced) || !Aligned(regions, forwarded))
         {
             return ReplayRow.Of(ReplayOutcome.Misaligned);
         }
 
-        var blocks = regions.Select((region, index) => Block(region, forwarded[index], result.Originals)).ToArray();
+        var blocks = regions.Select((region, index) => Block(region, reduced[index], forwarded[index], previewResult.Originals)).ToArray();
         return new ReplayRow(ReplayOutcome.Replayed, blocks);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        _owner?.Dispose();
+        foreach (var owner in _owners)
+        {
+            owner.Dispose();
+        }
     }
 
     private static bool IsJson(byte[] body)
@@ -90,12 +110,32 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         return ContentCompressionPipeline.WithoutOverlaps(regions);
     }
 
-    private ReplayBlock Block(ContentRegion original, ContentRegion forwarded, IReadOnlyDictionary<string, string> originals)
+    private static bool Aligned(IReadOnlyList<ContentRegion> original, IReadOnlyList<ContentRegion> after)
     {
-        var id = forwarded.Text == original.Text
+        return after.Count == original.Count && after.Zip(after.Skip(1)).All(static pair => pair.First.Start < pair.Second.Start);
+    }
+
+    private static ValueTask<CompressionResult> CompressAsync(ICompressionPipeline pipeline, byte[] body, CancellationToken cancellationToken)
+    {
+        return pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Unknown) { Ccr = CcrMode.Stateless }, cancellationToken);
+    }
+
+    private IReadOnlyList<ContentRegion> RegionsAfter(CompressionResult result, IReadOnlyList<ContentRegion> unchanged)
+    {
+        return result.Changed ? ToolOutputRegions(finder.Find(result.Body)) : unchanged;
+    }
+
+    private ReplayBlock Block(ContentRegion original, ContentRegion reduced, ContentRegion forwarded, IReadOnlyDictionary<string, string> originals)
+    {
+        var id = forwarded.Text == reduced.Text
             ? null
-            : originals.Where(pair => pair.Value == original.Text).Select(static pair => pair.Key).FirstOrDefault();
-        return new ReplayBlock(KindOf(original), options.TokensOf(original.Text.Length), options.TokensOf(forwarded.Text.Length), id);
+            : originals.Where(pair => pair.Value == original.Text).Select(static pair => pair.Key).FirstOrDefault() ?? "unidentified";
+        return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded), id);
+    }
+
+    private int Tokens(ContentRegion region)
+    {
+        return options.TokensOf(region.Text.Length);
     }
 
     private ContentType KindOf(ContentRegion region)

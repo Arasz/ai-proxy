@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using AiProxy.Core.Replay;
 using FluentValidation;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
@@ -27,6 +28,10 @@ public sealed class ReplaySettings : CommandSettings
     [Description("Where to read bodies: content, capture, both.")]
     public string Source { get; init; } = BothSources;
 
+    [CommandOption("--include-encoded")]
+    [Description("Replay bodies that carry a content encoding too; the proxy never compresses them, so they are left out by default.")]
+    public bool IncludeEncoded { get; init; }
+
     [CommandOption("--home <DIR>")]
     [Description("The proxy's data directory (defaults to Proxy__DataDirectory, then ~/.ai-proxy).")]
     public string? Home { get; init; }
@@ -34,6 +39,14 @@ public sealed class ReplaySettings : CommandSettings
     [CommandOption("--json")]
     [Description("Print the result as JSON.")]
     public bool Json { get; init; }
+
+    /// <summary>The databases <see cref="Source" /> names.</summary>
+    public ReplaySource[] Sources => Source switch
+    {
+        ContentSource => [ReplaySource.Content],
+        CaptureSource => [ReplaySource.Capture],
+        _ => [ReplaySource.Content, ReplaySource.Capture]
+    };
 
     /// <summary>The parsed <see cref="Since" />, or null when none was given.</summary>
     public DateTimeOffset? SinceTime => Since is null ? null : DateTimeOffset.Parse(Since, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);

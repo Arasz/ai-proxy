@@ -1,5 +1,6 @@
 using AiProxy.Hosting.Proxy;
 using AiProxy.Replay;
+using Microsoft.Extensions.Configuration;
 using Spectre.Console.Cli;
 
 namespace AiProxy.Cli;
@@ -11,21 +12,16 @@ public sealed class ReplayCommand : AsyncCommand<ReplaySettings>
 
     public override async Task<int> ExecuteAsync(CommandContext context, ReplaySettings settings, CancellationToken cancellationToken)
     {
-        var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The replay command was registered without its runtime.");
+        ArgumentNullException.ThrowIfNull(context.Data);
+        var runtime = (GainRuntime)context.Data;
         if (ReplaySettings.Validator.Error(settings) is { } validationError)
         {
             throw new ArgumentException(validationError);
         }
 
         var home = ProxyDataDirectory.FromEnvironment(settings.Home);
-        var scope = settings.Source switch
-        {
-            ReplaySettings.ContentSource => ReplayScope.Content,
-            ReplaySettings.CaptureSource => ReplayScope.Capture,
-            _ => ReplayScope.Both
-        };
-        using var runner = ReplayRunner.Create(home, settings.Minimum);
-        var run = await runner.RunAsync(scope, settings.SinceTime, cancellationToken).ConfigureAwait(false);
+        using var runner = ReplayRunner.Create(home, settings.Minimum, new ConfigurationBuilder().AddEnvironmentVariables().Build());
+        var run = await runner.RunAsync(settings.Sources, settings.SinceTime, settings.IncludeEncoded, cancellationToken).ConfigureAwait(false);
         var view = new ReplayView(home, settings, run);
         if (settings.Json)
         {

@@ -34,6 +34,24 @@ public sealed class EntryPointTests
         Assert.Equal(EntryRoute.Guard, EntryPoint.Route(["--guard-system-proxy", "/tmp/data"]));
     }
 
+    [Fact]
+    public void Every_registered_command_routes_as_a_command_and_the_name_list_is_the_registered_set()
+    {
+        Assert.Equal(CliApplication.CommandNames.Order(), RegisteredCommandNames().Order());
+        Assert.All(CliApplication.CommandNames, name => Assert.Equal(EntryRoute.Command, EntryPoint.Route([name])));
+    }
+
+    private static string[] RegisteredCommandNames()
+    {
+        using var fixture = new GainCommandTests.Fixture();
+        _ = new CliApplication(fixture.Runtime).RunAsync(["--help"]).GetAwaiter().GetResult();
+        var lines = fixture.Console.Output.Split('\n').Select(static line => line.TrimEnd()).ToArray();
+        return lines.SkipWhile(static line => line != "COMMANDS:").Skip(1)
+            .Where(static line => line.StartsWith("    ", StringComparison.Ordinal) && line[4] != ' ')
+            .Select(static line => line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
+            .ToArray();
+    }
+
     [Theory]
     [InlineData("gain")]
     [InlineData("stop")]

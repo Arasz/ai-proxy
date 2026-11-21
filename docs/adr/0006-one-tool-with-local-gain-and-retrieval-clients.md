@@ -16,7 +16,9 @@ a terminal, and an agent reading an original back in a later turn.
 - The clients reach the proxy only through that API (`AiProxy.Client`), never through its storage.
   A test fails if `AiProxy.Mcp` or `AiProxy.Cli` references `AiProxy.Storage` or SQLite.
   These live in the host assembly, which references both, so the test checks namespaces and
-  method bodies, not assembly references (2026-10-30, project-scope review F13).
+  method bodies, not assembly references (2026-10-30, project-scope review F13). The one
+  exception is the offline replay reader, see the "Offline exception" in
+  [ADR 0015](0015-size-scaled-previews-read-and-diff-skip-and-a-replay-tool.md).
 - Both clients ship inside the `ai-proxy` tool as subcommands, `ai-proxy gain` (Spectre.Console) and
   `ai-proxy mcp` (ModelContextProtocol SDK, stdio), so there is one package, one install and one
   version to keep in step with the API.
