@@ -22,7 +22,7 @@ public enum MessageStart
 /// </summary>
 /// <param name="start">Whether the client sees this round's <c>message_start</c>: only the first round's.</param>
 /// <param name="nextIndex">The client block index the first block passed on gets.</param>
-public sealed class RetrievalRound(MessageStart start, int nextIndex)
+public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetrievalRound
 {
     private readonly Dictionary<int, Block> _blocks = [];
     private readonly List<Block> _order = [];
@@ -51,6 +51,9 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     /// <summary>Whether the upstream sent an <c>error</c> event, which was passed on.</summary>
     public bool Failed { get; private set; }
 
+    /// <inheritdoc />
+    public bool StopsForTools => StopReason == StopReasons.ToolUse;
+
     /// <summary>Whether a delta could not be folded into its block, so the content cannot be re-sent as received.</summary>
     public bool Lossy { get; private set; }
 
@@ -76,6 +79,51 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     public RetrievalRound Next()
     {
         return new RetrievalRound(MessageStart.Drop, NextIndex);
+    }
+
+    IRetrievalRound IRetrievalRound.Next()
+    {
+        return Next();
+    }
+
+    /// <inheritdoc />
+    public byte[] ThreadFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
+    {
+        return RetrievalFollowUp.Thread(forwarded, MessageId, toolResults);
+    }
+
+    /// <inheritdoc />
+    public byte[] StatelessFollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> toolResults)
+    {
+        return RetrievalFollowUp.Stateless(forwarded, Content(), toolResults);
+    }
+
+    /// <inheritdoc />
+    public SseEvent Error(string message)
+    {
+        return SseEvent.Error(Errors.Api, message);
+    }
+
+    /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
+    public IReadOnlyList<SseEvent> Finish(int answered, long outputTokens)
+    {
+        var events = new List<SseEvent>(Release());
+        events.Add(answered == 0 && DeltaEvent is { } received ? received : MergedDelta(outputTokens));
+        events.Add(StopEvent ?? SseEvent.Of(Events.MessageStop, new JsonObject { [Fields.Type] = Events.MessageStop }));
+        return events;
+    }
+
+    /// <summary>The last response's <c>message_delta</c> with the output tokens of every response.</summary>
+    private SseEvent MergedDelta(long outputTokens)
+    {
+        var delta = Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
+        if (delta[Fields.Usage] is not JsonObject usage)
+        {
+            delta[Fields.Usage] = usage = [];
+        }
+
+        usage[Fields.OutputTokens] = outputTokens;
+        return SseEvent.Of(Events.MessageDelta, delta);
     }
 
     /// <summary>The assistant content as received, for a stateless follow-up.</summary>

@@ -1,6 +1,3 @@
-using System.Text.Json.Nodes;
-using static AiProxy.Core.Content.Ccr.MessagesApi;
-
 namespace AiProxy.Core.Content.Ccr.Loop;
 
 /// <summary>Where a client response is in the retrieval loop.</summary>
@@ -45,7 +42,8 @@ public enum RetrievalStep
 ///     The retrieval loop of one client response: the declared state transitions, the rounds, and the
 ///     merge of every upstream response into the one message the client sees.
 /// </summary>
-public sealed class RetrievalLoop
+/// <param name="first">The round of the first upstream response.</param>
+public sealed class RetrievalLoop(IRetrievalRound first)
 {
     /// <summary>How many rounds of <c>proxy_retrieve</c> calls are answered with text.</summary>
     public const int MaximumRounds = 3;
@@ -62,6 +60,11 @@ public sealed class RetrievalLoop
         [RetrievalState.Failed] = []
     };
 
+    /// <summary>A loop over Anthropic Messages rounds.</summary>
+    public RetrievalLoop() : this(RetrievalRound.First())
+    {
+    }
+
     private readonly List<RetrievalMove> _history = [];
     private long _outputTokens;
 
@@ -72,7 +75,7 @@ public sealed class RetrievalLoop
     public IReadOnlyList<RetrievalMove> History => _history;
 
     /// <summary>The upstream response streaming now.</summary>
-    public RetrievalRound Round { get; private set; } = RetrievalRound.First();
+    public IRetrievalRound Round { get; private set; } = first;
 
     /// <summary>How many rounds of calls were answered.</summary>
     public int Answered { get; private set; }
@@ -99,7 +102,7 @@ public sealed class RetrievalLoop
 
         Move(RetrievalState.HoldingTools, Triggers.MessageStop);
         _outputTokens += Round.OutputTokens;
-        var retrieves = Round.StopReason == StopReasons.ToolUse && Round.ToolCalls.Any(static call => call.IsRetrieval);
+        var retrieves = Round.StopsForTools && Round.ToolCalls.Any(static call => call.IsRetrieval);
         if (!retrieves)
         {
             Move(RetrievalState.Done, Triggers.NoRetrieval);
@@ -126,33 +129,17 @@ public sealed class RetrievalLoop
     }
 
     /// <summary>Starts the round of the follow-up response; its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
-    public RetrievalRound NextRound()
+    public IRetrievalRound NextRound()
     {
         Move(RetrievalState.Forwarding, Triggers.FollowUp);
         Round = Round.Next();
         return Round;
     }
 
-    /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
+    /// <summary>The held tool calls and the closing events of a released message.</summary>
     public IReadOnlyList<SseEvent> Finish()
     {
-        var events = new List<SseEvent>(Round.Release());
-        events.Add(Answered == 0 && Round.DeltaEvent is { } received ? received : MergedDelta());
-        events.Add(Round.StopEvent ?? SseEvent.Of(Events.MessageStop, new JsonObject { [Fields.Type] = Events.MessageStop }));
-        return events;
-    }
-
-    /// <summary>The last response's <c>message_delta</c> with the output tokens of every response.</summary>
-    private SseEvent MergedDelta()
-    {
-        var delta = Round.Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
-        if (delta[Fields.Usage] is not JsonObject usage)
-        {
-            delta[Fields.Usage] = usage = [];
-        }
-
-        usage[Fields.OutputTokens] = _outputTokens;
-        return SseEvent.Of(Events.MessageDelta, delta);
+        return Round.Finish(Answered, _outputTokens);
     }
 
     /// <summary>The error event of a failed loop.</summary>
@@ -163,7 +150,7 @@ public sealed class RetrievalLoop
             Move(RetrievalState.Failed, message);
         }
 
-        return SseEvent.Error(Errors.Api, message);
+        return Round.Error(message);
     }
 
     private void Move(RetrievalState to, string trigger)

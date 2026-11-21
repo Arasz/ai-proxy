@@ -298,8 +298,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         {
             var results = loop.ToolResults(await AnswerAsync(loop).ConfigureAwait(false));
             var followUp = plan.Mode == CcrMode.Thread
-                ? RetrievalFollowUp.Thread(forwarded, loop.Round.MessageId, results)
-                : RetrievalFollowUp.Stateless(forwarded, loop.Round.Content(), results);
+                ? loop.Round.ThreadFollowUp(forwarded, results)
+                : loop.Round.StatelessFollowUp(forwarded, results);
             loop.NextRound();
             return followUp;
         }
