@@ -7,9 +7,9 @@ name: publish
 # environment production) must be configured before the first publish; the
 # policy is keyed to owner + repo + workflow file, not to the package id.
 #
-# Before dispatching: bump the repo-root VERSION file and merge it — the pack
-# step publishes whatever version the csproj carries, so a second dispatch
-# without a bump is a no-op (--skip-duplicate).
+# Before dispatching: bump the repo-root VERSION file, merge it and push the
+# v{VERSION} tag — the pack job builds the tagged commit and fails when the tag
+# is missing; a second dispatch without a bump is a no-op (--skip-duplicate).
 #
 # Package id: `ai-proxy`. A NuGet reserved prefix rejects submissions from
 # non-owners, and the id is not publicly listable, so the first push is where
@@ -47,6 +47,20 @@ jobs:
         rid: [win-x64, win-arm64, osx-arm64, linux-x64, linux-arm64, linux-musl-x64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Check out the release tag
+        # Publishes the tagged commit, not main HEAD: a merge made after the tag
+        # must not ship under the tagged version. Fails when the tag is missing.
+        run: |
+          set -euo pipefail
+          VER=$(tr -d '[:space:]' < VERSION)
+          if [ -z "$VER" ]; then echo "::error::VERSION at the repo root is empty or missing." >&2; exit 1; fi
+          if ! git rev-parse -q --verify "refs/tags/v$VER" >/dev/null; then
+            echo "::error::Tag v$VER is missing. Tag the release before publishing." >&2; exit 1
+          fi
+          git checkout --detach "refs/tags/v$VER"
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json

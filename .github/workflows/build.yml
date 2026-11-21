@@ -19,7 +19,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
   workflow_dispatch: {}
 
 permissions:
@@ -329,19 +329,25 @@ jobs:
     # is a required check, and it runs on every change, docs-only included,
     # because docs-only changes are what it checks: every docs index resolves,
     # every evidence anchor names a real line, every action is pinned to a SHA,
-    # and the current VERSION has its changelog entry.
+    # and a PR that changes VERSION is a releasable bump.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Docs index
         run: python3 scripts/check-docs-index.py
       - name: Evidence anchors
         run: python3 scripts/check-evidence-anchors.py
       - name: Actions pinned to a commit SHA
         run: bash scripts/check-action-pins.sh
-      - name: Changelog entry for VERSION
-        run: |
-          set -euo pipefail
-          version="$(tr -d '[:space:]' < VERSION)"
-          ls docs/changelog/"${version}"-*.md >/dev/null 2>&1 || { echo "docs/changelog/${version}-*.md is missing"; exit 1; }
+      - name: Script unit tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Version bump has a changelog entry and a new version
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check-version-bump.py "$BASE_SHA" "$HEAD_SHA"
