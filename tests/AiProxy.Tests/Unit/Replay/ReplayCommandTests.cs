@@ -16,6 +16,7 @@ namespace AiProxy.Tests.Unit.Replay;
 public sealed class ReplayCommandTests : IDisposable
 {
     private static readonly string Output = string.Join("\n", Enumerable.Range(1, 120).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
+    private static readonly string NumberedOutput = string.Join("\n", Output.Split('\n').Select((line, index) => $"{index + 1,6}\t{line}"));
     private static readonly DateTimeOffset Stamp = DateTimeOffset.Parse("2026-11-10T12:00:00Z");
 
     private readonly GainCommandTests.Fixture _fixture = new();
@@ -410,6 +411,39 @@ public sealed class ReplayCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task A_numbered_read_is_counted_as_skipped_and_not_previewed()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "300");
+
+        Assert.Equal(1, result.GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(1, Assert.Single(result.GetProperty("kinds").EnumerateArray()).GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(0, result.GetProperty("rowsWithPreview").GetInt32());
+        Assert.Empty(result.GetProperty("previews").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task With_the_skip_off_the_same_read_is_previewed_and_the_band_is_printed()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "300", "--skip-under", "0");
+
+        Assert.Equal(0, result.GetProperty("blocksSkipped").GetInt32());
+        Assert.Equal(0, result.GetProperty("skipUnder").GetInt32());
+        Assert.Equal(1, result.GetProperty("rowsWithPreview").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_negative_skip_band_is_refused()
+    {
+        var code = await new CliApplication(_fixture.Runtime).RunAsync(["replay", "--home", _home.Path, "--skip-under", "-1"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, code);
+    }
+
+    [Fact]
     public async Task The_gain_request_count_covers_only_request_rows_in_the_window()
     {
         WriteCapture(ToolBody(Output));
@@ -424,8 +458,8 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task The_engine_binds_its_compression_settings_from_configuration_like_the_proxy_host()
     {
         var body = ReadBody("src/Example.cs", CodeFile);
-        using var defaults = ReplayEngine.Create(99999, null, null, new ConfigurationBuilder().Build());
-        using var noViews = ReplayEngine.Create(99999, null, null, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Proxy:Compression:CodeViews"] = "false" }).Build());
+        using var defaults = ReplayEngine.Create(99999, null, null, null, new ConfigurationBuilder().Build());
+        using var noViews = ReplayEngine.Create(99999, null, null, null, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Proxy:Compression:CodeViews"] = "false" }).Build());
 
         var withViews = Assert.Single((await defaults.ReplayAsync(body, TestContext.Current.CancellationToken)).Blocks);
         var withoutViews = Assert.Single((await noViews.ReplayAsync(body, TestContext.Current.CancellationToken)).Blocks);

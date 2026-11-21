@@ -16,6 +16,7 @@ namespace AiProxy.Core.Content.Ccr;
 /// <param name="MatchWindow">The characters shown around a match on a longer line.</param>
 /// <param name="MaximumContext">The most context lines a <c>pattern</c> call may ask for.</param>
 /// <param name="PatternTimeout">How long one pattern match may run.</param>
+/// <param name="SkipUnderTokens">A numbered read or a diff whose reduced text is under this many estimated tokens is not previewed.</param>
 public sealed record CcrOptions(
     decimal CharactersPerToken,
     int MinimumTokens,
@@ -29,7 +30,8 @@ public sealed record CcrOptions(
     int MaximumMatches,
     int MatchWindow,
     int MaximumContext,
-    TimeSpan PatternTimeout)
+    TimeSpan PatternTimeout,
+    int SkipUnderTokens)
 {
     /// <summary>The owner-approved ADR 0005 values.</summary>
     public static CcrOptions Default { get; } = new(
@@ -45,7 +47,8 @@ public sealed record CcrOptions(
         50,
         240,
         10,
-        TimeSpan.FromMilliseconds(250));
+        TimeSpan.FromMilliseconds(250),
+        int.MaxValue);
 
     /// <summary>The most a preview of a region of this many reduced tokens may hold, in estimated tokens.</summary>
     /// <param name="reducedTokens">The region's estimated tokens after its reducers.</param>

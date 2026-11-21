@@ -92,9 +92,10 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
       are consecutive. Any start number counts, so a read with an offset is caught too.
     - a diff: within the first 50 or so lines, a line that starts with `diff --git `, or a line
       starting `--- ` followed by one starting `+++ ` and then one starting `@@ -`.
-13. The check runs on the region text after the reducers (the code view included) and before the
-    preview builder. It applies only below an upper size band that replay sets. Above that band a
-    read or diff is previewed as before, because the saving outgrows a follow-up.
+13. The check runs on the region's original text, before the reducers, so a read the code view rewrites is
+    still recognised; the reducers still run. The preview is the only thing skipped. The skip applies only
+    below an upper size band (`SkipUnderTokens`, measured on the reduced text) that replay sets. Above that
+    band a read or diff is previewed as before, because the saving outgrows a follow-up.
 14. The skip goes by shape, not by tool name. `ToolCallFiles` names a path only for a read call
     with exactly one path argument (`src/AiProxy.Core/Content/ToolCallFiles.cs:118-157`), and most
     diffs come from `Bash`, so a tool-name rule would miss both.

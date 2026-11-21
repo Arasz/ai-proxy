@@ -6,10 +6,11 @@ namespace AiProxy.Core.Replay;
 /// <param name="Kind">The content kind.</param>
 /// <param name="BlocksSeen">How many regions of this kind were replayed.</param>
 /// <param name="BlocksPreviewed">How many of them went out as a preview.</param>
+/// <param name="BlocksSkipped">How many reached the preview floor but were a numbered read or a diff under the skip band.</param>
 /// <param name="OriginalTokens">The estimated tokens of those regions as sent.</param>
 /// <param name="ReducerSavedTokens">The estimated tokens the reducers removed.</param>
 /// <param name="PreviewSavedTokens">The estimated tokens the previews removed on top of the reducers.</param>
-public sealed record ReplayKindTotals(ContentType Kind, int BlocksSeen, int BlocksPreviewed, long OriginalTokens, long ReducerSavedTokens, long PreviewSavedTokens)
+public sealed record ReplayKindTotals(ContentType Kind, int BlocksSeen, int BlocksPreviewed, int BlocksSkipped, long OriginalTokens, long ReducerSavedTokens, long PreviewSavedTokens)
 {
     /// <summary>The estimated tokens of those regions as forwarded.</summary>
     public long ForwardedTokens => OriginalTokens - SavedTokens;
@@ -66,7 +67,7 @@ public sealed class ReplayReport
 
     /// <summary>The totals per content kind, largest saving first.</summary>
     public IReadOnlyList<ReplayKindTotals> Kinds => _kinds
-        .Select(static pair => new ReplayKindTotals(pair.Key, pair.Value.Seen, pair.Value.Previewed, pair.Value.Original, pair.Value.ReducerSaved, pair.Value.PreviewSaved))
+        .Select(static pair => new ReplayKindTotals(pair.Key, pair.Value.Seen, pair.Value.Previewed, pair.Value.Skipped, pair.Value.Original, pair.Value.ReducerSaved, pair.Value.PreviewSaved))
         .OrderByDescending(static totals => totals.SavedTokens)
         .ThenBy(static totals => totals.Kind)
         .ToArray();
@@ -84,6 +85,9 @@ public sealed class ReplayReport
         .OrderByDescending(static totals => totals.Rows)
         .ThenBy(static totals => totals.Host, StringComparer.Ordinal)
         .ToArray();
+
+    /// <summary>How many regions, over every kind, were skipped as a numbered read or a diff.</summary>
+    public int BlocksSkipped => _kinds.Values.Sum(static counts => counts.Skipped);
 
     /// <summary>The estimated tokens the reducers saved over every kind.</summary>
     public long ReducerSavedTokens => _kinds.Values.Sum(static counts => counts.ReducerSaved);
@@ -110,6 +114,7 @@ public sealed class ReplayReport
             {
                 Seen = counts.Seen + 1,
                 Previewed = counts.Previewed + (block.PreviewId is null ? 0 : 1),
+                Skipped = counts.Skipped + (block.Skipped ? 1 : 0),
                 Original = counts.Original + block.OriginalTokens,
                 ReducerSaved = counts.ReducerSaved + block.ReducerSaved,
                 PreviewSaved = counts.PreviewSaved + block.PreviewSaved
@@ -135,7 +140,7 @@ public sealed class ReplayReport
         return _outcomes.GetValueOrDefault(outcome);
     }
 
-    private readonly record struct Counts(int Seen, int Previewed, long Original, long ReducerSaved, long PreviewSaved);
+    private readonly record struct Counts(int Seen, int Previewed, int Skipped, long Original, long ReducerSaved, long PreviewSaved);
 
     private readonly record struct PreviewCounts(int Sends, long Saved);
 }

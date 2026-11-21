@@ -27,6 +27,10 @@ public sealed class ReplaySettings : CommandSettings
     [Description("The least a preview must save over the reduced text, in estimated tokens (default: the proxy's own).")]
     public int? MinimumSaving { get; init; }
 
+    [CommandOption("--skip-under <TOKENS>")]
+    [Description("A numbered read or a diff whose reduced text is under this many estimated tokens is not previewed; 0 turns the skip off (default: the proxy's own).")]
+    public int? SkipUnder { get; init; }
+
     [CommandOption("--since <DATE>")]
     [Description("Replay only requests from this date or time on (UTC).")]
     public string? Since { get; init; }
@@ -72,6 +76,9 @@ public sealed class ReplaySettings : CommandSettings
             RuleFor(static settings => settings.MinimumSaving)
                 .Must(static saving => saving is null or >= 0)
                 .WithMessage("The minimum saving must not be negative.");
+            RuleFor(static settings => settings.SkipUnder)
+                .Must(static skip => skip is null or >= 0)
+                .WithMessage("The skip band must not be negative.");
             RuleFor(static settings => settings.Source)
                 .Must(static source => source is BothSources or ContentSource or CaptureSource)
                 .WithMessage("The source must be content, capture or both.");
