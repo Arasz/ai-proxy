@@ -31,13 +31,14 @@ and nothing else reports it: `status` shows pid, start time, URLs and the data d
 
 ## Decision
 
-1. Capture keeps writing at its cap. A request and its response are stored as one pair in one
-   transaction. Before the insert, that transaction deletes the oldest rows, by capture time,
-   until live pages plus the pair fit under the cap.
-2. The cap is checked once per pair, so a request row is never kept without its response. If the
-   insert fails, the transaction rolls back and neither row stays.
-3. A pair larger than the cap on its own is rejected and recorded as a write error. It evicts
-   nothing.
+1. Capture keeps writing at its cap. The request row and the response row stay two writes, as
+   today: the request is written when it arrives and the response when the upstream answers
+   (`ProviderRequestInspector`). Each write runs in one transaction that first deletes the oldest
+   exchanges, by capture time, until live pages plus that write fit under the cap.
+2. Eviction removes a whole exchange: a request row and its response row go together. A response
+   whose request row is gone (evicted while the response streamed) is not stored.
+3. A single write larger than the cap on its own is rejected and recorded as a write error. It
+   evicts nothing.
 4. The 14-day age prune stays as a second bound and still runs below the cap.
 5. The store exposes a `CaptureState` record: live size, cap, oldest row time, last eviction time,
    and last write error. The control pipe's `info` reply carries it, so `status` and `doctor` can
@@ -75,3 +76,14 @@ P13 checks how a `status` from the previous release reads the longer reply.
 - Code: `src/AiProxy.Storage/SqliteCaptureStore.cs`,
   `src/AiProxy/Hosting/Integration/CaptureEvictionWorker.cs`,
   `src/AiProxy/Hosting/Proxy/ProxyControl.cs`, `src/AiProxy/Cli/StatusView.cs`
+
+## Amendment 2026-11-21: two writes, not one pair
+
+The first text of rules 1 to 3 stored a request and its response as one pair in one transaction.
+The P4 lane found that the code cannot do that without a wider change: the request row is written
+in `OnRequest` and the response row in `AfterResponseAsync`, through the two methods of
+`IRequestCaptureStore` (`src/AiProxy/Hosting/Integration/ProviderRequestInspector.cs:115`, `:208`),
+and the response size is not known when the request arrives. Rules 1 to 3 now keep the two writes
+and evict whole exchanges. Holding the request in memory until the response came (one write per
+pair) was rejected: it loses every request that never gets a response, and those rows are useful
+when an upstream fails. Decided by the orchestrator in away mode; the owner may reverse it.
