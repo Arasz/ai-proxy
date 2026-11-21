@@ -63,7 +63,7 @@ public sealed class GainViewTests
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
-        Assert.Single(fixture.Console.Output.Split('\n'), static line => line.Contains("│ other", StringComparison.Ordinal));
+        Assert.Single(TableLayout.Lines(fixture.Console.Output), static line => TableLayout.Cells(line)[0] == "other");
     }
 
     [Theory]
@@ -78,7 +78,7 @@ public sealed class GainViewTests
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
         Assert.Contains("Saved%", fixture.Console.Output, StringComparison.Ordinal);
-        Assert.Contains(fixture.Console.Output.Split('\n'), static line => line.StartsWith("│ all", StringComparison.Ordinal));
+        Assert.Contains(TableLayout.Lines(fixture.Console.Output), static line => TableLayout.Cells(line)[0] == "all");
     }
 
     [Fact]
@@ -217,8 +217,8 @@ public sealed class GainViewTests
 
         await new CliApplication(fixture.Runtime).RunAsync(["gain"], TestContext.Current.CancellationToken);
 
-        var table = fixture.Console.Output.Split('\n').SkipWhile(line => !line.StartsWith('╭')).TakeWhile(line => !line.StartsWith("Method", StringComparison.Ordinal)).Where(line => line.Length > 0).ToList();
-        Assert.Equal(5, table.Count);
+        var table = TableLayout.Table(TableLayout.Lines(fixture.Console.Output), "Harness", "Method");
+        Assert.Equal(2, table.Length);
     }
 
     private static readonly GainTotals LiveSummary = new(4_593, EstimatedOriginalTokens: 261_175_524, EstimatedForwardedTokens: 250_443_158, EstimatedSavedTokens: 10_756_350, EstimatedRetrievedTokens: 523_811, EstimatedToolTokens: 23_976);
