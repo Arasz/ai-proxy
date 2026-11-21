@@ -33,12 +33,16 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
     /// <summary>What a row costs beyond the bytes of its values, so the estimate of a write errs high.</summary>
     private const int RowOverheadBytes = 256;
 
+    /// <summary>The most exchanges one eviction pass looks at.</summary>
+    private const int EvictionBatch = 64;
+
     private static readonly SchemaLadder Ladder = new([CreateTables]);
 
     private readonly string _databasePath = RequirePath(databasePath);
     private readonly object _prepareGate = new();
     private volatile bool _prepared;
     private long _lastEvictionTicks;
+    private long _lastWriteErrorTicks;
     private volatile string? _lastWriteError;
 
     private static string RequirePath(string value)
@@ -72,28 +76,44 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         return removed;
     }
 
+    /// <summary>The oldest requests by capture time, read through the time index; takes <c>@Keep</c> and <c>@Batch</c>.</summary>
+    public const string OldestRequestsQuery = Sql.OldestExchange;
+
     /// <summary>Reads the live size, the cap, the oldest row and the last eviction and write error.</summary>
-    /// <remarks>A file that was never written reports an empty state and is not created.</remarks>
+    /// <remarks>It never creates, migrates or writes the file. A file that was never written reports an empty state, and a file newer than the code reports that as the error.</remarks>
     /// <param name="cancellationToken">The token that stops the read.</param>
     public async Task<CaptureState> GetStateAsync(CancellationToken cancellationToken)
     {
         var lastEviction = Interlocked.Read(ref _lastEvictionTicks);
         DateTimeOffset? lastEvictionAt = lastEviction == 0 ? null : new DateTimeOffset(lastEviction, TimeSpan.Zero);
+        var errorTicks = Interlocked.Read(ref _lastWriteErrorTicks);
+        DateTimeOffset? errorAt = errorTicks == 0 ? null : new DateTimeOffset(errorTicks, TimeSpan.Zero);
+        var error = _lastWriteError;
         if (!File.Exists(_databasePath))
         {
-            return new CaptureState(0, maxLiveBytes, null, lastEvictionAt, _lastWriteError);
+            return new CaptureState(0, maxLiveBytes, null, lastEvictionAt, error, errorAt);
         }
 
-        if (!_prepared)
+        try
         {
-            Prepare();
-        }
+            await using var connection = ContentSchema.Open(_databasePath);
+            var live = await LivePagesAsync(connection, cancellationToken).ConfigureAwait(false) * await PageSizeAsync(connection, cancellationToken).ConfigureAwait(false);
+            var version = await connection.ExecuteScalarAsync<long>(new CommandDefinition("PRAGMA user_version;", cancellationToken: cancellationToken)).ConfigureAwait(false);
+            if (version > Ladder.Version)
+            {
+                return new CaptureState(live, maxLiveBytes, null, lastEvictionAt, $"{FileName} is at schema version {version}, but this build only knows versions up to {Ladder.Version}; it was written by a newer ai-proxy.", time.GetUtcNow());
+            }
 
-        await using var connection = ContentSchema.Open(_databasePath);
-        var live = await LivePagesAsync(connection, cancellationToken).ConfigureAwait(false) * await PageSizeAsync(connection, cancellationToken).ConfigureAwait(false);
-        var oldest = await connection.ExecuteScalarAsync<string?>(new CommandDefinition("SELECT MIN(captured_at) FROM capture_request;", cancellationToken: cancellationToken)).ConfigureAwait(false);
-        DateTimeOffset? oldestAt = oldest is null ? null : DateTimeOffset.Parse(oldest, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-        return new CaptureState(live, maxLiveBytes, oldestAt, lastEvictionAt, _lastWriteError);
+            var oldest = version == 0
+                ? null
+                : await connection.ExecuteScalarAsync<string?>(new CommandDefinition("SELECT MIN(captured_at) FROM capture_request;", cancellationToken: cancellationToken)).ConfigureAwait(false);
+            DateTimeOffset? oldestAt = oldest is null ? null : DateTimeOffset.Parse(oldest, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            return new CaptureState(live, maxLiveBytes, oldestAt, lastEvictionAt, error, errorAt);
+        }
+        catch (SqliteException exception)
+        {
+            return new CaptureState(0, maxLiveBytes, null, lastEvictionAt, exception.Message, time.GetUtcNow());
+        }
     }
 
     /// <inheritdoc />
@@ -202,37 +222,74 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _lastWriteError = exception.Message;
+            RecordError(exception.Message);
             throw;
         }
     }
 
+    private void RecordError(string message)
+    {
+        _lastWriteError = message;
+        Interlocked.Exchange(ref _lastWriteErrorTicks, time.GetUtcNow().UtcTicks);
+    }
+
     private void Reject(long payloadBytes)
     {
-        _lastWriteError = $"a write of about {payloadBytes} bytes does not fit the cap of {maxLiveBytes} bytes and was not stored";
+        RecordError($"a write of about {payloadBytes} bytes does not fit the cap of {maxLiveBytes} bytes and was not stored");
         Log.WriteRejected(logger, _databasePath, payloadBytes, maxLiveBytes);
     }
 
-    /// <summary>Deletes the oldest whole exchanges until the live pages plus the write fit, and says how many went, or -1 when they cannot fit.</summary>
+    /// <summary>Deletes the oldest whole exchanges, in batches sized to the missing pages, until the live pages plus the write fit; returns how many went, or -1 when they cannot fit.</summary>
     private static async Task<int> MakeRoomAsync(SqliteConnection connection, long capPages, long needPages, string keepRequestId, CancellationToken cancellationToken)
     {
+        var pageSize = await PageSizeAsync(connection, cancellationToken).ConfigureAwait(false);
         var evicted = 0;
-        while (await LivePagesAsync(connection, cancellationToken).ConfigureAwait(false) + needPages > capPages)
+        while (true)
         {
-            var oldest = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
-                Sql.OldestExchange,
-                new { Keep = keepRequestId },
-                cancellationToken: cancellationToken)).ConfigureAwait(false);
-            if (oldest is null)
+            var missing = await LivePagesAsync(connection, cancellationToken).ConfigureAwait(false) + needPages - capPages;
+            if (missing <= 0)
             {
-                return -1;
+                return evicted;
             }
 
-            await connection.ExecuteAsync(new CommandDefinition(Sql.DeleteExchange, new { Id = oldest }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-            evicted++;
-        }
+            var oldest = (await connection.QueryAsync<OldRow>(new CommandDefinition(
+                OldestRequestsQuery,
+                new { Keep = keepRequestId, Batch = EvictionBatch },
+                cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
+            var ids = new List<string>();
+            var covered = 0L;
+            foreach (var row in oldest)
+            {
+                ids.Add(row.Id);
+                covered += PagesFor(row.Bytes, pageSize);
+                if (covered >= missing)
+                {
+                    break;
+                }
+            }
 
-        return evicted;
+            if (ids.Count == 0)
+            {
+                ids = (await connection.QueryAsync<string>(new CommandDefinition(
+                    Sql.OldestOrphanResponses,
+                    new { Keep = keepRequestId },
+                    cancellationToken: cancellationToken)).ConfigureAwait(false)).ToList();
+                if (ids.Count == 0)
+                {
+                    return -1;
+                }
+            }
+
+            await connection.ExecuteAsync(new CommandDefinition(Sql.DeleteExchanges, new { Ids = ids }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            evicted += ids.Count;
+        }
+    }
+
+    private sealed class OldRow
+    {
+        public string Id { get; init; } = string.Empty;
+
+        public long Bytes { get; init; }
     }
 
     private static async Task<bool> RequestRowExistsAsync(SqliteConnection connection, string requestId, CancellationToken cancellationToken)
@@ -384,17 +441,21 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
                                      """;
 
         public const string OldestExchange = """
-                                             SELECT request_id FROM (
-                                                 SELECT request_id, captured_at AS at, 0 AS rank FROM capture_request WHERE request_id <> @Keep
-                                                 UNION ALL
-                                                 SELECT request_id, completed_at AS at, 1 AS rank FROM capture_response WHERE request_id <> @Keep)
-                                             ORDER BY rank, at, request_id LIMIT 1;
+                                             SELECT request_id AS Id, CAST(length(body) AS INTEGER) AS Bytes FROM capture_request
+                                             WHERE captured_at >= '' AND request_id <> @Keep
+                                             ORDER BY captured_at LIMIT @Batch;
                                              """;
 
-        public const string DeleteExchange = """
-                                             DELETE FROM capture_response WHERE request_id = @Id;
-                                             DELETE FROM capture_request WHERE request_id = @Id;
-                                             """;
+        public const string OldestOrphanResponses = """
+                                                    SELECT request_id FROM capture_response
+                                                    WHERE completed_at >= '' AND request_id <> @Keep
+                                                    ORDER BY completed_at LIMIT 64;
+                                                    """;
+
+        public const string DeleteExchanges = """
+                                              DELETE FROM capture_response WHERE request_id IN @Ids;
+                                              DELETE FROM capture_request WHERE request_id IN @Ids;
+                                              """;
 
         public const string Insert = """
                                      INSERT INTO capture_request (request_id, captured_at, provider, host, path, body)

@@ -128,4 +128,65 @@ public sealed class CaptureCapTests : IDisposable
         Assert.Equal(_time.GetUtcNow(), state.LastEvictionAt);
         Assert.Null(state.OldestRowAt);
     }
+
+    [Fact]
+    public async Task The_oldest_exchange_query_walks_the_time_index_with_no_scan_and_no_sort()
+    {
+        await _store.StoreAsync(Request("r1", 100), TestContext.Current.CancellationToken);
+        using var connection = ContentSchema.Open(DatabasePath);
+
+        var plan = string.Join('\n', connection.Query("EXPLAIN QUERY PLAN " + SqliteCaptureStore.OldestRequestsQuery, new { Keep = "", Batch = 8 }).Select(row => (string)row.detail));
+
+        Assert.DoesNotContain("SCAN capture_", plan, StringComparison.Ordinal);
+        Assert.DoesNotContain("TEMP B-TREE", plan, StringComparison.Ordinal);
+        Assert.Contains("capture_request_captured", plan, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_write_whose_insert_throws_after_eviction_rolls_the_eviction_back_and_the_state_shows_the_error()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await _store.StoreAsync(Request("r1", 40_000), token);
+        await _store.StoreAsync(Request("r2", 40_000), token);
+        var before = _time.GetUtcNow();
+
+        await Assert.ThrowsAsync<SqliteException>(async () => await _store.StoreAsync(Request("r2", 40_000), token));
+
+        Assert.Equal(["r1", "r2"], Ids("capture_request"));
+        var state = await _store.GetStateAsync(token);
+        Assert.NotNull(state.LastWriteError);
+        Assert.NotNull(state.LastWriteErrorAt);
+        Assert.Null(state.LastEvictionAt);
+        Assert.True(before <= state.LastWriteErrorAt);
+    }
+
+    [Fact]
+    public async Task The_state_of_a_newer_file_carries_the_error_and_does_not_throw_or_migrate()
+    {
+        Directory.CreateDirectory(_directory);
+        using (var future = ContentSchema.Open(DatabasePath))
+        {
+            future.Execute("CREATE TABLE capture_request (request_id TEXT); PRAGMA user_version = 99;");
+        }
+
+        var state = await _store.GetStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("99", state.LastWriteError, StringComparison.Ordinal);
+        using var connection = ContentSchema.Open(DatabasePath);
+        Assert.Equal(99, connection.ExecuteScalar<long>("PRAGMA user_version;"));
+    }
+
+    [Fact]
+    public async Task One_pass_evicts_enough_exchanges_to_fit_a_big_write()
+    {
+        var token = TestContext.Current.CancellationToken;
+        for (var i = 1; i <= 3; i++)
+        {
+            await _store.StoreAsync(Request($"r{i}", 30_000), token);
+        }
+
+        await _store.StoreAsync(Request("big", 80_000), token);
+
+        Assert.Equal(["big"], Ids("capture_request"));
+    }
 }

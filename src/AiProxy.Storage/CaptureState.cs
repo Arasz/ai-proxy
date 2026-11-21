@@ -6,4 +6,5 @@ namespace AiProxy.Storage;
 /// <param name="OldestRowAt">When the oldest request row was captured, or null for an empty file.</param>
 /// <param name="LastEvictionAt">When rows were last evicted, by the cap or by age, since the process started.</param>
 /// <param name="LastWriteError">The reason the last write failed or was rejected, or null when none did.</param>
-public sealed record CaptureState(long LiveBytes, long CapBytes, DateTimeOffset? OldestRowAt, DateTimeOffset? LastEvictionAt, string? LastWriteError);
+/// <param name="LastWriteErrorAt">When that error happened, or null when there is none.</param>
+public sealed record CaptureState(long LiveBytes, long CapBytes, DateTimeOffset? OldestRowAt, DateTimeOffset? LastEvictionAt, string? LastWriteError, DateTimeOffset? LastWriteErrorAt);
