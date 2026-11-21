@@ -71,32 +71,32 @@ public sealed class GainViewLayoutTests
         Assert.Contains("claude", output, StringComparison.Ordinal);
         Assert.Contains("codex", output, StringComparison.Ordinal);
         Assert.Contains("total", output, StringComparison.Ordinal);
-        var lines = output.Split('\n');
-        var header = Array.FindIndex(lines, static l => l.Contains("Harness", StringComparison.Ordinal) && l.Contains("Net%", StringComparison.Ordinal));
-        Assert.Equal(1, lines.Count(static l => l.Contains("Harness", StringComparison.Ordinal) && l.Contains("Net%", StringComparison.Ordinal)));
-        var bottom = Array.FindIndex(lines, header, static l => l.StartsWith('╰'));
-        var rows = lines[header..bottom];
+        var rows = TableLayout.Table(TableLayout.Lines(output), "Harness", "Other traffic");
         foreach (var name in new[] { "claude", "codex", "total" })
         {
-            Assert.Single(rows, l => l.StartsWith("│ " + name, StringComparison.Ordinal));
+            Assert.Single(rows, l => TableLayout.Cells(l)[0] == name);
         }
         Assert.Contains("Other traffic: 3 requests, 1.2B bytes", output, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void All_six_harness_rows_and_the_total_fit_in_80_columns_without_wrapping_a_label()
+    public void Every_harness_row_and_the_total_take_one_line_at_80_columns_with_live_size_numbers()
     {
-        var totals = new GainTotals(1234, EstimatedOriginalTokens: 261_175_524, EstimatedForwardedTokens: 250_443_158, EstimatedSavedTokens: 10_756_350);
-        var harnesses = GainHarness.Names.Select(name => new GainAttribution("harness", name, totals)).ToArray();
+        var large = new GainTotals(1_234_567, EstimatedOriginalTokens: 235_400_000, EstimatedForwardedTokens: 0, EstimatedSavedTokens: 235_400_000,
+            EstimatedRetrievedTokens: 1_500_000, EstimatedFollowUpTokens: 123_456_789);
+        var losing = new GainTotals(10, EstimatedOriginalTokens: 100_000_000, EstimatedForwardedTokens: 100_000_000, EstimatedRetrievedTokens: 12_300_000);
+        var harnesses = GainHarness.Names.Select((name, index) => new GainAttribution("harness", name, index == 1 ? losing : large)).ToArray();
 
-        var output = Render(new GainSettings(), Report() with { Harnesses = harnesses });
+        var lines = TableLayout.Lines(Render(new GainSettings(), Report() with { Harnesses = harnesses }));
+        var table = TableLayout.Table(lines, "Harness", "Other traffic");
 
-        var lines = output.Split('\n').Select(static l => l.TrimEnd('\r')).ToArray();
-        Assert.All(lines, line => Assert.True(line.Length <= 80, $"{line.Length}: {line}"));
-        foreach (var name in GainHarness.Names.Append("total"))
-        {
-            Assert.Single(lines, l => l.StartsWith('│') && l.Split('│')[1].Trim() == name);
-        }
+        Assert.Equal(1 + GainHarness.Names.Count + 1, table.Length);
+        Assert.All(lines, line => Assert.True(line.Length <= TableLayout.Width, $"{line.Length}: {line}"));
+        Assert.Equal(["Harness", "Req", "Orig", "Fwd", "Saved", "Recall", "Follow", "Net", "Saved%", "Net%"], TableLayout.Cells(table[0]));
+        var rows = table[1..].Select(TableLayout.Cells).ToArray();
+        Assert.Equal(["claude", "codex", "openrouter", "openai", "openai (no host)", "other", "total"], rows.Select(static cells => cells[0]));
+        Assert.Equal(["claude", "1.2M", "235.4M", "0", "235.4M", "1.5M", "123.5M", "233.9M", "100.0%", "99.4%"], rows[0]);
+        Assert.Equal(["codex", "10", "100.0M", "100.0M", "0", "12.3M", "0", "-12.3M", "0.0%", "-12.3%"], rows[1]);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class GainViewLayoutTests
         var h = new GainAttribution("harness", "h", new GainTotals(1, EstimatedOriginalTokens: 1_000, EstimatedForwardedTokens: 1_500, EstimatedSavedTokens: -500, EstimatedRetrievedTokens: 99_500));
         var output = Render(new GainSettings(), Report() with { Harnesses = [h] });
 
-        var row = Assert.Single(output.Split('\n'), static l => l.StartsWith("│ h ", StringComparison.Ordinal));
+        var row = Assert.Single(TableLayout.Lines(output), static l => TableLayout.Cells(l)[0] == "h");
         Assert.Contains("-100.0K", row, StringComparison.Ordinal);
         Assert.Contains("<-999%", row, StringComparison.Ordinal);
     }
@@ -182,7 +182,7 @@ public sealed class GainViewLayoutTests
         var h = new GainAttribution("harness", "h", new GainTotals(1, EstimatedOriginalTokens: 1_000, EstimatedForwardedTokens: 1_500, EstimatedSavedTokens: -500, EstimatedRetrievedTokens: 9_499));
         var output = Render(new GainSettings(), Report() with { Harnesses = [h] });
 
-        var row = Assert.Single(output.Split('\n'), static l => l.StartsWith("│ h ", StringComparison.Ordinal));
+        var row = Assert.Single(TableLayout.Lines(output), static l => TableLayout.Cells(l)[0] == "h");
         Assert.Contains("<-999%", row, StringComparison.Ordinal);
         Assert.DoesNotContain("-999.9%", row, StringComparison.Ordinal);
     }

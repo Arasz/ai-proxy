@@ -139,7 +139,7 @@ public sealed class GainView
     {
         return
         [
-            Plain(name), Plain(Compact(totals.Requests)), Plain(Compact(totals.EstimatedOriginalTokens)), Plain(Compact(totals.EstimatedForwardedTokens)),
+            Plain(name == GainHarness.OpenAiHostUnknown ? "openai (no host)" : name), Plain(Compact(totals.Requests)), Plain(Compact(totals.EstimatedOriginalTokens)), Plain(Compact(totals.EstimatedForwardedTokens)),
             Signed(totals.EstimatedSavedTokens), Plain(Compact(totals.EstimatedRetrievedTokens)), Plain(Compact(totals.EstimatedFollowUpTokens)),
             Signed(totals.EstimatedNetTokens), Signed(totals.SavedPercent, Percent(totals.SavedPercent)), Signed(totals.NetPercent, Percent(totals.NetPercent))
         ];
@@ -204,17 +204,17 @@ public sealed class GainView
         return value.UtcDateTime.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>A table; <paramref name="tight"/> drops the right padding so the ten summary columns fit an 80-column terminal.</summary>
+    /// <summary>A table; <paramref name="tight"/> drops the outer border and all padding so the ten summary columns fit an 80-column terminal.</summary>
     private static Table Table(Column[] columns, IEnumerable<IRenderable[]> rows, bool tight = false)
     {
-        var table = new Table().Border(TableBorder.Rounded);
+        var table = new Table().Border(tight ? TableBorder.Minimal : TableBorder.Rounded);
         foreach (var column in columns)
         {
             table.AddColumn(new TableColumn(new Markup($"[bold]{Markup.Escape(column.Header)}[/]"))
             {
-                Padding = tight ? new Padding(1, 0, 0, 0) : new Padding(1, 0, 1, 0),
+                Padding = tight ? new Padding(0, 0, 0, 0) : new Padding(1, 0, 1, 0),
                 Alignment = column.Right ? Justify.Right : Justify.Left,
-                NoWrap = tight && !column.Right
+                NoWrap = tight
             });
         }
 

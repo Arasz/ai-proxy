@@ -87,15 +87,15 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
         }
 
 
-        var kinds = new Table().AddColumn("Kind");
+        var kinds = new Table().Border(TableBorder.Minimal).AddColumn(new TableColumn("Kind") { Padding = new Padding(0, 0, 0, 0), NoWrap = true });
         foreach (var heading in new[] { "Seen", "Previewed", "Skipped", "Original", "Reducers", "Previews", "Forwarded" })
         {
-            kinds.AddColumn(new TableColumn(heading).RightAligned());
+            kinds.AddColumn(new TableColumn(heading) { Padding = new Padding(0, 0, 0, 0), NoWrap = true, Alignment = Justify.Right });
         }
 
         foreach (var kind in report.Kinds)
         {
-            kinds.AddRow(kind.Kind.ToString(), Number(kind.BlocksSeen), Number(kind.BlocksPreviewed), Number(kind.BlocksSkipped), Number(kind.OriginalTokens), Number(kind.ReducerSavedTokens), Number(kind.PreviewSavedTokens), Number(kind.ForwardedTokens));
+            kinds.AddRow(kind.Kind.ToString(), GainView.Compact(kind.BlocksSeen), GainView.Compact(kind.BlocksPreviewed), GainView.Compact(kind.BlocksSkipped), GainView.Compact(kind.OriginalTokens), GainView.Compact(kind.ReducerSavedTokens), GainView.Compact(kind.PreviewSavedTokens), GainView.Compact(kind.ForwardedTokens));
         }
 
         console.Write(kinds);
