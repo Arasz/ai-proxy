@@ -415,7 +415,7 @@ public sealed class ReplayCommandTests : IDisposable
     {
         WriteCapture(ToolBody(NumberedOutput));
 
-        var result = await ReplayAsync("--minimum", "300");
+        var result = await ReplayAsync("--minimum", "300", "--skip-under", "100000");
 
         Assert.Equal(1, result.GetProperty("blocksSkipped").GetInt32());
         Assert.Equal(1, Assert.Single(result.GetProperty("kinds").EnumerateArray()).GetProperty("blocksSkipped").GetInt32());
@@ -433,6 +433,61 @@ public sealed class ReplayCommandTests : IDisposable
         Assert.Equal(0, result.GetProperty("blocksSkipped").GetInt32());
         Assert.Equal(0, result.GetProperty("skipUnder").GetInt32());
         Assert.Equal(1, result.GetProperty("rowsWithPreview").GetInt32());
+    }
+
+    [Fact]
+    public async Task A_numbered_read_under_the_minimum_is_not_counted_as_skipped()
+    {
+        WriteCapture(ToolBody(NumberedOutput));
+
+        var result = await ReplayAsync("--minimum", "99999", "--skip-under", "100000");
+
+        Assert.Equal(0, result.GetProperty("blocksSkipped").GetInt32());
+    }
+
+    [Fact]
+    public async Task The_budget_share_option_reaches_the_pipeline_so_a_smaller_share_saves_more()
+    {
+        WriteCapture(ToolBody(Output));
+
+        var standard = await ReplayAsync("--minimum", "300");
+        var small = await ReplayAsync("--minimum", "300", "--budget-share", "0.1");
+
+        Assert.Equal(1169, standard.GetProperty("savedTokens").GetInt64());
+        Assert.True(small.GetProperty("savedTokens").GetInt64() > 1169);
+    }
+
+    [Fact]
+    public async Task The_minimum_saving_option_reaches_the_pipeline_so_a_large_one_sends_the_reduced_text()
+    {
+        WriteCapture(ToolBody(Output));
+
+        var standard = await ReplayAsync("--minimum", "300");
+        var strict = await ReplayAsync("--minimum", "300", "--minimum-saving", "1170");
+
+        Assert.Equal(1, standard.GetProperty("rowsWithPreview").GetInt32());
+        Assert.Equal(0, strict.GetProperty("rowsWithPreview").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("--budget-share", "0")]
+    [InlineData("--budget-share", "1.01")]
+    [InlineData("--minimum-saving", "-1")]
+    public async Task A_budget_share_outside_zero_to_one_or_a_negative_minimum_saving_is_refused(string option, string value)
+    {
+        var code = await new CliApplication(_fixture.Runtime).RunAsync(["replay", "--home", _home.Path, option, value], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, code);
+    }
+
+    [Theory]
+    [InlineData("--budget-share", "1")]
+    [InlineData("--minimum-saving", "0")]
+    public async Task A_budget_share_of_one_and_a_zero_minimum_saving_are_accepted(string option, string value)
+    {
+        WriteCapture(ToolBody(Output));
+
+        await ReplayAsync("--minimum", "300", option, value);
     }
 
     [Fact]

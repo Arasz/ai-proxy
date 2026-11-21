@@ -72,12 +72,15 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
 
 ### Size-scaled previews
 
-8. The budget is `min(1500, floor(0.4 x reduced tokens))`, where reduced tokens are the estimated
-   tokens of the region after its reducers.
-9. The floor and the budget are both computed on the reduced text, and the floor is checked once.
-   The reduced text is a pure function of the region's bytes, so the preview stays byte-stable
-   across turns, as ADR 0005 requires for stateless re-previews (0005, "Cache placement", the
-   stateless paragraph, and the pure-function rule under "Preview format").
+8. The budget is `min(1500, floor(0.4 x original tokens))`, where original tokens are the estimated
+   tokens of the region as the client sent it, before its reducers.
+9. The floor is checked once, on the reduced text. The budget comes from the original text, not the
+   reduced text. The reduced text depends on whether the reducers succeed (a failed reducer leaves
+   the original in place), so a budget taken from it would change the preview bytes for the same
+   original and break prompt-cache stability across turns, as ADR 0005 requires for stateless
+   re-previews (0005, "Cache placement", the stateless paragraph, and the pure-function rule under
+   "Preview format"). The floor, the "preview must be shorter than the reduced text" rule and the
+   minimum saving are yes-or-no decisions on the reduced text and do not change the preview bytes.
 10. The builder returns null when the preview is not shorter than the reduced text. The region
     then goes out as its reducers left it.
 11. A preview is also not made when it saves less than a minimum per send. That minimum is sized
@@ -94,7 +97,7 @@ returns. `ClientBoundaryTests` fails when a CLI type reaches storage any other w
       starting `--- ` followed by one starting `+++ ` and then one starting `@@ -`.
 13. The check runs on the region's original text, before the reducers, so a read the code view rewrites is
     still recognised; the reducers still run. The preview is the only thing skipped. The skip applies only
-    below an upper size band (`SkipUnderTokens`, measured on the reduced text) that replay sets. Above that
+    below an upper size band (`SkipUnderTokens`, measured on the reduced text) that replay sets. The default is 0, which switches the skip off, until the tune step sets a finite band. Above that
     band a read or diff is previewed as before, because the saving outgrows a follow-up.
 14. The skip goes by shape, not by tool name. `ToolCallFiles` names a path only for a read call
     with exactly one path argument (`src/AiProxy.Core/Content/ToolCallFiles.cs:118-157`), and most

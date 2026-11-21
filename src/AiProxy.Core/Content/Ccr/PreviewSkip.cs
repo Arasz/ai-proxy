@@ -10,9 +10,11 @@ public static class PreviewSkip
     public const int DiffHeaderLines = 50;
 
     private const string GitHeader = "diff --git ";
+    private const string CombinedHeader = "diff --cc ";
     private const string OldFile = "--- ";
     private const string NewFile = "+++ ";
     private const string Hunk = "@@ -";
+    private const string CombinedHunk = "@@@ -";
 
     /// <summary>Whether the text is a file read: its first lines carry consecutive line numbers, from any start number.</summary>
     /// <param name="text">The region text as the tool returned it.</param>
@@ -20,7 +22,12 @@ public static class PreviewSkip
     {
         var lines = FirstLines(text, NumberedLines);
         var count = lines.Count;
-        var first = NumberOf(lines[0]);
+        if (count < NumberedLines)
+        {
+            return false;
+        }
+
+        var first = LineNumber.Of(lines[0]);
         if (first is null)
         {
             return false;
@@ -28,7 +35,7 @@ public static class PreviewSkip
 
         for (var index = 1; index < count; index++)
         {
-            if (NumberOf(lines[index]) != first + index)
+            if (LineNumber.Of(lines[index]) != first + index)
             {
                 return false;
             }
@@ -37,7 +44,7 @@ public static class PreviewSkip
         return true;
     }
 
-    /// <summary>Whether the text is a diff: a <c>diff --git</c> line, or <c>---</c>, <c>+++</c> and <c>@@ -</c> lines in a row, among the first lines.</summary>
+    /// <summary>Whether the text is a diff: a <c>diff --git</c> or <c>diff --cc</c> line, or <c>---</c>, <c>+++</c> and <c>@@ -</c> (or <c>@@@ -</c>) lines in a row, among the first lines.</summary>
     /// <param name="text">The region text as the tool returned it.</param>
     public static bool IsDiff(string text)
     {
@@ -45,7 +52,7 @@ public static class PreviewSkip
         var count = Math.Min(lines.Count, DiffHeaderLines);
         for (var index = 0; index < count; index++)
         {
-            if (lines[index].StartsWith(GitHeader, StringComparison.Ordinal))
+            if (lines[index].StartsWith(GitHeader, StringComparison.Ordinal) || lines[index].StartsWith(CombinedHeader, StringComparison.Ordinal))
             {
                 return true;
             }
@@ -53,7 +60,7 @@ public static class PreviewSkip
             if (index + 2 < lines.Count
                 && lines[index].StartsWith(OldFile, StringComparison.Ordinal)
                 && lines[index + 1].StartsWith(NewFile, StringComparison.Ordinal)
-                && lines[index + 2].StartsWith(Hunk, StringComparison.Ordinal))
+                && (lines[index + 2].StartsWith(Hunk, StringComparison.Ordinal) || lines[index + 2].StartsWith(CombinedHunk, StringComparison.Ordinal)))
             {
                 return true;
             }
@@ -79,27 +86,5 @@ public static class PreviewSkip
         }
 
         return lines;
-    }
-
-    private static int? NumberOf(string line)
-    {
-        var start = 0;
-        while (start < line.Length && line[start] == ' ')
-        {
-            start++;
-        }
-
-        var end = start;
-        while (end < line.Length && char.IsAsciiDigit(line[end]))
-        {
-            end++;
-        }
-
-        if (end == start || end >= line.Length || line[end] != '\t')
-        {
-            return null;
-        }
-
-        return int.TryParse(line.AsSpan(start, end - start), out var number) ? number : null;
     }
 }

@@ -34,9 +34,9 @@ ai-proxy replay --source capture --json
 | Option | Meaning |
 |---|---|
 | `--minimum <tokens>` | The smallest region, in estimated tokens, that becomes a preview. Without it, the proxy's own value (3,000) is used. |
-| `--budget-share <share>` | The share of a region's reduced tokens a preview may hold, above 0 and at most 1. The budget is the smaller of this share and 1,500 tokens. Without it, the proxy's own value (0.4) is used. |
+| `--budget-share <share>` | The share of a region's original tokens a preview may hold, above 0 and at most 1. The budget is the smaller of this share of the block's original tokens and 1,500 tokens. A preview that is not shorter than the reduced text is never sent. Without it, the proxy's own value (0.4) is used. |
 | `--minimum-saving <tokens>` | The least a preview must save over the reduced text, in estimated tokens. Without it, the proxy's own value (0) is used. |
-| `--skip-under <tokens>` | A numbered file read or a diff whose reduced text is under this many estimated tokens is not previewed, but is still reduced. `0` turns the skip off. Without it, the proxy's own value (no upper limit, so every numbered read and diff is skipped) is used. The report counts these regions as `blocksSkipped`, in total and per kind. |
+| `--skip-under <tokens>` | A numbered file read or a diff whose reduced text is under this many estimated tokens is not previewed, but is still reduced. `0` turns the skip off. Without it, the proxy's own value (0, off) is used. Regions under `--minimum` are not counted as skipped. The report counts these regions as `blocksSkipped`, in total and per kind. |
 | `--since <date>` | Replay only requests from this date on, in UTC. |
 | `--source content\|capture\|both` | Which database to read. The default is `both`. |
 | `--include-encoded` | Replay bodies that carry a content encoding too. They are left out by default. |

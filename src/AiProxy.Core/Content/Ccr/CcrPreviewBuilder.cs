@@ -20,7 +20,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     /// <summary>Returns a preview, or null for an existing preview, insufficient budget, or a preview that does not save enough.</summary>
     /// <param name="original">The region's text as the client sent it.</param>
     /// <param name="options">The CCR numbers.</param>
-    /// <param name="reducedTokens">The region's estimated tokens after its reducers; the budget and the saving are measured on it.</param>
+    /// <param name="reducedTokens">The region's estimated tokens after its reducers; the saving is measured on it; the budget comes from the original.</param>
     public CcrPreview? Build(string original, CcrOptions options, int reducedTokens)
     {
         try
@@ -57,7 +57,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         _id = CcrText.IdOf(original);
         _lines = CcrText.LinesOf(original);
         _shown = new bool[_lines.Length];
-        _budget = options.CharactersOf(options.BudgetFor(reducedTokens));
+        _budget = options.CharactersOf(options.BudgetFor(options.TokensOf(original.Length)));
         _gapCost = Gap(_lines.Length, _lines.Length).Length + 1;
         _overlayRoom = (int)(_budget * options.OverlayShare);
         _lineRoom = _budget - (Header(_lines.Length).Length + 1) - _overlayRoom - _gapCost;

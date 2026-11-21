@@ -25,7 +25,7 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
             return null;
         }
 
-        if (reducedTokens < options.SkipUnderTokens && (PreviewSkip.IsNumberedRead(original) || PreviewSkip.IsDiff(original)))
+        if (options.SkipsPreview(original, reducedTokens))
         {
             return null;
         }

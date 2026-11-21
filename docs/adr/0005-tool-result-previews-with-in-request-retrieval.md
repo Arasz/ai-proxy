@@ -36,7 +36,7 @@ The marker is fixed text with no timestamp, counter, request id or store state:
 ...
 ```
 
-The id is the first 16 hex characters of the SHA-256 of the region's original UTF-8 text. The preview bytes are a pure function of the original and a pinned preview version, with invariant-culture number formatting. The same original gives the same id and the same bytes in every request and after every restart. Changing the preview version is a cache event and ships as one.
+The id is the first 16 hex characters of the SHA-256 of the region's original UTF-8 text. The preview bytes are a pure function of the original and a pinned preview version, with invariant-culture number formatting. The bytes also depend on the `CcrOptions` values (ADR 0015 sets the budget share), so changing one is a cache event too. The same original gives the same id and the same bytes in every request and after every restart. Changing the preview version is a cache event and ships as one.
 
 This answers the 9% loss in three ways. Fewer regions are previewed, and only large ones, so each preview saves at least 2,000 tokens before any fetch. Signal lines survive, which is where rtk lost build and test answers. And a fetch returns a slice, not the whole original.
 

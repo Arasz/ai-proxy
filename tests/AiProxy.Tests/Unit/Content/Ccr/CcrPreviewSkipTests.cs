@@ -24,11 +24,20 @@ public sealed class CcrPreviewSkipTests
     }
 
     [Fact]
-    public async Task A_numbered_read_is_not_previewed_by_default()
+    public async Task A_numbered_read_of_four_thousand_tokens_is_previewed_with_the_default_options()
+    {
+        var read = Read(200);
+        Assert.InRange(Options.TokensOf(read.Length), 3_500, 4_500);
+
+        Assert.NotNull(await Previewer(Options).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_numbered_read_under_a_set_band_is_not_previewed()
     {
         var read = Read(300);
 
-        Assert.Null(await Previewer(Options).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
+        Assert.Null(await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
     }
 
     [Fact]
@@ -52,7 +61,7 @@ public sealed class CcrPreviewSkipTests
     [Fact]
     public async Task A_diff_around_four_hundred_tokens_gets_no_scaled_preview()
     {
-        var floor = Options with { MinimumTokens = 300 };
+        var floor = Options with { MinimumTokens = 300, SkipUnderTokens = 100_000 };
         var diff = Diff(9);
         var tokens = floor.TokensOf(diff.Length);
         Assert.InRange(tokens, 350, 450);
@@ -67,6 +76,6 @@ public sealed class CcrPreviewSkipTests
         var read = Read(300);
         var reduced = string.Join("\n", Enumerable.Range(1, 300).Select(index => $"view line {index} of a rewritten read, not numbered"));
 
-        Assert.Null(await Previewer(Options).PreviewAsync(read, reduced, CcrMode.Stateless, CancellationToken.None));
+        Assert.Null(await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, reduced, CcrMode.Stateless, CancellationToken.None));
     }
 }

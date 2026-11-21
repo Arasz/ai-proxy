@@ -27,7 +27,7 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
 
     /// <summary>Builds the engine from the proxy's own service registrations, with the CCR minimum replaced when one is given.</summary>
     /// <param name="minimumTokens">The preview floor in estimated tokens, or null for the proxy's own.</param>
-    /// <param name="budgetShare">The share of reduced tokens a preview may hold, or null for the proxy's own.</param>
+    /// <param name="budgetShare">The share of original tokens a preview may hold, or null for the proxy's own.</param>
     /// <param name="minimumSavingTokens">The least a preview must save, or null for the proxy's own.</param>
     /// <param name="skipUnderTokens">The skip band for numbered reads and diffs in estimated tokens, or null for the proxy's own.</param>
     /// <param name="configuration">The configuration the compression settings are bound from, as the proxy host binds them.</param>
@@ -144,7 +144,7 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
 
     private bool WasSkipped(ContentRegion original, int reducedTokens)
     {
-        return reducedTokens >= options.MinimumTokens && reducedTokens < options.SkipUnderTokens && (PreviewSkip.IsNumberedRead(original.Text) || PreviewSkip.IsDiff(original.Text));
+        return reducedTokens >= options.MinimumTokens && options.SkipsPreview(original.Text, reducedTokens);
     }
 
     private int Tokens(ContentRegion region)

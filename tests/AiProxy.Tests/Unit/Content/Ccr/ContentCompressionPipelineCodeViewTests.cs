@@ -170,7 +170,7 @@ public sealed class ContentCompressionPipelineCodeViewTests
     {
         var read = NumberedLargeFile();
 
-        var result = await CompressAsync(new MemoryOriginalStore(), CcrMode.Stateless, new ReadFile("src/Large.cs", read));
+        var result = await CompressAsync(new MemoryOriginalStore(), CcrOptions.Default with { SkipUnderTokens = 100_000 }, CcrMode.Stateless, new ReadFile("src/Large.cs", read));
 
         var sent = ToolResults(result)[0];
         Assert.DoesNotContain(CcrPreview.Marker, sent, StringComparison.Ordinal);

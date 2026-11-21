@@ -2,7 +2,7 @@ using AiProxy.Core.Content.Ccr;
 
 namespace AiProxy.Tests.Unit.Content.Ccr;
 
-/// <summary>The preview budget scales with the reduced text, the floor is checked once on it, and a preview must save tokens.</summary>
+/// <summary>The preview budget scales with the original text, the floor is checked once on the reduced text, and a preview must save tokens.</summary>
 public sealed class CcrPreviewBudgetTests
 {
     private static readonly CcrOptions Options = CcrOptions.Default;
@@ -20,7 +20,7 @@ public sealed class CcrPreviewBudgetTests
     [Theory]
     [InlineData(120)]
     [InlineData(400)]
-    public void The_preview_holds_at_most_the_share_of_the_reduced_tokens_and_the_cap(int lines)
+    public void The_preview_holds_at_most_the_share_of_the_original_tokens_and_the_cap(int lines)
     {
         var original = Log(lines);
         var reduced = Options.TokensOf(original.Length);
@@ -32,13 +32,25 @@ public sealed class CcrPreviewBudgetTests
     }
 
     [Fact]
-    public void The_budget_follows_the_reduced_tokens_not_the_original()
+    public void The_budget_follows_the_original_tokens_not_the_reduced()
     {
         var original = Log(400);
+        var originalTokens = Options.TokensOf(original.Length);
 
-        var small = Build(original, Options, 3_000) ?? throw new InvalidOperationException("expected a preview");
+        var afterReducers = Build(original, Options, 3_000) ?? throw new InvalidOperationException("expected a preview");
+        var afterNone = Build(original, Options, originalTokens) ?? throw new InvalidOperationException("expected a preview");
 
-        Assert.True(Options.TokensOf(small.Text.Length) <= 1_200);
+        Assert.Equal(afterNone, afterReducers);
+    }
+
+    [Fact]
+    public void A_preview_that_is_exactly_as_long_as_the_reduced_text_is_not_made_and_one_token_shorter_is()
+    {
+        var original = Log(400);
+        var previewTokens = Options.TokensOf((Build(original, Options, Options.TokensOf(original.Length)) ?? throw new InvalidOperationException("expected a preview")).Text.Length);
+
+        Assert.Null(Build(original, Options, previewTokens));
+        Assert.NotNull(Build(original, Options, previewTokens + 1));
     }
 
     [Fact]
