@@ -43,13 +43,24 @@ Compression is on by default. It changes provider request bodies, so set `PROXY_
 |---|---|
 | `PROXY__COMPRESSION__ENABLED` | Request compression. The default is `true`; `false` turns it off. |
 | `PROXY__COMPRESSION__DATABASE` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
-| `PROXY__COMPRESSION__MINIMUM` | A minimum size applied to every content kind, checked against the whole tool result. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
+| `PROXY__COMPRESSION__MINIMUM` | At least 1. A minimum size applied to every content kind, checked against the whole tool result. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
+| `PROXY__COMPRESSION__CODEVIEWS` | A whole C#, Python, JavaScript or TypeScript file a tool call read goes out as its code view, and the original stays available to `proxy_retrieve`. The default is `true`; `false` turns it off. |
 | `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
 
 The database contains the text tools returned to the agent. Keep it on the machine running
 ai-proxy and protect it like other local agent data. On Linux and macOS the file is `0600`. Requests,
 their chunks, originals, thread rows and dead-lettered queue rows older than 14 days are deleted, once
 at start and then every hour.
+
+## Recoverable compression
+
+Recoverable compression (CCR) replaces a large tool result with a preview. The model reads the original back with `proxy_retrieve`. It needs compression on.
+
+| Variable | What it is |
+|---|---|
+| `PROXY__CCR__ENABLED` | The default is `true`; `false` turns previews and `proxy_retrieve` off. |
+| `PROXY__CCR__UNKNOWNPROVIDERS` | Also make previews for providers the fallback covers. It has no effect until another provider has its own loop. The default is `false`. |
+| `PROXY__CCR__KEEPALIVEINTERVAL` | How often the client gets a keep-alive while a retrieval follow-up has no answer. A time span such as `00:00:05` (the default), from one millisecond to one day. A follow-up that sends no response headers in 10 minutes ends the turn with an error event. |
 
 ## Request capture
 
@@ -161,6 +172,7 @@ launch directory and attributes the agent's provider traffic in `gain`; see
 |---|---|
 | `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
 | `PROXY__CONFIGURESYSTEMPROXY` | `false` leaves the operating system proxy settings alone. Defaults to `true`. |
+| `PROXY__ROOTCERTIFICATEPASSWORD` | The password that protects the root certificate `.pfx` file. Unset or empty keeps the built-in option. |
 | `PROXY__TRUSTROOTCERTIFICATE` | `false` creates the inspection certificate without adding it to operating system trust. Defaults to `true`. |
 
 Unset values preserve runtime defaults, including options injected by an embedding host.

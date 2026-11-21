@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using AiProxy.Storage;
 using JetBrains.Annotations;
 
@@ -17,6 +18,7 @@ public sealed record CompressionSettings
     public bool CodeViews { get; init; } = true;
 
     /// <summary>The smallest part that is compressed, when the operator set one.</summary>
+    [Range(1, int.MaxValue, ErrorMessage = "Proxy:Compression:Minimum must be at least 1 character.")]
     public int? Minimum { get; init; }
 
     /// <summary>Reserved for the extractive model artifact, which this version does not include; accepted and ignored (environment form <c>PROXY__COMPRESSION__MODEL</c>).</summary>

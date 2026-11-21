@@ -102,7 +102,7 @@ public sealed class CcrChatRelayTests : IDisposable
         };
     }
 
-    private Task<ProxyHost> StartProxyAsync(bool chatHost = true, RecordingLoggerProvider? logs = null, string? keepAlive = null)
+    private Task<ProxyHost> StartProxyAsync(bool chatHost = true, RecordingLoggerProvider? logs = null, string? keepAlive = null, TimeProvider? time = null)
     {
         var settings = new Dictionary<string, string> { ["Proxy:Compression:Enabled"] = "true", ["Proxy:Compression:Database"] = _databasePath };
         if (keepAlive is not null)
@@ -110,7 +110,7 @@ public sealed class CcrChatRelayTests : IDisposable
             settings["Proxy:Ccr:KeepAliveInterval"] = keepAlive;
         }
 
-        return ProxyHost.StartAsync(settings, providerHosts: new LoopbackProviderHosts(Dialect.OpenAi, chatHost), logging: logs);
+        return ProxyHost.StartAsync(settings, providerHosts: new LoopbackProviderHosts(Dialect.OpenAi, chatHost), logging: logs, time: time);
     }
 
     private static JsonNode[] ChunksOf(string client)
@@ -538,5 +538,38 @@ public sealed class CcrChatRelayTests : IDisposable
         Assert.DoesNotContain("event: ping", client, StringComparison.Ordinal);
         Assert.Contains("answer", client, StringComparison.Ordinal);
         Assert.Equal(1, Count(client, "[DONE]"));
+    }
+
+    [Fact]
+    public async Task A_follow_up_that_never_sends_headers_ends_the_turn_with_an_error_chunk_then_done()
+    {
+        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var upstream = await FakeUpstream.StartAsync();
+        var calls = 0;
+        upstream.Handler = async (_, context) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                context.Response.ContentType = "text/event-stream";
+                await context.Response.WriteAsync(Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "tool_calls", 4));
+                return;
+            }
+
+            arrived.TrySetResult();
+            await Task.Delay(Timeout.Infinite, context.RequestAborted);
+        };
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        await using var proxy = await StartProxyAsync(keepAlive: "00:00:05", time: time);
+
+        var sending = SendAsync(proxy, upstream, Request());
+        await arrived.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        time.Advance(AiProxy.Ccr.CcrRelay.HeadersDeadline + TimeSpan.FromSeconds(1));
+        var client = await sending.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromSeconds(15));
+
+        Assert.Equal(1, ChunksOf(client).Count(static chunk => chunk["error"] is not null));
+        Assert.Equal(1, Count(client, "[DONE]"));
+        Assert.EndsWith("data: [DONE]\n\n", client, StringComparison.Ordinal);
+        Assert.DoesNotContain(": keep-alive", client[client.IndexOf("\"error\"", StringComparison.Ordinal)..], StringComparison.Ordinal);
     }
 }
