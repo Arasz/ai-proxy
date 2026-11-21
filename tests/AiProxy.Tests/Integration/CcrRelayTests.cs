@@ -453,6 +453,8 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Equal("", recall.PreviewId);
         Assert.Equal(GainLabels.Unknown, recall.Mode);
         Assert.Equal(CcrRetrieval.BadInput, recall.Error);
+        Assert.False(string.IsNullOrEmpty(recall.Host));
+        Assert.Equal(Assert.Single(gain.History).Host, recall.Host);
     }
 
     [Fact]

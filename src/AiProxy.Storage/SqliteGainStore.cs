@@ -89,7 +89,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Recalls = recalls,
             OtherTraffic = other,
             Harnesses = GainReportBuilder.Harnesses(rows.Where(static row => row.View == "provider")
-                .Select(static row => new GainProviderTotals(row.Name, row.ConvertToTotals())))
+                .Select(static row => new GainProviderTotals(row.Name, row.ConvertToTotals(), row.Host.Length == 0 ? null : row.Host)))
         };
     }
 
@@ -201,7 +201,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         _initialized = true;
     }
 
-    private sealed record AggregateRow(string View, long Start, string? Name, string Totals)
+    private sealed record AggregateRow(string View, long Start, string? Name, string Host, string Totals)
     {
         public GainTotals ConvertToTotals()
         {
@@ -292,25 +292,29 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                            'FollowUpMeasuredRequests',COALESCE(SUM(json_extract(totals,'$.FollowUpMeasuredRequests')),0))
                                        """;
 
+        private const string MetricsSelect = $"""
+                                              SELECT kind,at,provider,method,rule,layer,pipeline,
+                                                  COALESCE(json_extract(payload,'$.Host'),'') AS host,
+                                                  CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
+                                                      WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
+                                                          'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
+                                                      ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
+                                                          'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
+                                              FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate}
+                                              """;
+
         public const string Aggregate = $"""
-                                         WITH metrics AS (
-                                             SELECT kind,at,provider,method,rule,layer,pipeline,
-                                                 CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
-                                                     WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
-                                                         'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
-                                                     ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
-                                                         'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
-                                             FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate})
-                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
+                                         WITH metrics AS ({MetricsSelect})
+                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
                                              '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
                                              '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
                                          FROM metrics
-                                         UNION ALL SELECT 'daily',at - at % 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
-                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
-                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
-                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
+                                         UNION ALL SELECT 'daily',at - at % 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
+                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,'',{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
                                          GROUP BY dimension,Name
-                                         UNION ALL SELECT 'provider',0,provider,{SumJson}FROM metrics GROUP BY provider
+                                         UNION ALL SELECT 'provider',0,provider,host,{SumJson}FROM metrics GROUP BY provider,host
                                          """;
     }
 

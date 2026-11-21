@@ -1,6 +1,6 @@
 # 0014 - Gain tables fit the screen and count each rule
 
-Status: Accepted (owner request 2026-11-18)
+Status: Accepted (owner request 2026-11-18); amended 2026-11-20 (harness by host)
 
 ## Context
 
@@ -58,3 +58,39 @@ longer; a builder test asserts a mixed-rule request counts under each rule; a st
 - Keep combination rows and only fix the layout: rejected; it still cannot answer what one rule
   saves.
 - Transpose the summary (harnesses as columns): fits easily, but the owner chose harness rows.
+
+## Amendment 2026-11-20: harness by host
+
+Status: Accepted (owner rulings 2026-11-20, plan review)
+
+`GainHarness.Of` labels every row of the `openai` provider "codex"
+(`src/AiProxy.Core/Gain/GainHarness.cs:15-22`). The 11-20 record found that 221 of those rows,
+56.7M original tokens, were the pi agent's DeepSeek requests on OpenRouter, not Codex
+([token return record](../work/2026-11-20-token-return-vs-rtk.md) F2). The provider alone cannot
+tell the two apart, because both use the OpenAI dialect.
+
+1. Each request row in the ledger carries the request host. `GainHistoryEntry` gets a `Host`
+   field, filled where the proxy writes the row
+   (`src/AiProxy/Hosting/Integration/ProviderRequestInspector.cs:412`).
+2. The harness label comes from provider and host together:
+
+   | Provider | Host | Harness |
+   |---|---|---|
+   | `anthropic` | any | `claude` |
+   | `openai` | `chatgpt.com` | `codex` |
+   | `openai` | `openrouter.ai` or a subdomain such as `eu.openrouter.ai` | `openrouter` |
+   | `openai` | `api.openai.com` or a regional `*.api.openai.com` | `openai` |
+   | `openai` | any other host | `other` |
+   | anything else | any | `other` |
+
+   Host matching ignores case and a trailing dot. A look-alike such as `evilopenrouter.ai` is
+   `other`, not `openrouter`.
+3. Follow-up and recall rows carry the host of the request they belong to, so they count under the
+   same harness as that request.
+4. Rows written before this change have no host. An `openai` row without a host shows as
+   `openai (host unknown)`, not `codex`. Old rows are not rewritten, because the ledger never kept
+   the host and guessing it from tokens would be a guess presented as data.
+
+Positive: pi traffic on OpenRouter gets its own row, and the `codex` row counts only Codex. Negative:
+the history before the change stays in one mixed row under a new name. The summary table can grow
+to six harness rows plus `total`, and decision 3 above still requires it to fit in 80 columns.

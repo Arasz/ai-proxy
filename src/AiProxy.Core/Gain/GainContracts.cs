@@ -84,13 +84,14 @@ public sealed record GainHistoryEntry(
     string Rule,
     string Layer,
     string Pipeline,
-    GainTotals Totals);
+    GainTotals Totals,
+    string? Host = null);
 
 /// <summary>Totals assigned once within one attribution dimension.</summary>
 public sealed record GainAttribution(string Dimension, string Name, GainTotals Totals);
 
 /// <summary>The totals of one provider; a null provider is one the ledger does not know.</summary>
-public sealed record GainProviderTotals(string? Provider, GainTotals Totals);
+public sealed record GainProviderTotals(string? Provider, GainTotals Totals, string? Host = null);
 
 /// <summary>The method, rule, layer and pipeline an event is attributed to.</summary>
 public sealed record GainPath(string Method, string Rule, string Layer, string Pipeline);
@@ -99,7 +100,7 @@ public sealed record GainPath(string Method, string Rule, string Layer, string P
 public sealed record GainRecallEvent(GainRecall Recall, GainPath Path);
 
 /// <summary>A follow-up request the CCR relay sent upstream to carry retrieval results; <c>Bytes</c> is its body length and <c>Characters</c> its text.</summary>
-public sealed record GainFollowUp(DateTimeOffset At, string? Project, int Round, long Characters, long Bytes, long EstimatedTokens);
+public sealed record GainFollowUp(DateTimeOffset At, string? Project, int Round, long Characters, long Bytes, long EstimatedTokens, string? Host = null);
 
 /// <summary>A follow-up as the ledger holds it: the follow-up and the path it is attributed to.</summary>
 public sealed record GainFollowUpEvent(GainFollowUp FollowUp, GainPath Path);
@@ -116,7 +117,8 @@ public sealed record GainRecall(
     string Mode,
     long Characters,
     long EstimatedTokens,
-    string? Error);
+    string? Error,
+    string? Host = null);
 
 /// <summary>Whether this release measures a requested feature.</summary>
 public sealed record GainCapability(string Name, bool Supported, string? Reason = null);

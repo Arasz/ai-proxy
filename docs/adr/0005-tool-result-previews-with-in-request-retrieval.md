@@ -1,7 +1,7 @@
 # 0005: Tool result previews with retrieval answered inside the request
 
 Date: 2026-10-25
-Status: Accepted (owner, 2026-10-25)
+Status: Accepted (owner, 2026-10-25); amended by [0015](0015-size-scaled-previews-read-and-diff-skip-and-a-replay-tool.md) (floor, budget, read and diff skip) and [0016](0016-recoverable-compression-for-chat-completions-on-openrouter.md) (Chat Completions on OpenRouter), 2026-11-20
 
 ## Context
 
