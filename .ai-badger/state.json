@@ -1,7 +1,23 @@
 {
-  "lastUpdated": "2026-11-18T12:39:31+00:00",
-  "next": "Owner live smoke of 0.27.0 Codex chatgpt.com recording; quoted-echo references build (high loop, default shape); #24 restore system proxy after crash, NSS cleanup, capture message id.",
+  "lastUpdated": "2026-11-21T16:03:17Z",
+  "next": "Project review fix campaign (aip-run-review-fix-campaign-waves): waves W0-W4 of docs/work/2026-11-21-project-review-plan.md. Then L5 Codex after an owner Codex session; capture-week read about 2026-11-27.",
   "completedTasks": [
+    {
+      "taskId": "aip-close-token-return-open-items",
+      "title": "Token-return levers 1-4: harness labels, replay tool, size-scaled previews and read/diff skip, Chat Completions CCR on OpenRouter",
+      "pr": [
+        133,
+        134,
+        135,
+        136,
+        137,
+        138
+      ],
+      "merge": "9d9c5b4",
+      "version": "0.34.0",
+      "finished": "2026-11-21",
+      "open": "L5 Codex compression waits for one owner Codex session through the proxy with capture on; one-week billed-usage capture read about 2026-11-27; NuGet publish of 0.31.0-0.34.0 is the owner gate"
+    },
     {
       "taskId": "aip-gain-tables-fit-colour-per-rule",
       "title": "Gain UI: fit tables on 80 columns, sign colours, one by-rule row per rule",
