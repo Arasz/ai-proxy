@@ -124,7 +124,7 @@ public sealed partial class ProviderRequestInspector(
 
         if (compression.Compresses && !recordOnly && !encoded)
         {
-            var plan = await ccr.DecideAsync(dialect, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
+            var plan = await ccr.DecideAsync(dialect, provider.ChatCcr, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
             if (plan.Failure is { } failure)
             {
                 Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
@@ -297,7 +297,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var toolCharacters = 0;
-        if (plan.Action == CcrAction.RelayWithTool && CcrRequest.AppendTool(forwarded) is { } withTool)
+        if (plan.Action == CcrAction.RelayWithTool && (plan.Chat ? ChatRequest.Prepare(forwarded) : CcrRequest.AppendTool(forwarded)) is { } withTool)
         {
             toolCharacters = Encoding.UTF8.GetCharCount(withTool) - Encoding.UTF8.GetCharCount(forwarded);
             forwarded = withTool;

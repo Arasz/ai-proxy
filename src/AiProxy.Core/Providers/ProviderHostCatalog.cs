@@ -19,7 +19,7 @@ public static class ProviderHostCatalog
         ["ae.api.openai.com"] = new(Dialect.OpenAi, HarnessOnly: false),
         ["api.anthropic.com"] = new(Dialect.Anthropic, HarnessOnly: false),
         ["generativelanguage.googleapis.com"] = new(Dialect.Gemini, HarnessOnly: false),
-        ["openrouter.ai"] = new(Dialect.OpenAi, HarnessOnly: false),
+        ["openrouter.ai"] = new(Dialect.OpenAi, HarnessOnly: false, ChatCcr: true),
         ["eu.openrouter.ai"] = new(Dialect.OpenAi, HarnessOnly: false),
         ["chatgpt.com"] = new(Dialect.OpenAi, HarnessOnly: true)
     };

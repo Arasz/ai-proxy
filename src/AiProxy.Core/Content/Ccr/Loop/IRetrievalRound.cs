@@ -46,4 +46,13 @@ public interface IRetrievalRound
 
     /// <summary>The error event the client gets when the loop fails.</summary>
     SseEvent Error(string message);
+
+    /// <summary>The error event for an upstream error body that is JSON: the client gets it as the provider wrote it.</summary>
+    SseEvent ErrorOf(string body);
+
+    /// <summary>What the client gets while a follow-up has not answered yet.</summary>
+    SseEvent KeepAlive { get; }
+
+    /// <summary>The event that ends the client's stream after a failure; null when the dialect has none.</summary>
+    SseEvent? Terminator { get; }
 }

@@ -330,7 +330,7 @@ public sealed class RetrievalLoopTests
                 "data: [DONE]\n\n");
         }
 
-        private static string Chunk(string id, JsonObject? delta, string? finishReason, JsonObject? usage)
+        public static string Chunk(string id, JsonObject? delta, string? finishReason, JsonObject? usage)
         {
             var choices = new JsonArray();
             if (delta is not null)

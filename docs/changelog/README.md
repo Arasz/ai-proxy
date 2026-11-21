@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.34.0](0.34.0-chat-completions-recoverable-compression.md) | Streamed Chat Completions requests to OpenRouter models (`anthropic/`, `openai/`, `google/`, `deepseek/`) get recoverable previews and in-request `proxy_retrieve`, as the Anthropic path does. | - |
 | [0.33.0](0.33.0-preview-floor-1000.md) | Previews start at 1,000 tokens (was 3,000), scale to the block, and skip small file reads and diffs; one cache break per session after upgrade. | [#136](https://github.com/Arasz/ai-proxy/pull/136) |
 | [0.32.0](0.32.0-replay-command.md) | `ai-proxy replay` runs stored request bodies through the compression pipeline read-only and prints the saving per content kind, with the row counts it is based on. | [#135](https://github.com/Arasz/ai-proxy/pull/135) |
 | [0.31.0](0.31.0-gain-harness-by-host.md) | `ai-proxy gain` names the harness from provider and host, so OpenRouter traffic is `openrouter` and not `codex`; older OpenAI rows show as `openai (host unknown)`. | [#134](https://github.com/Arasz/ai-proxy/pull/134) |

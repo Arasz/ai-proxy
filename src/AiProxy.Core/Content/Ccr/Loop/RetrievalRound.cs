@@ -104,6 +104,18 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex) : IRetriev
         return SseEvent.Error(Errors.Api, message);
     }
 
+    /// <inheritdoc />
+    public SseEvent ErrorOf(string body)
+    {
+        return new SseEvent(Events.Error, body);
+    }
+
+    /// <inheritdoc />
+    public SseEvent KeepAlive => SseEvent.Ping;
+
+    /// <inheritdoc />
+    public SseEvent? Terminator => null;
+
     /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
     public IReadOnlyList<SseEvent> Finish(int answered, long outputTokens)
     {

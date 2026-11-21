@@ -82,6 +82,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             exchange.Response = ResponseBuffer.For(EventStream, null);
         }
 
+        IRetrievalRound firstRound = plan.Chat ? ChatRound.First(plan.ChatUsage) : RetrievalRound.First();
         using var deadline = new CancellationTokenSource(HeadersDeadline, time);
         HttpResponseMessage response;
         try
@@ -91,21 +92,21 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         catch (OperationCanceledException) when (deadline.IsCancellationRequested)
         {
             Log.UpstreamSilent(logger, request.RequestUri.Host);
-            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, Messages.UpstreamSilent).Data);
+            var error = Encoding.UTF8.GetBytes(firstRound.Error(Messages.UpstreamSilent).Data);
             e.GenericResponse(error, HttpStatusCode.GatewayTimeout, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
             return;
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
             Log.UpstreamUnreachable(logger, request.RequestUri.Host, exception);
-            var error = Encoding.UTF8.GetBytes(SseEvent.Error(MessagesApi.Errors.Api, Messages.UpstreamUnreachable).Data);
+            var error = Encoding.UTF8.GetBytes(firstRound.Error(Messages.UpstreamUnreachable).Data);
             e.GenericResponse(error, HttpStatusCode.BadGateway, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
             return;
         }
 
         var answer = ClientResponse(response, exchange.ContentId);
         var streams = response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == EventStream;
-        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time, parser), exchange, headers, request.RequestUri, body, plan, originals);
+        var conversation = new Conversation(new RelayServices(store, retrievers, options, logger, _http, gain, time, parser), exchange, headers, request.RequestUri, body, plan, originals, firstRound);
         e.RespondStreaming(answer, streams ? conversation.RunAsync(response) : conversation.CopyAsync(response), true);
     }
 
@@ -166,8 +167,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         Uri uri,
         byte[] body,
         CcrPlan plan,
-        IReadOnlyDictionary<string, string> originals)
+        IReadOnlyDictionary<string, string> originals,
+        IRetrievalRound firstRound)
     {
+        private readonly RetrievalLoop _loop = new(firstRound);
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
 
@@ -202,14 +205,14 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
                     Log.LoopFailed(relay.Logger, uri.Host, exception);
-                    await WriteAsync(SseEvent.Error(MessagesApi.Errors.Api, Messages.ResponseLost));
+                    await WriteFailureAsync(_loop.Failure(Messages.ResponseLost));
                 }
             };
         }
 
         private async Task LoopAsync(HttpResponseMessage first)
         {
-            var loop = new RetrievalLoop();
+            var loop = _loop;
             var forwarded = body;
             var response = first;
             while (true)
@@ -227,7 +230,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
                 if (plan.Mode == CcrMode.Stateless && loop.Round.Lossy)
                 {
-                    await WriteAsync(loop.Failure(Messages.LossyMessage));
+                    await WriteFailureAsync(loop.Failure(Messages.LossyMessage));
                     return;
                 }
 
@@ -266,25 +269,26 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         {
             if (loop.Round.Failed)
             {
+                await WriteTerminatorAsync(loop);
                 return;
             }
 
             if (!loop.Round.Ended)
             {
                 Log.StreamCutOff(relay.Logger, uri.Host, loop.Answered + 1);
-                await WriteAsync(loop.Failure(Messages.StreamCutOff));
+                await WriteFailureAsync(loop.Failure(Messages.StreamCutOff));
                 return;
             }
 
             Log.LimitExceeded(relay.Logger, uri.Host, loop.Answered);
-            await WriteAsync(loop.Failure(Messages.LimitExceeded));
+            await WriteFailureAsync(loop.Failure(Messages.LimitExceeded));
         }
 
         private async Task ReleaseAsync(RetrievalLoop loop)
         {
             if (!await LinkAsync(loop).ConfigureAwait(false))
             {
-                await WriteAsync(loop.Failure(Messages.ThreadNotRecorded));
+                await WriteFailureAsync(loop.Failure(Messages.ThreadNotRecorded));
                 return;
             }
 
@@ -310,10 +314,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             {
                 var error = await response.Content.ReadAsStringAsync(_cancellation);
                 Log.FollowUpRefused(relay.Logger, uri.Host, (int)response.StatusCode, error);
-                await WriteAsync(IsJson(error)
-                    ? new SseEvent(MessagesApi.Events.Error, error)
-                    : SseEvent.Error(MessagesApi.Errors.Api, string.Format(Messages.FollowUpRefused, (int)response.StatusCode)));
                 loop.Failure(Messages.FollowUpRefusedTrigger);
+                await WriteFailureAsync(IsJson(error) ? loop.Round.ErrorOf(error) : loop.Round.Error(string.Format(Messages.FollowUpRefused, (int)response.StatusCode)));
             }
         }
 
@@ -421,10 +423,24 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, _cancellation);
             while (await Task.WhenAny(sending, Task.Delay(PingInterval, _cancellation)).ConfigureAwait(false) != sending)
             {
-                await WriteAsync(SseEvent.Ping);
+                await WriteAsync(_loop.Round.KeepAlive);
             }
 
             return await sending;
+        }
+
+        private async Task WriteFailureAsync(SseEvent failure)
+        {
+            await WriteAsync(failure);
+            await WriteTerminatorAsync(_loop);
+        }
+
+        private async Task WriteTerminatorAsync(RetrievalLoop loop)
+        {
+            if (loop.Round.Terminator is { } terminator)
+            {
+                await WriteAsync(terminator);
+            }
         }
 
         private async Task WriteAsync(SseEvent sse)
