@@ -23,6 +23,8 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
             home,
             since = settings.SinceTime,
             minimum = settings.Minimum,
+            budgetShare = settings.BudgetShare,
+            minimumSaving = settings.MinimumSaving,
             source = settings.Source,
             includeEncoded = settings.IncludeEncoded,
             coverage = run.Coverage,

@@ -6,6 +6,8 @@ namespace AiProxy.Core.Content.Ccr;
 /// <param name="CharactersPerToken">Characters per estimated token.</param>
 /// <param name="MinimumTokens">The smallest whole region, in estimated tokens, that gets a preview.</param>
 /// <param name="BudgetTokens">The most a preview may hold, in estimated tokens, markers and overlay included.</param>
+/// <param name="BudgetShare">The share of the region's reduced tokens a preview may hold; the budget is the smaller of this and <paramref name="BudgetTokens" />.</param>
+/// <param name="MinimumSavingTokens">The least a preview must save over the reduced text, in estimated tokens; a smaller saving sends the reduced text.</param>
 /// <param name="SignalShare">The share of the line budget signal lines may take first.</param>
 /// <param name="HeadShare">The share of what is left after signal lines that goes to the head; the tail gets the rest.</param>
 /// <param name="OverlayShare">The share of the budget the trailing identifier block may take.</param>
@@ -18,6 +20,8 @@ public sealed record CcrOptions(
     decimal CharactersPerToken,
     int MinimumTokens,
     int BudgetTokens,
+    decimal BudgetShare,
+    int MinimumSavingTokens,
     decimal SignalShare,
     decimal HeadShare,
     decimal OverlayShare,
@@ -33,6 +37,8 @@ public sealed record CcrOptions(
         3_000,
         1_500,
         0.40m,
+        0,
+        0.40m,
         2m / 3m,
         0.05m,
         3_000,
@@ -40,6 +46,13 @@ public sealed record CcrOptions(
         240,
         10,
         TimeSpan.FromMilliseconds(250));
+
+    /// <summary>The most a preview of a region of this many reduced tokens may hold, in estimated tokens.</summary>
+    /// <param name="reducedTokens">The region's estimated tokens after its reducers.</param>
+    public int BudgetFor(int reducedTokens)
+    {
+        return Math.Min(BudgetTokens, (int)(BudgetShare * reducedTokens));
+    }
 
     /// <summary>The estimated tokens of a text of this many characters, rounded down.</summary>
     public int TokensOf(int characters)

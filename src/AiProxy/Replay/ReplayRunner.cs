@@ -35,10 +35,12 @@ public sealed class ReplayRunner(ReplayReader reader, ReplayEngine engine) : IDi
     /// <summary>Opens a runner over a data directory.</summary>
     /// <param name="home">The proxy data directory.</param>
     /// <param name="minimumTokens">The preview floor in estimated tokens, or null for the proxy's own.</param>
+    /// <param name="budgetShare">The share of reduced tokens a preview may hold, or null for the proxy's own.</param>
+    /// <param name="minimumSavingTokens">The least a preview must save, or null for the proxy's own.</param>
     /// <param name="configuration">The configuration the compression settings are bound from.</param>
-    public static ReplayRunner Create(string home, int? minimumTokens, IConfiguration configuration)
+    public static ReplayRunner Create(string home, int? minimumTokens, decimal? budgetShare, int? minimumSavingTokens, IConfiguration configuration)
     {
-        return new ReplayRunner(new ReplayReader(home), ReplayEngine.Create(minimumTokens, configuration));
+        return new ReplayRunner(new ReplayReader(home), ReplayEngine.Create(minimumTokens, budgetShare, minimumSavingTokens, configuration));
     }
 
     /// <inheritdoc />
