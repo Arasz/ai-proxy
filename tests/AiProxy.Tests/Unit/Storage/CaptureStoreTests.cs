@@ -123,6 +123,7 @@ public sealed class CaptureStoreTests : IDisposable
         var completedAt = new DateTimeOffset(2026, 10, 23, 12, 30, 1, TimeSpan.Zero);
         StageTiming[] stages = [new("body-read", TimeSpan.FromTicks(15)), new("compression.reduce.Log", TimeSpan.FromMilliseconds(2.5)), new("upstream.ttfb", TimeSpan.FromSeconds(1))];
 
+        await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
         await _store.StoreResponseAsync(
             new CapturedResponse("r1", completedAt, 200, 1000, 600, 321, new ResponseUsage(11, 22, 33, 44), null, stages),
             TestContext.Current.CancellationToken);
@@ -145,6 +146,7 @@ public sealed class CaptureStoreTests : IDisposable
     [Fact]
     public async Task A_response_without_usage_keeps_null_counts_and_the_reason()
     {
+        await _store.StoreAsync(Capture("r1"), TestContext.Current.CancellationToken);
         await _store.StoreResponseAsync(
             new CapturedResponse("r1", DateTimeOffset.UnixEpoch, 529, 10, 10, 0, null, "over-cap", []),
             TestContext.Current.CancellationToken);
@@ -220,6 +222,7 @@ public sealed class CaptureStoreTests : IDisposable
         }
 
         var store = new SqliteCaptureStore(_databasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
+        await store.StoreAsync(Capture("new"), TestContext.Current.CancellationToken);
         await store.StoreResponseAsync(
             new CapturedResponse("new", DateTimeOffset.UnixEpoch, 200, 2, 2, 5, new ResponseUsage(1, 2, null, null), null, [])
             {
