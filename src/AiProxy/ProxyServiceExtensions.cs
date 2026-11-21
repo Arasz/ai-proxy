@@ -109,67 +109,19 @@ public static partial class ProxyServiceExtensions
             return services;
         }
 
-        /// <summary>Registers the compression stage and everything it is composed of.</summary>
+        /// <summary>Registers the compression stage: its pipeline, then the SQLite stores it keeps what it compressed in.</summary>
         /// <param name="settings">What the operator configured about the stage.</param>
         public IServiceCollection AddCompression(CompressionSettings settings)
         {
-            var options = settings.Minimum is { } minimum
-                ? CompressionOptions.WithMinimum(minimum)
-                : CompressionOptions.Default;
-
-            services.AddTransient<CcrPreviewOverlay>();
-            services.AddTransient<CcrPreviewBuilder>();
-            services.AddSingleton<IToolArgumentSchema, RetrievalArgumentSchema>();
-            services.AddTransient<CcrRetrievalParser>();
-            services.AddTransient<CcrRetriever>();
-            services.AddSingleton(CcrOptions.Default);
-            services.AddSingleton<Func<CcrPreviewBuilder>>(provider => provider.GetRequiredService<CcrPreviewBuilder>);
-            services.AddSingleton<Func<CcrRetriever>>(provider => provider.GetRequiredService<CcrRetriever>);
+            services.AddCompressionPipeline(settings);
             services.AddSingleton<SqliteOriginalStore>();
             services.AddSingleton<IOriginalStore>(provider => provider.GetRequiredService<SqliteOriginalStore>());
-            services.AddSingleton<CcrPreviewer>();
-            services.AddSingleton(options);
-            services.AddSingleton(settings.Store);
+            services.AddSingleton(new ContentStoreOptions(string.IsNullOrWhiteSpace(settings.Database) ? ContentStoreOptions.DefaultDatabasePath : settings.Database.Trim()));
             services.AddSingleton<ContentQueue>();
             services.AddSingleton<IContentQueue>(provider => provider.GetRequiredService<ContentQueue>());
             services.AddSingleton<SqliteContentStore>();
             services.AddSingleton<IContentStore>(provider => provider.GetRequiredService<SqliteContentStore>());
             services.AddSingleton<IContentWriter>(provider => provider.GetRequiredService<SqliteContentStore>());
-            services.AddSingleton<ToolOutputRegionFinder>();
-            services.AddSingleton<IDecompositor, ContentDecompositor>();
-            services.AddSingleton<ICompositor, ContentCompositor>();
-            services.AddSingleton<ICompressionHandler, LogCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, JsonCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, XmlCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, TomlCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, MarkdownCompressionHandler>();
-            if (settings.CodeViews)
-            {
-                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.PythonKey, static (provider, _) =>
-                    new TreeSitterLanguage(TreeSitterLanguage.PythonKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
-                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.JavaScriptKey, static (provider, _) =>
-                    new TreeSitterLanguage(TreeSitterLanguage.JavaScriptKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
-                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.TypeScriptKey, static (provider, _) =>
-                    new TreeSitterLanguage(TreeSitterLanguage.TypeScriptKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
-                services.AddKeyedSingleton<TreeSitterLanguage>(TreeSitterLanguage.TsxKey, static (provider, _) =>
-                    new TreeSitterLanguage(TreeSitterLanguage.TsxKey, provider.GetRequiredService<ILogger<TreeSitterLanguage>>()));
-                services.AddSingleton<ICodeLexer, CSharpCodeLexer>();
-                services.AddSingleton<ICodeLexer, PythonCodeLexer>();
-                services.AddSingleton<ICodeLexer, JavaScriptCodeLexer>();
-                services.AddSingleton<ICodeLexer, TypeScriptCodeLexer>();
-            }
-
-            services.AddSingleton<ICompressionHandler, SourceCodeCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, ProseCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, DirectoryListingCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, ShellTranscriptCompressionHandler>();
-            services.AddSingleton<ICompressionHandler, BuildOutputCompressionHandler>();
-            services.AddSingleton<PassThroughCompressionHandler>();
-            services.AddSingleton<IContentRouter>(provider => new ContentRouter(
-                provider.GetServices<ICompressionHandler>(),
-                provider.GetRequiredService<PassThroughCompressionHandler>()));
-            services.AddSingleton<ICompressionExecutor, CompressionExecutor>();
-            services.AddSingleton<ICompressionPipeline, ContentCompressionPipeline>();
             services.AddHostedService<ContentStoreWorker>();
 
             return services;
