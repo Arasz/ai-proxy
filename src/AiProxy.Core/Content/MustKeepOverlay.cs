@@ -133,7 +133,7 @@ public static partial class MustKeepOverlay
     }
 
     [GeneratedRegex(
-        @"\b0x[0-9A-Fa-f]+\b|(?<![\w.])\d+(?:\.\d+)?(?![\w.\t])|[A-Z_]{2,}|[a-z_][a-z0-9_]*\.[a-z0-9_]+|/[a-z0-9/._-]{2,}|\.[a-z]{2,4}\b|--?[a-z][\w-]*|\b[A-Z][a-z]+[A-Z]\w*|(?i:\b(?:not|never|none|cannot|can't|don't|doesn't|didn't|won't|shouldn't|mustn't|isn't|aren't|avoid|refuse|prohibited|forbidden|disallow|unless|except|without|must|should|shall|required|always|only|mandatory|and|or|nor|xor)\b)",
+        @"\b0x[0-9A-Fa-f]+\b|(?<![\w.])(?!(?<=(?m:^)[ \t]*)\d+\t)\d+(?:\.\d+)?(?![\w.])|[A-Z_]{2,}|[a-z_][a-z0-9_]*\.[a-z0-9_]+|/[a-z0-9/._-]{2,}|\.[a-z]{2,4}\b|--?[a-z][\w-]*|\b[A-Z][a-z]+[A-Z]\w*|(?i:\b(?:not|never|none|cannot|can't|don't|doesn't|didn't|won't|shouldn't|mustn't|isn't|aren't|avoid|refuse|prohibited|forbidden|disallow|unless|except|without|must|should|shall|required|always|only|mandatory|and|or|nor|xor)\b)",
         RegexOptions.CultureInvariant)]
     private static partial Regex CreateIdentifierPattern();
 

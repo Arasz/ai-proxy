@@ -204,6 +204,9 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
     private static void ScanOptions(ref Utf8JsonReader reader, BodyScan scan)
     {
         scan.HasStreamOptions = true;
+        scan.UsageRequested = false;
+        scan.UsageStart = -1;
+        scan.UsageEnd = -1;
         scan.OptionsStart = (int)reader.TokenStartIndex;
         scan.OptionsAreObject = reader.TokenType == JsonTokenType.StartObject;
         if (!scan.OptionsAreObject)

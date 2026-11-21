@@ -120,6 +120,27 @@ public sealed class ChatRequestTests
         Assert.Equal($"{Before}\"stream_options\": {expectedOptions}{after}", prepared);
     }
 
+    [Fact]
+    public void Prepare_uses_the_last_of_two_stream_options_keys()
+    {
+        var body = $"{{\"stream\":true,\"stream_options\":{{\"include_usage\":true}},\"stream_options\":{{\"x\":1}},\"tools\":[{Tool}],\"messages\":[]}}";
+
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+
+        Assert.Contains("\"stream_options\":{\"include_usage\":true,\"x\":1}", prepared);
+    }
+
+    [Fact]
+    public void Prepare_ignores_stream_options_inside_messages()
+    {
+        const string Messages = "\"messages\":[{\"role\":\"user\",\"content\":\"\\\"stream_options\\\"\",\"stream_options\":{\"a\":1}}]";
+        var body = $"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages}}}";
+
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+
+        Assert.Equal($"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages},\"stream_options\":{{\"include_usage\":true}}}}", prepared);
+    }
+
     [Theory]
     [InlineData(",\"n\":null", true)]
     [InlineData(",\"n\":\"2\"", false)]
