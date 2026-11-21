@@ -41,6 +41,15 @@ operation, so a start or restart launched meanwhile fails fast instead of racing
 When the process lease is free, `stop` reports "not running" and leaves anything listening on
 the proxy port alone, because a port cannot identify an ai-proxy owner.
 
+## Log file
+
+The proxy writes every log event to `proxy.log` in the data directory, as well as to the console
+(see [ADR 0020](../adr/0020-proxy-writes-a-rolling-log-file.md)). At 5 MiB the file rolls to
+`proxy.1.log`, which replaces any earlier one, so the two files together stay under 10 MiB. The
+size is fixed and has no setting. Each line holds the UTC time, level, EventId, category and
+message, then the exception text when there is one. On POSIX the file has mode 0600. Do not
+redirect the proxy output to the same file: each line would be written twice.
+
 ## Crash recovery
 
 When system-proxy integration is enabled, ai-proxy writes a private marker before changing the
