@@ -1,5 +1,4 @@
 using Microsoft.Data.Sqlite;
-using SQLitePCL;
 
 namespace AiProxy.Storage;
 
@@ -17,8 +16,13 @@ public static class ContentSchema
     /// </remarks>
     public const int RequestCommandTimeoutSeconds = 1;
 
-    /// <summary>The version of the schema this build writes.</summary>
-    private const int SchemaVersion = 3;
+    /// <summary>Step N brings a file from version N-1 to N; every statement is idempotent, so a file that was stamped late is safe to run through.</summary>
+    private static readonly SchemaLadder Ladder = new(
+    [
+        connection => connection.Execute(Sql.Requests, RequestCommandTimeoutSeconds),
+        connection => connection.Execute(Sql.Ccr, RequestCommandTimeoutSeconds),
+        connection => connection.Execute(Sql.Retention, RequestCommandTimeoutSeconds)
+    ]);
 
     /// <summary>Opens a connection with the settings the store needs.</summary>
     /// <param name="path">The path of the database file.</param>
@@ -94,50 +98,13 @@ public static class ContentSchema
     /// <param name="connection">The connection to prepare.</param>
     extension(SqliteConnection connection)
     {
-        /// <summary>Makes the tables when they are not there yet.</summary>
-        /// <remarks>
-        ///     Reads the user version first, so a current file costs no write. Otherwise it creates
-        ///     everything in one immediate transaction that checks the version again under the lock.
-        /// </remarks>
+        /// <summary>Brings the file to the schema this build writes, through the ladder.</summary>
+        /// <remarks>A current file costs a read of its version and no write.</remarks>
         /// <param name="commandTimeoutSeconds">How long the statements wait for the write lock.</param>
+        /// <exception cref="InvalidOperationException">The file was written by a newer build.</exception>
         public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-            if (connection.ReadUserVersion() >= SchemaVersion)
-            {
-                return;
-            }
-
-            connection.Execute("BEGIN IMMEDIATE;", commandTimeoutSeconds);
-            try
-            {
-                if (connection.ReadUserVersion() < SchemaVersion)
-                {
-                    connection.Execute(Sql.Statements, commandTimeoutSeconds);
-                    connection.Execute($"PRAGMA user_version = {SchemaVersion};", commandTimeoutSeconds);
-                }
-
-                connection.Execute("COMMIT;", commandTimeoutSeconds);
-            }
-            catch
-            {
-                connection.RollBack();
-                throw;
-            }
-        }
-
-        private long ReadUserVersion()
-        {
-            using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version;";
-            return Convert.ToInt64(command.ExecuteScalar());
-        }
-
-        private void RollBack()
-        {
-            if (raw.sqlite3_get_autocommit(connection.Handle) == 0)
-            {
-                connection.Execute("ROLLBACK;");
-            }
+            Ladder.Apply(connection, Path.GetFileName(connection.DataSource), commandTimeoutSeconds);
         }
 
         /// <summary>Runs a statement that returns nothing.</summary>
@@ -154,8 +121,8 @@ public static class ContentSchema
 
     private static class Sql
     {
-        /// <summary>The statements that make the database ready to use.</summary>
-        public const string Statements = """
+        /// <summary>Version 1: the requests, their chunks and the work queue.</summary>
+        public const string Requests = """
                                          CREATE TABLE IF NOT EXISTS content_request (
                                              request_id  TEXT PRIMARY KEY,
                                              created_at  TEXT NOT NULL,
@@ -184,6 +151,10 @@ public static class ContentSchema
                                              payload    TEXT NOT NULL
                                          );
 
+                                         """;
+
+        /// <summary>Version 2: the originals and threads of retrieval.</summary>
+        public const string Ccr = """
                                          CREATE TABLE IF NOT EXISTS ccr_original (
                                              id         TEXT PRIMARY KEY,
                                              text       TEXT NOT NULL,
@@ -201,6 +172,10 @@ public static class ContentSchema
 
                                          CREATE INDEX IF NOT EXISTS ccr_thread_created ON ccr_thread (created_at);
 
+                                         """;
+
+        /// <summary>Version 3: the age index of requests and the dead-letter table.</summary>
+        public const string Retention = """
                                          CREATE INDEX IF NOT EXISTS content_request_created ON content_request (created_at);
 
                                          CREATE TABLE IF NOT EXISTS content_queue_dead (
