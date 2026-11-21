@@ -3,24 +3,23 @@ using AiProxy.Core.Providers;
 using AiProxy.Storage;
 using Dapper;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
 namespace AiProxy.Tests.Unit.Storage;
 
-/// <summary>How long the capture file keeps rows, and the ceiling above which capture stops.</summary>
+/// <summary>How long the capture file keeps rows, and the cap capture evicts at.</summary>
 public sealed class CaptureRetentionTests : IDisposable
 {
     private const int CeilingBytes = 64 * 1024;
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "ai-proxy-tests", Guid.CreateVersion7().ToString("N"));
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
-    private readonly RecordingLogger _logger = new();
     private readonly SqliteCaptureStore _store;
 
     public CaptureRetentionTests()
     {
-        _store = new SqliteCaptureStore(DatabasePath, CeilingBytes, _time, _logger);
+        _store = new SqliteCaptureStore(DatabasePath, CeilingBytes, _time, NullLogger<SqliteCaptureStore>.Instance);
     }
 
     private string DatabasePath => Path.Combine(_directory, SqliteCaptureStore.FileName);
@@ -42,37 +41,6 @@ public sealed class CaptureRetentionTests : IDisposable
     private SqliteConnection Open()
     {
         return ContentSchema.Open(DatabasePath);
-    }
-
-    [Fact]
-    public async Task Capture_stops_once_the_live_pages_pass_the_ceiling_and_logs_it_once()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await _store.StoreAsync(Capture("r1", 100_000), token);
-
-        await _store.StoreAsync(Capture("r2", 10), token);
-        await _store.StoreAsync(Capture("r3", 10), token);
-
-        using var connection = Open();
-        Assert.Equal(["r1"], connection.Query<string>("SELECT request_id FROM capture_request;").ToList());
-        Assert.Equal(1, _logger.Messages.Count(message => message.Contains("ceiling", StringComparison.OrdinalIgnoreCase)));
-    }
-
-    [Fact]
-    public async Task Capture_resumes_after_an_eviction_pass_frees_pages_even_though_the_file_stays_large()
-    {
-        var token = TestContext.Current.CancellationToken;
-        await _store.StoreAsync(Capture("old", 100_000, daysAgo: 15), token);
-        await _store.StoreAsync(Capture("refused", 10), token);
-        var fileLengthBefore = new FileInfo(DatabasePath).Length;
-
-        var removed = await _store.EvictAsync(token);
-        await _store.StoreAsync(Capture("resumed", 10), token);
-
-        using var connection = Open();
-        Assert.Equal(1, removed);
-        Assert.Equal(["resumed"], connection.Query<string>("SELECT request_id FROM capture_request;").ToList());
-        Assert.True(new FileInfo(DatabasePath).Length >= fileLengthBefore - 4096);
     }
 
     [Fact]
@@ -113,26 +81,5 @@ public sealed class CaptureRetentionTests : IDisposable
 
         Assert.Equal(0, removed);
         Assert.False(File.Exists(DatabasePath));
-    }
-
-    private sealed class RecordingLogger : ILogger<SqliteCaptureStore>
-    {
-        public List<string> Messages { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            Messages.Add(formatter(state, exception));
-        }
     }
 }
