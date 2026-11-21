@@ -305,7 +305,16 @@ Every gate below must be seen red on the defect before the fix, and green after.
 - How Titanium caches leaf certificates across a root change needs a check against the 8.0.2 source before P7 starts.
 - The one-week capture for the token-return work (to about 2026-11-27) fits under 8 GiB at 37.9 MB per hour (about 9 days). If 0.35.0 goes live after that, eviction starts to remove its oldest rows.
 
-## Owner questions
+
+## Owner rulings on the plan's questions (2026-11-21)
+
+- F14: no byte cap on content.db; ADR 0008's 14-day promise stands. P5 only sizes eviction batches by bytes so the write lock stays short.
+- F4: the loopback API token covers every route (gain, reset, content, retrieval); the CLI and the MCP client read it from the 0700 data directory.
+- LOW items: a package may fix a one-line LOW item in a file it already changes (F28 `labeled` trigger, the three child-process tests without an isolated HOME), each with its own check.
+- F27: the Windows lifecycle and installed-tool lanes stay advisory; P8 only stops `lifecycle` cancelling runs on main and records the choice.
+- Version: the campaign takes the next minor version at its release PR (V), whatever that is then.
+
+## Owner questions (answered above)
 
 1. **content.db byte cap (F14).** ADR 0008 keeps originals for 14 days so a preview can still be retrieved. At about 78 MB per day the file settles near 1.1 GB. P5 fixes the lock time only. Do you also want a byte cap, which would make an older preview unrecoverable inside the 14 days?
 2. **Token scope (F4).** The plan requires the token on every loopback API route, retrieval included, so a process without the file cannot read originals either. Do you agree, or do you want it on the reset route only?
