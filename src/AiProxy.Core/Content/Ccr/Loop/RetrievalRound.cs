@@ -22,7 +22,8 @@ public enum MessageStart
 /// </summary>
 /// <param name="start">Whether the client sees this round's <c>message_start</c>: only the first round's.</param>
 /// <param name="nextIndex">The client block index the first block passed on gets.</param>
-public sealed class RetrievalRound(MessageStart start, int nextIndex)
+/// <param name="mode">Whether the follow-up continues a thread or repeats the conversation.</param>
+public sealed class RetrievalRound(MessageStart start, int nextIndex, CcrMode mode) : IRetrievalRound
 {
     private readonly Dictionary<int, Block> _blocks = [];
     private readonly List<Block> _order = [];
@@ -51,6 +52,9 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     /// <summary>Whether the upstream sent an <c>error</c> event, which was passed on.</summary>
     public bool Failed { get; private set; }
 
+    /// <inheritdoc />
+    public bool StopsForTools => StopReason == StopReasons.ToolUse;
+
     /// <summary>Whether a delta could not be folded into its block, so the content cannot be re-sent as received.</summary>
     public bool Lossy { get; private set; }
 
@@ -67,15 +71,68 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
         .ToArray();
 
     /// <summary>The round of the first upstream response.</summary>
-    public static RetrievalRound First()
+    public static RetrievalRound First(CcrMode mode)
     {
-        return new RetrievalRound(MessageStart.Pass, 0);
+        return new RetrievalRound(MessageStart.Pass, 0, mode);
     }
 
     /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
     public RetrievalRound Next()
     {
-        return new RetrievalRound(MessageStart.Drop, NextIndex);
+        return new RetrievalRound(MessageStart.Drop, NextIndex, mode);
+    }
+
+    IRetrievalRound IRetrievalRound.Next()
+    {
+        return Next();
+    }
+
+    /// <inheritdoc />
+    public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results)
+    {
+        return mode == CcrMode.Thread
+            ? RetrievalFollowUp.Thread(forwarded, MessageId, results)
+            : RetrievalFollowUp.Stateless(forwarded, Content(), results);
+    }
+
+    /// <inheritdoc />
+    public SseEvent Error(string message)
+    {
+        return SseEvent.Error(Errors.Api, message);
+    }
+
+    /// <inheritdoc />
+    public SseEvent ErrorOf(string body)
+    {
+        return new SseEvent(Events.Error, body);
+    }
+
+    /// <inheritdoc />
+    public SseEvent KeepAlive => SseEvent.Ping;
+
+    /// <inheritdoc />
+    public SseEvent? Terminator => null;
+
+    /// <summary>The held tool calls, the merged <c>message_delta</c> and <c>message_stop</c> of a released message.</summary>
+    public IReadOnlyList<SseEvent> Finish(int answered, long outputTokens)
+    {
+        var events = new List<SseEvent>(Release());
+        events.Add(answered == 0 && DeltaEvent is { } received ? received : MergedDelta(outputTokens));
+        events.Add(StopEvent ?? SseEvent.Of(Events.MessageStop, new JsonObject { [Fields.Type] = Events.MessageStop }));
+        return events;
+    }
+
+    /// <summary>The last response's <c>message_delta</c> with the output tokens of every response.</summary>
+    private SseEvent MergedDelta(long outputTokens)
+    {
+        var delta = Delta?.DeepClone() as JsonObject ?? new JsonObject { [Fields.Type] = Events.MessageDelta, [Fields.Delta] = new JsonObject() };
+        if (delta[Fields.Usage] is not JsonObject usage)
+        {
+            delta[Fields.Usage] = usage = [];
+        }
+
+        usage[Fields.OutputTokens] = outputTokens;
+        return SseEvent.Of(Events.MessageDelta, delta);
     }
 
     /// <summary>The assistant content as received, for a stateless follow-up.</summary>
@@ -87,6 +144,11 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex)
     /// <summary>Takes one upstream event and returns what the client gets now; an event it cannot read passes on as it came.</summary>
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
     {
+        if (sse.Name == SseEvent.Comment)
+        {
+            return [];
+        }
+
         if (JsonNode.Parse(sse.Data) is not JsonObject data)
         {
             return [sse];

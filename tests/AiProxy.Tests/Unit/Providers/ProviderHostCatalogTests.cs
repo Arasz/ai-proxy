@@ -75,6 +75,6 @@ public sealed class ProviderHostCatalogTests
     [InlineData("api.anthropic.com", Dialect.Anthropic, false)]
     public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly)
     {
-        Assert.Equal(new ProviderHost(dialect, harnessOnly), new CanonicalProviderHosts().Find(host));
+        Assert.Equal(new ProviderHost(dialect, harnessOnly, host == "openrouter.ai"), new CanonicalProviderHosts().Find(host));
     }
 }

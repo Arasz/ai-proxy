@@ -20,12 +20,28 @@ public enum CcrAction
     Refuse
 }
 
+/// <summary>The wire format of the request and its streamed answer.</summary>
+public enum CcrWire
+{
+    /// <summary>Anthropic Messages.</summary>
+    Messages,
+
+    /// <summary>OpenAI-style Chat Completions.</summary>
+    Chat
+}
+
 /// <summary>The plan for one provider request; build it with the factories.</summary>
 /// <param name="Action">What the proxy does.</param>
 /// <param name="Mode">The CCR mode the pipeline previews with.</param>
 /// <param name="ContinueFrom">The message a relayed <c>continue</c> follows; empty otherwise.</param>
 public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom)
 {
+    /// <summary>The wire format, which picks the round that reads the stream.</summary>
+    public CcrWire Wire { get; private init; } = CcrWire.Messages;
+
+    /// <summary>Whether a Chat Completions client asked for a usage chunk; the proxy asks the upstream either way.</summary>
+    public bool ClientUsage { get; private init; }
+
     /// <summary>The only path CCR acts on: the Anthropic Messages API, shared with <see cref="ProviderEndpoints.AnthropicMessagesPath" />.</summary>
     public const string MessagesPath = ProviderEndpoints.AnthropicMessagesPath;
 
@@ -44,6 +60,12 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     /// <summary>Relay a stateless request.</summary>
     public static CcrPlan Stateless { get; } = new(CcrAction.RelayWithTool, CcrMode.Stateless, "");
 
+    /// <summary>Relay a stateless Chat Completions request.</summary>
+    public static CcrPlan ChatStateless(bool clientUsage)
+    {
+        return new CcrPlan(CcrAction.RelayWithTool, CcrMode.Stateless, "") { Wire = CcrWire.Chat, ClientUsage = clientUsage };
+    }
+
     /// <summary>Whether the proxy answers the client itself.</summary>
     public bool Relays => Action is CcrAction.RelayWithTool or CcrAction.RelayContinue;
 
@@ -59,16 +81,22 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         return new CcrPlan(CcrAction.RelayContinue, CcrMode.Thread, continueFrom);
     }
 
-    /// <summary>Decides the plan of a request; a <c>continue</c> is looked up in the ledger whatever the settings, so a thread with hidden turns keeps working.</summary>
+    /// <summary>Decides the plan of a request; a Chat Completions request on a host that serves it gets a stateless plan; a <c>continue</c> is looked up in the ledger whatever the settings, so a thread with hidden turns keeps working.</summary>
     public static async Task<CcrPlan> DecideAsync(
         CcrSettings settings,
         IOriginalStore store,
         Dialect dialect,
+        bool chatHost,
         string method,
         string path,
         ReadOnlyMemory<byte> body,
         CancellationToken cancellationToken)
     {
+        if (dialect == Dialect.OpenAi)
+        {
+            return DecideChat(settings, chatHost, method, path, body);
+        }
+
         if (dialect != Dialect.Anthropic || !HttpMethods.IsPost(method) || path != MessagesPath || CcrRequest.Read(body) is not { Response: CcrResponse.Streamed } request)
         {
             return Forward;
@@ -81,6 +109,13 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
             CcrThread.None when settings.Enabled && request.Tools == CcrTools.Defined => Stateless,
             _ => Forward
         };
+    }
+
+    private static CcrPlan DecideChat(CcrSettings settings, bool chatHost, string method, string path, ReadOnlyMemory<byte> body)
+    {
+        return settings.Enabled && chatHost && HttpMethods.IsPost(method) && ChatRequest.IsChatPath(path) && ChatRequest.Read(body) is { Qualifies: true } request
+            ? ChatStateless(request.IncludeUsage)
+            : Forward;
     }
 
     private static async Task<CcrPlan> LookUpAsync(IOriginalStore store, string previous, CancellationToken cancellationToken)

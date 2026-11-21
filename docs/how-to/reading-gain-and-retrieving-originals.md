@@ -182,6 +182,13 @@ Statistics start with version 0.15.0; older requests are not backfilled.
 
 ## Let an agent read originals back
 
+The proxy answers `proxy_retrieve` inside the request for two kinds of traffic: streamed Anthropic
+Messages requests, and streamed Chat Completions requests to `openrouter.ai` for models whose id
+starts with `anthropic/`, `openai/`, `google/` or `deepseek/` (a router such as `openrouter/auto`
+is not served). The Chat Completions path is stateless, needs tools in the request, and is left
+alone when `n` is above 1 or `tool_choice` rules out `proxy_retrieve`. Other OpenAI-dialect hosts
+are forwarded without previews. Its gain rows show under `openrouter`.
+
 Register the server with the agent, for example in Claude Code:
 
 ```bash

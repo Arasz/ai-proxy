@@ -89,6 +89,14 @@ stateless rules of ADR 0005 apply as they are.
       could not call it;
     - it is not streamed, has no tools, or fails the host or prefix gate.
 
+## Implementation notes (2026-11-21, 0.34.0)
+
+- The loop retrieves when proxy_retrieve calls are held and `finish_reason` is `tool_calls` or `stop`; on `length` or `content_filter` the client calls are released, the proxy_retrieve calls are dropped, and the drop is logged.
+- The reasoning echoed in the follow-up joins `reasoning_details` pieces by `index` (text joined, last signature, format and type kept); a JSON null never erases collected reasoning.
+- Every numeric `usage` field (including `cost` and nested `*_details`) is summed across rounds.
+- A repeated `index` with a different non-empty `id` opens a new call; a delta with no `index` continues the last call.
+- OpenRouter comment lines (`: OPENROUTER PROCESSING`) are forwarded to the client as keep-alive comments.
+
 ## Consequences
 
 Positive: pi traffic on OpenRouter gets previews, and the 38.4% of its body in blocks of 300 tokens

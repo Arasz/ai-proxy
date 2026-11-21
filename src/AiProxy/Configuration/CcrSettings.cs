@@ -11,4 +11,7 @@ public sealed record CcrSettings
 
     /// <summary>Also previews for providers the fallback covers; bound but without effect until another provider has its own loop.</summary>
     public bool UnknownProviders { get; init; }
+
+    /// <summary>How often a client gets a keep-alive while a retrieval follow-up has not answered yet.</summary>
+    public TimeSpan KeepAliveInterval { get; init; } = TimeSpan.FromSeconds(5);
 }

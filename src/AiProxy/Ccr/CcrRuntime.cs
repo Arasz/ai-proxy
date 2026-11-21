@@ -10,8 +10,8 @@ namespace AiProxy.Ccr;
 /// <summary>Plans recoverable compression for a provider request and relays the requests it takes over.</summary>
 public interface ICcrRuntime
 {
-    /// <summary>Decides what the proxy does with the request.</summary>
-    Task<CcrPlan> DecideAsync(Dialect dialect, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken);
+    /// <summary>Decides what the proxy does with the request; <paramref name="chatHost" /> says the host is served in Chat Completions.</summary>
+    Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken);
 
     /// <summary>Sends a relayed request upstream and answers its client.</summary>
     Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals);
@@ -24,9 +24,9 @@ public interface ICcrRuntime
 public sealed class CcrRuntime(CcrSettings settings, IOriginalStore store, CcrRelay relay) : ICcrRuntime
 {
     /// <inheritdoc />
-    public Task<CcrPlan> DecideAsync(Dialect dialect, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
-        return CcrPlan.DecideAsync(settings, store, dialect, method, path, body, cancellationToken);
+        return CcrPlan.DecideAsync(settings, store, dialect, chatHost, method, path, body, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -40,7 +40,7 @@ public sealed class CcrRuntime(CcrSettings settings, IOriginalStore store, CcrRe
 public sealed class CcrOff : ICcrRuntime
 {
     /// <inheritdoc />
-    public Task<CcrPlan> DecideAsync(Dialect dialect, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
         return Task.FromResult(CcrPlan.Forward);
     }

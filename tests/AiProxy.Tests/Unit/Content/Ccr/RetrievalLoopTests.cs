@@ -82,7 +82,7 @@ public sealed class RetrievalLoopTests
             Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve),
             Sse.Tool("tu_e", "Bash", "")));
 
-        var content = loop.Round.Content();
+        var content = ((RetrievalRound)loop.Round).Content();
 
         Assert.Equal(
             """[{"type":"thinking","thinking":"think ","signature":"sig-1"},{"type":"text","text":"hi"},{"type":"tool_use","id":"tu_r","name":"proxy_retrieve","input":{"id":"0123456789abcdef","mode":"whole"}},{"type":"tool_use","id":"tu_e","name":"Bash","input":{}}]""",
@@ -188,6 +188,42 @@ public sealed class RetrievalLoopTests
         return string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
     }
 
+    [Fact]
+    public async Task Chat_chunks_built_by_the_test_builder_parse_back_as_a_tool_call_round()
+    {
+        var wire = ChatSse.Message("chatcmpl-1", "tool_calls", ChatSse.ToolCall(0, "call_1", "proxy_retrieve", Retrieve), ChatSse.Usage(7));
+
+        var events = await ParseAsync(wire);
+
+        Assert.All(events.Take(events.Count - 1), sse => Assert.Equal("chat.completion.chunk", JsonNode.Parse(sse.Data)!["object"]!.GetValue<string>()));
+        Assert.Equal("[DONE]", events[^1].Data);
+        var call = JsonNode.Parse(events[1].Data)!["choices"]![0]!["delta"]!["tool_calls"]![0]!;
+        Assert.Equal("call_1", call["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Responses_events_built_by_the_test_builder_parse_back_in_order()
+    {
+        var wire = ResponsesSse.Message("resp_1", ResponsesSse.FunctionCall("fc_1", "call_1", "proxy_retrieve", Retrieve), 9);
+
+        var events = await ParseAsync(wire);
+
+        Assert.Equal(["response.created", "response.output_item.added", "response.function_call_arguments.done", "response.output_item.done", "response.completed"], events.Select(sse => sse.Name));
+        Assert.Equal(9, JsonNode.Parse(events[^1].Data)!["response"]!["usage"]!["output_tokens"]!.GetValue<int>());
+    }
+
+    private static async Task<List<SseEvent>> ParseAsync(string wire)
+    {
+        var events = new List<SseEvent>();
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(wire));
+        await foreach (var sse in new SseReader().ReadAsync(stream, CancellationToken.None))
+        {
+            events.Add(sse);
+        }
+
+        return events;
+    }
+
     /// <summary>Builds Messages streams the way the API sends them.</summary>
     internal static class Sse
     {
@@ -260,6 +296,80 @@ public sealed class RetrievalLoopTests
         private static SseEvent Stop(int index)
         {
             return Event("content_block_stop", new JsonObject { ["type"] = "content_block_stop", ["index"] = index });
+        }
+    }
+
+    /// <summary>Builds Chat Completions streams the way the API sends them: unnamed <c>chat.completion.chunk</c> data lines and <c>[DONE]</c>.</summary>
+    internal static class ChatSse
+    {
+        public static JsonObject ToolCall(int index, string id, string name, string arguments)
+        {
+            return new JsonObject
+            {
+                ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["id"] = id, ["type"] = "function", ["function"] = new JsonObject { ["name"] = name, ["arguments"] = arguments } })
+            };
+        }
+
+        public static JsonObject Text(string text)
+        {
+            return new JsonObject { ["content"] = text };
+        }
+
+        public static JsonObject Usage(int completionTokens)
+        {
+            return new JsonObject { ["completion_tokens"] = completionTokens, ["prompt_tokens"] = 3, ["total_tokens"] = 3 + completionTokens };
+        }
+
+        public static string Message(string id, string finishReason, JsonObject delta, JsonObject usage)
+        {
+            return string.Concat(
+                Chunk(id, new JsonObject { ["role"] = "assistant" }, null, null),
+                Chunk(id, delta, null, null),
+                Chunk(id, new JsonObject(), finishReason, null),
+                Chunk(id, null, null, usage),
+                "data: [DONE]\n\n");
+        }
+
+        public static string Chunk(string id, JsonObject? delta, string? finishReason, JsonObject? usage)
+        {
+            var choices = new JsonArray();
+            if (delta is not null)
+            {
+                choices.Add(new JsonObject { ["index"] = 0, ["delta"] = delta.DeepClone(), ["finish_reason"] = finishReason });
+            }
+
+            var chunk = new JsonObject { ["id"] = id, ["object"] = "chat.completion.chunk", ["choices"] = choices };
+            if (usage is not null)
+            {
+                chunk["usage"] = usage.DeepClone();
+            }
+
+            return $"data: {chunk.ToJsonString()}\n\n";
+        }
+    }
+
+    /// <summary>Builds Responses API streams the way the API sends them: named <c>response.*</c> events.</summary>
+    internal static class ResponsesSse
+    {
+        public static JsonObject FunctionCall(string itemId, string callId, string name, string arguments)
+        {
+            return new JsonObject { ["type"] = "function_call", ["id"] = itemId, ["call_id"] = callId, ["name"] = name, ["arguments"] = arguments };
+        }
+
+        public static string Message(string id, JsonObject item, int outputTokens)
+        {
+            return string.Concat(
+                Event("response.created", new JsonObject { ["response"] = new JsonObject { ["id"] = id, ["status"] = "in_progress" } }),
+                Event("response.output_item.added", new JsonObject { ["output_index"] = 0, ["item"] = item.DeepClone() }),
+                Event("response.function_call_arguments.done", new JsonObject { ["output_index"] = 0, ["arguments"] = item["arguments"]!.GetValue<string>() }),
+                Event("response.output_item.done", new JsonObject { ["output_index"] = 0, ["item"] = item.DeepClone() }),
+                Event("response.completed", new JsonObject { ["response"] = new JsonObject { ["id"] = id, ["status"] = "completed", ["usage"] = new JsonObject { ["output_tokens"] = outputTokens } } }));
+        }
+
+        private static string Event(string name, JsonObject data)
+        {
+            data["type"] = name;
+            return $"event: {name}\ndata: {data.ToJsonString()}\n\n";
         }
     }
 }

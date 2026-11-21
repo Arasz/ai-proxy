@@ -6,7 +6,7 @@ namespace AiProxy.Core.Content.Ccr.Loop;
 /// <summary>Reads server-sent events from a stream.</summary>
 public sealed class SseReader
 {
-    /// <summary>Yields each complete event; a trailing event without its blank line is yielded at the end.</summary>
+    /// <summary>Yields each complete event and each comment line as a <see cref="SseEvent.Comment" /> event; a trailing event without its blank line is yielded at the end.</summary>
     public async IAsyncEnumerable<SseEvent> ReadAsync(Stream stream, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true);
@@ -20,6 +20,12 @@ public sealed class SseReader
                     yield return completed;
                 }
 
+                continue;
+            }
+
+            if (line.StartsWith(':'))
+            {
+                yield return new SseEvent(SseEvent.Comment, line[1..].TrimStart(' '));
                 continue;
             }
 
@@ -40,11 +46,6 @@ public sealed class SseReader
 
         public void Accept(string line)
         {
-            if (line.StartsWith(':'))
-            {
-                return;
-            }
-
             var colon = line.IndexOf(':');
             var field = colon < 0 ? line : line[..colon];
             var value = colon < 0 ? "" : line[(colon + 1)..].TrimStart(' ');
