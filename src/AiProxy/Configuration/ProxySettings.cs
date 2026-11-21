@@ -12,7 +12,11 @@ public sealed record ProxySettings
     public static ProxySettings Load(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         var settings = configuration.GetSection(SectionName).Get<ProxySettings>(static binder => binder.ErrorOnUnknownConfiguration = true) ?? new ProxySettings();
-        Validator.ValidateObject(settings, new ValidationContext(settings), true);
+        foreach (var section in new object[] { settings, settings.Compression, settings.Ccr })
+        {
+            Validator.ValidateObject(section, new ValidationContext(section), true);
+        }
+
         return settings;
     }
 

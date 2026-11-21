@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using JetBrains.Annotations;
 
 namespace AiProxy.Configuration;
@@ -13,5 +14,6 @@ public sealed record CcrSettings
     public bool UnknownProviders { get; init; }
 
     /// <summary>How often a client gets a keep-alive while a retrieval follow-up has not answered yet.</summary>
+    [Range(typeof(TimeSpan), "00:00:00.001", "1.00:00:00", ErrorMessage = "Proxy:Ccr:KeepAliveInterval must be a positive time span of at most one day.")]
     public TimeSpan KeepAliveInterval { get; init; } = TimeSpan.FromSeconds(5);
 }

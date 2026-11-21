@@ -238,7 +238,15 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 }
 
                 forwarded = await FollowUpAsync(loop, forwarded);
-                response = await SendWithPingsAsync(forwarded);
+                var sent = await SendWithPingsAsync(forwarded);
+                if (sent is null)
+                {
+                    Log.FollowUpSilent(relay.Logger, uri.Host, loop.Answered);
+                    await WriteFailureAsync(loop.Failure(Messages.UpstreamSilent));
+                    return;
+                }
+
+                response = sent;
                 if (response.IsSuccessStatusCode)
                 {
                     await RecordFollowUpAsync(loop, forwarded);
@@ -430,15 +438,24 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             }
         }
 
-        private async Task<HttpResponseMessage> SendWithPingsAsync(byte[] followUp)
+        private async Task<HttpResponseMessage?> SendWithPingsAsync(byte[] followUp)
         {
-            var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, _cancellation);
-            while (await Task.WhenAny(sending, Task.Delay(relay.KeepAlive, _cancellation)).ConfigureAwait(false) != sending)
+            using var expiry = new CancellationTokenSource(HeadersDeadline, relay.Time);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(_cancellation, expiry.Token);
+            var sending = relay.Http.SendAsync(Message(uri, headers, followUp), HttpCompletionOption.ResponseHeadersRead, linked.Token);
+            try
             {
-                await WriteAsync(_loop.Round.KeepAlive);
-            }
+                while (await Task.WhenAny(sending, Task.Delay(relay.KeepAlive, relay.Time, linked.Token)).ConfigureAwait(false) != sending)
+                {
+                    await WriteAsync(_loop.Round.KeepAlive);
+                }
 
-            return await sending;
+                return await sending;
+            }
+            catch (OperationCanceledException) when (expiry.IsCancellationRequested && !_cancellation.IsCancellationRequested)
+            {
+                return null;
+            }
         }
 
         private async Task WriteFailureAsync(SseEvent failure)
@@ -487,6 +504,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     {
         [LoggerMessage(EventId = 1610, Level = LogLevel.Warning, Message = "The provider {ProviderHost} sent no response headers before the deadline for a CCR request")]
         public static partial void UpstreamSilent(ILogger logger, string providerHost);
+
+        [LoggerMessage(EventId = 1616, Level = LogLevel.Warning, Message = "The provider {ProviderHost} sent no response headers before the deadline for the retrieval follow-up after {Answered} answers")]
+        public static partial void FollowUpSilent(ILogger logger, string providerHost, int answered);
 
         [LoggerMessage(EventId = 1613, Level = LogLevel.Warning, Message = "Follow-up metadata for request {RequestId} could not be recorded")]
         public static partial void FollowUpWriteFailed(ILogger logger, string requestId, Exception exception);

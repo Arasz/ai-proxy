@@ -414,6 +414,39 @@ public sealed class CcrRelayTests : IDisposable
     }
 
     [Fact]
+    public async Task A_follow_up_that_never_sends_headers_ends_the_turn_with_one_error_event_and_no_more_pings()
+    {
+        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var upstream = await FakeUpstream.StartAsync();
+        var first = Script(Sse.Message("msg_1", "tool_use", 4, Sse.Tool("tu_r", CcrRetrieval.Name, Retrieve)));
+        var calls = 0;
+        upstream.Handler = async (fake, context) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                await first(fake, context);
+                return;
+            }
+
+            arrived.TrySetResult();
+            await Task.Delay(Timeout.Infinite, context.RequestAborted);
+        };
+        var time = new FakeTimeProvider();
+        await using var proxy = await StartProxyAsync(time, new KeyValuePair<string, string>("Proxy:Ccr:KeepAliveInterval", "00:00:05"));
+
+        var sending = SendAsync(proxy, upstream, StatelessRequest());
+        await arrived.Task.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+        time.Advance(CcrRelay.HeadersDeadline + TimeSpan.FromSeconds(1));
+        using var response = await sending.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+        var client = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromSeconds(15));
+
+        Assert.Equal(1, client.Split("event: error").Length - 1);
+        Assert.DoesNotContain("event: ping", client[client.IndexOf("event: error", StringComparison.Ordinal)..], StringComparison.Ordinal);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
     public async Task A_redirect_from_the_upstream_reaches_the_client_and_is_not_followed()
     {
         await using var target = await FakeUpstream.StartAsync();
@@ -600,7 +633,7 @@ public sealed class CcrRelayTests : IDisposable
             if (Interlocked.Increment(ref calls) == 2)
             {
                 // Runs while the follow-up is in flight, after the first response's headers returned, so the 10-minute HeadersDeadline never sees it.
-                time.Advance(TimeSpan.FromHours(3));
+                time.Advance(TimeSpan.FromMinutes(9));
             }
 
             return stream(fake, context);
@@ -614,7 +647,7 @@ public sealed class CcrRelayTests : IDisposable
         var atStart = await GainAsync(proxy, started, started.AddSeconds(1));
         Assert.Equal(1, atStart.Summary.Requests);
         Assert.Equal(1, atStart.Summary.FollowUps);
-        Assert.Equal(0, (await GainAsync(proxy, started.AddHours(3))).Summary.FollowUps);
+        Assert.Equal(0, (await GainAsync(proxy, started.AddMinutes(9))).Summary.FollowUps);
     }
 
     private static async Task<GainReport> GainAsync(ProxyHost proxy, DateTimeOffset? from = null, DateTimeOffset? to = null)
