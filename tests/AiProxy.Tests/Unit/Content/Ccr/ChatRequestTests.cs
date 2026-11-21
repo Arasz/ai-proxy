@@ -103,6 +103,45 @@ public sealed class ChatRequestTests
     }
 
     [Theory]
+    [InlineData("{}", "{\"include_usage\":true}")]
+    [InlineData("{ \"other\" : 1 }", "{\"include_usage\":true, \"other\" : 1 }")]
+    [InlineData("{ \"include_usage\" : false }", "{ \"include_usage\" : true }")]
+    [InlineData("null", "{\"include_usage\":true}")]
+    public void Prepare_changes_only_the_stream_options_span_when_usage_is_missing_or_off(string options, string expectedOptions)
+    {
+        // The body uses forms System.Text.Json rewrites: extra whitespace, an escaped
+        // character and an exponent number. Every byte outside the span must survive.
+        const string Before = "{ \"model\" : \"deepseek/x\",  \"temperature\": 1.0E2, \"note\": \"caf\\u00e9\", \"stream\" : true,\n";
+        var after = $", \"tools\" : [{Tool},{CcrRetrieval.ChatDefinition}], \"messages\" : [] }}";
+        var body = $"{Before}\"stream_options\": {options}{after}";
+
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+
+        Assert.Equal($"{Before}\"stream_options\": {expectedOptions}{after}", prepared);
+    }
+
+    [Fact]
+    public void Prepare_uses_the_last_of_two_stream_options_keys()
+    {
+        var body = $"{{\"stream\":true,\"stream_options\":{{\"include_usage\":true}},\"stream_options\":{{\"x\":1}},\"tools\":[{Tool}],\"messages\":[]}}";
+
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+
+        Assert.Contains("\"stream_options\":{\"include_usage\":true,\"x\":1}", prepared);
+    }
+
+    [Fact]
+    public void Prepare_ignores_stream_options_inside_messages()
+    {
+        const string Messages = "\"messages\":[{\"role\":\"user\",\"content\":\"\\\"stream_options\\\"\",\"stream_options\":{\"a\":1}}]";
+        var body = $"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages}}}";
+
+        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+
+        Assert.Equal($"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages},\"stream_options\":{{\"include_usage\":true}}}}", prepared);
+    }
+
+    [Theory]
     [InlineData(",\"n\":null", true)]
     [InlineData(",\"n\":\"2\"", false)]
     [InlineData(",\"n\":2.5", false)]

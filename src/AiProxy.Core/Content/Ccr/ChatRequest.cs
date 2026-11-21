@@ -24,6 +24,9 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
     private const string NoToolChoice = "none";
     private const int UnreadableChoices = 2;
     private static readonly byte[] DefinitionBytes = Encoding.UTF8.GetBytes(CcrRetrieval.ChatDefinition);
+    private static readonly byte[] TrueBytes = Encoding.UTF8.GetBytes("true");
+    private static readonly byte[] UsageMemberBytes = Encoding.UTF8.GetBytes("\"include_usage\":true");
+    private static readonly byte[] OptionsBytes = Encoding.UTF8.GetBytes("{\"include_usage\":true}");
     private static readonly byte[] UsageBytes = Encoding.UTF8.GetBytes("\"stream_options\":{\"include_usage\":true}");
 
     /// <summary>Whether CCR can serve the request: streamed, with tools, one choice, a known model, and a tool choice that allows <c>proxy_retrieve</c>.</summary>
@@ -74,25 +77,50 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
             return null;
         }
 
-        var edits = new List<(int At, byte[] Text)>();
+        var edits = new List<(int Start, int End, byte[] Text)>();
         if (!scan.HasRetrieval)
         {
-            edits.Add((scan.ToolsEnd, [(byte)',', .. DefinitionBytes]));
+            edits.Add((scan.ToolsEnd, scan.ToolsEnd, [(byte)',', .. DefinitionBytes]));
             toolCharacters = DefinitionBytes.Length + 1;
         }
 
-        if (!scan.HasStreamOptions)
+        if (UsageEdit(scan) is { } usageEdit)
         {
-            edits.Add((scan.ObjectEnd, [(byte)',', .. UsageBytes]));
+            edits.Add(usageEdit);
         }
 
         var result = body.ToArray();
-        foreach (var (at, text) in edits.OrderByDescending(static edit => edit.At))
+        foreach (var (start, end, text) in edits.OrderByDescending(static edit => edit.Start))
         {
-            result = [.. result[..at], .. text, .. result[at..]];
+            result = [.. result[..start], .. text, .. result[end..]];
         }
 
-        return scan.HasStreamOptions && !scan.UsageRequested ? WithUsage(result) : result;
+        return result;
+    }
+
+    private static (int Start, int End, byte[] Text)? UsageEdit(BodyScan scan)
+    {
+        if (!scan.HasStreamOptions)
+        {
+            return (scan.ObjectEnd, scan.ObjectEnd, [(byte)',', .. UsageBytes]);
+        }
+
+        if (scan.UsageRequested)
+        {
+            return null;
+        }
+
+        if (!scan.OptionsAreObject)
+        {
+            return (scan.OptionsStart, scan.OptionsEnd, OptionsBytes);
+        }
+
+        if (scan.UsageStart >= 0)
+        {
+            return (scan.UsageStart, scan.UsageEnd, TrueBytes);
+        }
+
+        return (scan.OptionsStart + 1, scan.OptionsStart + 1, scan.OptionsEmpty ? UsageMemberBytes : [.. UsageMemberBytes, (byte)',']);
     }
 
     private static int ChoicesOf(JsonElement root)
@@ -114,15 +142,6 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
                                     && function.TryGetProperty(ChatApi.Fields.Name, out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == CcrRetrieval.Name,
             _ => true
         };
-    }
-
-    private static byte[] WithUsage(byte[] body)
-    {
-        var request = System.Text.Json.Nodes.JsonNode.Parse(body)!.AsObject();
-        var options = request[StreamOptions] as System.Text.Json.Nodes.JsonObject ?? [];
-        options[UsageOption] = true;
-        request[StreamOptions] = options;
-        return JsonSerializer.SerializeToUtf8Bytes(request, MessagesApi.Json);
     }
 
     private static BodyScan? Scan(ReadOnlySpan<byte> body)
@@ -167,11 +186,8 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
             }
             else if (reader.ValueTextEquals(StreamOptions))
             {
-                scan.HasStreamOptions = true;
                 reader.Read();
-                var start = (int)reader.TokenStartIndex;
-                reader.Skip();
-                scan.UsageRequested = reader.TokenType == JsonTokenType.EndObject && IncludesUsage(body[start..((int)reader.TokenStartIndex + 1)]);
+                ScanOptions(ref reader, scan);
             }
         }
 
@@ -185,10 +201,41 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
             && function.ValueKind == JsonValueKind.Object && function.TryGetProperty(ChatApi.Fields.Name, out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == CcrRetrieval.Name));
     }
 
-    private static bool IncludesUsage(ReadOnlySpan<byte> options)
+    private static void ScanOptions(ref Utf8JsonReader reader, BodyScan scan)
     {
-        using var document = JsonDocument.Parse(options.ToArray());
-        return document.RootElement.TryGetProperty(UsageOption, out var usage) && usage.ValueKind == JsonValueKind.True;
+        scan.HasStreamOptions = true;
+        scan.UsageRequested = false;
+        scan.UsageStart = -1;
+        scan.UsageEnd = -1;
+        scan.OptionsStart = (int)reader.TokenStartIndex;
+        scan.OptionsAreObject = reader.TokenType == JsonTokenType.StartObject;
+        if (!scan.OptionsAreObject)
+        {
+            reader.Skip();
+            scan.OptionsEnd = (int)reader.BytesConsumed;
+            return;
+        }
+
+        var depth = reader.CurrentDepth;
+        scan.OptionsEmpty = true;
+        while (reader.Read() && !(reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == depth))
+        {
+            scan.OptionsEmpty = false;
+            if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == depth + 1 && reader.ValueTextEquals(UsageOption))
+            {
+                reader.Read();
+                scan.UsageStart = (int)reader.TokenStartIndex;
+                scan.UsageRequested = reader.TokenType == JsonTokenType.True;
+                reader.Skip();
+                scan.UsageEnd = (int)reader.BytesConsumed;
+            }
+            else if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+            {
+                reader.Skip();
+            }
+        }
+
+        scan.OptionsEnd = (int)reader.BytesConsumed;
     }
 
     private sealed class BodyScan
@@ -204,5 +251,17 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
         public bool HasStreamOptions { get; set; }
 
         public bool UsageRequested { get; set; }
+
+        public bool OptionsAreObject { get; set; }
+
+        public bool OptionsEmpty { get; set; }
+
+        public int OptionsStart { get; set; } = -1;
+
+        public int OptionsEnd { get; set; } = -1;
+
+        public int UsageStart { get; set; } = -1;
+
+        public int UsageEnd { get; set; } = -1;
     }
 }
