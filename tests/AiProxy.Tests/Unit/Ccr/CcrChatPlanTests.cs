@@ -63,10 +63,10 @@ public sealed class CcrChatPlanTests
     [Fact]
     public void The_catalog_serves_chat_ccr_on_openrouter_only()
     {
-        Assert.True(ProviderHostCatalog.Lookup("openrouter.ai")!.Value.ChatCcr);
+        Assert.True(Assert.IsType<ProviderHost>(ProviderHostCatalog.Lookup("openrouter.ai").Value).ChatCcr);
         foreach (var host in new[] { "api.openai.com", "eu.openrouter.ai", "chatgpt.com", "api.anthropic.com" })
         {
-            Assert.False(ProviderHostCatalog.Lookup(host)!.Value.ChatCcr, host);
+            Assert.False(Assert.IsType<ProviderHost>(ProviderHostCatalog.Lookup(host).Value).ChatCcr, host);
         }
     }
     [Fact]

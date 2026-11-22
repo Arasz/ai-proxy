@@ -16,7 +16,7 @@ public interface IProviderHosts
 public sealed class CanonicalProviderHosts : IProviderHosts
 {
     /// <inheritdoc />
-    public ProviderHostMatch Find(string host) => ProviderHostCatalog.Lookup(host) is { } provider ? provider : NoneProviderHost.Instance;
+    public ProviderHostMatch Find(string host) => ProviderHostCatalog.Lookup(host);
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> Hosts => ProviderHostCatalog.Hosts;

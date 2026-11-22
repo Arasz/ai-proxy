@@ -27,16 +27,16 @@ public static class ProviderHostCatalog
     /// <summary>Every canonical provider host.</summary>
     public static IReadOnlyCollection<string> Hosts { get; } = [.. Providers.Keys];
 
-    /// <summary>Returns the canonical host's dialect and harness-only flag, or null for default pass-through.</summary>
-    public static ProviderHost? Lookup(string host)
+    /// <summary>Returns the canonical host's provider settings, or <see cref="NoneProviderHost" /> for default pass-through.</summary>
+    public static ProviderHostMatch Lookup(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
-        return Providers.GetValueOrDefault(host.TrimEnd('.'));
+        return Providers.TryGetValue(host.TrimEnd('.'), out var provider) ? provider : NoneProviderHost.Instance;
     }
 
-    /// <summary>Returns the provider dialect for a canonical host, or null for default pass-through.</summary>
-    public static Dialect? Find(string host) => Lookup(host)?.Dialect;
+    /// <summary>Returns the provider dialect for a canonical host, or <see cref="Dialect.Unknown" /> for default pass-through.</summary>
+    public static Dialect Find(string host) => Lookup(host) is ProviderHost provider ? provider.Dialect : Dialect.Unknown;
 
     /// <summary>Whether the host also serves browsers, so the proxy decrypts it only for traffic that carries an ai-proxy credential.</summary>
-    public static bool IsHarnessOnly(string host) => Lookup(host)?.HarnessOnly == true;
+    public static bool IsHarnessOnly(string host) => Lookup(host) is ProviderHost { HarnessOnly: true };
 }

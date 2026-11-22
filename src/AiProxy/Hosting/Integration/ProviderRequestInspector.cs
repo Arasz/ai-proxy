@@ -51,7 +51,7 @@ public sealed partial class ProviderRequestInspector(
     {
         var request = e.HttpClient.Request;
         var caller = TakeCaller(e.HttpClient);
-        if (providerHosts.Find(request.RequestUri.Host) is not { } provider || !Admits(e, provider, caller) || !Inspects(request, provider))
+        if (providerHosts.Find(request.RequestUri.Host) is not ProviderHost provider || !Admits(e, provider, caller) || !Inspects(request, provider))
         {
             return;
         }

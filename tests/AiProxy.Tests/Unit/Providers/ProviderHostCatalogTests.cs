@@ -35,7 +35,7 @@ public sealed class ProviderHostCatalogTests
     [InlineData("xx.api.openai.com")]
     [InlineData("eu.api.anthropic.com")]
     [InlineData("www.chatgpt.com")]
-    public void An_unrecognized_host_is_left_for_default_pass_through(string host) => Assert.Null(ProviderHostCatalog.Find(host));
+    public void An_unrecognized_host_is_left_for_default_pass_through(string host) => Assert.Equal(Dialect.Unknown, ProviderHostCatalog.Find(host));
 
     [Fact]
     public void Chatgpt_com_is_the_only_harness_only_host_in_the_catalog() => Assert.Equal(["chatgpt.com"], ProviderHostCatalog.Hosts.Where(ProviderHostCatalog.IsHarnessOnly));
