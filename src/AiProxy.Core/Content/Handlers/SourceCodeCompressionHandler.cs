@@ -30,7 +30,7 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
 
         var id = CcrView.IdOf(part.Text);
         var view = new CodeReducer(lexer).Reduce(part.Text, part.FilePath, new CodeReductionOptions(), CcrView.Hint(id));
-        return view.Changed ? new HandledContent(view.Text, CodeViewPath, id) : null;
+        return view.Changed ? new HandledContent(view.Text, CodeViewPath) { RetrievalId = id } : null;
     }
 
     private static string WithoutBlankLines(string text)

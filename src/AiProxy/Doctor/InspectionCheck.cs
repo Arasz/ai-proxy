@@ -74,7 +74,7 @@ internal sealed class InspectionCheck(Uri proxy, string host, string dataDirecto
         await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = host }, cancellationToken).ConfigureAwait(false);
         return presented && chained
             ? new CheckResult(Name, CheckStatus.Pass, $"{host} is decrypted by the proxy; its certificate chains to the published root.")
-            : new CheckResult(Name, CheckStatus.Fail, $"{host} is not decrypted by this proxy, or its certificate does not chain to the published root.", "Restart ai-proxy, and check that --data-directory is the proxy's own.");
+            : new CheckResult(Name, CheckStatus.Fail, $"{host} is not decrypted by this proxy, or its certificate does not chain to the published root.") { Fix = "Restart ai-proxy, and check that --data-directory is the proxy's own." };
     }
 
     private static bool ChainsTo(X509Certificate2 root, X509Certificate certificate)

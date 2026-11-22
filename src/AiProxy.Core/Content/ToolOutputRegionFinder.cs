@@ -220,7 +220,7 @@ public sealed class ToolOutputRegionFinder
                 var start = (int)reader.TokenStartIndex;
                 var end = body.EndOfStringToken(start);
                 var text = reader.GetString() ?? "";
-                regions.Add(new ContentRegion(start, end - start, text, read?.PathFor(text)));
+                regions.Add(new ContentRegion(start, end - start, text) { FilePath = read?.PathFor(text) });
             }
 
             counter++;

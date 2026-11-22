@@ -39,7 +39,7 @@ public static partial class GainEndpoints
             var parser = context.RequestServices.GetRequiredService<CcrRetrievalParser>();
             var options = context.RequestServices.GetRequiredService<CcrOptions>();
             var parsed = parser.Parse(arguments, options);
-            var original = parsed.Request is { } valid ? await store.FindAsync(valid.Id, cancellationToken) : null;
+            var original = parsed.Value is CcrRetrievalRequest valid ? await store.FindAsync(valid.Id, cancellationToken) : null;
             var answer = retriever.Answer(arguments, original, options);
             var project = context.Request.Headers[GainApi.ProjectHeader].FirstOrDefault();
             try

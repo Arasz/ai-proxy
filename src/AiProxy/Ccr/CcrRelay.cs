@@ -361,7 +361,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             var answers = new Dictionary<string, CcrRetrieval>(StringComparer.Ordinal);
             foreach (var call in loop.Round.ToolCalls.Where(static call => call.IsRetrieval))
             {
-                var request = relay.Parser.Parse(call.Input, relay.Options).Request;
+                var request = relay.Parser.Parse(call.Input, relay.Options).Value as CcrRetrievalRequest;
                 var answer = loop.AtLimit
                     ? CcrRetrieval.Limit()
                     : relay.Retrievers().Answer(call.Input, request is null ? null : await OriginalAsync(request.Id).ConfigureAwait(false), relay.Options);

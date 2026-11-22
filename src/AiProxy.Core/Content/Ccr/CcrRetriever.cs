@@ -13,12 +13,15 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     /// <param name="options">The caps the answer keeps to.</param>
     public CcrRetrieval Answer(string arguments, string? original, CcrOptions options)
     {
-        var parsed = parser.Parse(arguments, options);
-        if (parsed.Request is not { } request)
+        return parser.Parse(arguments, options) switch
         {
-            return CcrRetrieval.Fail(CcrRetrieval.BadInput, parsed.Reason);
-        }
+            CcrRetrievalRequest request => Answer(request, original, options),
+            CcrRefusal refusal => CcrRetrieval.Fail(CcrRetrieval.BadInput, refusal.Reason),
+        };
+    }
 
+    private static CcrRetrieval Answer(CcrRetrievalRequest request, string? original, CcrOptions options)
+    {
         if (original is null || IdOf(original) != request.Id)
         {
             return CcrRetrieval.Fail(CcrRetrieval.NotKept, Invariant($"No text is kept for {request.Id}. Re-run the tool that produced it."));

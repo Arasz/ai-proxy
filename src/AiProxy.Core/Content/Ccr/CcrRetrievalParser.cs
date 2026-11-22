@@ -13,12 +13,12 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         using var document = JsonDocument.TryParse(arguments);
         if (document is null)
         {
-            return CcrParseResult.Refused("The arguments are not JSON.");
+            return new CcrRefusal("The arguments are not JSON.");
         }
 
         var root = document.RootElement;
         var violation = HasMalformedUnicode(root) ? "The arguments contain malformed Unicode." : schema.Violation(root);
-        return violation is null ? Validate(root, options) : CcrParseResult.Refused(violation);
+        return violation is null ? Validate(root, options) : new CcrRefusal(violation);
     }
 
     private static bool HasMalformedUnicode(JsonElement root)
@@ -63,25 +63,25 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         var context = Integer(root, RetrievalJson.Context);
         if (!start.Valid || !end.Valid || !context.Valid)
         {
-            return CcrParseResult.Refused("'start', 'end' and 'context' must be whole numbers in range.");
+            return new CcrRefusal("'start', 'end' and 'context' must be whole numbers in range.");
         }
 
         if (context.Value > options.MaximumContext)
         {
-            return CcrParseResult.Refused(CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
+            return new CcrRefusal(CcrText.Invariant($"'context' must be 0 to {options.MaximumContext}."));
         }
 
         if (mode == RetrievalJson.LinesMode && (start.Value is null || end.Value is null))
         {
-            return CcrParseResult.Refused("Mode lines needs 'start' and 'end'.");
+            return new CcrRefusal("Mode lines needs 'start' and 'end'.");
         }
 
         if (mode == RetrievalJson.PatternMode && pattern is null)
         {
-            return CcrParseResult.Refused("Mode pattern needs 'pattern'.");
+            return new CcrRefusal("Mode pattern needs 'pattern'.");
         }
 
-        return CcrParseResult.Accepted(new CcrRetrievalRequest(id, mode, start.Value, end.Value, pattern, context.Value ?? 0));
+        return new CcrRetrievalRequest(id, mode, start.Value, end.Value, pattern, context.Value ?? 0);
     }
 
     private static IntegerArgument Integer(JsonElement root, string name)
