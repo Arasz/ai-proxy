@@ -115,22 +115,13 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
     }
 
     /// <summary>Creates a passwordless SQL NSS database at the given path.</summary>
-    private static async Task InitializeDatabaseAsync(string database)
-    {
-        await RunAsync("certutil", ["-N", "--empty-password", "-d", $"sql:{database}"]);
-    }
+    private static async Task InitializeDatabaseAsync(string database) => await RunAsync("certutil", ["-N", "--empty-password", "-d", $"sql:{database}"]);
 
     /// <summary>Imports one certificate under its test nickname.</summary>
-    private static async Task ImportAsync(string nickname, string pemPath, string database)
-    {
-        await RunAsync("certutil", ["-A", "-d", $"sql:{database}", "-n", nickname, "-t", "CT,C,C", "-i", pemPath]);
-    }
+    private static async Task ImportAsync(string nickname, string pemPath, string database) => await RunAsync("certutil", ["-A", "-d", $"sql:{database}", "-n", nickname, "-t", "CT,C,C", "-i", pemPath]);
 
     /// <summary>Checks whether certutil can find a nickname in one database.</summary>
-    private static async Task<bool> ContainsAsync(string nickname, string database)
-    {
-        return await RunAsync("certutil", ["-L", "-d", $"sql:{database}", "-n", nickname], allowFailure: true) == 0;
-    }
+    private static async Task<bool> ContainsAsync(string nickname, string database) => await RunAsync("certutil", ["-L", "-d", $"sql:{database}", "-n", nickname], allowFailure: true) == 0;
 
     /// <summary>Writes one test certificate as PEM into the isolated profile.</summary>
     private async Task<string> WritePemAsync(X509Certificate2 certificate, string name)
@@ -224,17 +215,11 @@ public sealed class NssCertificateStoreTests : IAsyncDisposable
 
     [SupportedOSPlatform("linux")]
     /// <summary>Makes the certificate database itself read-only for a failed-delete fixture.</summary>
-    private static void SetDatabaseReadOnly(string database)
-    {
-        File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead);
-    }
+    private static void SetDatabaseReadOnly(string database) => File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead);
 
     [SupportedOSPlatform("linux")]
     /// <summary>Restores database write access so fixture cleanup can remove it.</summary>
-    private static void SetDatabaseWritable(string database)
-    {
-        File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead | UnixFileMode.UserWrite);
-    }
+    private static void SetDatabaseWritable(string database) => File.SetUnixFileMode(Path.Combine(database, "cert9.db"), UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
     /// <summary>Checks whether a child PID has exited, including when its process record is gone.</summary>
     private static bool HasExited(int processId)

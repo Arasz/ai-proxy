@@ -111,12 +111,10 @@ public sealed class ProviderCompressionTests : IDisposable
         Assert.DoesNotContain(logs.Entries, entry => entry.EventId == 1407);
     }
 
-    private static string Body(string toolOutput)
-    {
-        return $$"""
-                 {"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(toolOutput)}}}]}]}
-                 """;
-    }
+    private static string Body(string toolOutput) =>
+        $$"""
+          {"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(toolOutput)}}}]}]}
+          """;
 
     private Task<ProxyHost> StartProxyAsync(bool compression, RecordingLoggerProvider? logs = null)
     {
@@ -144,10 +142,7 @@ public sealed class ProviderCompressionTests : IDisposable
 /// <summary>Treats loopback hosts as a provider, so a local upstream stands in for a provider API.</summary>
 internal sealed class LoopbackProviderHosts(Dialect dialect, bool chatCcr = false) : IProviderHosts
 {
-    public ProviderHost? Find(string host)
-    {
-        return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(dialect, HarnessOnly: false, chatCcr) : null;
-    }
+    public ProviderHost? Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(dialect, HarnessOnly: false, chatCcr) : null;
 
     public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 }

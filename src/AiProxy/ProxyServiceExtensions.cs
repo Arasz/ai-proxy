@@ -1,14 +1,10 @@
-using System.ComponentModel.DataAnnotations;
 using AiProxy.Ccr;
 using AiProxy.Cli;
-using AiProxy.Code;
 using AiProxy.Configuration;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
-using AiProxy.Core.Content.Code;
-using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Doctor;
 using AiProxy.Core.Gain;
 using AiProxy.Hosting;
@@ -157,10 +153,7 @@ public static partial class ProxyServiceExtensions
         }
     }
 
-    private static string CapturePath(ProxyRuntimeOptions options)
-    {
-        return Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
-    }
+    private static string CapturePath(ProxyRuntimeOptions options) => Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
 
     private static partial class Log
     {

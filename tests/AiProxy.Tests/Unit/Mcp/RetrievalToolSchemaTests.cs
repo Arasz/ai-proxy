@@ -9,10 +9,7 @@ public sealed class RetrievalToolSchemaTests
 {
     private static JsonElement Schema => RetrievalTools.CreateTool().ProtocolTool.InputSchema;
 
-    private static JsonElement Property(string name)
-    {
-        return Schema.GetProperty("properties").GetProperty(name);
-    }
+    private static JsonElement Property(string name) => Schema.GetProperty("properties").GetProperty(name);
 
     [Fact]
     public void Mode_is_the_enum_of_the_three_selections()
@@ -44,10 +41,7 @@ public sealed class RetrievalToolSchemaTests
     }
 
     [Fact]
-    public void Id_is_16_lowercase_hex_characters()
-    {
-        Assert.Equal("^[0-9a-f]{16}$", Property("id").GetProperty("pattern").GetString());
-    }
+    public void Id_is_16_lowercase_hex_characters() => Assert.Equal("^[0-9a-f]{16}$", Property("id").GetProperty("pattern").GetString());
 
     [Fact]
     public void Id_and_mode_are_required_and_nothing_else_is_allowed()

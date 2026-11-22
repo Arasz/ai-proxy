@@ -24,20 +24,11 @@ public sealed partial class CcrPreviewTests
         return string.Join("\n", Enumerable.Range(1, lines).Select(line));
     }
 
-    private static string IdOf(string original)
-    {
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
-    }
+    private static string IdOf(string original) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
 
-    private static CcrPreview? Built(CcrPreviewBuilder builder, string original, CcrOptions options)
-    {
-        return builder.Build(original, options, options.TokensOf(original.Length));
-    }
+    private static CcrPreview? Built(CcrPreviewBuilder builder, string original, CcrOptions options) => builder.Build(original, options, options.TokensOf(original.Length));
 
-    private static CcrPreview Build(string original)
-    {
-        return Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options) ?? throw new InvalidOperationException("expected a preview");
-    }
+    private static CcrPreview Build(string original) => Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options) ?? throw new InvalidOperationException("expected a preview");
 
     [Theory]
     [InlineData("plain", "c5ff72de3e0f8dff", "be371a8c77ae6bbe06630d1c6d98a44b0864917cced3574edb7241329524dbc5")]
@@ -120,10 +111,7 @@ public sealed partial class CcrPreviewTests
     }
 
     [Fact]
-    public void The_id_is_the_first_sixteen_hex_characters_of_the_sha256_of_the_text()
-    {
-        Assert.Equal("c5ff72de3e0f8dff", Build(Shape("plain")).Id);
-    }
+    public void The_id_is_the_first_sixteen_hex_characters_of_the_sha256_of_the_text() => Assert.Equal("c5ff72de3e0f8dff", Build(Shape("plain")).Id);
 
     [Fact]
     public void The_marker_carries_the_id_and_the_line_counts()
@@ -301,9 +289,8 @@ public sealed partial class CcrPreviewTests
         Assert.True(new UTF8Encoding(false, true).GetByteCount(preview.Text) > 0);
     }
 
-    private static string Shape(string shape)
-    {
-        return shape switch
+    private static string Shape(string shape) =>
+        shape switch
         {
             "plain" => Log(400),
             "signals" => Log(800, index => index % 3 == 0 ? $"worker {index} failed with exit code 2" : $"step {index}: fine"),
@@ -315,7 +302,6 @@ public sealed partial class CcrPreviewTests
             "unicode-cut" => $"a{string.Concat(Enumerable.Repeat("😀", 10_000))}",
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
         };
-    }
 
     private static IEnumerable<string> Body(string preview)
     {

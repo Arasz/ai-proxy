@@ -50,10 +50,7 @@ internal static class StaleProxyValues
     }
 
     /// <summary>The endpoints a value may still point at: the previous run's, when it parses, then this run's own.</summary>
-    public static IReadOnlyList<IPEndPoint> Endpoints(IPEndPoint own, string? previousEndpoint)
-    {
-        return IPEndPoint.TryParse(previousEndpoint ?? "", out var previous) && !previous.Equals(own) ? [previous, own] : [own];
-    }
+    public static IReadOnlyList<IPEndPoint> Endpoints(IPEndPoint own, string? previousEndpoint) => IPEndPoint.TryParse(previousEndpoint ?? "", out var previous) && !previous.Equals(own) ? [previous, own] : [own];
 
     /// <summary>macOS: an enabled stale proxy takes the same service's previous triple, or is disabled.</summary>
     private static bool CleanMac(Snapshot snapshot, Snapshot? previous, Matches matched)
@@ -192,10 +189,7 @@ internal static class StaleProxyValues
     }
 
     /// <summary>Copies one KDE proxy URL from <paramref name="previous" />, or empties it.</summary>
-    private static void ReplaceKde(JsonObject kde, JsonObject? previous, string key, Matches matched)
-    {
-        kde[key] = previous is not null && Text(previous, key) is { } value && !matched.PointsAtUrl(value) ? value : "";
-    }
+    private static void ReplaceKde(JsonObject kde, JsonObject? previous, string key, Matches matched) => kde[key] = previous is not null && Text(previous, key) is { } value && !matched.PointsAtUrl(value) ? value : "";
 
     /// <summary>
     ///     Windows: while the manual proxy is active, a stale <c>ProxyServer</c> entry takes the previous active entry for its protocol,
@@ -276,12 +270,10 @@ internal static class StaleProxyValues
     private static bool SameProtocol(string? left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A macOS service's triple for <paramref name="protocol" />, or null when any part is missing.</summary>
-    private static MacValue? ReadMac(JsonObject service, string protocol)
-    {
-        return Bool(service, $"{protocol}Enabled") is { } enabled && Text(service, $"{protocol}Host") is { } host && Int(service, $"{protocol}Port") is { } port
+    private static MacValue? ReadMac(JsonObject service, string protocol) =>
+        Bool(service, $"{protocol}Enabled") is { } enabled && Text(service, $"{protocol}Host") is { } host && Int(service, $"{protocol}Port") is { } port
             ? new MacValue(enabled, host, port)
             : null;
-    }
 
     /// <summary>The string value of <paramref name="name" />, or null when it is missing or not a string.</summary>
     private static string? Text(JsonObject item, string name) => item[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
@@ -317,14 +309,12 @@ internal static class StaleProxyValues
         public bool ServesHttp => Protocol is null || WindowsProtocols.Any(protocol => SameProtocol(Protocol, protocol));
 
         /// <summary>The entries of a <c>ProxyServer</c> value, in order.</summary>
-        public static WindowsEntry[] Parse(string? proxyServer)
-        {
-            return (proxyServer ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(entry => entry.Split('=', 2, StringSplitOptions.TrimEntries) is [var protocol, var address]
-                    ? new WindowsEntry(protocol, address, entry)
-                    : new WindowsEntry(null, entry, entry))
-                .ToArray();
-        }
+        public static WindowsEntry[] Parse(string? proxyServer) =>
+            (proxyServer ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(entry => entry.Split('=', 2, StringSplitOptions.TrimEntries) is [var protocol, var address]
+                ? new WindowsEntry(protocol, address, entry)
+                : new WindowsEntry(null, entry, entry))
+            .ToArray();
     }
 
     /// <summary>The stale endpoints, and those that values were found pointing at, in the order found.</summary>

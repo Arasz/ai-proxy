@@ -8,13 +8,7 @@ internal static class CaptureText
 {
     private const double BytesPerMebibyte = 1024 * 1024;
 
-    public static string Size(CaptureState state)
-    {
-        return string.Create(CultureInfo.InvariantCulture, $"{state.LiveBytes / BytesPerMebibyte:F1} MiB of {state.CapBytes / BytesPerMebibyte:F1} MiB");
-    }
+    public static string Size(CaptureState state) => string.Create(CultureInfo.InvariantCulture, $"{state.LiveBytes / BytesPerMebibyte:F1} MiB of {state.CapBytes / BytesPerMebibyte:F1} MiB");
 
-    public static string Time(DateTimeOffset? at)
-    {
-        return at is { } value ? value.ToString("u", CultureInfo.InvariantCulture) : "none";
-    }
+    public static string Time(DateTimeOffset? at) => at is { } value ? value.ToString("u", CultureInfo.InvariantCulture) : "none";
 }

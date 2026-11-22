@@ -62,19 +62,20 @@ internal sealed partial class NssCertificateStore
     /// <summary>Finds existing NSS databases in the user's shared store and Firefox profiles.</summary>
     private static IEnumerable<string> Databases(string homeDirectory)
     {
-        var candidates = new List<string> { Path.Combine(homeDirectory, ".pki", "nssdb") };
-        candidates.AddRange(Profiles(Path.Combine(homeDirectory, ".mozilla", "firefox")));
-        candidates.AddRange(Profiles(Path.Combine(homeDirectory, ".var", "app", "org.mozilla.firefox", ".mozilla", "firefox")));
+        List<string> candidates =
+        [
+            Path.Combine(homeDirectory, ".pki", "nssdb"),
+            .. Profiles(Path.Combine(homeDirectory, ".mozilla", "firefox")),
+            .. Profiles(Path.Combine(homeDirectory, ".var", "app", "org.mozilla.firefox", ".mozilla", "firefox"))
+        ];
         return candidates.Where(static path => File.Exists(Path.Combine(path, "cert9.db"))).Distinct(StringComparer.Ordinal);
     }
 
     /// <summary>Finds direct child profile directories that contain an SQL NSS database.</summary>
-    private static IEnumerable<string> Profiles(string directory)
-    {
-        return Directory.Exists(directory)
+    private static IEnumerable<string> Profiles(string directory) =>
+        Directory.Exists(directory)
             ? Directory.EnumerateDirectories(directory).Where(static path => File.Exists(Path.Combine(path, "cert9.db")))
             : [];
-    }
 
     /// <summary>Lists certificate nicknames in one NSS database.</summary>
     private static IEnumerable<string> Nicknames(string database, string certutil)

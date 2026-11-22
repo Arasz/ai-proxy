@@ -8,10 +8,7 @@ public sealed class ShellTranscriptCompressionHandlerTests
 {
     private static readonly ShellTranscriptCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text)
-    {
-        return new ContentPart("request", 1, ContentType.ShellTranscript, text);
-    }
+    private static ContentPart Part(string text) => new("request", 1, ContentType.ShellTranscript, text);
 
     [Fact]
     public async Task The_line_that_carries_the_failure_survives()

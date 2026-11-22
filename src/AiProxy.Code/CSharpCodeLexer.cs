@@ -29,17 +29,12 @@ public sealed class CSharpCodeLexer : ICodeLexer
     ];
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath)
-    {
-        return filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
-    }
+    public bool SupportsPath(string? filePath) => filePath is not null && filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
-    public bool IsKeyword(string text)
-    {
-        return SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
-               || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
-               || text is "nint" or "nuint" or "value";
-    }
+    public bool IsKeyword(string text) =>
+        SyntaxFacts.GetKeywordKind(text) != SyntaxKind.None
+        || SyntaxFacts.GetContextualKeywordKind(text) != SyntaxKind.None
+        || text is "nint" or "nuint" or "value";
 
 
     /// <inheritdoc />
@@ -64,9 +59,12 @@ public sealed class CSharpCodeLexer : ICodeLexer
             return tokenLexingResult;
         }
 
-        var spans = new List<CodeToken>(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count);
-        spans.AddRange(triviaLexingResult.Tokens);
-        spans.AddRange(tokenLexingResult.Tokens);
+        List<CodeToken> spans =
+        [
+            with(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count),
+            .. triviaLexingResult.Tokens,
+            .. tokenLexingResult.Tokens
+        ];
         spans.Sort(static (left, right) => left.Offset.CompareTo(right.Offset));
         var tokens = CompleteCoverage(text, spans);
         return tokens is null ? Unsupported() : new CodeLexResult(true, tokens);
@@ -114,9 +112,8 @@ public sealed class CSharpCodeLexer : ICodeLexer
         return new CodeLexResult(true, spans);
     }
 
-    private static CodeTokenKind? TriviaKind(SyntaxKind kind)
-    {
-        return kind switch
+    private static CodeTokenKind? TriviaKind(SyntaxKind kind) =>
+        kind switch
         {
             SyntaxKind.SingleLineCommentTrivia or SyntaxKind.MultiLineCommentTrivia
                 or SyntaxKind.SingleLineDocumentationCommentTrivia or SyntaxKind.MultiLineDocumentationCommentTrivia
@@ -125,7 +122,6 @@ public sealed class CSharpCodeLexer : ICodeLexer
             SyntaxKind.EndOfLineTrivia => CodeTokenKind.NewLine,
             _ => null
         };
-    }
 
     private static CodeTokenKind TokenKind(SyntaxToken token)
     {
@@ -200,8 +196,5 @@ public sealed class CSharpCodeLexer : ICodeLexer
         return line;
     }
 
-    private static CodeLexResult Unsupported()
-    {
-        return new CodeLexResult(false, []);
-    }
+    private static CodeLexResult Unsupported() => new(false, []);
 }

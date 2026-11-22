@@ -25,10 +25,7 @@ public sealed class ContentCompressionPipelineTests
                                       2026-03-12 10:00:05 INFO worker=api-1 nothing to see
                                       """;
 
-    private static string Body(string toolOutput)
-    {
-        return $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
-    }
+    private static string Body(string toolOutput) => $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
 
     private static (ContentCompressionPipeline Pipeline, RecordingContentStore Store) Build(
         IContentStore? store = null,
@@ -93,7 +90,7 @@ public sealed class ContentCompressionPipelineTests
     public async Task A_body_without_tool_output_is_forwarded_unchanged()
     {
         var (pipeline, store) = Build();
-        var body = Encoding.UTF8.GetBytes("""{"messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),
@@ -181,8 +178,7 @@ public sealed class ContentCompressionPipelineTests
     public void The_regions_the_finder_found_do_not_overlap()
     {
         // The promise the guard rests on, checked against the finder itself.
-        var regions = new ToolOutputRegionFinder().Find(Encoding.UTF8.GetBytes(
-            """{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""));
+        var regions = new ToolOutputRegionFinder().Find("""{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""u8.ToArray());
 
         var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
 
@@ -287,10 +283,7 @@ public sealed class ContentCompressionPipelineTests
     /// <summary>Runs another handler and moves the clock on, so a stage has a known duration.</summary>
     private sealed class SlowHandler(ICompressionHandler inner, FakeTimeProvider time, TimeSpan cost) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return inner.CanHandle(type);
-        }
+        public bool CanHandle(ContentType type) => inner.CanHandle(type);
 
         public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
         {
@@ -301,15 +294,9 @@ public sealed class ContentCompressionPipelineTests
 
     private sealed class ThrowingLogHandler(bool cancelled = false) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return type == ContentType.Log;
-        }
+        public bool CanHandle(ContentType type) => type == ContentType.Log;
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-        {
-            return cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
-        }
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
     }
 
     private sealed class RecordingContentStore : IContentStore
@@ -333,10 +320,7 @@ public sealed class ContentCompressionPipelineTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
     }
 
     [Theory]
@@ -347,7 +331,7 @@ public sealed class ContentCompressionPipelineTests
     public async Task Characters_JSON_does_not_require_escaping_are_forwarded_as_they_are(string fragment)
     {
         var (pipeline, _) = Build();
-        var body = Encoding.UTF8.GetBytes(Body(ToolOutput + $"\n2026-03-12 10:00:06 INFO worker=api-1 {fragment}"));
+        var body = Encoding.UTF8.GetBytes(Body($"{ToolOutput}\n2026-03-12 10:00:06 INFO worker=api-1 {fragment}"));
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),

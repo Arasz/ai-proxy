@@ -92,10 +92,7 @@ public static class ResponseUsageReader
         }
     }
 
-    private static bool IsEventStream(string? contentType)
-    {
-        return contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsEventStream(string? contentType) => contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
 
     private static UsageReading ReadMessage(ReadOnlyMemory<byte> body, Dialect dialect)
     {

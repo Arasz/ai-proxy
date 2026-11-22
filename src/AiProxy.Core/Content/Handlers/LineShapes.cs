@@ -48,15 +48,9 @@ public static class LineShapes
         return kept;
     }
 
-    private static bool IsPair(string token)
-    {
-        return token.IndexOf('=', StringComparison.Ordinal) > 0;
-    }
+    private static bool IsPair(string token) => token.IndexOf('=', StringComparison.Ordinal) > 0;
 
-    private static string Shape(string[] tokens)
-    {
-        return string.Join(" ", tokens.Select(Mask));
-    }
+    private static string Shape(string[] tokens) => string.Join(" ", tokens.Select(Mask));
 
     private static string Mask(string token)
     {

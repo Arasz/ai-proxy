@@ -16,10 +16,7 @@ public sealed class ProxySettingsStrictnessTests
     }
 
     [Fact]
-    public void Unknown_proxy_key_fails_service_registration()
-    {
-        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddProxy(Configure("Proxy:Prot")));
-    }
+    public void Unknown_proxy_key_fails_service_registration() => Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddProxy(Configure("Proxy:Prot")));
 
     [Fact]
     public void Known_keys_load()
@@ -44,10 +41,7 @@ public sealed class ProxySettingsStrictnessTests
     [Theory]
     [InlineData("Proxy:Ccr:KeepAliveInterval", "00:00:00.001")]
     [InlineData("Proxy:Compression:Minimum", "1")]
-    public void Lowest_valid_value_loads(string key, string value)
-    {
-        ProxySettings.Load(Configure(key, value));
-    }
+    public void Lowest_valid_value_loads(string key, string value) => ProxySettings.Load(Configure(key, value));
 
     [Fact]
     public void Every_bound_key_is_in_the_settings_reference()

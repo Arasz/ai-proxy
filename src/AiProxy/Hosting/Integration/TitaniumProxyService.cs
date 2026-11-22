@@ -393,15 +393,15 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private Task BeforeRequestAsync(object sender, SessionEventArgs e)
     {
-        if (IsAddressedToSelf(e.HttpClient.Request.RequestUri))
+        if (!IsAddressedToSelf(e.HttpClient.Request.RequestUri))
         {
-            var request = e.HttpClient.Request;
-            Log.AddressedToSelf(_logger, request.Method, request.RequestUri.AbsolutePath, request.Headers.GetFirstHeader(HeaderNames.UserAgent)?.Value);
-            e.GenericResponse(SelfRequestMessage, HttpStatusCode.BadRequest, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
-            return Task.CompletedTask;
+            return _inspector.BeforeRequestAsync(e);
         }
 
-        return _inspector.BeforeRequestAsync(sender, e);
+        var request = e.HttpClient.Request;
+        Log.AddressedToSelf(_logger, request.Method, request.RequestUri.AbsolutePath, request.Headers.GetFirstHeader(HeaderNames.UserAgent)?.Value);
+        e.GenericResponse(SelfRequestMessage, HttpStatusCode.BadRequest, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+        return Task.CompletedTask;
     }
 
     /// <summary>True when the request names this proxy's own listener as its origin, which Titanium cannot forward.</summary>
@@ -415,16 +415,13 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         return target.IsLoopback || (IPAddress.TryParse(target.Host, out var address) && address.Equals(_options.ListenAddress));
     }
 
-    private Task BeforeResponseAsync(object sender, SessionEventArgs e)
-    {
-        return _inspector.BeforeResponseAsync(sender, e);
-    }
+    private Task BeforeResponseAsync(object sender, SessionEventArgs e) => ProviderRequestInspector.BeforeResponseAsync(e);
 
     private async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
         if (_inspector.CapturesResponses)
         {
-            await _inspector.AfterResponseAsync(sender, e);
+            await _inspector.AfterResponseAsync(e);
         }
 
         CloseClientAfterUpstreamClosed(e);

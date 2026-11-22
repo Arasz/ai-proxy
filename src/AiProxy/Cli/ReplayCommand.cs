@@ -1,6 +1,5 @@
 using AiProxy.Hosting.Proxy;
 using AiProxy.Replay;
-using Microsoft.Extensions.Configuration;
 using Spectre.Console.Cli;
 
 namespace AiProxy.Cli;

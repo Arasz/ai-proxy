@@ -183,19 +183,10 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
 
     private sealed record MatchScan(SortedDictionary<int, Match> Matches, bool Stopped, int? TimedOutAt)
     {
-        public static MatchScan Complete(SortedDictionary<int, Match> matches)
-        {
-            return new MatchScan(matches, false, null);
-        }
+        public static MatchScan Complete(SortedDictionary<int, Match> matches) => new(matches, false, null);
 
-        public static MatchScan AtLimit(SortedDictionary<int, Match> matches)
-        {
-            return new MatchScan(matches, true, null);
-        }
+        public static MatchScan AtLimit(SortedDictionary<int, Match> matches) => new(matches, true, null);
 
-        public static MatchScan TimedOut(SortedDictionary<int, Match> matches, int line)
-        {
-            return new MatchScan(matches, false, line);
-        }
+        public static MatchScan TimedOut(SortedDictionary<int, Match> matches, int line) => new(matches, false, line);
     }
 }

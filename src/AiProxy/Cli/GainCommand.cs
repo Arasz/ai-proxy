@@ -99,13 +99,11 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         return 0;
     }
 
-    private static GainQuery Query(GainSettings settings, string directory)
-    {
-        return new GainQuery(
+    private static GainQuery Query(GainSettings settings, string directory) =>
+        new(
             settings.ProjectPath ?? (settings.Project ? Path.GetFullPath(directory) : null),
             ParseDate(settings.From), ParseDate(settings.To), settings.Provider, settings.Method,
             settings.Rule, settings.Layer, settings.Pipeline, settings.Limit);
-    }
 
     private static DateTimeOffset? ParseDate(string? value)
     {

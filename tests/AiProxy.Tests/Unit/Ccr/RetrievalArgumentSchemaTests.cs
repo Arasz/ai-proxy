@@ -19,10 +19,7 @@ public sealed class RetrievalArgumentSchemaTests
     [InlineData("""{"id":"0123456789abcdef","mode":"whole"}""")]
     [InlineData("""{"id":"0123456789abcdef","mode":"lines","start":1,"end":2}""")]
     [InlineData("""{"id":"0123456789abcdef","mode":"pattern","pattern":"x","context":10}""")]
-    public void Arguments_that_follow_the_tool_schema_pass(string arguments)
-    {
-        Assert.Null(Violation(arguments));
-    }
+    public void Arguments_that_follow_the_tool_schema_pass(string arguments) => Assert.Null(Violation(arguments));
 
     [Theory]
     [InlineData("[]")]

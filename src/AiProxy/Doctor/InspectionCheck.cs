@@ -5,7 +5,6 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using AiProxy.Core.Doctor;
-using AiProxy.Hosting.Integration;
 
 namespace AiProxy.Doctor;
 
@@ -109,8 +108,5 @@ internal sealed class InspectionCheck(Uri proxy, string host, string dataDirecto
         return parts.Length >= 2 && parts[0].StartsWith("HTTP/", StringComparison.Ordinal) && parts[1].Length == 3 && parts[1].All(char.IsAsciiDigit) ? parts[1] : null;
     }
 
-    private static CheckResult Unknown(string reason)
-    {
-        return new CheckResult(Name, CheckStatus.Unknown, $"Could not tell: {reason}");
-    }
+    private static CheckResult Unknown(string reason) => new(Name, CheckStatus.Unknown, $"Could not tell: {reason}");
 }

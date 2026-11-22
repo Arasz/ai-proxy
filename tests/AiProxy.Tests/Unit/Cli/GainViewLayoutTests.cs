@@ -37,11 +37,10 @@ public sealed class GainViewLayoutTests
         return console.Output;
     }
 
-    public static TheoryData<string> Views => new() { "default", "history", "by-rule", "recalls", "all", "failures" };
+    public static TheoryData<string> Views => ["default", "history", "by-rule", "recalls", "all", "failures"];
 
-    private static GainSettings Settings(string view)
-    {
-        return view switch
+    private static GainSettings Settings(string view) =>
+        view switch
         {
             "history" => new GainSettings { History = true },
             "by-rule" => new GainSettings { ByRule = true },
@@ -50,7 +49,6 @@ public sealed class GainViewLayoutTests
             "all" => new GainSettings { All = true },
             _ => new GainSettings()
         };
-    }
 
     [Theory]
     [MemberData(nameof(Views))]
@@ -212,7 +210,7 @@ public sealed class GainViewLayoutTests
 
         var output = Render(new GainSettings { History = true }, report);
 
-        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
+        Assert.Contains($"│ {folder} ", output, StringComparison.Ordinal);
         Assert.DoesNotContain("work", output, StringComparison.Ordinal);
     }
 
@@ -225,7 +223,7 @@ public sealed class GainViewLayoutTests
 
         var output = Render(new GainSettings { History = true }, report);
 
-        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
+        Assert.Contains($"│ {folder} ", output, StringComparison.Ordinal);
     }
 
     [Theory]

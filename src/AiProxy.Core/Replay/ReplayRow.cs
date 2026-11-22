@@ -62,8 +62,5 @@ public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int Reduc
 public sealed record ReplayRow(ReplayOutcome Outcome, IReadOnlyList<ReplayBlock> Blocks, string? Host = null)
 {
     /// <summary>A row with no blocks.</summary>
-    public static ReplayRow Of(ReplayOutcome outcome)
-    {
-        return new ReplayRow(outcome, []);
-    }
+    public static ReplayRow Of(ReplayOutcome outcome) => new(outcome, []);
 }

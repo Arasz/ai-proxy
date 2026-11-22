@@ -56,10 +56,7 @@ public static class JsonExtensions
     {
         /// <summary>Whether the property has this name and holds a string.</summary>
         /// <param name="name">The property name.</param>
-        public bool IsString(string name)
-        {
-            return property.NameEquals(name) && property.Value.IsString;
-        }
+        public bool IsString(string name) => property.NameEquals(name) && property.Value.IsString;
     }
 
     /// <param name="element">The element to read from.</param>
@@ -101,24 +98,15 @@ public static class JsonExtensions
 
         /// <summary>The property of the object, or an undefined element when there is none.</summary>
         /// <param name="name">The property name.</param>
-        public JsonElement PropertyOrDefault(string name)
-        {
-            return element.IsObject && element.TryGetProperty(name, out var value) ? value : default;
-        }
+        public JsonElement PropertyOrDefault(string name) => element.IsObject && element.TryGetProperty(name, out var value) ? value : default;
 
         /// <summary>The string value of the property, or null when it is missing, not a string, or does not transcode.</summary>
         /// <param name="name">The property name.</param>
-        public string? StringProperty(string name)
-        {
-            return element.PropertyOrDefault(name).ReadString();
-        }
+        public string? StringProperty(string name) => element.PropertyOrDefault(name).ReadString();
 
         /// <summary>Whether the property is the JSON value true.</summary>
         /// <param name="name">The property name.</param>
-        public bool IsTrue(string name)
-        {
-            return element.PropertyOrDefault(name).ValueKind == JsonValueKind.True;
-        }
+        public bool IsTrue(string name) => element.PropertyOrDefault(name).ValueKind == JsonValueKind.True;
 
         /// <summary>The integer value of the property, or null when it is missing, not a number, or not an integer that fits.</summary>
         /// <param name="name">The property name.</param>

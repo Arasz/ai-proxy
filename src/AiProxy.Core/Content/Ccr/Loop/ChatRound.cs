@@ -64,10 +64,7 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId, 
     public SseEvent? Terminator => Unnamed(Done);
 
     /// <summary>The round of the first upstream response.</summary>
-    public static ChatRound First(bool clientUsage)
-    {
-        return new ChatRound(false, clientUsage, "");
-    }
+    public static ChatRound First(bool clientUsage) => new(false, clientUsage, "");
 
     /// <inheritdoc />
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)
@@ -129,10 +126,7 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId, 
     }
 
     /// <inheritdoc />
-    public IRetrievalRound Next()
-    {
-        return new ChatRound(true, clientUsage, ClientId, MergedUsage());
-    }
+    public IRetrievalRound Next() => new ChatRound(true, clientUsage, ClientId, MergedUsage());
 
     /// <inheritdoc />
     public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results)
@@ -152,21 +146,12 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId, 
     }
 
     /// <inheritdoc />
-    public SseEvent Error(string message)
-    {
-        return Unnamed(new JsonObject { ["error"] = new JsonObject { ["message"] = message, ["type"] = MessagesApi.Errors.Api, ["code"] = MessagesApi.Errors.Api } }.ToJsonString(MessagesApi.Json));
-    }
+    public SseEvent Error(string message) => Unnamed(new JsonObject { ["error"] = new JsonObject { ["message"] = message, ["type"] = MessagesApi.Errors.Api, ["code"] = MessagesApi.Errors.Api } }.ToJsonString(MessagesApi.Json));
 
     /// <inheritdoc />
-    public SseEvent ErrorOf(string body)
-    {
-        return Unnamed(body);
-    }
+    public SseEvent ErrorOf(string body) => Unnamed(body);
 
-    private static SseEvent Unnamed(string data)
-    {
-        return new SseEvent(SseEvent.Unnamed, data);
-    }
+    private static SseEvent Unnamed(string data) => new(SseEvent.Unnamed, data);
 
     private static bool TryParse(string text, out JsonObject data)
     {
@@ -331,12 +316,10 @@ public sealed class ChatRound(bool dropRole, bool clientUsage, string clientId, 
         }
     }
 
-    private static JsonObject? SameIndex(JsonArray all, JsonObject piece)
-    {
-        return piece["index"] is JsonValue index && index.TryGetValue<int>(out var number)
+    private static JsonObject? SameIndex(JsonArray all, JsonObject piece) =>
+        piece["index"] is JsonValue index && index.TryGetValue<int>(out var number)
             ? all.OfType<JsonObject>().FirstOrDefault(known => known["index"] is JsonValue other && other.TryGetValue<int>(out var otherNumber) && otherNumber == number)
             : null;
-    }
 
     private static void Join(JsonObject into, JsonObject piece)
     {

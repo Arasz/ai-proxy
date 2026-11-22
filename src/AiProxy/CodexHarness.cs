@@ -22,16 +22,10 @@ public static class CodexHarness
         "-p", "--profile", "-s", "--sandbox", "-C", "--cd", "--add-dir", "-a", "--ask-for-approval"
     ];
 
-    public static bool IsCodex(string executable)
-    {
-        return Path.GetFileNameWithoutExtension(executable).Equals(Name, StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsCodex(string executable) => Path.GetFileNameWithoutExtension(executable).Equals(Name, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The arguments to launch with: Codex gets <c>--no-daemon</c> first when it runs the TUI or a model command, unless the leading options already choose a daemon or remote.</summary>
-    public static IReadOnlyList<string> LaunchArguments(string executable, IReadOnlyList<string> arguments)
-    {
-        return IsCodex(executable) && NeedsNoDaemon(arguments) ? [NoDaemon, .. arguments] : arguments;
-    }
+    public static IReadOnlyList<string> LaunchArguments(string executable, IReadOnlyList<string> arguments) => IsCodex(executable) && NeedsNoDaemon(arguments) ? [NoDaemon, .. arguments] : arguments;
 
     private static bool NeedsNoDaemon(IReadOnlyList<string> arguments)
     {

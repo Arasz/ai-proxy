@@ -34,16 +34,10 @@ public sealed record SseEvent(string Name, string Data)
     }
 
     /// <summary>An event whose data is the object.</summary>
-    public static SseEvent Of(string name, JsonObject data)
-    {
-        return new SseEvent(name, data.ToJsonString(MessagesApi.Json));
-    }
+    public static SseEvent Of(string name, JsonObject data) => new(name, data.ToJsonString(MessagesApi.Json));
 
     /// <summary>An <c>error</c> event the client treats like any upstream error.</summary>
-    public static SseEvent Error(string type, string message)
-    {
-        return new SseEvent(MessagesApi.Events.Error, JsonSerializer.Serialize(new ErrorBody(new ErrorDetail(type, message)), MessagesApi.Json));
-    }
+    public static SseEvent Error(string type, string message) => new(MessagesApi.Events.Error, JsonSerializer.Serialize(new ErrorBody(new ErrorDetail(type, message)), MessagesApi.Json));
 
     private sealed record ErrorBody(ErrorDetail Error)
     {

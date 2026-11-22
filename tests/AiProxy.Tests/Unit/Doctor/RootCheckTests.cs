@@ -18,25 +18,13 @@ public sealed class RootCheckTests : IDisposable
         public bool IsTrusted(X509Certificate2 root) => trusted;
     }
 
-    public void Dispose()
-    {
-        Directory.Delete(_directory, true);
-    }
+    public void Dispose() => Directory.Delete(_directory, true);
 
-    private static X509Certificate2 Root(DateTimeOffset createdAt, IEnumerable<string>? hosts = null)
-    {
-        return RootCertificateAuthority.Create(hosts ?? ProviderHostCatalog.Hosts, createdAt);
-    }
+    private static X509Certificate2 Root(DateTimeOffset createdAt, IEnumerable<string>? hosts = null) => RootCertificateAuthority.Create(hosts ?? ProviderHostCatalog.Hosts, createdAt);
 
-    private void WritePem(string text)
-    {
-        File.WriteAllText(Path.Combine(_directory, "root-ca.pem"), text);
-    }
+    private void WritePem(string text) => File.WriteAllText(Path.Combine(_directory, "root-ca.pem"), text);
 
-    private Task<CheckResult> Run(bool trusted = true)
-    {
-        return new RootCheck(_directory, new FakeTimeProvider(Now), new FixedTrust(trusted)).RunAsync(TestContext.Current.CancellationToken);
-    }
+    private Task<CheckResult> Run(bool trusted = true) => new RootCheck(_directory, new FakeTimeProvider(Now), new FixedTrust(trusted)).RunAsync(TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task A_constrained_current_trusted_root_passes()
@@ -114,7 +102,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_file_holding_a_private_key_fails()
     {
         using var root = Root(Now);
-        WritePem(root.ExportCertificatePem() + "\n" + root.GetRSAPrivateKey()!.ExportPkcs8PrivateKeyPem());
+        WritePem($"{root.ExportCertificatePem()}\n{root.GetRSAPrivateKey()!.ExportPkcs8PrivateKeyPem()}");
         var result = await Run();
         Assert.Equal(CheckStatus.Fail, result.Status);
         Assert.DoesNotContain("BEGIN", result.Detail + result.Fix);
@@ -124,7 +112,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_valid_root_followed_by_more_than_64_KiB_of_padding_fails_as_too_large()
     {
         using var root = Root(Now);
-        WritePem(root.ExportCertificatePem() + "\n" + new string(' ', 65 * 1024));
+        WritePem($"{root.ExportCertificatePem()}\n{new string(' ', 65 * 1024)}");
         var result = await Run();
         Assert.Equal(CheckStatus.Fail, result.Status);
         Assert.Contains("larger than 64 KiB", result.Detail);
@@ -134,7 +122,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_valid_root_with_padding_just_under_the_bound_passes()
     {
         using var root = Root(Now);
-        var pem = root.ExportCertificatePem() + "\n";
+        var pem = $"{root.ExportCertificatePem()}\n";
         WritePem(pem + new string(' ', 64 * 1024 - pem.Length - 10));
         Assert.Equal(CheckStatus.Pass, (await Run()).Status);
     }
@@ -160,10 +148,8 @@ public sealed class RootCheckTests : IDisposable
         Assert.Equal(before, Snapshot());
     }
 
-    private string[] Snapshot()
-    {
-        return [.. Directory.EnumerateFileSystemEntries(_directory, "*", SearchOption.AllDirectories)
-            .Order(StringComparer.Ordinal)
-            .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}:{File.GetLastWriteTimeUtc(path).Ticks}")];
-    }
+    private string[] Snapshot() =>
+    [.. Directory.EnumerateFileSystemEntries(_directory, "*", SearchOption.AllDirectories)
+        .Order(StringComparer.Ordinal)
+        .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}:{File.GetLastWriteTimeUtc(path).Ticks}")];
 }

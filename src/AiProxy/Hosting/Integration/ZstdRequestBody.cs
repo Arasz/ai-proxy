@@ -13,10 +13,7 @@ internal static class ZstdRequestBody
     public const int MaxWindowLog = 24;
 
     /// <summary>Whether a <c>Content-Encoding</c> value names zstd alone.</summary>
-    public static bool IsZstd(string? contentEncoding)
-    {
-        return contentEncoding is not null && contentEncoding.Trim().Equals("zstd", StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsZstd(string? contentEncoding) => contentEncoding is not null && contentEncoding.Trim().Equals("zstd", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Returns the decoded bytes; throws <see cref="InvalidDataException" /> on a body that does not decode, is cut short or is too large.</summary>
     public static byte[] Decode(byte[] body)

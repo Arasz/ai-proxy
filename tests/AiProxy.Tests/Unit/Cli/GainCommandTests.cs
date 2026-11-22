@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Channels;
 using AiProxy.Cli;
@@ -288,10 +287,7 @@ public sealed class GainCommandTests
             return timer;
         }
 
-        public void Advance(TimeSpan elapsed)
-        {
-            _clock.Advance(elapsed);
-        }
+        public void Advance(TimeSpan elapsed) => _clock.Advance(elapsed);
     }
 
     internal sealed class Fixture : IDisposable

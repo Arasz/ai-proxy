@@ -8,15 +8,9 @@ public sealed class ChatRequestTests
 {
     private const string Tool = """{"type":"function","function":{"name":"read","parameters":{"type":"object"}}}""";
 
-    private static string Body(string extra = "", string model = "deepseek/deepseek-v4", string tools = $"[{Tool}]")
-    {
-        return $$"""{"model":"{{model}}","stream":true,"tools":{{tools}}{{extra}},"messages":[{"role":"user","content":"hi"}]}""";
-    }
+    private static string Body(string extra = "", string model = "deepseek/deepseek-v4", string tools = $"[{Tool}]") => $$"""{"model":"{{model}}","stream":true,"tools":{{tools}}{{extra}},"messages":[{"role":"user","content":"hi"}]}""";
 
-    private static ChatRequest Read(string body)
-    {
-        return ChatRequest.Read(Encoding.UTF8.GetBytes(body))!;
-    }
+    private static ChatRequest Read(string body) => ChatRequest.Read(Encoding.UTF8.GetBytes(body))!;
 
     [Theory]
     [InlineData("deepseek/deepseek-v4", true)]
@@ -26,10 +20,7 @@ public sealed class ChatRequestTests
     [InlineData("openrouter/auto", false)]
     [InlineData("mistralai/mixtral", false)]
     [InlineData("", false)]
-    public void Only_models_with_a_known_prefix_qualify(string model, bool qualifies)
-    {
-        Assert.Equal(qualifies, Read(Body(model: model)).Qualifies);
-    }
+    public void Only_models_with_a_known_prefix_qualify(string model, bool qualifies) => Assert.Equal(qualifies, Read(Body(model: model)).Qualifies);
 
     [Theory]
     [InlineData(",\"n\":2", false)]
@@ -39,10 +30,7 @@ public sealed class ChatRequestTests
     [InlineData(",\"tool_choice\":\"required\"", true)]
     [InlineData(",\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"read\"}}", false)]
     [InlineData(",\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"proxy_retrieve\"}}", true)]
-    public void A_choice_count_or_tool_choice_the_loop_cannot_serve_disqualifies_the_request(string extra, bool qualifies)
-    {
-        Assert.Equal(qualifies, Read(Body(extra)).Qualifies);
-    }
+    public void A_choice_count_or_tool_choice_the_loop_cannot_serve_disqualifies_the_request(string extra, bool qualifies) => Assert.Equal(qualifies, Read(Body(extra)).Qualifies);
 
     [Fact]
     public void A_request_without_stream_or_tools_does_not_qualify()
@@ -75,7 +63,7 @@ public sealed class ChatRequestTests
         Assert.Equal(CcrRetrieval.Name, tools[1].GetProperty("function").GetProperty("name").GetString());
         Assert.Equal("object", tools[1].GetProperty("function").GetProperty("parameters").GetProperty("type").GetString());
         Assert.True(document.RootElement.GetProperty("stream_options").GetProperty("include_usage").GetBoolean());
-        var expected = body.Insert(body.IndexOf("],\"messages\"", StringComparison.Ordinal), "," + CcrRetrieval.ChatDefinition)[..^1] + ",\"stream_options\":{\"include_usage\":true}}";
+        var expected = $"{body.Insert(body.IndexOf("],\"messages\"", StringComparison.Ordinal), $",{CcrRetrieval.ChatDefinition}")[..^1]},\"stream_options\":{{\"include_usage\":true}}}}";
         Assert.Equal(expected, prepared);
     }
 
@@ -151,25 +139,16 @@ public sealed class ChatRequestTests
     [InlineData(",\"tool_choice\":{\"function\":{\"name\":null}}", false)]
     [InlineData(",\"stream_options\":null", true)]
     [InlineData(",\"stream_options\":{\"include_usage\":null}", true)]
-    public void A_null_or_wrongly_typed_field_never_throws_and_qualifies_only_when_the_loop_can_serve_it(string extra, bool qualifies)
-    {
-        Assert.Equal(qualifies, Read(Body(extra)).Qualifies);
-    }
+    public void A_null_or_wrongly_typed_field_never_throws_and_qualifies_only_when_the_loop_can_serve_it(string extra, bool qualifies) => Assert.Equal(qualifies, Read(Body(extra)).Qualifies);
 
     [Fact]
-    public void A_model_that_is_not_a_string_does_not_qualify()
-    {
-        Assert.False(Read("""{"model":5,"stream":true,"tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""").Qualifies);
-    }
+    public void A_model_that_is_not_a_string_does_not_qualify() => Assert.False(Read("""{"model":5,"stream":true,"tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""").Qualifies);
 
     [Theory]
     [InlineData("""{"model":"deepseek/x","stream":true,"tools":[],"messages":[]}""")]
     [InlineData("""{"model":"deepseek/x","stream":true,"messages":[]}""")]
     [InlineData("""{"model":"deepseek/x","stream":true,"tools":[{"type":"function","function":{"name":"read"}}]""")]
-    public void WithTool_returns_null_when_it_cannot_append_the_tool(string body)
-    {
-        Assert.Null(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body)));
-    }
+    public void WithTool_returns_null_when_it_cannot_append_the_tool(string body) => Assert.Null(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body)));
 
     [Fact]
     public void WithTool_reports_only_the_characters_of_the_tool_it_appended_not_the_usage_option()

@@ -510,10 +510,7 @@ public sealed class TitaniumProxyServiceTests
         }
     }
 
-    private static string MarkerPath(TemporaryDirectory directory)
-    {
-        return Path.Combine(directory.Path, "system-proxy.lock");
-    }
+    private static string MarkerPath(TemporaryDirectory directory) => Path.Combine(directory.Path, "system-proxy.lock");
 
     private static TitaniumProxyService CreateService(
         ISystemProxyRegistrar registrar,
@@ -522,9 +519,8 @@ public sealed class TitaniumProxyServiceTests
         ISystemProxyGuardLauncher? launcher = null,
         TimeSpan? markerWait = null,
         TimeProvider? timeProvider = null,
-        RecordingLoggerProvider? loggerProvider = null)
-    {
-        return new TitaniumProxyService(
+        RecordingLoggerProvider? loggerProvider = null) =>
+        new(
             registrar,
             new ProxyRuntimeOptions(IPAddress.Loopback, port, true, false, dataDirectory),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
@@ -533,7 +529,6 @@ public sealed class TitaniumProxyServiceTests
             loggerProvider is null ? NullLoggerFactory.Instance : new LoggerFactory([loggerProvider]),
             markerWait ?? TimeSpan.FromSeconds(1),
             timeProvider ?? TimeProvider.System);
-    }
 
     private sealed class RecordingSystemProxyRegistrar(List<string>? events = null) : ISystemProxyRegistrar
     {
@@ -675,10 +670,7 @@ public sealed class TitaniumProxyServiceTests
                 }
             }
 
-            public void Dispose()
-            {
-                owner.DisposeCount++;
-            }
+            public void Dispose() => owner.DisposeCount++;
         }
     }
 }

@@ -52,28 +52,16 @@ public sealed record CcrOptions(
 
     /// <summary>The most a preview of a region of this many original tokens may hold, in estimated tokens.</summary>
     /// <param name="originalTokens">The region's estimated tokens as the client sent it; reducers do not change the budget.</param>
-    public int BudgetFor(int originalTokens)
-    {
-        return Math.Min(BudgetTokens, (int)(BudgetShare * originalTokens));
-    }
+    public int BudgetFor(int originalTokens) => Math.Min(BudgetTokens, (int)(BudgetShare * originalTokens));
 
     /// <summary>Whether a region is a numbered read or a diff small enough, after its reducers, to go out without a preview.</summary>
     /// <param name="original">The region's text as the client sent it.</param>
     /// <param name="reducedTokens">The region's estimated tokens after its reducers.</param>
-    public bool SkipsPreview(string original, int reducedTokens)
-    {
-        return reducedTokens < SkipUnderTokens && (PreviewSkip.IsNumberedRead(original) || PreviewSkip.IsDiff(original));
-    }
+    public bool SkipsPreview(string original, int reducedTokens) => reducedTokens < SkipUnderTokens && (PreviewSkip.IsNumberedRead(original) || PreviewSkip.IsDiff(original));
 
     /// <summary>The estimated tokens of a text of this many characters, rounded down.</summary>
-    public int TokensOf(int characters)
-    {
-        return (int)(characters / CharactersPerToken);
-    }
+    public int TokensOf(int characters) => (int)(characters / CharactersPerToken);
 
     /// <summary>The most characters that still fit in this many estimated tokens.</summary>
-    public int CharactersOf(int tokens)
-    {
-        return (int)(tokens * CharactersPerToken);
-    }
+    public int CharactersOf(int tokens) => (int)(tokens * CharactersPerToken);
 }

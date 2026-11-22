@@ -71,41 +71,24 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex, CcrMode mo
         .ToArray();
 
     /// <summary>The round of the first upstream response.</summary>
-    public static RetrievalRound First(CcrMode mode)
-    {
-        return new RetrievalRound(MessageStart.Pass, 0, mode);
-    }
+    public static RetrievalRound First(CcrMode mode) => new(MessageStart.Pass, 0, mode);
 
     /// <summary>The round of a follow-up response: its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
-    public RetrievalRound Next()
-    {
-        return new RetrievalRound(MessageStart.Drop, NextIndex, mode);
-    }
+    public RetrievalRound Next() => new(MessageStart.Drop, NextIndex, mode);
 
-    IRetrievalRound IRetrievalRound.Next()
-    {
-        return Next();
-    }
+    IRetrievalRound IRetrievalRound.Next() => Next();
 
     /// <inheritdoc />
-    public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results)
-    {
-        return mode == CcrMode.Thread
+    public byte[] FollowUp(ReadOnlySpan<byte> forwarded, IReadOnlyList<ToolResult> results) =>
+        mode == CcrMode.Thread
             ? RetrievalFollowUp.Thread(forwarded, MessageId, results)
             : RetrievalFollowUp.Stateless(forwarded, Content(), results);
-    }
 
     /// <inheritdoc />
-    public SseEvent Error(string message)
-    {
-        return SseEvent.Error(Errors.Api, message);
-    }
+    public SseEvent Error(string message) => SseEvent.Error(Errors.Api, message);
 
     /// <inheritdoc />
-    public SseEvent ErrorOf(string body)
-    {
-        return new SseEvent(Events.Error, body);
-    }
+    public SseEvent ErrorOf(string body) => new(Events.Error, body);
 
     /// <inheritdoc />
     public SseEvent KeepAlive => SseEvent.Ping;
@@ -136,10 +119,7 @@ public sealed class RetrievalRound(MessageStart start, int nextIndex, CcrMode mo
     }
 
     /// <summary>The assistant content as received, for a stateless follow-up.</summary>
-    public JsonArray Content()
-    {
-        return new JsonArray(_order.Select(static block => (JsonNode)block.Content.DeepClone()).ToArray());
-    }
+    public JsonArray Content() => new(_order.Select(static block => (JsonNode)block.Content.DeepClone()).ToArray());
 
     /// <summary>Takes one upstream event and returns what the client gets now; an event it cannot read passes on as it came.</summary>
     public IReadOnlyList<SseEvent> Accept(SseEvent sse)

@@ -9,24 +9,15 @@ public sealed class ApiCheckTests
 {
     private sealed class StubHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(respond());
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(respond());
     }
 
     private sealed class RefusingHandler : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            throw new HttpRequestException("Connection refused");
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => throw new HttpRequestException("Connection refused");
     }
 
-    private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK)
-    {
-        return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-    }
+    private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private sealed class TokenHandler(string token) : HttpMessageHandler
     {
@@ -47,7 +38,7 @@ public sealed class ApiCheckTests
     private static async Task<ApiProbe> Probe(HttpMessageHandler handler, string? dataDirectory = null)
     {
         using var client = new HttpClient(handler);
-        return await new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3", dataDirectory ?? Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))).ProbeAsync(TestContext.Current.CancellationToken);
+        return await new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3", dataDirectory ?? Path.Combine(Path.GetTempPath(), $"ai-proxy-no-token-{Guid.NewGuid():N}")).ProbeAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

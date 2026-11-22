@@ -38,14 +38,11 @@ public sealed class ReplayCommandTests : IDisposable
         Enumerable.Range(0, 60).Select(index => new Dictionary<string, object?> { ["id"] = index, ["name"] = $"item{index}", ["tags"] = new[] { "a", "b" }, ["nested"] = new Dictionary<string, object?> { ["x"] = index, ["y"] = null } }),
         new JsonSerializerOptions { WriteIndented = true, IndentSize = 4 });
 
-    private static readonly string CodeFile = "using System;\n\nnamespace Demo;\n\n/// <summary>The demo type.</summary>\npublic sealed class Example\n{\n"
-                                              + string.Concat(Enumerable.Range(0, 40).Select(index =>
-                                                  $"    /// <summary>Returns the number {index} after doing a fair amount of careful work that the comment goes on to describe at length.</summary>\n    public int Value{index}()\n    {{\n        var total = {index};\n        for (var step = 0; step < 10; step++)\n        {{\n            total += step * {index};\n        }}\n\n        return total;\n    }}\n\n"))
-                                              + "}\n";
+    private static readonly string CodeFile = $"using System;\n\nnamespace Demo;\n\n/// <summary>The demo type.</summary>\npublic sealed class Example\n{{\n{string.Concat(Enumerable.Range(0, 40).Select(index =>
+        $"    /// <summary>Returns the number {index} after doing a fair amount of careful work that the comment goes on to describe at length.</summary>\n    public int Value{index}()\n    {{\n        var total = {index};\n        for (var step = 0; step < 10; step++)\n        {{\n            total += step * {index};\n        }}\n\n        return total;\n    }}\n\n"))}}}\n";
 
-    private static byte[] ReadBody(string path, string output)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] ReadBody(string path, string output) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new object[]
             {
@@ -53,33 +50,22 @@ public sealed class ReplayCommandTests : IDisposable
                 new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = output } } }
             }
         }));
-    }
 
-    private static byte[] TwoToolBody(string first, string second)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] TwoToolBody(string first, string second) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new[] { new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = first }, new { type = "tool_result", tool_use_id = "t2", content = second } } } }
         }));
-    }
 
-    private static byte[] ToolBody(string output)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] ToolBody(string output) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new[] { new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = output } } } }
         }));
-    }
 
-    private string Db(string file)
-    {
-        return Path.Combine(_home.Path, file);
-    }
+    private string Db(string file) => Path.Combine(_home.Path, file);
 
-    private void WriteContent(params byte[][] originals)
-    {
-        WriteContentAt(Stamp, originals);
-    }
+    private void WriteContent(params byte[][] originals) => WriteContentAt(Stamp, originals);
 
     private void WriteContentAt(DateTimeOffset at, params byte[][] originals)
     {
@@ -95,10 +81,7 @@ public sealed class ReplayCommandTests : IDisposable
         }
     }
 
-    private void WriteCapture(params byte[][] bodies)
-    {
-        WriteCaptureAt(Stamp, "api.anthropic.com", bodies);
-    }
+    private void WriteCapture(params byte[][] bodies) => WriteCaptureAt(Stamp, "api.anthropic.com", bodies);
 
     private void WriteCaptureAt(DateTimeOffset at, string host, params byte[][] bodies)
     {
@@ -148,10 +131,7 @@ public sealed class ReplayCommandTests : IDisposable
         return JsonDocument.Parse(_fixture.Output.ToString()).RootElement.Clone();
     }
 
-    private string Hashes()
-    {
-        return string.Join(",", new[] { "content.db", "capture.db" }.Select(file => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Db(file))))));
-    }
+    private string Hashes() => string.Join(",", new[] { "content.db", "capture.db" }.Select(file => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Db(file))))));
 
     [Fact]
     public async Task The_minimum_option_reaches_the_pipeline_so_the_same_body_previews_only_when_it_is_low_enough()
@@ -188,7 +168,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task A_good_zstd_capture_row_is_decoded_and_replayed()
     {
         using var compressor = new Compressor();
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300", "--include-encoded");
 
@@ -213,7 +193,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Replay_leaves_both_databases_byte_identical_and_a_write_through_its_connection_throws()
     {
         WriteContent(ToolBody(Output));
-        WriteCapture(ToolBody(Output + "\nextra"));
+        WriteCapture(ToolBody($"{Output}\nextra"));
         var before = Hashes();
 
         await ReplayAsync("--minimum", "300");
@@ -244,8 +224,8 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_row_that_is_not_json_and_a_row_with_no_tool_region_are_counted_in_their_own_denominators()
     {
-        var noTool = Encoding.UTF8.GetBytes("""{"messages":[{"role":"user","content":"hello"}]}""");
-        WriteCapture(Encoding.UTF8.GetBytes("this is not json"), noTool, ToolBody(Output));
+        var noTool = """{"messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
+        WriteCapture([.. "this is not json"u8], noTool, ToolBody(Output));
 
         var result = await ReplayAsync("--minimum", "300");
 
@@ -272,7 +252,7 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_preview_sent_by_two_requests_is_summed_over_both_under_its_id()
     {
-        WriteCapture(ToolBody(Output), ToolBody(Output).Concat(" "u8.ToArray()).ToArray());
+        WriteCapture(ToolBody(Output), [.. ToolBody(Output), .. " "u8.ToArray()]);
 
         var result = await ReplayAsync("--minimum", "300", "--source", "capture");
 
@@ -372,9 +352,9 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task Since_keeps_the_rows_at_and_after_the_time_and_drops_the_ones_before()
     {
-        WriteCaptureAt(Stamp.AddSeconds(-1), "api.anthropic.com", ToolBody(Output + "\nbefore"));
-        WriteCaptureAt(Stamp, "api.anthropic.com", ToolBody(Output + "\nat"));
-        WriteCaptureAt(Stamp.AddSeconds(1), "api.anthropic.com", ToolBody(Output + "\nafter"));
+        WriteCaptureAt(Stamp.AddSeconds(-1), "api.anthropic.com", ToolBody($"{Output}\nbefore"));
+        WriteCaptureAt(Stamp, "api.anthropic.com", ToolBody($"{Output}\nat"));
+        WriteCaptureAt(Stamp.AddSeconds(1), "api.anthropic.com", ToolBody($"{Output}\nafter"));
 
         var result = await ReplayAsync("--minimum", "300", "--since", Stamp.ToString("O"));
 
@@ -385,7 +365,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Source_content_reads_no_capture_rows()
     {
         WriteContent(ToolBody(Output));
-        WriteCapture(ToolBody(Output + "\nother"));
+        WriteCapture(ToolBody($"{Output}\nother"));
 
         var result = await ReplayAsync("--minimum", "300", "--source", "content");
 
@@ -399,7 +379,7 @@ public sealed class ReplayCommandTests : IDisposable
     {
         using var compressor = new Compressor();
         WriteContent(ToolBody(Output));
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300");
 
@@ -413,7 +393,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Encoded_bodies_are_left_out_unless_they_are_asked_for()
     {
         using var compressor = new Compressor();
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var left = await ReplayAsync("--minimum", "300");
         var included = await ReplayAsync("--minimum", "300", "--include-encoded");
@@ -430,7 +410,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Rows_are_counted_per_host_and_a_content_row_has_no_host()
     {
         WriteContent(ToolBody(Output));
-        WriteCaptureAt(Stamp, "api.openai.com", ToolBody(Output + "\none"), ToolBody(Output + "\ntwo"));
+        WriteCaptureAt(Stamp, "api.openai.com", ToolBody($"{Output}\none"), ToolBody($"{Output}\ntwo"));
 
         var result = await ReplayAsync("--minimum", "300");
 

@@ -54,15 +54,9 @@ public sealed class CliApplication(GainRuntime runtime)
     /// <summary>The names of the commands this application registers, the same list that registers them.</summary>
     public static IReadOnlyCollection<string> CommandNames => Commands;
 
-    public static bool IsCommandInvocation(string[] args)
-    {
-        return IsRootHelp(args) || (args.Length > 0 && (Commands.Contains(args[0]) || args[0] is "--version"));
-    }
+    public static bool IsCommandInvocation(string[] args) => IsRootHelp(args) || (args.Length > 0 && (Commands.Contains(args[0]) || args[0] is "--version"));
 
-    private static bool IsRootHelp(string[] args)
-    {
-        return args.Any(argument => argument is "-h" or "-?" or "--help") && (args.Length == 0 || !Commands.Contains(args[0]));
-    }
+    private static bool IsRootHelp(string[] args) => args.Any(argument => argument is "-h" or "-?" or "--help") && (args.Length == 0 || !Commands.Contains(args[0]));
 
     /// <summary>Reports a command line that is neither a command nor valid start options: the parse error, then the usage, both on stderr.</summary>
     public static async Task<int> RunRejectedAsync(string[] args)

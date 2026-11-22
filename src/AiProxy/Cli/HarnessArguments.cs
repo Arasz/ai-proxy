@@ -46,8 +46,5 @@ internal sealed record HarnessArguments(string[] Launcher, string[]? Forwarded)
         return new HarnessArguments(args, null);
     }
 
-    private static bool IsInlineOption(string argument)
-    {
-        return ValueOptions.Any(option => argument.StartsWith($"{option}=", StringComparison.Ordinal));
-    }
+    private static bool IsInlineOption(string argument) => ValueOptions.Any(option => argument.StartsWith($"{option}=", StringComparison.Ordinal));
 }

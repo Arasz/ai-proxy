@@ -18,10 +18,7 @@ public sealed class MarkdownCompressionHandler : ICompressionHandler
         RegexOptions.Compiled);
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.Markdown;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.Markdown;
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

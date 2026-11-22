@@ -52,10 +52,7 @@ public sealed class ClientBoundaryTests
         Assert.Empty(violations);
     }
 
-    private static bool IsBoundaryRoot(Type type)
-    {
-        return IsClientType(type) || type.Name is "McpCommand" or "HarnessProcess" || type.Namespace == "AiProxy.Doctor";
-    }
+    private static bool IsBoundaryRoot(Type type) => IsClientType(type) || type.Name is "McpCommand" or "HarnessProcess" || type.Namespace == "AiProxy.Doctor";
 
     private static IEnumerable<string> ChainViolations(Type root, Assembly assembly)
     {
@@ -138,7 +135,7 @@ public sealed class ClientBoundaryTests
             root = root.DeclaringType;
         }
 
-        return ClientNamespaces.Any(name => root.Namespace == name || root.Namespace?.StartsWith(name + ".", StringComparison.Ordinal) == true);
+        return ClientNamespaces.Any(name => root.Namespace == name || root.Namespace?.StartsWith($"{name}.", StringComparison.Ordinal) == true);
     }
 
     private static IEnumerable<string> Violations(Type owner)

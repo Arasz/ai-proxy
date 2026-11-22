@@ -11,15 +11,9 @@ internal sealed record StatusView(int Pid, DateTime StartUtc, string ProxyUrl, s
 
     public bool Running => true;
 
-    public static StatusView From(ProxyControl.ProxyInfo owner, string dataDirectory)
-    {
-        return new StatusView(owner.Pid, owner.StartUtc, owner.ProxyUrl, owner.ApiUrls, dataDirectory, Path.Combine(dataDirectory, ProxyLogFile.FileName), owner.Capture);
-    }
+    public static StatusView From(ProxyControl.ProxyInfo owner, string dataDirectory) => new(owner.Pid, owner.StartUtc, owner.ProxyUrl, owner.ApiUrls, dataDirectory, Path.Combine(dataDirectory, ProxyLogFile.FileName), owner.Capture);
 
-    public string Json()
-    {
-        return JsonSerializer.Serialize(this, JsonOptions);
-    }
+    public string Json() => JsonSerializer.Serialize(this, JsonOptions);
 
     public string Text(DateTimeOffset now)
     {

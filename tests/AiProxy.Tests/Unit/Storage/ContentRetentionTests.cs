@@ -28,10 +28,7 @@ public sealed class ContentRetentionTests : IDisposable
         }
     }
 
-    private string DaysAgo(int days)
-    {
-        return (_time.GetUtcNow() - TimeSpan.FromDays(days)).ToString("O", CultureInfo.InvariantCulture);
-    }
+    private string DaysAgo(int days) => (_time.GetUtcNow() - TimeSpan.FromDays(days)).ToString("O", CultureInfo.InvariantCulture);
 
     private SqliteConnection OpenReady()
     {

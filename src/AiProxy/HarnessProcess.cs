@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
 using AiProxy.Core.Gain;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
@@ -105,7 +104,7 @@ public sealed class HarnessProcess : AsyncCommand<HarnessProcess.Settings>
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or Win32Exception or InvalidOperationException)
         {
-            await Console.Error.WriteLineAsync(CommandLine.ErrorPrefix + exception.Message);
+            await Console.Error.WriteLineAsync($"{CommandLine.ErrorPrefix}{exception.Message}", cancellationToken);
             return 1;
         }
     }

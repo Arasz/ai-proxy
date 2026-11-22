@@ -64,12 +64,9 @@ public sealed class DoctorSettings : OptionValueSettings
                 .WithMessage("The timeout must be between 1 and 300 seconds.");
             RuleFor(static settings => settings.Host)
                 .Must(static host => InspectedHosts.Contains(host))
-                .WithMessage("The host must be one of the provider hosts the proxy inspects: " + string.Join(", ", InspectedHosts) + ".");
+                .WithMessage($"The host must be one of the provider hosts the proxy inspects: {string.Join(", ", InspectedHosts)}.");
         }
 
-        public static string? Error(DoctorSettings settings)
-        {
-            return new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
-        }
+        public static string? Error(DoctorSettings settings) => new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
     }
 }

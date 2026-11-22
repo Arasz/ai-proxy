@@ -28,7 +28,7 @@ public sealed class DrainOnEofStreamTests
     public async Task End_of_input_waits_until_the_pending_request_is_answered()
     {
         var pending = new PendingRequests();
-        using var stream = Wrap(pending, new FakeTimeProvider(), Request + "\n");
+        using var stream = Wrap(pending, new FakeTimeProvider(), $"{Request}\n");
 
         var drain = DrainAsync(stream);
         await Task.Delay(100, TestContext.Current.CancellationToken);
@@ -58,7 +58,7 @@ public sealed class DrainOnEofStreamTests
     {
         var pending = new PendingRequests();
         var cancel = """{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}""";
-        using var stream = Wrap(pending, new FakeTimeProvider(), Request + "\n" + cancel + "\n");
+        using var stream = Wrap(pending, new FakeTimeProvider(), $"{Request}\n{cancel}\n");
 
         await DrainAsync(stream).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
@@ -95,7 +95,7 @@ public sealed class DrainOnEofStreamTests
     {
         var clock = new TimerObservingTimeProvider();
         var pending = new PendingRequests();
-        using var stream = Wrap(pending, clock, Request + "\n");
+        using var stream = Wrap(pending, clock, $"{Request}\n");
 
         var drain = DrainAsync(stream);
         await clock.FirstTimerCreated.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -140,7 +140,7 @@ public sealed class DrainOnEofStreamTests
     public async Task A_line_ending_in_carriage_return_and_newline_is_tracked()
     {
         var pending = new PendingRequests();
-        using var stream = Wrap(pending, new FakeTimeProvider(), Request + "\r\n");
+        using var stream = Wrap(pending, new FakeTimeProvider(), $"{Request}\r\n");
 
         var drain = DrainAsync(stream);
         await Task.Delay(100, TestContext.Current.CancellationToken);
@@ -155,7 +155,7 @@ public sealed class DrainOnEofStreamTests
     {
         var pending = new PendingRequests();
         var huge = """{"id":1,"method":"a","params":"%s"}""".Replace("%s", new string('x', DrainOnEofStream.MaxLineBytes + 10));
-        using var stream = Wrap(pending, new FakeTimeProvider(), huge + "\n" + Request + "\n");
+        using var stream = Wrap(pending, new FakeTimeProvider(), $"{huge}\n{Request}\n");
 
         var drain = DrainAsync(stream);
         await Task.Delay(100, TestContext.Current.CancellationToken);
@@ -182,7 +182,7 @@ public sealed class DrainOnEofStreamTests
     public void A_synchronous_read_passes_bytes_through_and_tracks_requests()
     {
         var pending = new PendingRequests();
-        using var stream = Wrap(pending, new FakeTimeProvider(), Request + "\n");
+        using var stream = Wrap(pending, new FakeTimeProvider(), $"{Request}\n");
 
         var buffer = new byte[256];
         var read = stream.Read(buffer, 0, buffer.Length);
@@ -196,7 +196,7 @@ public sealed class DrainOnEofStreamTests
     {
         var clock = new TimerObservingTimeProvider();
         var logger = new CapturingLogger();
-        using var stream = Wrap(new PendingRequests(), clock, Request + "\n", logger);
+        using var stream = Wrap(new PendingRequests(), clock, $"{Request}\n", logger);
 
         var drain = DrainAsync(stream);
         await clock.FirstTimerCreated.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);

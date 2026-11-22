@@ -290,9 +290,6 @@ public sealed class ContentSchemaTests : IDisposable
             }
         }
 
-        public void Dispose()
-        {
-            raw.sqlite3_trace(_handle, (delegate_trace?)null, null);
-        }
+        public void Dispose() => raw.sqlite3_trace(_handle, (delegate_trace?)null, null);
     }
 }

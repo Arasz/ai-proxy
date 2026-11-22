@@ -18,35 +18,17 @@ public sealed class CcrRetrievalTests
 
     private static readonly string Id = IdOf(Original);
 
-    private static string IdOf(string original)
-    {
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
-    }
+    private static string IdOf(string original) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
 
-    private static CcrRetrieval Answer(string arguments, string? original = null)
-    {
-        return Retriever().Answer(arguments, original ?? Original, Options);
-    }
+    private static CcrRetrieval Answer(string arguments, string? original = null) => Retriever().Answer(arguments, original ?? Original, Options);
 
-    private static CcrRetriever Retriever()
-    {
-        return new CcrRetriever(new CcrRetrievalParser(new RetrievalArgumentSchema()));
-    }
+    private static CcrRetriever Retriever() => new(new CcrRetrievalParser(new RetrievalArgumentSchema()));
 
-    private static string Lines(int start, int end)
-    {
-        return $$"""{"id":"{{Id}}","mode":"lines","start":{{start}},"end":{{end}}}""";
-    }
+    private static string Lines(int start, int end) => $$"""{"id":"{{Id}}","mode":"lines","start":{{start}},"end":{{end}}}""";
 
-    private static string Pattern(string pattern, int context = 0, string? id = null)
-    {
-        return $$"""{"id":"{{id ?? Id}}","mode":"pattern","pattern":{{JsonSerializer.Serialize(pattern)}},"context":{{context}}}""";
-    }
+    private static string Pattern(string pattern, int context = 0, string? id = null) => $$"""{"id":"{{id ?? Id}}","mode":"pattern","pattern":{{JsonSerializer.Serialize(pattern)}},"context":{{context}}}""";
 
-    private static string[] Body(CcrRetrieval result)
-    {
-        return result.Text.Split('\n')[1..];
-    }
+    private static string[] Body(CcrRetrieval result) => result.Text.Split('\n')[1..];
 
     [Fact]
     public void The_definition_is_the_exact_tool_the_adr_declares()
@@ -243,10 +225,7 @@ public sealed class CcrRetrievalTests
     [InlineData("(")]
     [InlineData(@"(a)\1")]
     [InlineData("[z-a]")]
-    public void An_invalid_pattern_is_a_bad_pattern(string pattern)
-    {
-        Assert.Equal(CcrRetrieval.BadPattern, Answer(Pattern(pattern)).Error);
-    }
+    public void An_invalid_pattern_is_a_bad_pattern(string pattern) => Assert.Equal(CcrRetrieval.BadPattern, Answer(Pattern(pattern)).Error);
 
     [Fact]
     public void A_catastrophic_backtracking_pattern_returns_a_normal_answer()
@@ -286,10 +265,7 @@ public sealed class CcrRetrievalTests
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":11}""")]
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"x","context":-1}""")]
     [InlineData("""{"id":"ID","mode":"lines","start":0,"end":5}""")]
-    public void Malformed_arguments_are_bad_input(string arguments)
-    {
-        Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
-    }
+    public void Malformed_arguments_are_bad_input(string arguments) => Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
 
     [Theory]
     [InlineData("""{"id":"ID","mode":"pattern","pattern":"\uD800"}""")]
@@ -297,10 +273,7 @@ public sealed class CcrRetrievalTests
     [InlineData("""{"id":"\uD800","mode":"whole"}""")]
     [InlineData("""{"id":"ID","mode":"\uD800"}""")]
     [InlineData("""{"id":"ID","mode":"whole","\uD800":1}""")]
-    public void Malformed_unicode_arguments_are_bad_input(string arguments)
-    {
-        Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
-    }
+    public void Malformed_unicode_arguments_are_bad_input(string arguments) => Assert.Equal(CcrRetrieval.BadInput, Answer(arguments.Replace("ID", Id, StringComparison.Ordinal)).Error);
 
     [Theory]
     [InlineData('\uD800')]
@@ -342,9 +315,6 @@ public sealed class CcrRetrievalTests
 
     private sealed class RejectingSchema(string violation) : IToolArgumentSchema
     {
-        public string? Violation(JsonElement arguments)
-        {
-            return violation;
-        }
+        public string? Violation(JsonElement arguments) => violation;
     }
 }

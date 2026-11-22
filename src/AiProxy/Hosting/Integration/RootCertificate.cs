@@ -25,22 +25,13 @@ internal interface IRootCertificate
 internal sealed class TitaniumRootCertificate(CertificateManager certificates) : IRootCertificate
 {
     /// <inheritdoc />
-    public void Load()
-    {
-        certificates.EnsureRootCertificate();
-    }
+    public void Load() => certificates.EnsureRootCertificate();
 
     /// <inheritdoc />
-    public bool IsTrusted()
-    {
-        return certificates.IsRootCertificateUserTrusted();
-    }
+    public bool IsTrusted() => certificates.IsRootCertificateUserTrusted();
 
     /// <inheritdoc />
-    public void Trust()
-    {
-        certificates.TrustRootCertificate();
-    }
+    public void Trust() => certificates.TrustRootCertificate();
 
     /// <inheritdoc />
     /// <remarks>Matches by thumbprint only: Titanium's own untrust helpers also match by common name, which would remove other

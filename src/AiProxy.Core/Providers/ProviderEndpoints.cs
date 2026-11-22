@@ -27,8 +27,5 @@ public static class ProviderEndpoints
         };
     }
 
-    private static bool EndsWithAny(string path, string[] endings)
-    {
-        return endings.Any(ending => path.EndsWith(ending, StringComparison.OrdinalIgnoreCase));
-    }
+    private static bool EndsWithAny(string path, string[] endings) => endings.Any(ending => path.EndsWith(ending, StringComparison.OrdinalIgnoreCase));
 }

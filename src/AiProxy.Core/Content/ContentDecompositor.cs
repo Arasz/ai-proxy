@@ -70,10 +70,7 @@ public sealed partial class ContentDecompositor : IDecompositor
         return new Decomposition(requestId, content, template.ToString(), parts);
     }
 
-    private static List<Span> FindParts(string content)
-    {
-        return new PartScanner(content).Scan();
-    }
+    private static List<Span> FindParts(string content) => new PartScanner(content).Scan();
 
     private static List<Span> Merge(string content, List<Span> spans)
     {

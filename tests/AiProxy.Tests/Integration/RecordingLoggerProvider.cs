@@ -13,10 +13,7 @@ internal sealed class RecordingLoggerProvider : ILoggerProvider
 
     public IReadOnlyCollection<LogEntry> Entries => _entries.ToArray();
 
-    public ILogger CreateLogger(string categoryName)
-    {
-        return new RecordingLogger(categoryName, _entries);
-    }
+    public ILogger CreateLogger(string categoryName) => new RecordingLogger(categoryName, _entries);
 
     public void Dispose()
     {
@@ -25,19 +22,11 @@ internal sealed class RecordingLoggerProvider : ILoggerProvider
     private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull =>
+            null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, exception, formatter(state, exception)));
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, exception, formatter(state, exception)));
     }
 }

@@ -22,10 +22,7 @@ public sealed class GainHarnessTests
     [InlineData("gemini", "chatgpt.com", "other")]
     [InlineData("unknown", null, "other")]
     [InlineData(null, null, "other")]
-    public void A_provider_and_host_belong_to_one_harness(string? provider, string? host, string harness)
-    {
-        Assert.Equal(harness, GainHarness.Of(provider, host));
-    }
+    public void A_provider_and_host_belong_to_one_harness(string? provider, string? host, string harness) => Assert.Equal(harness, GainHarness.Of(provider, host));
 
     [Fact]
     public void Harness_totals_merge_providers_and_keep_display_order()

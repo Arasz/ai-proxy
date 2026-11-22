@@ -27,9 +27,6 @@ public sealed class StatusSettings : OptionValueSettings
                 .WithMessage("Output format must be text or json.");
         }
 
-        public static string? Error(StatusSettings settings)
-        {
-            return new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
-        }
+        public static string? Error(StatusSettings settings) => new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
     }
 }

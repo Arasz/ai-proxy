@@ -201,20 +201,12 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         _lineRoom = 0;
     }
 
-    private string Header(int shown)
-    {
-        return string.Create(
+    private string Header(int shown) =>
+        string.Create(
             CultureInfo.InvariantCulture,
             $"{CcrPreview.Marker}{_id}: {shown} of {_lines.Length} lines shown. Call proxy_retrieve with this id for a line range, a pattern, or the whole text.]");
-    }
 
-    private static string Gap(int first, int last)
-    {
-        return string.Create(CultureInfo.InvariantCulture, $"[lines {first}-{last} not shown]");
-    }
+    private static string Gap(int first, int last) => string.Create(CultureInfo.InvariantCulture, $"[lines {first}-{last} not shown]");
 
-    private static string Cut(int at, int length)
-    {
-        return string.Create(CultureInfo.InvariantCulture, $"[line 1 cut at character {at} of {length}]");
-    }
+    private static string Cut(int at, int length) => string.Create(CultureInfo.InvariantCulture, $"[line 1 cut at character {at} of {length}]");
 }

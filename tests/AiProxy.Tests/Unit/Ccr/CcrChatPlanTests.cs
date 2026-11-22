@@ -11,10 +11,7 @@ public sealed class CcrChatPlanTests
     private const string Chat = "/api/v1/chat/completions";
     private const string Stream = """{"model":"deepseek/deepseek-v4.1-flash-1017","stream":true,"tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""";
 
-    private static Task<CcrPlan> DecideAsync(string body, bool chatHost = true, string path = Chat, string method = "POST", CcrSettings? settings = null, Dialect dialect = Dialect.OpenAi)
-    {
-        return CcrPlan.DecideAsync(settings ?? new CcrSettings(), null!, dialect, chatHost, method, path, Encoding.UTF8.GetBytes(body), CancellationToken.None);
-    }
+    private static Task<CcrPlan> DecideAsync(string body, bool chatHost = true, string path = Chat, string method = "POST", CcrSettings? settings = null, Dialect dialect = Dialect.OpenAi) => CcrPlan.DecideAsync(settings ?? new CcrSettings(), null!, dialect, chatHost, method, path, Encoding.UTF8.GetBytes(body), CancellationToken.None);
 
     [Fact]
     public async Task A_streamed_request_with_tools_to_a_known_model_on_a_chat_host_gets_a_stateless_chat_plan()
@@ -37,10 +34,7 @@ public sealed class CcrChatPlanTests
     }
 
     [Fact]
-    public async Task A_host_that_does_not_serve_chat_ccr_is_forwarded()
-    {
-        Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, chatHost: false));
-    }
+    public async Task A_host_that_does_not_serve_chat_ccr_is_forwarded() => Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, chatHost: false));
 
     [Theory]
     [InlineData("""{"model":"openrouter/auto","stream":true,"tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""")]
@@ -50,10 +44,7 @@ public sealed class CcrChatPlanTests
     [InlineData("""{"model":"deepseek/x","stream":true,"messages":[]}""")]
     [InlineData("""{"model":"deepseek/x","stream":true,"tool_choice":"none","tools":[{"type":"function","function":{"name":"read"}}],"messages":[]}""")]
     [InlineData("not json")]
-    public async Task A_request_the_loop_cannot_serve_is_forwarded(string body)
-    {
-        Assert.Equal(CcrPlan.Forward, await DecideAsync(body));
-    }
+    public async Task A_request_the_loop_cannot_serve_is_forwarded(string body) => Assert.Equal(CcrPlan.Forward, await DecideAsync(body));
 
     [Fact]
     public async Task Only_a_post_to_a_chat_completions_path_is_planned()
@@ -64,16 +55,10 @@ public sealed class CcrChatPlanTests
     }
 
     [Fact]
-    public async Task Switching_ccr_off_forwards_chat_requests_too()
-    {
-        Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, settings: new CcrSettings { Enabled = false }));
-    }
+    public async Task Switching_ccr_off_forwards_chat_requests_too() => Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, settings: new CcrSettings { Enabled = false }));
 
     [Fact]
-    public async Task A_gemini_request_is_forwarded()
-    {
-        Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, dialect: Dialect.Gemini));
-    }
+    public async Task A_gemini_request_is_forwarded() => Assert.Equal(CcrPlan.Forward, await DecideAsync(Stream, dialect: Dialect.Gemini));
 
     [Fact]
     public void The_catalog_serves_chat_ccr_on_openrouter_only()

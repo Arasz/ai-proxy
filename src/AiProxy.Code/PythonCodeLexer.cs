@@ -59,28 +59,16 @@ public sealed partial class PythonCodeLexer([FromKeyedServices(TreeSitterLanguag
     }
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath)
-    {
-        return filePath is not null && filePath.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
-    }
+    public bool SupportsPath(string? filePath) => filePath is not null && filePath.EndsWith(".py", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Keywords, soft keywords, builtins, <c>self</c>/<c>cls</c> and dunder names.</summary>
-    public bool IsKeyword(string text)
-    {
-        return Keywords.Contains(text) || (text.Length > 4 && text.StartsWith("__", StringComparison.Ordinal) && text.EndsWith("__", StringComparison.Ordinal));
-    }
+    public bool IsKeyword(string text) => Keywords.Contains(text) || (text.Length > 4 && text.StartsWith("__", StringComparison.Ordinal) && text.EndsWith("__", StringComparison.Ordinal));
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text)
-    {
-        return TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
-    }
+    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
 
     /// <summary>Scans a file; a package's <c>__init__.py</c> keeps its imports, since they are what the package exports.</summary>
-    public CodeLexResult Lex(string text, string? filePath)
-    {
-        return Path.GetFileName(filePath) == PackageInit ? Lex(text) with { Imports = [] } : Lex(text);
-    }
+    public CodeLexResult Lex(string text, string? filePath) => Path.GetFileName(filePath) == PackageInit ? Lex(text) with { Imports = [] } : Lex(text);
 
     /// <summary>A type-checker, linter, coverage or formatter directive anywhere in a comment.</summary>
     [GeneratedRegex(@"#\s*(?:type:|noqa\b|pragma:|pylint:|mypy:|pyright:|ruff:|isort:|nosec\b|pyre-|fmt:\s*(?:off|on|skip)\b)")]

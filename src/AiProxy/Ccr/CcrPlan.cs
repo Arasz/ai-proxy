@@ -62,10 +62,7 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     public static CcrPlan Stateless { get; } = new(CcrAction.RelayWithTool, CcrMode.Stateless, "");
 
     /// <summary>Relay a stateless Chat Completions request.</summary>
-    public static CcrPlan ChatStateless(bool clientUsage)
-    {
-        return new CcrPlan(CcrAction.RelayWithTool, CcrMode.Stateless, "") { Wire = CcrWire.Chat, ClientUsage = clientUsage };
-    }
+    public static CcrPlan ChatStateless(bool clientUsage) => new(CcrAction.RelayWithTool, CcrMode.Stateless, "") { Wire = CcrWire.Chat, ClientUsage = clientUsage };
 
     /// <summary>Whether the proxy answers the client itself.</summary>
     public bool Relays => Action is CcrAction.RelayWithTool or CcrAction.RelayContinue;
@@ -84,16 +81,10 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
     }
 
     /// <summary>Refuse the request because the ledger read failed.</summary>
-    public static CcrPlan Refuse(Exception failure)
-    {
-        return new CcrPlan(CcrAction.Refuse, CcrMode.Off, "") { Failure = failure };
-    }
+    public static CcrPlan Refuse(Exception failure) => new(CcrAction.Refuse, CcrMode.Off, "") { Failure = failure };
 
     /// <summary>Relay a thread <c>continue</c> from the message the ledger names.</summary>
-    public static CcrPlan Continue(string continueFrom)
-    {
-        return new CcrPlan(CcrAction.RelayContinue, CcrMode.Thread, continueFrom);
-    }
+    public static CcrPlan Continue(string continueFrom) => new(CcrAction.RelayContinue, CcrMode.Thread, continueFrom);
 
     /// <summary>Decides the plan of a request; a Chat Completions request on a host that serves it gets a stateless plan; a <c>continue</c> is looked up in the ledger whatever the settings, so a thread with hidden turns keeps working.</summary>
     public static async Task<CcrPlan> DecideAsync(
@@ -125,12 +116,10 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
         };
     }
 
-    private static CcrPlan DecideChat(CcrSettings settings, bool chatHost, string method, string path, ReadOnlyMemory<byte> body)
-    {
-        return settings.Enabled && chatHost && HttpMethods.IsPost(method) && ChatRequest.IsChatPath(path) && ChatRequest.Read(body) is { Qualifies: true } request
+    private static CcrPlan DecideChat(CcrSettings settings, bool chatHost, string method, string path, ReadOnlyMemory<byte> body) =>
+        settings.Enabled && chatHost && HttpMethods.IsPost(method) && ChatRequest.IsChatPath(path) && ChatRequest.Read(body) is { Qualifies: true } request
             ? ChatStateless(request.IncludeUsage)
             : Forward;
-    }
 
     private static async Task<CcrPlan> LookUpAsync(IOriginalStore store, string previous, CancellationToken cancellationToken)
     {

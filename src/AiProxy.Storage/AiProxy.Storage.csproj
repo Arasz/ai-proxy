@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Diagnostics" />
         <PackageReference Include="Dapper"/>
         <PackageReference Include="Microsoft.Data.Sqlite"/>
     </ItemGroup>

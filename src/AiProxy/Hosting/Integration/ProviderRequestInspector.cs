@@ -37,15 +37,16 @@ public sealed partial class ProviderRequestInspector(
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
     /// <summary>The Codex Responses path; a WebSocket upgrade to it on a harness-only host gets 426, so Codex falls back to HTTPS.</summary>
-    public const string CodexResponsesPath = "/backend-api/codex/responses";
+    private const string CodexResponsesPath = "/backend-api/codex/responses";
 
     private const string UpgradeRequired = "ai-proxy records this host over HTTPS only; retry without a WebSocket.\n";
+    private const string ContentEncodingHeader = "Content-Encoding";
 
     /// <summary>Whether capture is on, so the proxy has to time exchanges and hand over each finished response.</summary>
     internal bool CapturesResponses => capture.Keeps;
 
     /// <summary>Leaves unknown hosts untouched and processes known provider requests.</summary>
-    public async Task BeforeRequestAsync(object sender, SessionEventArgs e)
+    public async Task BeforeRequestAsync(SessionEventArgs e)
     {
         var request = e.HttpClient.Request;
         var requestCredential = ProjectCredential.Read(request.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
@@ -54,23 +55,19 @@ public sealed partial class ProviderRequestInspector(
         request.Headers.RemoveHeader(GainApi.ProjectHeader);
         request.Headers.RemoveHeader(HeaderNames.ProxyAuthorization);
         var host = request.RequestUri.Host;
-        if (providerHosts.Find(host) is not { } provider)
+        if (providerHosts.Find(host) is not var (dialect, recordOnly, chatCcr))
         {
             return;
         }
 
-        var dialect = provider.Dialect;
-        var recordOnly = provider.HarnessOnly;
-        if (recordOnly && requestCredential is null && connectCredential is null)
+        switch (recordOnly)
         {
-            return;
-        }
-
-        if (recordOnly && request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase))
-        {
-            Log.WebSocketRefused(logger, host);
-            e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
-            return;
+            case true when requestCredential is null && connectCredential is null:
+                return;
+            case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
+                Log.WebSocketRefused(logger, host);
+                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+                return;
         }
 
         if (!request.HasBody)
@@ -124,7 +121,7 @@ public sealed partial class ProviderRequestInspector(
 
         if (compression.Compresses && !recordOnly && !encoded)
         {
-            var plan = await ccr.DecideAsync(dialect, provider.ChatCcr, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
+            var plan = await ccr.DecideAsync(dialect, chatCcr, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
             if (plan.Failure is { } failure)
             {
                 Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
@@ -159,14 +156,9 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>Returns the original-content handle when compression stored a request, and picks what a capture keeps of the body.</summary>
-    public Task BeforeResponseAsync(object sender, SessionEventArgs e)
+    public static Task BeforeResponseAsync(SessionEventArgs e)
     {
-        if (e.UserData is not CapturedExchange exchange)
-        {
-            return Task.CompletedTask;
-        }
-
-        if (exchange.Relayed)
+        if (e.UserData is not CapturedExchange exchange || exchange.Relayed)
         {
             return Task.CompletedTask;
         }
@@ -174,7 +166,7 @@ public sealed partial class ProviderRequestInspector(
         var response = e.HttpClient.Response;
         if (exchange.CaptureId is not null)
         {
-            exchange.Response = ResponseBuffer.For(response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value);
+            exchange.Response = ResponseBuffer.For(response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value);
         }
 
         if (exchange.ContentId is { } contentId)
@@ -186,7 +178,7 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>Keeps the response numbers of a captured request; a failure is logged and never reaches the exchange.</summary>
-    public async Task AfterResponseAsync(object sender, SessionEventArgs e)
+    public async Task AfterResponseAsync(SessionEventArgs e)
     {
         if (!capture.Keeps || e.UserData is not CapturedExchange { CaptureId: { } captureId } exchange)
         {
@@ -201,7 +193,7 @@ public sealed partial class ProviderRequestInspector(
             var stage = time.GetTimestamp();
             var reading = kept.OverCap
                 ? new UsageReading(null, ResponseUsageReader.OverCap)
-                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader("Content-Encoding")?.Value, exchange.Dialect);
+                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value, exchange.Dialect);
             exchange.Stages.Add("usage-read", time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
@@ -297,15 +289,15 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var toolCharacters = 0;
-        if (plan.Action == CcrAction.RelayWithTool && plan.WithTool(forwarded) is { } withTool)
+        switch (plan.Action)
         {
-            toolCharacters = withTool.ToolCharacters;
-            forwarded = withTool.Body;
-        }
-
-        if (plan.Action == CcrAction.RelayContinue)
-        {
-            forwarded = CcrRequest.ContinueFrom(forwarded, plan.ContinueFrom);
+            case CcrAction.RelayWithTool when plan.WithTool(forwarded) is { } withTool:
+                toolCharacters = withTool.ToolCharacters;
+                forwarded = withTool.Body;
+                break;
+            case CcrAction.RelayContinue:
+                forwarded = CcrRequest.ContinueFrom(forwarded, plan.ContinueFrom);
+                break;
         }
 
         exchange.ForwardedBytes = forwarded.Length;

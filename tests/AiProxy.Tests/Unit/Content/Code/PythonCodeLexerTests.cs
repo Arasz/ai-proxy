@@ -180,10 +180,7 @@ public sealed class PythonCodeLexerTests
     [InlineData("EXAMPLE.PY", true)]
     [InlineData("example.pyi", false)]
     [InlineData(null, false)]
-    public void Supports_python_paths(string? path, bool expected)
-    {
-        Assert.Equal(expected, new PythonCodeLexer().SupportsPath(path));
-    }
+    public void Supports_python_paths(string? path, bool expected) => Assert.Equal(expected, new PythonCodeLexer().SupportsPath(path));
 
     [Theory]
     [InlineData("\n")]

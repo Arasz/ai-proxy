@@ -7,10 +7,7 @@ public static partial class TableLayout
 {
     public const int Width = 80;
 
-    public static string[] Lines(string output)
-    {
-        return AnsiCodes().Replace(output, "").Split('\n').Select(static line => line.TrimEnd('\r')).ToArray();
-    }
+    public static string[] Lines(string output) => AnsiCodes().Replace(output, "").Split('\n').Select(static line => line.TrimEnd('\r')).ToArray();
 
     /// <summary>
     /// The text lines of one table, border rules left out: the header line, then every row line up to the line that starts with
@@ -24,10 +21,7 @@ public static partial class TableLayout
     }
 
     /// <summary>The cell texts of one table line, trimmed.</summary>
-    public static string[] Cells(string line)
-    {
-        return line.Trim('│', ' ').Split('│').Select(static cell => cell.Trim()).ToArray();
-    }
+    public static string[] Cells(string line) => line.Trim('│', ' ').Split('│').Select(static cell => cell.Trim()).ToArray();
 
     [GeneratedRegex("\u001b\\[[0-9;]*m")]
     private static partial Regex AnsiCodes();

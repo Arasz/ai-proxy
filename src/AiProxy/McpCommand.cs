@@ -10,10 +10,7 @@ namespace AiProxy;
 [UsedImplicitly]
 public sealed class McpCommand : AsyncCommand<McpCommand.Settings>
 {
-    public override Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
-    {
-        return McpServerProcess.RunAsync(settings.Endpoint, ProxyDataDirectory.FromEnvironment(settings.DataDirectory), cancellationToken);
-    }
+    public override Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken) => McpServerProcess.RunAsync(settings.Endpoint, ProxyDataDirectory.FromEnvironment(settings.DataDirectory), cancellationToken);
 
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     public sealed class Settings : CommandSettings

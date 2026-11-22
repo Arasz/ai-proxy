@@ -229,8 +229,5 @@ public sealed class TextCompressionHandlerTests
         }
     }
 
-    private static ContentPart Part(ContentType type, string text)
-    {
-        return new ContentPart("request", 1, type, text);
-    }
+    private static ContentPart Part(ContentType type, string text) => new("request", 1, type, text);
 }

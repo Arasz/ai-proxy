@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using AiProxy.Core.Doctor;
 using AiProxy.Core.Gain;
@@ -135,22 +134,20 @@ public sealed class ApiTokenTests : IDisposable
         return int.Parse(status!.Split(' ')[1], System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private Task<ProxyHost> StartWithEveryRouteAsync()
-    {
-        return ProxyHost.StartAsync(new Dictionary<string, string>
+    private Task<ProxyHost> StartWithEveryRouteAsync() =>
+        ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["Proxy:Compression:Enabled"] = "true",
             ["Proxy:Compression:Database"] = _databasePath
         });
-    }
 
     private static List<(string Method, string Path)> Routes(ProxyHost proxy)
     {
         var routes = new List<(string, string)>();
         foreach (var endpoint in proxy.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>())
         {
-            var path = "/" + string.Join("/", endpoint.RoutePattern.PathSegments.Select(static segment =>
-                string.Concat(segment.Parts.Select(static part => part is Microsoft.AspNetCore.Routing.Patterns.RoutePatternLiteralPart literal ? literal.Content : "0123456789abcdef"))));
+            var path = $"/{string.Join("/", endpoint.RoutePattern.PathSegments.Select(static segment =>
+                string.Concat(segment.Parts.Select(static part => part is Microsoft.AspNetCore.Routing.Patterns.RoutePatternLiteralPart literal ? literal.Content : "0123456789abcdef"))))}";
             var methods = endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["GET"];
             routes.AddRange(methods.Select(method => (method, path)));
         }

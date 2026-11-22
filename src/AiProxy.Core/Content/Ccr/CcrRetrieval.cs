@@ -33,10 +33,7 @@ public sealed record CcrRetrieval(string Text, string? Error)
     public const string LimitReached = "limit_reached";
 
     /// <summary>The answer every call gets once the loop has answered its last round.</summary>
-    public static CcrRetrieval Limit()
-    {
-        return Fail(LimitReached, "The retrieval limit for this turn is reached. Answer with what you have read.");
-    }
+    public static CcrRetrieval Limit() => Fail(LimitReached, "The retrieval limit for this turn is reached. Answer with what you have read.");
 
     private static string AsFunctionTool(string definition)
     {
@@ -46,14 +43,8 @@ public sealed record CcrRetrieval(string Text, string? Error)
     }
 
     /// <summary>A successful answer.</summary>
-    internal static CcrRetrieval Answered(string text)
-    {
-        return new CcrRetrieval(text, null);
-    }
+    internal static CcrRetrieval Answered(string text) => new(text, null);
 
     /// <summary>A failed answer: the error code and the reason the model reads.</summary>
-    internal static CcrRetrieval Fail(string code, string reason)
-    {
-        return new CcrRetrieval(CcrText.Invariant($"[{Name} error {code}] {reason}"), code);
-    }
+    internal static CcrRetrieval Fail(string code, string reason) => new(CcrText.Invariant($"[{Name} error {code}] {reason}"), code);
 }

@@ -7,10 +7,7 @@ public sealed class BuildOutputDetectionTests
 {
     private static readonly ContentDecompositor Decompositor = new();
 
-    private static string Payload(string name)
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ReducerScoring", "payloads", $"{name}.txt"));
-    }
+    private static string Payload(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ReducerScoring", "payloads", $"{name}.txt"));
 
     [Theory]
     [InlineData("dotnet_build_failure")]

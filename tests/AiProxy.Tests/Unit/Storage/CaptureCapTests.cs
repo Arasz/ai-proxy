@@ -40,10 +40,7 @@ public sealed class CaptureCapTests : IDisposable
         return new CapturedRequest(id, _time.GetUtcNow(), Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[bodyBytes]);
     }
 
-    private CapturedResponse Response(string id)
-    {
-        return new CapturedResponse(id, _time.GetUtcNow(), 200, 1, 1, 1, null, null, []);
-    }
+    private CapturedResponse Response(string id) => new(id, _time.GetUtcNow(), 200, 1, 1, 1, null, null, []);
 
     private List<string> Ids(string table)
     {
@@ -135,7 +132,7 @@ public sealed class CaptureCapTests : IDisposable
         await _store.StoreAsync(Request("r1", 100), TestContext.Current.CancellationToken);
         using var connection = ContentSchema.Open(DatabasePath);
 
-        var plan = string.Join('\n', connection.Query("EXPLAIN QUERY PLAN " + SqliteCaptureStore.OldestRequestsQuery, new { Keep = "", Batch = 8 }).Select(row => (string)row.detail));
+        var plan = string.Join('\n', connection.Query($"EXPLAIN QUERY PLAN {SqliteCaptureStore.OldestRequestsQuery}", new { Keep = "", Batch = 8 }).Select(row => (string)row.detail));
 
         Assert.DoesNotContain("SCAN capture_", plan, StringComparison.Ordinal);
         Assert.DoesNotContain("TEMP B-TREE", plan, StringComparison.Ordinal);

@@ -79,10 +79,7 @@ public sealed class ContentCompressionPipelineFilePathTests
     {
         public List<(string Text, string? FilePath)> Seen { get; } = [];
 
-        public bool CanHandle(ContentType type)
-        {
-            return type == ContentType.SourceCode;
-        }
+        public bool CanHandle(ContentType type) => type == ContentType.SourceCode;
 
         public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
         {
@@ -93,14 +90,8 @@ public sealed class ContentCompressionPipelineFilePathTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<ContentRecord?>(null);
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
     }
 }

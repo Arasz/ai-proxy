@@ -9,22 +9,13 @@ public static class MessagesJsonExtensions
     extension(JsonObject node)
     {
         /// <summary>The string under the name, or empty when it is missing or not a string.</summary>
-        public string TextOf(string name)
-        {
-            return node[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : "";
-        }
+        public string TextOf(string name) => node[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : "";
 
         /// <summary>The whole number under the name, or null when it is missing or not one.</summary>
-        public int? NumberOf(string name)
-        {
-            return node[name] is JsonValue value && value.TryGetValue<int>(out var number) ? number : null;
-        }
+        public int? NumberOf(string name) => node[name] is JsonValue value && value.TryGetValue<int>(out var number) ? number : null;
 
         /// <summary>Appends a streamed string fragment to the string under the name.</summary>
-        public void Append(string name, JsonNode? addition)
-        {
-            node[name] = node.TextOf(name) + (addition is JsonValue value && value.TryGetValue<string>(out var text) ? text : "");
-        }
+        public void Append(string name, JsonNode? addition) => node[name] = node.TextOf(name) + (addition is JsonValue value && value.TryGetValue<string>(out var text) ? text : "");
     }
 
     extension(SseEvent sse)

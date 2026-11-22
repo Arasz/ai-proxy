@@ -72,12 +72,10 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         Assert.Contains(CcrRetrieval.NotKept, notKept["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
-    private static JsonElement Property(JsonElement element, string camelCase)
-    {
-        return element.TryGetProperty(camelCase, out var value)
+    private static JsonElement Property(JsonElement element, string camelCase) =>
+        element.TryGetProperty(camelCase, out var value)
             ? value
             : element.EnumerateObject().First(property => string.Equals(property.Name.Replace("_", "", StringComparison.Ordinal), camelCase, StringComparison.OrdinalIgnoreCase)).Value;
-    }
 
     private static string Request(string toolResult, bool thread)
     {
@@ -115,15 +113,9 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private static string Rpc(int id, string method, object parameters)
-    {
-        return $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters })}\n";
-    }
+    private static string Rpc(int id, string method, object parameters) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", id, method, @params = parameters })}\n";
 
-    private static string Notification(string method)
-    {
-        return $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", method })}\n";
-    }
+    private static string Notification(string method) => $"{JsonSerializer.Serialize(new { jsonrpc = "2.0", method })}\n";
 
     private static async Task<ProcessResult> RunAsync(string? input, params string[] arguments)
     {

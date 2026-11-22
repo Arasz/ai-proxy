@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using AiProxy.Ccr;
@@ -37,10 +36,7 @@ public sealed class OperatingSystemIsolationTests
         Assert.Equal(before, CountRootCertificates());
     }
 
-    private static (int My, int Root) CountRootCertificates()
-    {
-        return (Count(StoreName.My), Count(StoreName.Root));
-    }
+    private static (int My, int Root) CountRootCertificates() => (Count(StoreName.My), Count(StoreName.Root));
 
     private static int Count(StoreName storeName)
     {

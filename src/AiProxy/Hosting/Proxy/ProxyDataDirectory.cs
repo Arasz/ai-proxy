@@ -22,8 +22,5 @@ public static class ProxyDataDirectory
     }
 
     /// <summary>Resolves from the process environment; names match case-insensitively, as for serve.</summary>
-    public static string FromEnvironment(string? option)
-    {
-        return Resolve(option, new ConfigurationBuilder().AddEnvironmentVariables().Build());
-    }
+    public static string FromEnvironment(string? option) => Resolve(option, new ConfigurationBuilder().AddEnvironmentVariables().Build());
 }

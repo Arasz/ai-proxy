@@ -60,10 +60,7 @@ public sealed class ResponseBuffer
     }
 
     /// <summary>Lets the kept bytes go once usage has been read.</summary>
-    public void Release()
-    {
-        _strategy = null;
-    }
+    public void Release() => _strategy = null;
 
     private interface IStrategy
     {

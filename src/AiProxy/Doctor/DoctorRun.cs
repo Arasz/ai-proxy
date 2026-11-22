@@ -42,10 +42,7 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
         return new DoctorReport([first, inspection, root, environment, capture]);
     }
 
-    private bool IsConfiguredOn()
-    {
-        return bool.TryParse(variable(CaptureVariable) ?? variable(LegacyCaptureVariable), out var on) && on;
-    }
+    private bool IsConfiguredOn() => bool.TryParse(variable(CaptureVariable) ?? variable(LegacyCaptureVariable), out var on) && on;
 
     private Uri ProxyAddress()
     {

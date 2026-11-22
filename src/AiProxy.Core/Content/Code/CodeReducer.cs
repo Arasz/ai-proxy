@@ -253,10 +253,7 @@ public sealed class CodeReducer(ICodeLexer lexer)
         return new NumberedText(source.ToString(), prefixes);
     }
 
-    private static CodeReductionResult Original(string text, bool supported)
-    {
-        return new CodeReductionResult(text, false, supported, new Dictionary<string, string>());
-    }
+    private static CodeReductionResult Original(string text, bool supported) => new(text, false, supported, new Dictionary<string, string>());
 
     private static void Blank(char[] text, int start, int length)
     {

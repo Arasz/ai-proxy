@@ -136,13 +136,10 @@ public class ContentQueue(ContentStoreOptions options, TimeProvider time) : ICon
     /// <summary>The value of the pragma that tells whether another connection committed.</summary>
     /// <param name="connection">The connection to read it on.</param>
     /// <param name="cancellationToken">The token that stops the read.</param>
-    public async Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
-    {
-
-        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+    public async Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             "PRAGMA data_version;",
             cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
 
     /// <summary>Publishes a record and returns once the row is committed.</summary>
     /// <param name="record">The record to publish.</param>

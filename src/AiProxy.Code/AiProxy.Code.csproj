@@ -4,6 +4,7 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../AiProxy.Core/AiProxy.Core.csproj"/>
+        <PackageReference Include="CommunityToolkit.Diagnostics" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp"/>
         <PackageReference Include="TreeSitter.DotNet"/>
         <InternalsVisibleTo Include="AiProxy.Tests"/>

@@ -127,10 +127,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <summary>True when a manual proxy is on and no PAC file overrides it.</summary>
-    internal static bool WindowsProxyIsActive(int? proxyEnable, string? autoConfigUrl)
-    {
-        return proxyEnable == 1 && string.IsNullOrWhiteSpace(autoConfigUrl);
-    }
+    internal static bool WindowsProxyIsActive(int? proxyEnable, string? autoConfigUrl) => proxyEnable == 1 && string.IsNullOrWhiteSpace(autoConfigUrl);
 
     /// <summary>ai-proxy always sets HTTP and HTTPS together, so a single protocol still pointing at it means the other was changed.</summary>
     internal static bool UnixProxyIsOwned(ProxyProtocolType owned) => owned == ProxyProtocolType.AllHttp;
@@ -182,12 +179,10 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <summary>Titanium drops non-HTTP entries when it sets the proxy, so each remaining one must still be the snapshot's.</summary>
-    private static bool OtherProtocolsUnchanged(IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> original)
-    {
-        return current.Keys
+    private static bool OtherProtocolsUnchanged(IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> original) =>
+        current.Keys
             .Where(protocol => !protocol.Equals("http", StringComparison.OrdinalIgnoreCase) && !protocol.Equals("https", StringComparison.OrdinalIgnoreCase))
             .All(protocol => SameProxy(current, original, protocol));
-    }
 
     /// <summary>
     ///     Maps each WinINET entry to its protocol. An unnamed <c>host:port</c> entry is kept under the empty key and, as in
@@ -224,10 +219,8 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     private static bool SameProxy(
         IReadOnlyDictionary<string, string> current,
         IReadOnlyDictionary<string, string> original,
-        string protocol)
-    {
-        return string.Equals(current.GetValueOrDefault(protocol), original.GetValueOrDefault(protocol), StringComparison.OrdinalIgnoreCase);
-    }
+        string protocol) =>
+        string.Equals(current.GetValueOrDefault(protocol), original.GetValueOrDefault(protocol), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>True when the entry for <paramref name="protocol" /> points at <paramref name="expected" />.</summary>
     private static bool ProxyMatches(IReadOnlyDictionary<string, string> protocols, string protocol, IPEndPoint expected)
@@ -275,10 +268,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <summary>The string value of <paramref name="property" />, or null when it is missing or not a string.</summary>
-    private static string? StringProperty(JsonElement element, string property)
-    {
-        return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-    }
+    private static string? StringProperty(JsonElement element, string property) => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     /// <summary>Asks the backend which protocols still point at a local proxy on <paramref name="port" />.</summary>
     private static ProxyProtocolType GetStaleLocalProxyProtocols(object backend, int port)
@@ -290,10 +280,7 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     }
 
     /// <summary>True when two serialized snapshots hold the same values, ignoring where a switched-off macOS proxy points.</summary>
-    internal static bool SnapshotsMatch(string expected, string actual)
-    {
-        return JsonNode.DeepEquals(Comparable(expected), Comparable(actual));
-    }
+    internal static bool SnapshotsMatch(string expected, string actual) => JsonNode.DeepEquals(Comparable(expected), Comparable(actual));
 
     /// <summary>
     ///     Parses a snapshot for comparison. macOS restores a switched-off proxy by turning its switch off only, leaving the host and
@@ -421,11 +408,9 @@ public sealed class TitaniumSystemProxySnapshotProvider(ProxyServer server) : IS
     private static object? ReadField(object backend, string name) => GetField(backend, name).GetValue(backend);
 
     /// <summary>Finds a private backend field, failing when Titanium no longer has it.</summary>
-    private static FieldInfo GetField(object backend, string name)
-    {
-        return backend.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException($"The installed Titanium proxy backend no longer exposes snapshot field {name}.");
-    }
+    private static FieldInfo GetField(object backend, string name) =>
+        backend.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException($"The installed Titanium proxy backend no longer exposes snapshot field {name}.");
 
     /// <summary>The serialized snapshot: format version, backend type and each field as JSON.</summary>
     private sealed record SnapshotDocument(int Version, string BackendType, Dictionary<string, string> Values);

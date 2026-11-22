@@ -15,10 +15,7 @@ public sealed class XmlCompressionHandler : ICompressionHandler
     private static readonly XNamespace XmlNamespace = XNamespace.Xml;
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.Xml;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.Xml;
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

@@ -34,26 +34,17 @@ internal sealed class EnvironmentCheck(Uri proxy, Func<string, string?> variable
         }
         else
         {
-            result = new CheckResult(Name, CheckStatus.Pass, string.Join(", ", set.Select(static setting => $"{setting.Name}={setting.Shown}")) + " matches the proxy.");
+            result = new CheckResult(Name, CheckStatus.Pass, $"{string.Join(", ", set.Select(static setting => $"{setting.Name}={setting.Shown}"))} matches the proxy.");
         }
 
         return Task.FromResult(result);
     }
 
-    private bool Matches(string shown)
-    {
-        return Uri.TryCreate(shown, UriKind.Absolute, out var uri) && uri.Port == proxy.Port && SameHost(uri.Host, proxy.Host);
-    }
+    private bool Matches(string shown) => Uri.TryCreate(shown, UriKind.Absolute, out var uri) && uri.Port == proxy.Port && SameHost(uri.Host, proxy.Host);
 
-    private static bool SameHost(string left, string right)
-    {
-        return Canonical(left).Equals(Canonical(right), StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool SameHost(string left, string right) => Canonical(left).Equals(Canonical(right), StringComparison.OrdinalIgnoreCase);
 
-    private static string Canonical(string host)
-    {
-        return host == "localhost" ? "127.0.0.1" : host;
-    }
+    private static string Canonical(string host) => host == "localhost" ? "127.0.0.1" : host;
 
     private sealed record Setting(string Name, string Shown);
 }

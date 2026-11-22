@@ -4,7 +4,6 @@ using System.Text.Json;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
-using AiProxy.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -81,9 +80,8 @@ public sealed class PartIsolationTests : IDisposable
         AssertOnePartFailureLogged(logs);
     }
 
-    private Task<ProxyHost> StartProxyAsync(RecordingLoggerProvider logs)
-    {
-        return ProxyHost.StartAsync(
+    private Task<ProxyHost> StartProxyAsync(RecordingLoggerProvider logs) =>
+        ProxyHost.StartAsync(
             new Dictionary<string, string>
             {
                 ["Proxy:Compression:Enabled"] = "true",
@@ -97,7 +95,6 @@ public sealed class PartIsolationTests : IDisposable
                 services.AddSingleton<ICompressionHandler, ThrowingLogHandler>();
                 services.AddSingleton<ILoggerProvider>(logs);
             });
-    }
 
     private static async Task SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
@@ -119,14 +116,8 @@ public sealed class PartIsolationTests : IDisposable
 
     private sealed class ThrowingLogHandler : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return type == ContentType.Log;
-        }
+        public bool CanHandle(ContentType type) => type == ContentType.Log;
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-        {
-            throw new InvalidOperationException("boom");
-        }
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => throw new InvalidOperationException("boom");
     }
 }

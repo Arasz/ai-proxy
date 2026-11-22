@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -134,7 +133,7 @@ public sealed class ProxyCredentialAttributionTests
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>(), providerHosts: new LoopbackProviderHosts(Dialect.Anthropic));
         using var client = new HttpClient(new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true });
-        var bearer = "Bearer " + Credential("/project/x")["Basic ".Length..];
+        var bearer = $"Bearer {Credential("/project/x")["Basic ".Length..]}";
 
         using var response = await client.SendAsync(Post(new Uri(upstream.BaseAddress, "/v1/messages"), bearer), TestContext.Current.CancellationToken);
 

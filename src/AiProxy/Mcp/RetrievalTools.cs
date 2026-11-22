@@ -4,7 +4,6 @@ using System.Text.Json;
 using AiProxy.Ccr;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
-using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -62,8 +61,5 @@ public sealed class RetrievalTools(IProxyClient client, McpServerOptions options
         return tool;
     }
 
-    private static CallToolResult Failed(string text)
-    {
-        return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = text }] };
-    }
+    private static CallToolResult Failed(string text) => new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
 }

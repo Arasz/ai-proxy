@@ -12,7 +12,7 @@ public sealed class PassThroughCompressionPipelineTests
     [Fact]
     public async Task The_body_comes_back_byte_for_byte()
     {
-        var body = Encoding.UTF8.GetBytes("{\"messages\":[{\"role\":\"user\",\"content\":\"héllo\"}]}");
+        var body = "{\"messages\":[{\"role\":\"user\",\"content\":\"héllo\"}]}"u8.ToArray();
 
         var result = await _pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.Anthropic),
@@ -24,7 +24,7 @@ public sealed class PassThroughCompressionPipelineTests
     [Fact]
     public async Task The_pipeline_says_it_changed_nothing()
     {
-        var body = Encoding.UTF8.GetBytes("{\"model\":\"gpt-4o\"}");
+        var body = "{\"model\":\"gpt-4o\"}"u8.ToArray();
 
         var result = await _pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),

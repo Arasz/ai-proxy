@@ -1,5 +1,4 @@
 using AiProxy.Core.Content;
-using AiProxy.Hosting;
 using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -40,9 +39,8 @@ public sealed class ContentStoreWorkerTests : IDisposable
         }
     }
 
-    private static ContentRecord Record()
-    {
-        return new ContentRecord(
+    private static ContentRecord Record() =>
+        new(
             "request-1",
             new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
             "the original bödy",
@@ -51,7 +49,6 @@ public sealed class ContentStoreWorkerTests : IDisposable
             "log.signal-filter",
             1,
             [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
-    }
 
     /// <summary>Makes the tables, as the host does when the store starts.</summary>
     private void EnsureSchema()
@@ -60,10 +57,7 @@ public sealed class ContentStoreWorkerTests : IDisposable
         connection.Ensure();
     }
 
-    private ContentStoreWorker Worker(IContentWriter writer)
-    {
-        return new ContentStoreWorker(writer, _queue, _options, NullLogger<ContentStoreWorker>.Instance, _time);
-    }
+    private ContentStoreWorker Worker(IContentWriter writer) => new(writer, _queue, _options, NullLogger<ContentStoreWorker>.Instance, _time);
 
     [Fact]
     public async Task A_pass_writes_the_record_and_takes_it_out_of_the_queue()
@@ -170,15 +164,9 @@ public sealed class ContentStoreWorkerTests : IDisposable
             return Task.FromResult<IReadOnlyList<ContentJob>>([]);
         }
 
-        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(7L);
-        }
+        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) => Task.FromResult(7L);
     }
 
     private sealed class CountingQueue(IContentQueue inner) : IContentQueue
@@ -191,15 +179,9 @@ public sealed class ContentStoreWorkerTests : IDisposable
             return inner.ReadAsync(limit, cancellationToken);
         }
 
-        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken)
-        {
-            return inner.RemoveAsync(jobId, cancellationToken);
-        }
+        public ValueTask RemoveAsync(long jobId, CancellationToken cancellationToken) => inner.RemoveAsync(jobId, cancellationToken);
 
-        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
-        {
-            return inner.ReadDataVersionAsync(connection, cancellationToken);
-        }
+        public Task<long> ReadDataVersionAsync(SqliteConnection connection, CancellationToken cancellationToken) => inner.ReadDataVersionAsync(connection, cancellationToken);
     }
 
     private sealed class RecordingWriter : IContentWriter

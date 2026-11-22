@@ -16,16 +16,10 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
     private readonly ICodeLexer[] _lexers = lexers.ToArray();
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.SourceCode;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.SourceCode;
 
     /// <inheritdoc />
-    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-    {
-        return ValueTask.FromResult(View(part) ?? new HandledContent(WithoutBlankLines(part.Text), HandlerPath));
-    }
+    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => ValueTask.FromResult(View(part) ?? new HandledContent(WithoutBlankLines(part.Text), HandlerPath));
 
     private HandledContent? View(ContentPart part)
     {

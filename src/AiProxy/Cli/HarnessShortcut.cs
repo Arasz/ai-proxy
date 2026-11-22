@@ -62,10 +62,7 @@ internal sealed record HarnessShortcut(string ToolPath, ShortcutScript Script)
         return $"Removed {FilePath}.";
     }
 
-    private static bool IsRunnable(string path)
-    {
-        return File.Exists(path) && (OperatingSystem.IsWindows() || (File.GetUnixFileMode(path) & Executable) != 0);
-    }
+    private static bool IsRunnable(string path) => File.Exists(path) && (OperatingSystem.IsWindows() || (File.GetUnixFileMode(path) & Executable) != 0);
 
     private void RefuseForeignFile()
     {

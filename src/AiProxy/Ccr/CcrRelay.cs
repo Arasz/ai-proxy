@@ -8,7 +8,6 @@ using AiProxy.Core.Capture;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Ccr.Loop;
 using AiProxy.Core.Gain;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Integration;
 using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
@@ -40,12 +39,13 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private const string EventStream = "text/event-stream";
     private const string Chunked = "chunked";
 
-    private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<string> HopByHop =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
         HeaderNames.Host, HeaderNames.ContentLength, HeaderNames.TransferEncoding, HeaderNames.Connection, HeaderNames.KeepAlive,
         HeaderNames.ProxyConnection, HeaderNames.ProxyAuthorization, HeaderNames.ProxyAuthenticate, HeaderNames.TE, HeaderNames.Trailer,
         HeaderNames.Upgrade, HeaderNames.Expect, HeaderNames.AcceptEncoding, HeaderNames.ContentEncoding
-    };
+    ];
 
     private readonly HttpClient _http = new(new SocketsHttpHandler
     {
@@ -59,10 +59,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     };
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        _http.Dispose();
-    }
+    public void Dispose() => _http.Dispose();
 
     /// <summary>Sends the request upstream and makes the session answer the client from the proxy.</summary>
     /// <param name="e">The Titanium session of the client request.</param>
@@ -177,9 +174,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
 
-        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response) =>
+            async (client, cancellationToken) =>
             {
                 using (response)
                 {
@@ -193,11 +189,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     }
                 }
             };
-        }
 
-        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first) =>
+            async (client, cancellationToken) =>
             {
                 _client = client;
                 _cancellation = cancellationToken;
@@ -211,7 +205,6 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     await WriteFailureAsync(_loop.Failure(Messages.ResponseLost));
                 }
             };
-        }
 
         private async Task LoopAsync(HttpResponseMessage first)
         {

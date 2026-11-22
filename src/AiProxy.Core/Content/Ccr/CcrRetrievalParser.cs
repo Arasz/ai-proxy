@@ -101,9 +101,6 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
 
         public static IntegerArgument Invalid { get; } = new(null, false);
 
-        public static IntegerArgument Of(int value)
-        {
-            return new IntegerArgument(value, true);
-        }
+        public static IntegerArgument Of(int value) => new(value, true);
     }
 }

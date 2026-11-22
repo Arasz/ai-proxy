@@ -117,10 +117,7 @@ public sealed class JavaScriptCodeLexerTests
     [InlineData("a.JSX", true)]
     [InlineData("a.ts", false)]
     [InlineData(null, false)]
-    public void Supports_javascript_paths(string? path, bool expected)
-    {
-        Assert.Equal(expected, new JavaScriptCodeLexer().SupportsPath(path));
-    }
+    public void Supports_javascript_paths(string? path, bool expected) => Assert.Equal(expected, new JavaScriptCodeLexer().SupportsPath(path));
 
     [Fact]
     public void Dialect_grammar_leaves_its_literal_map_untouched()

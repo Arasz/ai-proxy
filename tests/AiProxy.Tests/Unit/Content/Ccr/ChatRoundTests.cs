@@ -26,20 +26,11 @@ public sealed class ChatRoundTests
         return ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(call) }, null, null);
     }
 
-    private static string Stream(params string[] chunks)
-    {
-        return string.Concat(chunks) + "data: [DONE]\n\n";
-    }
+    private static string Stream(params string[] chunks) => $"{string.Concat(chunks)}data: [DONE]\n\n";
 
-    private static string Finish(string reason)
-    {
-        return ChatSse.Chunk("c1", new JsonObject(), reason, null);
-    }
+    private static string Finish(string reason) => ChatSse.Chunk("c1", new JsonObject(), reason, null);
 
-    private static string Usage(int completionTokens)
-    {
-        return ChatSse.Chunk("c1", null, null, ChatSse.Usage(completionTokens));
-    }
+    private static string Usage(int completionTokens) => ChatSse.Chunk("c1", null, null, ChatSse.Usage(completionTokens));
 
     private static async Task<(IReadOnlyList<SseEvent> Passed, ChatRound Round)> ReadAsync(string wire, bool clientUsage = false, ChatRound? round = null)
     {
@@ -160,7 +151,7 @@ public sealed class ChatRoundTests
         var next = (ChatRound)first.Round.Next();
 
         var (passed, _) = await ReadAsync(
-            ChatSse.Chunk("c2", new JsonObject { ["role"] = "assistant" }, null, null) + ChatSse.Chunk("c2", ChatSse.Text("more"), null, null) + "data: [DONE]\n\n", round: next);
+            $"{ChatSse.Chunk("c2", new JsonObject { ["role"] = "assistant" }, null, null)}{ChatSse.Chunk("c2", ChatSse.Text("more"), null, null)}data: [DONE]\n\n", round: next);
 
         var only = Assert.Single(passed);
         Assert.Equal("c1", JsonNode.Parse(only.Data)!["id"]!.GetValue<string>());
@@ -182,7 +173,7 @@ public sealed class ChatRoundTests
         var (_, round) = await ReadAsync(wire);
 
         var body = round.FollowUp(
-            Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""),
+            """{"model":"m","messages":[{"role":"user","content":"q"}]}"""u8,
             [ToolResult.Of("call_r", new CcrRetrieval("TEXT", null)), ToolResult.Deferred("call_c")]);
 
         var messages = JsonNode.Parse(body)!["messages"]!.AsArray();
@@ -212,7 +203,7 @@ public sealed class ChatRoundTests
     [Fact]
     public async Task Comment_lines_are_forwarded_as_keep_alives_and_a_stream_without_done_has_not_ended()
     {
-        var (passed, round) = await ReadAsync(": OPENROUTER PROCESSING\n\n" + ChatSse.Chunk("c1", ChatSse.Text("hi"), null, null) + ": ping\n\n");
+        var (passed, round) = await ReadAsync($": OPENROUTER PROCESSING\n\n{ChatSse.Chunk("c1", ChatSse.Text("hi"), null, null)}: ping\n\n");
 
         Assert.Equal([SseEvent.CommentLine, SseEvent.CommentLine], passed.Where(static sse => sse.Name == SseEvent.Comment).ToArray());
         Assert.Single(passed, static sse => sse.Name != SseEvent.Comment);
@@ -248,14 +239,11 @@ public sealed class ChatRoundTests
         return ChatSse.Chunk("c1", extras, null, null);
     }
 
-    private static string CallWithoutIndex(string arguments)
-    {
-        return ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["function"] = new JsonObject { ["arguments"] = arguments } }) }, null, null);
-    }
+    private static string CallWithoutIndex(string arguments) => ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["function"] = new JsonObject { ["arguments"] = arguments } }) }, null, null);
 
     private static JsonObject FollowUpOf(ChatRound round, params ToolResult[] results)
     {
-        var body = round.FollowUp(Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""), results);
+        var body = round.FollowUp("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""u8, results);
         return JsonNode.Parse(body)!["messages"]!.AsArray()[1]!.AsObject();
     }
 

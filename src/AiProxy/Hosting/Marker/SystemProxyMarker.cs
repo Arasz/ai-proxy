@@ -153,15 +153,11 @@ public sealed class SystemProxyMarker : IDisposable
             return MarkerRecord.Empty;
         }
 
-        var text = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true).ReadToEnd().Trim();
-        if (text.Length == 0)
-        {
-            throw new InvalidDataException("The system proxy marker contains no valid record.");
-        }
+        var markerText = ReadMarkerText(stream);
 
         try
         {
-            var record = JsonSerializer.Deserialize<MarkerRecord>(text, JsonOptions);
+            var record = JsonSerializer.Deserialize<MarkerRecord>(markerText, JsonOptions);
             if (record?.Endpoint is null || !IPEndPoint.TryParse(record.Endpoint, out _))
             {
                 throw new InvalidDataException("The system proxy marker contains an invalid endpoint.");
@@ -172,24 +168,31 @@ public sealed class SystemProxyMarker : IDisposable
         catch (JsonException exception)
         {
             // Older versions wrote only the endpoint. Keep recognizing that marker so upgrades still recover.
-            if (IPEndPoint.TryParse(text, out _))
+            if (IPEndPoint.TryParse(markerText, out _))
             {
-                return new MarkerRecord(text, null);
+                return new MarkerRecord(markerText, null);
             }
 
-            if (RecordBeforeApplied(text) is { } recorded)
+            if (RecordBeforeApplied(markerText) is { } recorded)
             {
                 return recorded;
             }
 
             // Write flushes the whole record before the system proxy is set, so a cut-short record never had a proxy change behind it.
-            if (IsCutShort(text))
+            if (IsCutShort(markerText))
             {
                 return MarkerRecord.Empty with { Torn = true };
             }
 
             throw new InvalidDataException("The system proxy marker is malformed.", exception);
         }
+    }
+
+    private static string ReadMarkerText(FileStream stream)
+    {
+        var markerReader = new StreamReader(stream, Encoding.UTF8, false, leaveOpen: true);
+        var markerText = markerReader.ReadToEnd().Trim();
+        return markerText.Length == 0 ? throw new InvalidDataException("The system proxy marker contains no valid record.") : markerText;
     }
 
     /// <summary>
@@ -228,12 +231,12 @@ public sealed class SystemProxyMarker : IDisposable
     /// </summary>
     private static MarkerRecord? RecordBeforeApplied(string text)
     {
-        const string AppliedField = ",\"appliedSettingsSnapshot\"";
-        var start = text.IndexOf(AppliedField, StringComparison.Ordinal);
+        const string appliedField = ",\"appliedSettingsSnapshot\"";
+        var start = text.IndexOf(appliedField, StringComparison.Ordinal);
         if (start < 0)
         {
-            start = Enumerable.Range(1, AppliedField.Length - 1)
-                .Where(length => text.EndsWith(AppliedField[..length], StringComparison.Ordinal))
+            start = Enumerable.Range(1, appliedField.Length - 1)
+                .Where(length => text.EndsWith(appliedField[..length], StringComparison.Ordinal))
                 .Select(length => text.Length - length)
                 .DefaultIfEmpty(-1)
                 .First();
@@ -246,7 +249,7 @@ public sealed class SystemProxyMarker : IDisposable
 
         try
         {
-            var head = text[..start] + "}";
+            var head = $"{text[..start]}}}";
             using var document = JsonDocument.Parse(head);
             if (!document.RootElement.TryGetProperty("previousSettingsSnapshot", out _))
             {

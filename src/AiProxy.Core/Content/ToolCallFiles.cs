@@ -10,7 +10,7 @@ namespace AiProxy.Core.Content;
 /// </remarks>
 internal sealed class ToolCallFiles
 {
-    private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal) { ToolCallJson.FilePathSnake, ToolCallJson.Path, ToolCallJson.FilePathCamel };
+    private static readonly HashSet<string> PathKeys = [with(StringComparer.Ordinal), ToolCallJson.FilePathSnake, ToolCallJson.Path, ToolCallJson.FilePathCamel];
 
     private readonly Dictionary<string, FileRead?> _calls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);
@@ -88,11 +88,9 @@ internal sealed class ToolCallFiles
         }
     }
 
-    private void AddCall(string id, FileRead? path)
-    {
+    private void AddCall(string id, FileRead? path) =>
         // A second call with the same id makes both ambiguous, so the id keeps no path.
         _calls[id] = _calls.ContainsKey(id) ? null : path;
-    }
 
     private static string? ResultId(JsonElement element)
     {

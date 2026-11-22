@@ -11,10 +11,7 @@ public sealed class ProviderHostCatalogTests
     [InlineData("generativelanguage.googleapis.com", Dialect.Gemini)]
     [InlineData("openrouter.ai", Dialect.OpenAi)]
     [InlineData("chatgpt.com", Dialect.OpenAi)]
-    public void A_known_provider_host_selects_its_request_dialect(string host, Dialect dialect)
-    {
-        Assert.Equal(dialect, ProviderHostCatalog.Find(host));
-    }
+    public void A_known_provider_host_selects_its_request_dialect(string host, Dialect dialect) => Assert.Equal(dialect, ProviderHostCatalog.Find(host));
 
     [Theory]
     [InlineData("us.api.openai.com")]
@@ -28,10 +25,7 @@ public sealed class ProviderHostCatalogTests
     [InlineData("in.api.openai.com")]
     [InlineData("ae.api.openai.com")]
     [InlineData("eu.openrouter.ai")]
-    public void A_documented_regional_api_host_selects_the_openai_dialect(string host)
-    {
-        Assert.Equal(Dialect.OpenAi, ProviderHostCatalog.Find(host));
-    }
+    public void A_documented_regional_api_host_selects_the_openai_dialect(string host) => Assert.Equal(Dialect.OpenAi, ProviderHostCatalog.Find(host));
 
     [Theory]
     [InlineData("api.openai.com.attacker.test")]
@@ -41,40 +35,25 @@ public sealed class ProviderHostCatalogTests
     [InlineData("xx.api.openai.com")]
     [InlineData("eu.api.anthropic.com")]
     [InlineData("www.chatgpt.com")]
-    public void An_unrecognized_host_is_left_for_default_pass_through(string host)
-    {
-        Assert.Null(ProviderHostCatalog.Find(host));
-    }
+    public void An_unrecognized_host_is_left_for_default_pass_through(string host) => Assert.Null(ProviderHostCatalog.Find(host));
 
     [Fact]
-    public void Chatgpt_com_is_the_only_harness_only_host_in_the_catalog()
-    {
-        Assert.Equal(["chatgpt.com"], ProviderHostCatalog.Hosts.Where(ProviderHostCatalog.IsHarnessOnly));
-    }
+    public void Chatgpt_com_is_the_only_harness_only_host_in_the_catalog() => Assert.Equal(["chatgpt.com"], ProviderHostCatalog.Hosts.Where(ProviderHostCatalog.IsHarnessOnly));
 
     [Theory]
     [InlineData("chatgpt.com.")]
     [InlineData("ChatGPT.com")]
-    public void A_harness_only_host_is_matched_like_any_provider_host(string host)
-    {
-        Assert.True(ProviderHostCatalog.IsHarnessOnly(host));
-    }
+    public void A_harness_only_host_is_matched_like_any_provider_host(string host) => Assert.True(ProviderHostCatalog.IsHarnessOnly(host));
 
     [Theory]
     [InlineData("api.openai.com")]
     [InlineData("www.chatgpt.com")]
     [InlineData("example.test")]
-    public void Other_hosts_are_not_harness_only(string host)
-    {
-        Assert.False(ProviderHostCatalog.IsHarnessOnly(host));
-    }
+    public void Other_hosts_are_not_harness_only(string host) => Assert.False(ProviderHostCatalog.IsHarnessOnly(host));
 
     [Theory]
     [InlineData("chatgpt.com", Dialect.OpenAi, true)]
     [InlineData("api.openai.com", Dialect.OpenAi, false)]
     [InlineData("api.anthropic.com", Dialect.Anthropic, false)]
-    public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly)
-    {
-        Assert.Equal(new ProviderHost(dialect, harnessOnly, host == "openrouter.ai"), new CanonicalProviderHosts().Find(host));
-    }
+    public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly) => Assert.Equal(new ProviderHost(dialect, harnessOnly, host == "openrouter.ai"), new CanonicalProviderHosts().Find(host));
 }

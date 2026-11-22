@@ -164,10 +164,7 @@ public sealed class TypeScriptCodeLexerTests
     [InlineData("a.d.ts", true)]
     [InlineData("a.js", false)]
     [InlineData(null, false)]
-    public void Supports_typescript_paths(string? path, bool expected)
-    {
-        Assert.Equal(expected, new TypeScriptCodeLexer().SupportsPath(path));
-    }
+    public void Supports_typescript_paths(string? path, bool expected) => Assert.Equal(expected, new TypeScriptCodeLexer().SupportsPath(path));
 
     [Theory]
     [InlineData("\n")]

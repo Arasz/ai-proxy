@@ -82,7 +82,7 @@ public sealed class RequestCaptureTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
         // Multi-byte characters and odd spacing: a re-serialized or re-encoded body would differ.
-        var body = Encoding.UTF8.GetBytes("{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  ");
+        var body = "{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  "u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -116,7 +116,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"capture-body-marker"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"capture-body-marker"}]}"""u8.ToArray();
         string[] secrets = ["secret-authorization-7f3a", "secret-api-key-91bc", "secret-cookie-4d2e", "secret-query-key-c0de"];
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true, UseCookies = false };
         using var client = new HttpClient(handler);
@@ -148,7 +148,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(false);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -164,7 +164,7 @@ public sealed class RequestCaptureTests : IDisposable
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true, store: new ThrowingCaptureStore(), logs: logs);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -208,7 +208,7 @@ public sealed class RequestCaptureTests : IDisposable
 
         var bytes = ReadCaptureFiles(directory.Path, writer.Close);
 
-        Assert.True(Contains(bytes, Encoding.UTF8.GetBytes("capture-inspection-marker")));
+        Assert.True(Contains(bytes, "capture-inspection-marker"u8.ToArray()));
     }
 
     [Fact]
@@ -218,8 +218,8 @@ public sealed class RequestCaptureTests : IDisposable
         await using var proxy = await ProxyHost.StartAsync(
             new Dictionary<string, string> { ["Proxy:Capture"] = "true" },
             providerHosts: new SingleProviderHost("127.0.0.1", Dialect.Anthropic));
-        var providerBody = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}""");
-        var otherBody = Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}""");
+        var providerBody = """{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}"""u8.ToArray();
+        var otherBody = """{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}"""u8.ToArray();
         var otherHost = new UriBuilder(upstream.BaseAddress) { Host = "localhost" }.Uri;
 
         using var providerResponse = await SendAsync(proxy, upstream.BaseAddress, providerBody);
@@ -266,7 +266,7 @@ public sealed class RequestCaptureTests : IDisposable
             return context.Response.Body.WriteAsync(encoded).AsTask();
         };
         await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -661,10 +661,7 @@ public sealed class RequestCaptureTests : IDisposable
         Assert.Equal("truncated", row.UsageError);
     }
 
-    private static Dictionary<string, long> Stages(ResponseRow row)
-    {
-        return JsonSerializer.Deserialize<Dictionary<string, long>>(row.Stages)!;
-    }
+    private static Dictionary<string, long> Stages(ResponseRow row) => JsonSerializer.Deserialize<Dictionary<string, long>>(row.Stages)!;
 
     private static byte[] Gzip(byte[] bytes)
     {
@@ -698,10 +695,8 @@ public sealed class RequestCaptureTests : IDisposable
     }
 
     private static Task<T> WaitForAsync<T>(Func<T?> probe)
-        where T : class
-    {
-        return WaitForAsync(() => Task.FromResult(probe()));
-    }
+        where T : class =>
+        WaitForAsync(() => Task.FromResult(probe()));
 
     private static async Task<T> WaitForAsync<T>(Func<Task<T?>> probe)
         where T : class
@@ -752,11 +747,9 @@ public sealed class RequestCaptureTests : IDisposable
         return ProxyHost.StartAsync(configuration, providerHosts: new LoopbackProviderHosts(Dialect.Anthropic), capture: store, logging: logs, time: time);
     }
 
-    private static byte[] ToolResultBody()
-    {
-        return Encoding.UTF8.GetBytes(
+    private static byte[] ToolResultBody() =>
+        Encoding.UTF8.GetBytes(
             $$"""{"model":"claude-haiku-4-5","max_tokens":5,"messages":[{"role":"user","content":[{"type":"tool_result","content":{{JsonSerializer.Serialize(ToolOutput)}}}]}]}""");
-    }
 
     private static ByteArrayContent Json(byte[] body)
     {
@@ -765,10 +758,7 @@ public sealed class RequestCaptureTests : IDisposable
         return content;
     }
 
-    private static Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body)
-    {
-        return SendAsync(proxy, upstream.BaseAddress, body);
-    }
+    private static Task<HttpResponseMessage> SendAsync(ProxyHost proxy, FakeUpstream upstream, byte[] body) => SendAsync(proxy, upstream.BaseAddress, body);
 
     private static async Task<HttpResponseMessage> SendAsync(ProxyHost proxy, Uri upstream, byte[] body)
     {
@@ -792,10 +782,7 @@ public sealed class RequestCaptureTests : IDisposable
     }
 
     /// <summary>Every byte of the capture database and its journal files, wherever SQLite put a page.</summary>
-    private static byte[] ReadCaptureFiles(ProxyHost proxy)
-    {
-        return ReadCaptureFiles(proxy.DataDirectory);
-    }
+    private static byte[] ReadCaptureFiles(ProxyHost proxy) => ReadCaptureFiles(proxy.DataDirectory);
 
     private static byte[] ReadCaptureFiles(string directory, Action? beforeRead = null)
     {
@@ -821,10 +808,7 @@ public sealed class RequestCaptureTests : IDisposable
         return all.ToArray();
     }
 
-    private static bool Contains(byte[] haystack, byte[] needle)
-    {
-        return haystack.AsSpan().IndexOf(needle) >= 0;
-    }
+    private static bool Contains(byte[] haystack, byte[] needle) => haystack.AsSpan().IndexOf(needle) >= 0;
 
     /// <summary>Keeps what the proxy hands it in memory; can move a fake clock or stall, to time a step.</summary>
     private sealed class RecordingCaptureStore : IRequestCaptureStore
@@ -876,10 +860,7 @@ public sealed class RequestCaptureTests : IDisposable
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken) => throw new IOException("disk full");
     }
 
     private sealed record CaptureRow(string RequestId, string CapturedAt, string Provider, string Host, string Path, byte[] Body);
@@ -887,10 +868,7 @@ public sealed class RequestCaptureTests : IDisposable
     /// <summary>Treats one host as a provider and every other host as pass-through traffic.</summary>
     private sealed class SingleProviderHost(string host, Dialect dialect) : IProviderHosts
     {
-        public ProviderHost? Find(string candidate)
-        {
-            return string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? new ProviderHost(dialect, HarnessOnly: false) : null;
-        }
+        public ProviderHost? Find(string candidate) => string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? new ProviderHost(dialect, HarnessOnly: false) : null;
 
         public IReadOnlyCollection<string> Hosts { get; } = [host];
     }
@@ -901,10 +879,7 @@ public sealed class RequestCaptureTests : IDisposable
 
         public int Responses => _responses;
 
-        public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask StoreAsync(CapturedRequest request, CancellationToken cancellationToken) => throw new IOException("disk full");
 
         public ValueTask StoreResponseAsync(CapturedResponse response, CancellationToken cancellationToken)
         {
@@ -921,10 +896,7 @@ public sealed class RequestCaptureTests : IDisposable
 
         public IReadOnlyCollection<LogEntry> Entries => [.. _entries];
 
-        public ILogger CreateLogger(string categoryName)
-        {
-            return new RecordingLogger(categoryName, _entries);
-        }
+        public ILogger CreateLogger(string categoryName) => new RecordingLogger(categoryName, _entries);
 
         public void Dispose()
         {
@@ -934,19 +906,11 @@ public sealed class RequestCaptureTests : IDisposable
     private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull =>
+            null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, formatter(state, exception), exception));
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => entries.Enqueue(new LogEntry(category, logLevel, eventId.Id, formatter(state, exception), exception));
     }
 }

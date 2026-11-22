@@ -33,15 +33,9 @@ public sealed class CaptureRetentionTests : IDisposable
         }
     }
 
-    private CapturedRequest Capture(string id, int bodyBytes, int daysAgo = 0)
-    {
-        return new CapturedRequest(id, _time.GetUtcNow() - TimeSpan.FromDays(daysAgo), Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[bodyBytes]);
-    }
+    private CapturedRequest Capture(string id, int bodyBytes, int daysAgo = 0) => new(id, _time.GetUtcNow() - TimeSpan.FromDays(daysAgo), Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[bodyBytes]);
 
-    private SqliteConnection Open()
-    {
-        return ContentSchema.Open(DatabasePath);
-    }
+    private SqliteConnection Open() => ContentSchema.Open(DatabasePath);
 
     [Fact]
     public async Task A_pass_removes_requests_and_responses_older_than_fourteen_days_and_keeps_the_newer_ones()

@@ -96,15 +96,9 @@ public sealed partial class SqliteOriginalStore(ContentStoreOptions options, Tim
         return connection;
     }
 
-    private string Now()
-    {
-        return time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
-    }
+    private string Now() => time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
 
-    private static CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken)
-    {
-        return new CommandDefinition(sql, parameters, commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken);
-    }
+    private static CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken) => new(sql, parameters, commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken);
 
     private static partial class Log
     {

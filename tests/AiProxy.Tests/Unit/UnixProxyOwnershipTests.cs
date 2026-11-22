@@ -28,10 +28,8 @@ public sealed class UnixProxyOwnershipTests
         string http,
         string https,
         string bypass,
-        bool expected)
-    {
+        bool expected) =>
         Assert.Equal(expected, IsOwned(MacSnapshot(http, https, bypass), MacApplied, MacOriginal));
-    }
 
     [Fact]
     public void A_proxy_turned_off_by_someone_else_is_not_owned()
@@ -101,10 +99,7 @@ public sealed class UnixProxyOwnershipTests
         Assert.True(owner);
     }
 
-    private static bool IsOwned(string current, string applied, string original)
-    {
-        return TitaniumSystemProxySnapshotProvider.UnixProxyIsOwned(original, applied, () => current, () => ProxyProtocolType.None);
-    }
+    private static bool IsOwned(string current, string applied, string original) => TitaniumSystemProxySnapshotProvider.UnixProxyIsOwned(original, applied, () => current, () => ProxyProtocolType.None);
 
     private static string MacSnapshot(string http, string https, string bypass, bool httpEnabled = true)
     {
@@ -153,16 +148,14 @@ public sealed class UnixProxyOwnershipTests
         };
     }
 
-    private static string LinuxSnapshot(Dictionary<string, object?>? gnome, string? env = null)
-    {
-        return Snapshot("Titanium.Web.Proxy.Helpers.LinuxSystemProxyBackend", new Dictionary<string, object?>
+    private static string LinuxSnapshot(Dictionary<string, object?>? gnome, string? env = null) =>
+        Snapshot("Titanium.Web.Proxy.Helpers.LinuxSystemProxyBackend", new Dictionary<string, object?>
         {
             ["_originalEnv"] = new Dictionary<string, string?> { ["http_proxy"] = env },
             ["_gnome"] = gnome,
             ["_kde"] = null,
             ["_hasSnapshot"] = true
         });
-    }
 
     private static string Snapshot(string backendType, Dictionary<string, object?> fields)
     {

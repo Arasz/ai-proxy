@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using AiProxy.Ccr;
@@ -453,15 +452,9 @@ public sealed class RootCertificateStorageTests
         Assert.True(root.HasPrivateKey);
     }
 
-    private static string StoredPassword(string dataDirectory)
-    {
-        return File.ReadAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName));
-    }
+    private static string StoredPassword(string dataDirectory) => File.ReadAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName));
 
-    private static X509Certificate2 LoadRoot(string dataDirectory, string password)
-    {
-        return X509CertificateLoader.LoadPkcs12FromFile(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName), password);
-    }
+    private static X509Certificate2 LoadRoot(string dataDirectory, string password) => X509CertificateLoader.LoadPkcs12FromFile(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName), password);
 
     /// <summary>Writes the root Titanium used to make: its generic name, no name constraint, the given password.</summary>
     private static string WriteOldRoot(string dataDirectory, string password)
@@ -552,10 +545,7 @@ public sealed class RootCertificateStorageTests
 
         public Exception? UntrustFailure { get; init; }
 
-        public void Load()
-        {
-            Calls.Add("load");
-        }
+        public void Load() => Calls.Add("load");
 
         public bool IsTrusted()
         {

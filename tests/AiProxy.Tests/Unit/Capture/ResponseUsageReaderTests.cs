@@ -265,7 +265,7 @@ public sealed class ResponseUsageReaderTests
     [Fact]
     public void A_body_that_decodes_to_exactly_the_limit_is_read()
     {
-        var body = Encoding.UTF8.GetBytes("""{"usage":{"input_tokens":7}}""");
+        var body = """{"usage":{"input_tokens":7}}"""u8.ToArray();
         var padded = new byte[SixteenMiB];
         Array.Fill(padded, (byte)' ');
         body.CopyTo(padded, 0);
@@ -310,10 +310,7 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal(ResponseUsageReader.Truncated, reading.Error);
     }
 
-    private static string LongMessageBody()
-    {
-        return $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
-    }
+    private static string LongMessageBody() => $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
 
     [Theory]
     [InlineData(Json, "{\"usage\":{\"input_tokens\":1,")]
@@ -400,12 +397,12 @@ public sealed class ResponseUsageReaderTests
     [Fact]
     public void A_later_responses_terminal_event_without_some_counts_keeps_the_counts_read_earlier()
     {
-        var stream = ResponsesStream + """
-                                       event: response.failed
-                                       data: {"type":"response.failed","response":{"object":"response","usage":{"output_tokens":60}}}
+        var stream = $$$$"""
+                         {{{{ResponsesStream}}}}event: response.failed
+                         data: {"type":"response.failed","response":{"object":"response","usage":{"output_tokens":60}}}
 
 
-                                       """;
+                         """;
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
 

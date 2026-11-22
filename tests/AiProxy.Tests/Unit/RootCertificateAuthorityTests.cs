@@ -22,10 +22,7 @@ public sealed class RootCertificateAuthorityTests
     }
 
     [Fact]
-    public void A_host_is_permitted_in_lower_case_and_without_a_trailing_dot()
-    {
-        Assert.Equal(["api.anthropic.com"], RootCertificateAuthority.PermittedDomains(["API.Anthropic.com."]));
-    }
+    public void A_host_is_permitted_in_lower_case_and_without_a_trailing_dot() => Assert.Equal(["api.anthropic.com"], RootCertificateAuthority.PermittedDomains(["API.Anthropic.com."]));
 
     [Fact]
     public void A_root_made_from_the_canonical_host_source_permits_every_catalog_host_and_nothing_else()
@@ -176,18 +173,12 @@ public sealed class RootCertificateAuthorityTests
     /// <summary>The flag a chain reports for an address inside an excluded subtree.</summary>
     /// <remarks>Measured: Linux (OpenSSL) reports <see cref="X509ChainStatusFlags.HasExcludedNameConstraint" />, macOS
     /// <see cref="X509ChainStatusFlags.InvalidNameConstraints" />.</remarks>
-    private static X509ChainStatusFlags ExpectedExcludedAddressFailure()
-    {
-        return OperatingSystem.IsMacOS() ? X509ChainStatusFlags.InvalidNameConstraints : X509ChainStatusFlags.HasExcludedNameConstraint;
-    }
+    private static X509ChainStatusFlags ExpectedExcludedAddressFailure() => OperatingSystem.IsMacOS() ? X509ChainStatusFlags.InvalidNameConstraints : X509ChainStatusFlags.HasExcludedNameConstraint;
 
     /// <summary>The flag each chain engine reports for a name outside the constraint.</summary>
     /// <remarks>Linux (OpenSSL) and Windows report <see cref="X509ChainStatusFlags.HasNotPermittedNameConstraint" />. macOS's
     /// Security framework enforces the constraint but .NET maps its result to <see cref="X509ChainStatusFlags.InvalidNameConstraints" />.</remarks>
-    private static X509ChainStatusFlags ExpectedNameConstraintFailure()
-    {
-        return OperatingSystem.IsMacOS() ? X509ChainStatusFlags.InvalidNameConstraints : X509ChainStatusFlags.HasNotPermittedNameConstraint;
-    }
+    private static X509ChainStatusFlags ExpectedNameConstraintFailure() => OperatingSystem.IsMacOS() ? X509ChainStatusFlags.InvalidNameConstraints : X509ChainStatusFlags.HasNotPermittedNameConstraint;
 
     private static X509Chain Chain(X509Certificate2 root)
     {

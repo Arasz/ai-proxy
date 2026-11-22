@@ -20,10 +20,7 @@ public sealed class CcrOptionsTests
     }
 
     [Fact]
-    public void Default_lines_and_pattern_results_are_capped_at_3000_tokens()
-    {
-        Assert.Equal(3_000, CcrOptions.Default.RetrievalTokens);
-    }
+    public void Default_lines_and_pattern_results_are_capped_at_3000_tokens() => Assert.Equal(3_000, CcrOptions.Default.RetrievalTokens);
 
     [Fact]
     public void Default_skip_band_is_6000_reduced_tokens()
