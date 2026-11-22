@@ -1,4 +1,5 @@
 import re,pathlib,collections,sys
+if len(sys.argv)!=2: sys.exit('usage: nullable-inventory.py <out.md>  (run from the repository root)')
 T=r'[A-Za-z_][\w<>,\[\]\. ]*?\?'
 cats={
  'return':re.compile(r'^\s*(?:public|internal|private|protected)(?:\s+(?:static|async|override|virtual|abstract|sealed|new))*\s+(?:Task<|ValueTask<)?'+T+r'>?\s+[A-Z]\w*\s*[(<]'),

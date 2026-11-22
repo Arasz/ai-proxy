@@ -11,9 +11,15 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     /// <param name="arguments">The tool call's input, as JSON.</param>
     /// <param name="original">The original text kept under the id, or null when none is kept.</param>
     /// <param name="options">The caps the answer keeps to.</param>
-    public CcrRetrieval Answer(string arguments, string? original, CcrOptions options)
+    public CcrRetrieval Answer(string arguments, string? original, CcrOptions options) => Answer(parser.Parse(arguments, options), original, options);
+
+    /// <summary>Answers a call the caller already parsed, against the original it found for the request's id.</summary>
+    /// <param name="parsed">The parsed call.</param>
+    /// <param name="original">The original text kept under the id, or null when none is kept.</param>
+    /// <param name="options">The caps the answer keeps to.</param>
+    public static CcrRetrieval Answer(CcrParseResult parsed, string? original, CcrOptions options)
     {
-        return parser.Parse(arguments, options) switch
+        return parsed switch
         {
             CcrRetrievalRequest request => Answer(request, original, options),
             CcrRefusal refusal => CcrRetrieval.Fail(CcrRetrieval.BadInput, refusal.Reason),
