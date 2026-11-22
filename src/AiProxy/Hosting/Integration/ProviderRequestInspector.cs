@@ -297,10 +297,10 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var toolCharacters = 0;
-        if (plan.Action == CcrAction.RelayWithTool && WithTool(plan, forwarded, out var appended) is { } withTool)
+        if (plan.Action == CcrAction.RelayWithTool && plan.WithTool(forwarded) is { } withTool)
         {
-            toolCharacters = appended;
-            forwarded = withTool;
+            toolCharacters = withTool.ToolCharacters;
+            forwarded = withTool.Body;
         }
 
         if (plan.Action == CcrAction.RelayContinue)
@@ -313,18 +313,6 @@ public sealed partial class ProviderRequestInspector(
         await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, rule, toolCharacters);
         e.UserData = exchange;
         await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
-    }
-
-    private static byte[]? WithTool(CcrPlan plan, byte[] forwarded, out int toolCharacters)
-    {
-        if (plan.Wire == CcrWire.Chat)
-        {
-            return ChatRequest.Prepare(forwarded, out toolCharacters);
-        }
-
-        var withTool = CcrRequest.AppendTool(forwarded);
-        toolCharacters = withTool is null ? 0 : Encoding.UTF8.GetCharCount(withTool) - Encoding.UTF8.GetCharCount(forwarded);
-        return withTool;
     }
 
     private void LogFailures(SessionEventArgs e, CompressionResult? compressed)

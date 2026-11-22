@@ -84,4 +84,32 @@ public sealed class CcrChatPlanTests
             Assert.False(ProviderHostCatalog.Lookup(host)!.ChatCcr, host);
         }
     }
+    [Fact]
+    public async Task A_chat_plan_appends_the_chat_tool_and_counts_its_characters()
+    {
+        var plan = await DecideAsync(Stream);
+
+        var request = plan.WithTool(Encoding.UTF8.GetBytes(Stream))!;
+
+        Assert.Contains(CcrRetrieval.ChatDefinition, Encoding.UTF8.GetString(request.Body), StringComparison.Ordinal);
+        Assert.Equal(CcrRetrieval.ChatDefinition.Length + 1, request.ToolCharacters);
+    }
+
+    [Fact]
+    public void A_messages_plan_appends_the_messages_tool_and_counts_its_characters()
+    {
+        var body = Encoding.UTF8.GetBytes("""{"stream":true,"tools":[{"name":"read"}],"messages":[]}""");
+
+        var request = CcrPlan.Stateless.WithTool(body)!;
+
+        Assert.DoesNotContain(CcrRetrieval.ChatDefinition, Encoding.UTF8.GetString(request.Body), StringComparison.Ordinal);
+        Assert.Contains(CcrRetrieval.Name, Encoding.UTF8.GetString(request.Body), StringComparison.Ordinal);
+        Assert.Equal(request.Body.Length - body.Length, request.ToolCharacters);
+    }
+
+    [Fact]
+    public void A_body_without_tools_gets_no_tool_request()
+    {
+        Assert.Null(CcrPlan.Stateless.WithTool(Encoding.UTF8.GetBytes("""{"stream":true,"messages":[]}""")));
+    }
 }

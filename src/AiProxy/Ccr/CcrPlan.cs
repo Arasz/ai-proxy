@@ -1,3 +1,4 @@
+using System.Text;
 using AiProxy.Configuration;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
@@ -68,6 +69,19 @@ public sealed record CcrPlan(CcrAction Action, CcrMode Mode, string ContinueFrom
 
     /// <summary>Whether the proxy answers the client itself.</summary>
     public bool Relays => Action is CcrAction.RelayWithTool or CcrAction.RelayContinue;
+
+    /// <summary>Adds <c>proxy_retrieve</c> to the body in this plan's wire format; null when the body has no tools to add it to.</summary>
+    public ToolRequest? WithTool(byte[] body)
+    {
+        if (Wire == CcrWire.Chat)
+        {
+            return ChatRequest.WithTool(body);
+        }
+
+        return CcrRequest.AppendTool(body) is { } withTool
+            ? new ToolRequest(withTool, Encoding.UTF8.GetCharCount(withTool) - Encoding.UTF8.GetCharCount(body))
+            : null;
+    }
 
     /// <summary>Refuse the request because the ledger read failed.</summary>
     public static CcrPlan Refuse(Exception failure)

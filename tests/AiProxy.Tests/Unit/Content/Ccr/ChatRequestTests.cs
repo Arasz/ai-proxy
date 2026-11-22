@@ -61,11 +61,11 @@ public sealed class ChatRequestTests
     }
 
     [Fact]
-    public void Prepare_appends_the_function_tool_last_and_asks_for_usage_leaving_the_other_bytes_alone()
+    public void WithTool_appends_the_function_tool_last_and_asks_for_usage_leaving_the_other_bytes_alone()
     {
         var body = Body();
 
-        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        var prepared = Encoding.UTF8.GetString(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body))!.Body);
 
         using var document = JsonDocument.Parse(prepared);
         var tools = document.RootElement.GetProperty("tools");
@@ -80,21 +80,21 @@ public sealed class ChatRequestTests
     }
 
     [Fact]
-    public void Prepare_keeps_a_proxy_retrieve_tool_the_request_already_has_and_a_usage_option_already_set()
+    public void WithTool_keeps_a_proxy_retrieve_tool_the_request_already_has_and_a_usage_option_already_set()
     {
         var already = Body(",\"stream_options\":{\"include_usage\":true}", tools: $"[{Tool},{CcrRetrieval.ChatDefinition}]");
 
-        var prepared = ChatRequest.Prepare(Encoding.UTF8.GetBytes(already));
+        var prepared = ChatRequest.WithTool(Encoding.UTF8.GetBytes(already))!.Body;
 
-        Assert.Equal(already, Encoding.UTF8.GetString(prepared!));
+        Assert.Equal(already, Encoding.UTF8.GetString(prepared));
     }
 
     [Fact]
-    public void Prepare_turns_on_a_usage_option_the_client_set_to_false_and_keeps_its_other_stream_options()
+    public void WithTool_turns_on_a_usage_option_the_client_set_to_false_and_keeps_its_other_stream_options()
     {
         var body = Body(",\"stream_options\":{\"include_usage\":false,\"other\":1}");
 
-        using var document = JsonDocument.Parse(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        using var document = JsonDocument.Parse(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body))!.Body);
 
         var options = document.RootElement.GetProperty("stream_options");
         Assert.True(options.GetProperty("include_usage").GetBoolean());
@@ -107,7 +107,7 @@ public sealed class ChatRequestTests
     [InlineData("{ \"other\" : 1 }", "{\"include_usage\":true, \"other\" : 1 }")]
     [InlineData("{ \"include_usage\" : false }", "{ \"include_usage\" : true }")]
     [InlineData("null", "{\"include_usage\":true}")]
-    public void Prepare_changes_only_the_stream_options_span_when_usage_is_missing_or_off(string options, string expectedOptions)
+    public void WithTool_changes_only_the_stream_options_span_when_usage_is_missing_or_off(string options, string expectedOptions)
     {
         // The body uses forms System.Text.Json rewrites: extra whitespace, an escaped
         // character and an exponent number. Every byte outside the span must survive.
@@ -115,28 +115,28 @@ public sealed class ChatRequestTests
         var after = $", \"tools\" : [{Tool},{CcrRetrieval.ChatDefinition}], \"messages\" : [] }}";
         var body = $"{Before}\"stream_options\": {options}{after}";
 
-        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        var prepared = Encoding.UTF8.GetString(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body))!.Body);
 
         Assert.Equal($"{Before}\"stream_options\": {expectedOptions}{after}", prepared);
     }
 
     [Fact]
-    public void Prepare_uses_the_last_of_two_stream_options_keys()
+    public void WithTool_uses_the_last_of_two_stream_options_keys()
     {
         var body = $"{{\"stream\":true,\"stream_options\":{{\"include_usage\":true}},\"stream_options\":{{\"x\":1}},\"tools\":[{Tool}],\"messages\":[]}}";
 
-        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        var prepared = Encoding.UTF8.GetString(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body))!.Body);
 
         Assert.Contains("\"stream_options\":{\"include_usage\":true,\"x\":1}", prepared);
     }
 
     [Fact]
-    public void Prepare_ignores_stream_options_inside_messages()
+    public void WithTool_ignores_stream_options_inside_messages()
     {
         const string Messages = "\"messages\":[{\"role\":\"user\",\"content\":\"\\\"stream_options\\\"\",\"stream_options\":{\"a\":1}}]";
         var body = $"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages}}}";
 
-        var prepared = Encoding.UTF8.GetString(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        var prepared = Encoding.UTF8.GetString(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body))!.Body);
 
         Assert.Equal($"{{\"stream\":true,\"tools\":[{Tool},{CcrRetrieval.ChatDefinition}],{Messages},\"stream_options\":{{\"include_usage\":true}}}}", prepared);
     }
@@ -166,19 +166,17 @@ public sealed class ChatRequestTests
     [InlineData("""{"model":"deepseek/x","stream":true,"tools":[],"messages":[]}""")]
     [InlineData("""{"model":"deepseek/x","stream":true,"messages":[]}""")]
     [InlineData("""{"model":"deepseek/x","stream":true,"tools":[{"type":"function","function":{"name":"read"}}]""")]
-    public void Prepare_returns_null_when_it_cannot_append_the_tool(string body)
+    public void WithTool_returns_null_when_it_cannot_append_the_tool(string body)
     {
-        Assert.Null(ChatRequest.Prepare(Encoding.UTF8.GetBytes(body))!);
+        Assert.Null(ChatRequest.WithTool(Encoding.UTF8.GetBytes(body)));
     }
 
     [Fact]
-    public void Prepare_reports_only_the_characters_of_the_tool_it_appended_not_the_usage_option()
+    public void WithTool_reports_only_the_characters_of_the_tool_it_appended_not_the_usage_option()
     {
         var body = Encoding.UTF8.GetBytes(Body());
 
-        Assert.NotNull(ChatRequest.Prepare(body, out var appended));
-        Assert.Equal(CcrRetrieval.ChatDefinition.Length + 1, appended);
-        Assert.NotNull(ChatRequest.Prepare(Encoding.UTF8.GetBytes(Body(tools: $"[{Tool},{CcrRetrieval.ChatDefinition}]")), out var none));
-        Assert.Equal(0, none);
+        Assert.Equal(CcrRetrieval.ChatDefinition.Length + 1, ChatRequest.WithTool(body)!.ToolCharacters);
+        Assert.Equal(0, ChatRequest.WithTool(Encoding.UTF8.GetBytes(Body(tools: $"[{Tool},{CcrRetrieval.ChatDefinition}]")))!.ToolCharacters);
     }
 }
