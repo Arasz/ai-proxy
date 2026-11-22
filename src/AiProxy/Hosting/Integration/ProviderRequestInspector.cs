@@ -35,6 +35,9 @@ public sealed partial class ProviderRequestInspector(
     TimeProvider time,
     IGainStore gain)
 {
+    private static readonly HttpHeader[] PlainTextHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Text.Plain)];
+    private static readonly HttpHeader[] JsonHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
+
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
     /// <summary>The Codex Responses path; a WebSocket upgrade to it on a harness-only host gets 426, so Codex falls back to HTTPS.</summary>
@@ -51,13 +54,13 @@ public sealed partial class ProviderRequestInspector(
     {
         var request = e.HttpClient.Request;
         var caller = ExtractCaller(e.HttpClient);
-        if (providerHosts.Find(request.RequestUri.Host) is not ProviderHost provider || !Admits(e, provider, caller) || !Inspects(request, provider))
+        if (providerHosts.Find(request.RequestUri.Host) is not ProviderHost provider || !PassesHarnessOnlyRules(e, provider, caller) || !Inspects(request, provider))
         {
             return;
         }
 
         var started = time.GetTimestamp();
-        var exchange = Start(request, provider, caller.Project);
+        var exchange = CreateExchange(request, provider, caller.Project);
         var body = await ReadBodyAsync(e, exchange);
         var encoded = IsZstd(request);
         var content = encoded ? Decode(exchange, request.RequestUri.Host, body) : body;
@@ -71,7 +74,7 @@ public sealed partial class ProviderRequestInspector(
             await RecordGainAsync(exchange, request.Method, content, content, GainLabels.Rules.Unchanged, passthrough: true);
         }
 
-        exchange.Stages.Add("inspector", time.GetElapsedTime(started));
+        exchange.Stages.Add(Stages.Inspector, time.GetElapsedTime(started));
     }
 
     /// <summary>Reads the caller's project and credentials, then strips those headers so they never reach any upstream.</summary>
@@ -87,7 +90,7 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>Whether a provider request is inspected: a harness-only host needs a credential and refuses a Codex WebSocket with 426.</summary>
-    private bool Admits(SessionEventArgs e, ProviderHost provider, Caller caller)
+    private bool PassesHarnessOnlyRules(SessionEventArgs e, ProviderHost provider, Caller caller)
     {
         var request = e.HttpClient.Request;
         switch (provider.HarnessOnly)
@@ -96,7 +99,7 @@ public sealed partial class ProviderRequestInspector(
                 return false;
             case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
                 Log.WebSocketRefused(logger, request.RequestUri.Host);
-                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, PlainTextHeaders, true);
                 return false;
             default:
                 return true;
@@ -121,7 +124,7 @@ public sealed partial class ProviderRequestInspector(
 
     private static bool IsZstd(Request request) => ZstdRequestBody.IsZstd(request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value);
 
-    private static CapturedExchange Start(Request request, ProviderHost provider, string? project) => new()
+    private static CapturedExchange CreateExchange(Request request, ProviderHost provider, string? project) => new()
     {
         Dialect = provider.Dialect,
         GainProject = project,
@@ -134,7 +137,7 @@ public sealed partial class ProviderRequestInspector(
     {
         var stage = time.GetTimestamp();
         var body = await e.GetRequestBody(CancellationToken.None);
-        exchange.Stages.Add("body-read", time.GetElapsedTime(stage));
+        exchange.Stages.Add(Stages.BodyRead, time.GetElapsedTime(stage));
         exchange.RequestBytes = body.Length;
         exchange.ForwardedBytes = body.Length;
         e.UserData = exchange;
@@ -157,7 +160,7 @@ public sealed partial class ProviderRequestInspector(
             e.DataReceived += exchange.OnDataReceived;
         }
 
-        exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
+        exchange.Stages.Add(Stages.CaptureWrite, time.GetElapsedTime(stage));
     }
 
     /// <summary>Plans recoverable compression, then relays or forwards the compressed body and records its gain.</summary>
@@ -188,9 +191,9 @@ public sealed partial class ProviderRequestInspector(
     {
         var request = e.HttpClient.Request;
         Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
-        exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "ccr-plan", failure.GetType().Name));
+        exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, Stages.CcrPlanning, failure.GetType().Name));
         await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.CcrPlanFailed);
-        e.GenericResponse(CcrPlan.LedgerUnavailable, (HttpStatusCode)529, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
+        e.GenericResponse(CcrPlan.LedgerUnavailable, (HttpStatusCode)529, JsonHeaders, true);
     }
 
     /// <summary>The project a request is billed to, and whether it carried an ai-proxy credential.</summary>
@@ -235,7 +238,7 @@ public sealed partial class ProviderRequestInspector(
             var reading = kept.OverCap
                 ? new UsageReading(null, ResponseUsageReader.OverCap)
                 : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value, exchange.Dialect);
-            exchange.Stages.Add("usage-read", time.GetElapsedTime(stage));
+            exchange.Stages.Add(Stages.UsageRead, time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
             await capture.StoreResponseAsync(
@@ -273,12 +276,12 @@ public sealed partial class ProviderRequestInspector(
             return;
         }
 
-        Add(stages, "titanium.client-request-read", timing.ClientRequestReadDuration);
-        Add(stages, "titanium.connection-wait", timing.ConnectionWaitDuration);
-        Add(stages, "titanium.request-send", timing.RequestSendDuration);
-        Add(stages, "titanium.ttfb", timing.TimeToFirstByte);
-        Add(stages, "titanium.response-delivery", timing.ResponseDeliveryDuration);
-        Add(stages, "titanium.total", timing.TotalDuration);
+        Add(stages, Stages.TitaniumClientRequestRead, timing.ClientRequestReadDuration);
+        Add(stages, Stages.TitaniumConnectionWait, timing.ConnectionWaitDuration);
+        Add(stages, Stages.TitaniumRequestSend, timing.RequestSendDuration);
+        Add(stages, Stages.TitaniumTimeToFirstByte, timing.TimeToFirstByte);
+        Add(stages, Stages.TitaniumResponseDelivery, timing.ResponseDeliveryDuration);
+        Add(stages, Stages.TitaniumTotal, timing.TotalDuration);
     }
 
     private static void Add(StageTimings stages, string name, TimeSpan? elapsed)
@@ -297,7 +300,7 @@ public sealed partial class ProviderRequestInspector(
             var compressed = await compression.CompressAsync(new CompressionRequest(body, contentType, dialect) { Ccr = mode }, CancellationToken.None);
             if (compressed.Failure is not null)
             {
-                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "content-store", "content_store_failed"));
+                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, Stages.ContentStore, "content_store_failed"));
             }
 
             if (compressed is { Changed: true, Summary: { } summary })
@@ -306,15 +309,15 @@ public sealed partial class ProviderRequestInspector(
                     body.Length == 0 ? 1 : (double)compressed.Body.Length / body.Length);
             }
 
-            exchange.Stages.Add("compression", time.GetElapsedTime(stage));
-            exchange.Stages.Add("compression.", compressed.Stages);
+            exchange.Stages.Add(Stages.Compression, time.GetElapsedTime(stage));
+            exchange.Stages.Add(Stages.CompressionPrefix, compressed.Stages);
             return compressed;
         }
         catch (Exception exception)
         {
-            exchange.Stages.Add("compression", time.GetElapsedTime(stage));
+            exchange.Stages.Add(Stages.Compression, time.GetElapsedTime(stage));
             Log.CompressionFailed(logger, host, exception);
-            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "compression", exception.GetType().Name));
+            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, Stages.Compression, exception.GetType().Name));
             return null;
         }
     }
@@ -378,7 +381,7 @@ public sealed partial class ProviderRequestInspector(
         var stage = time.GetTimestamp();
         var forwarded = compressed.Body.ToArray();
         e.SetRequestBody(forwarded);
-        exchange.Stages.Add("set-body", time.GetElapsedTime(stage));
+        exchange.Stages.Add(Stages.SetBody, time.GetElapsedTime(stage));
         exchange.ForwardedBytes = forwarded.Length;
         if (compressed.Summary is { } summary)
         {
@@ -419,12 +422,12 @@ public sealed partial class ProviderRequestInspector(
         catch (Exception exception) when (exception is not (OutOfMemoryException or StackOverflowException))
         {
             Log.ZstdDecodeFailed(logger, host, exception);
-            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "zstd", exception.GetType().Name));
+            exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, Stages.Zstd, exception.GetType().Name));
             return body;
         }
         finally
         {
-            exchange.Stages.Add("zstd-decode", time.GetElapsedTime(stage));
+            exchange.Stages.Add(Stages.ZstdDecode, time.GetElapsedTime(stage));
         }
     }
 
@@ -465,6 +468,28 @@ public sealed partial class ProviderRequestInspector(
         {
             Log.GainWriteFailed(logger, exchange.GainId, exception);
         }
+    }
+
+    /// <summary>Names of the timed stages and gain-failure stages this inspector records.</summary>
+    private static class Stages
+    {
+        public const string Inspector = "inspector";
+        public const string BodyRead = "body-read";
+        public const string CaptureWrite = "capture-write";
+        public const string UsageRead = "usage-read";
+        public const string Compression = "compression";
+        public const string CompressionPrefix = "compression.";
+        public const string SetBody = "set-body";
+        public const string ZstdDecode = "zstd-decode";
+        public const string TitaniumClientRequestRead = "titanium.client-request-read";
+        public const string TitaniumConnectionWait = "titanium.connection-wait";
+        public const string TitaniumRequestSend = "titanium.request-send";
+        public const string TitaniumTimeToFirstByte = "titanium.ttfb";
+        public const string TitaniumResponseDelivery = "titanium.response-delivery";
+        public const string TitaniumTotal = "titanium.total";
+        public const string CcrPlanning = "ccr-plan";
+        public const string ContentStore = "content-store";
+        public const string Zstd = "zstd";
     }
 
     private static partial class Log
