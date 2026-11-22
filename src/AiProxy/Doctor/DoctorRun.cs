@@ -19,7 +19,7 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
     public async Task<DoctorReport> RunAsync(CancellationToken cancellationToken)
     {
         var proxy = ProxyAddress();
-        var dataDirectory = Path.GetFullPath(settings.DataDirectory ?? ProxyRuntimeOptions.DefaultDataDirectory);
+        var dataDirectory = ProxyDataDirectory.Resolve(settings.DataDirectory, variable);
         using var handler = new HttpClientHandler { UseProxy = false };
         using var http = new HttpClient(handler) { Timeout = _timeout };
         var api = await new ApiCheck(http, new Uri(settings.Endpoint), EntryPoint.ProductVersion, dataDirectory).ProbeAsync(cancellationToken).ConfigureAwait(false);

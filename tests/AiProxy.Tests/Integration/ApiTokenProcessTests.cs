@@ -106,6 +106,20 @@ public sealed class ApiTokenProcessTests
         Assert.Contains(child.Process.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), status.Output, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Doctor_finds_the_token_from_the_data_directory_environment_variable_alone()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var child = ProxyChild.Start(directory.Path, restart: false);
+        var endpoint = await ApiEndpointAsync(child, directory.Path);
+
+        var result = await RunAsync(new Dictionary<string, string> { ["Proxy__DataDirectory"] = directory.Path }, "doctor", "--endpoint", endpoint, "--format", "json", "--timeout", "30");
+
+        using var json = JsonDocument.Parse(result.Output);
+        var api = json.RootElement.GetProperty("checks").EnumerateArray().Single(static check => check.GetProperty("name").GetString() == "api");
+        Assert.Equal("pass", api.GetProperty("status").GetString());
+    }
+
     private static async Task<string> RetrieveAsync(McpProcess server)
     {
         var response = await server.CallAsync("tools/call", new { name = "retrieve_original", arguments = new { id = "0123456789abcdef", mode = "whole" } });
@@ -137,7 +151,12 @@ public sealed class ApiTokenProcessTests
     }
 
     /// <summary>Runs one client command under a throwaway home and without <c>Proxy__DataDirectory</c>, so no default reaches the child's directory.</summary>
-    private static async Task<ProcessResult> RunAsync(params string[] arguments)
+    private static Task<ProcessResult> RunAsync(params string[] arguments)
+    {
+        return RunAsync(new Dictionary<string, string>(), arguments);
+    }
+
+    private static async Task<ProcessResult> RunAsync(IReadOnlyDictionary<string, string> environment, params string[] arguments)
     {
         using var home = new TemporaryDirectory();
         Directory.CreateDirectory(home.Path);
@@ -152,6 +171,11 @@ public sealed class ApiTokenProcessTests
         start.Environment["USERPROFILE"] = home.Path;
         start.Environment.Remove("Proxy__DataDirectory");
         start.Environment.Remove("PROXY__DATADIRECTORY");
+        foreach (var (name, value) in environment)
+        {
+            start.Environment[name] = value;
+        }
+
         using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
         process.StandardInput.Close();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
