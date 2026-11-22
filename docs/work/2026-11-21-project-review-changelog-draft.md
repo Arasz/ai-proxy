@@ -29,8 +29,40 @@ this file is the only place the notes live. Amended at the end of each wave.
 - **Log file.** The proxy writes its log to `proxy.log` in the data directory as well as to the
   console. It rolls once at 5 MiB to `proxy.1.log`, and on POSIX only the owner can read it.
   (P3, #145)
+- **Typos no longer start the proxy.** A mistyped command (`ai-proxy stauts`) or a start line with
+  a stray `--key` and no value prints the usage on stderr and exits 1. `stop`, `status`, `gain`
+  and `replay` options with no value at the end of the line are rejected by name. (P1, #147)
+- **Tables fit 80 columns.** `gain` and `replay` print every row on one line; numbers and headers
+  are never split. The summary and replay kind tables drop their outer box, and the unknown-host
+  OpenAI row shows as `openai (no host)` on screen (JSON and CSV keep `openai (host unknown)`).
+  (P2, #148)
+- **Capture keeps running at its cap.** At `Proxy:CaptureMaxBytes`, each write deletes the oldest
+  whole request and response pairs to make room, walking the time index. A single write larger
+  than the cap is rejected and recorded. capture.db carries a schema version, and a file written
+  by a newer build refuses to open. (P4, #149)
+- **Content store eviction** deletes at most 16 MiB of originals per batch, so it no longer holds
+  the write lock longer than a request waits; a row refreshed during eviction is kept. content.db
+  opens through the shared schema ladder. (P5, #154)
+- **Gain ledger.** A reset writes a `gain_reset` row (time, filter, removed count, caller) in the
+  same transaction as the delete. The report reads the ledger in one query with unchanged output;
+  on a copy of the live ledger it took 0.41 s instead of 1.24 s (observation). gain.db has a
+  schema version. (P6a, #156)
+- **CI.** A PR that changes `VERSION` must add its changelog entry and a version above the latest
+  tag. `publish` builds the tagged commit. The `labeled` trigger no longer cancels a PR's first
+  run, lifecycle runs on main are not cancelled, and the Python script tests run in CI. (P8, #152)
+- **Retrieval follow-up deadline.** A follow-up that gets no response headers in 10 minutes ends
+  the turn with the dialect's error event instead of pinging forever. `Proxy:Ccr:KeepAliveInterval`
+  must be positive and `Proxy:Compression:Minimum` at least 1; nested settings sections are now
+  validated at start. (P10, #150)
+- **MCP schema.** `retrieve_original` publishes the schema the proxy enforces, and a bad-input
+  error names the allowed values. (P11, #153)
+- **Status and doctor show capture.** `status` prints capture on or off, size against the cap,
+  oldest row, last eviction, last write error and the `proxy.log` path. `doctor` warns on a
+  write failure in the last hour, or capture off while `Proxy__Capture` asks for it. A capture
+  fault never stops the control pipe. (P13, #155)
 
 ## In review
 
-- P1 typos and dangling options print usage (#147), P2 tables at 80 columns (#148), P4 capture at
-  its cap and capture.db ladder (#149), P10 follow-up deadline and setting ranges (#150).
+- P7 root names exact hosts and rotates once. At the first start after release the root is
+  replaced, and macOS shows one trust prompt.
+- P6b loopback API token.
