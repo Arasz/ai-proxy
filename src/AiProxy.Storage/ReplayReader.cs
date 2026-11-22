@@ -9,9 +9,8 @@ namespace AiProxy.Storage;
 /// <param name="Source">The database it came from.</param>
 /// <param name="Id">The request id.</param>
 /// <param name="Bytes">The stored bytes; a capture body may still be zstd.</param>
-/// <param name="Provider">The provider a capture row names; null for a content row.</param>
 /// <param name="Host">The host a capture row names; null for a content row.</param>
-public sealed record StoredBody(ReplaySource Source, string Id, byte[] Bytes, string? Provider = null, string? Host = null);
+public sealed record StoredBody(ReplaySource Source, string Id, byte[] Bytes, string? Host = null);
 
 /// <summary>Reads stored request bodies and the gain request count from the proxy's databases, which it opens read-only and never changes.</summary>
 /// <param name="directory">The proxy data directory that holds <c>content.db</c>, <c>capture.db</c> and <c>gain.db</c>.</param>
@@ -50,14 +49,14 @@ public sealed class ReplayReader(string directory)
         await using var command = connection.CreateCommand();
         command.CommandText = source == ReplaySource.Content
             ? "SELECT request_id, original FROM content_request WHERE created_at >= @Since ORDER BY created_at"
-            : "SELECT request_id, body, provider, host FROM capture_request WHERE captured_at >= @Since ORDER BY captured_at";
+            : "SELECT request_id, body, host FROM capture_request WHERE captured_at >= @Since ORDER BY captured_at";
         command.Parameters.AddWithValue("@Since", (since ?? DateTimeOffset.MinValue).ToUniversalTime().ToString("O"));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return source == ReplaySource.Content
                 ? new StoredBody(source, reader.GetString(0), Encoding.UTF8.GetBytes(reader.GetString(1)))
-                : new StoredBody(source, reader.GetString(0), reader.GetFieldValue<byte[]>(1), reader.GetString(2), reader.GetString(3));
+                : new StoredBody(source, reader.GetString(0), reader.GetFieldValue<byte[]>(1), reader.GetString(2));
         }
     }
 
