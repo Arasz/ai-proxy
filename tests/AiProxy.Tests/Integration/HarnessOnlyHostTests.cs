@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;
@@ -234,6 +235,27 @@ public sealed class HarnessOnlyHostTests : IDisposable
     }
 
     [Fact]
+    public async Task A_credentialed_gzip_body_to_a_harness_only_host_is_forwarded_byte_identical_and_never_read()
+    {
+        await using var upstream = await FakeUpstream.StartAsync();
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string> { ["Proxy:Capture"] = "true" }, providerHosts: new HarnessLoopbackHosts());
+        var body = Encoding.UTF8.GetBytes(ResponsesBody("hello"));
+        var gzip = Gzip(body);
+        var content = new ByteArrayContent(gzip);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        content.Headers.ContentEncoding.Add("gzip");
+
+        using var response = await PlainPostAsync(proxy, upstream, content, Credential("/project/gzip"));
+        // A credentialed request after it: once its row is in, the gzip one had its chance to be recorded.
+        using var marker = await PlainPostAsync(proxy, upstream, JsonContent(body), Credential("/project/marker"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(gzip, upstream.Requests[0].BodyBytes);
+        Assert.Equal("/project/marker", (await OnlyHistoryAsync(proxy)).Project);
+        Assert.Single(await ReadCapturedBodiesAsync(proxy));
+    }
+
+    [Fact]
     public async Task A_corrupt_zstd_body_to_a_compressing_host_is_forwarded_unchanged_with_one_zstd_failure_and_no_compression_failure()
     {
         await using var upstream = await FakeUpstream.StartAsync();
@@ -322,6 +344,17 @@ public sealed class HarnessOnlyHostTests : IDisposable
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         content.Headers.ContentEncoding.Add("zstd");
         return content;
+    }
+
+    private static byte[] Gzip(byte[] bytes)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, true))
+        {
+            gzip.Write(bytes);
+        }
+
+        return output.ToArray();
     }
 
     private static HttpRequestMessage ZstdPost(Uri uri, byte[] encoded) => new(HttpMethod.Post, uri) { Content = ZstdContent(encoded) };
