@@ -348,9 +348,14 @@ public sealed class ContentCompressionPipelineTests
     {
         var request = new CompressionRequest(body, "application/json", Dialect.OpenAi);
         await pipeline.CompressAsync(request, CancellationToken.None);
+        var thread = Environment.CurrentManagedThreadId;
         var before = GC.GetAllocatedBytesForCurrentThread();
         await pipeline.CompressAsync(request, CancellationToken.None);
-        return GC.GetAllocatedBytesForCurrentThread() - before;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // The count covers one thread only; a pipeline that resumed elsewhere would hide its copies.
+        Assert.Equal(thread, Environment.CurrentManagedThreadId);
+        return allocated;
     }
 
     [Fact]
