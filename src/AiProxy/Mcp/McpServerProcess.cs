@@ -1,5 +1,4 @@
 using AiProxy.Client;
-using ModelContextProtocol.Protocol;
 
 namespace AiProxy.Mcp;
 

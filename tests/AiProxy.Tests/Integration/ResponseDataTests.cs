@@ -2,7 +2,6 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using AiProxy.Core.Providers;
-using AiProxy.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 

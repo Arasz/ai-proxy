@@ -6,8 +6,6 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Content.Code;
 using AiProxy.Core.Content.Handlers;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace AiProxy;
 

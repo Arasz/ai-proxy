@@ -4,7 +4,6 @@ using System.Text.Json;
 using AiProxy.Ccr;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
-using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 

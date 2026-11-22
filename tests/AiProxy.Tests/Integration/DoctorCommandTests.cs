@@ -3,7 +3,6 @@ using System.Net.Sockets;
 using System.Text.Json;
 using AiProxy.Cli;
 using AiProxy.Client;
-using AiProxy.Core.Doctor;
 using AiProxy.Core.Providers;
 using AiProxy.Hosting;
 using Spectre.Console.Testing;

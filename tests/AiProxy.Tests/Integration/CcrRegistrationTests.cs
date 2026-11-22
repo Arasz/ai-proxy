@@ -1,6 +1,5 @@
 using AiProxy.Ccr;
 using AiProxy.Core.Content.Ccr;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;

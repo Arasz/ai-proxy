@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using AiProxy.Core.Doctor;
 using AiProxy.Core.Providers;
 using AiProxy.Doctor;

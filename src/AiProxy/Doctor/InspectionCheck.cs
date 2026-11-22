@@ -5,7 +5,6 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using AiProxy.Core.Doctor;
-using AiProxy.Hosting.Integration;
 
 namespace AiProxy.Doctor;
 

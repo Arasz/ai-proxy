@@ -1,5 +1,4 @@
 using System.Net;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
 using AiProxy.Tests.Integration;

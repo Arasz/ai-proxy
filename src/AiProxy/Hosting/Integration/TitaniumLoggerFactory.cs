@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace AiProxy.Hosting.Integration;
 
 /// <summary>The logger factory Titanium writes to: a failed certificate store step becomes a one-line warning, every other entry passes through.</summary>

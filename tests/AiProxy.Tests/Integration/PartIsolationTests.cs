@@ -4,7 +4,6 @@ using System.Text.Json;
 using AiProxy.Core.Content;
 using AiProxy.Core.Content.Handlers;
 using AiProxy.Core.Providers;
-using AiProxy.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

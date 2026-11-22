@@ -1,4 +1,3 @@
-using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 
 namespace AiProxy.Tests.Unit;

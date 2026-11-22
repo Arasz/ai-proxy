@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
 using AiProxy.Core.Gain;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;

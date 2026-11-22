@@ -1,7 +1,6 @@
 using AiProxy.Configuration;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Integration;
 using Titanium.Web.Proxy.EventArguments;
 

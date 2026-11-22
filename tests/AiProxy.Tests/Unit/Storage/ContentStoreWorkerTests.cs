@@ -1,5 +1,4 @@
 using AiProxy.Core.Content;
-using AiProxy.Hosting;
 using AiProxy.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;

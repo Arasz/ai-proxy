@@ -1,5 +1,4 @@
 using AiProxy.Core.Gain;
-using AiProxy.Hosting;
 using AiProxy.Hosting.Proxy;
 
 namespace AiProxy;

@@ -5,8 +5,6 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
 using AiProxy.Core.Replay;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AiProxy.Replay;
 

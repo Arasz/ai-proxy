@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using AiProxy.Core.Replay;
 using AiProxy.Hosting.Integration;
 using AiProxy.Storage;
-using Microsoft.Extensions.Configuration;
 
 namespace AiProxy.Replay;
 
