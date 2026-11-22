@@ -167,7 +167,7 @@ launch directory and attributes the agent's provider traffic in `gain`; see
 
 ## Runtime isolation and restart
 
-<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:33#runtimeOptions -->
+<!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:35#runtimeOptions -->
 | Variable | What it is |
 |---|---|
 | `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, API token (`api-token`, rewritten at each start), and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. `gain` and `mcp` also read it to find the API token when `--data-directory` is not given. |

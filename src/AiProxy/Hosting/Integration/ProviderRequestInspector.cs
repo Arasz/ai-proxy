@@ -10,6 +10,7 @@ using AiProxy.Core.Providers;
 using AiProxy.Core.Timing;
 using Microsoft.Net.Http.Headers;
 using Titanium.Web.Proxy.EventArguments;
+using Titanium.Web.Proxy.Http;
 using Titanium.Web.Proxy.Models;
 
 namespace AiProxy.Hosting.Integration;
@@ -49,103 +50,21 @@ public sealed partial class ProviderRequestInspector(
     public async Task BeforeRequestAsync(SessionEventArgs e)
     {
         var request = e.HttpClient.Request;
-        var requestCredential = ProjectCredential.Read(request.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
-        var connectCredential = ProjectCredential.Read(e.HttpClient.ConnectRequest?.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
-        var project = ProjectCredential.Resolve(request.Headers.GetFirstHeader(GainApi.ProjectHeader)?.Value, requestCredential, connectCredential);
-        request.Headers.RemoveHeader(GainApi.ProjectHeader);
-        request.Headers.RemoveHeader(HeaderNames.ProxyAuthorization);
-        var host = request.RequestUri.Host;
-        if (providerHosts.Find(host) is not var (dialect, recordOnly, chatCcr))
+        var caller = TakeCaller(e.HttpClient);
+        if (providerHosts.Find(request.RequestUri.Host) is not { } provider || !Admits(e, provider, caller) || !Inspects(request, provider))
         {
-            return;
-        }
-
-        switch (recordOnly)
-        {
-            case true when requestCredential is null && connectCredential is null:
-                return;
-            case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
-                Log.WebSocketRefused(logger, host);
-                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
-                return;
-        }
-
-        if (!request.HasBody)
-        {
-            return;
-        }
-
-        if (request.ContentLength is < 0 or > MaxInspectedBodyBytes)
-        {
-            return;
-        }
-
-        var contentEncoding = request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value;
-        var encoded = ZstdRequestBody.IsZstd(contentEncoding);
-        if (recordOnly && !encoded && !string.IsNullOrWhiteSpace(contentEncoding) && !contentEncoding.Trim().Equals("identity", StringComparison.OrdinalIgnoreCase))
-        {
-            // Reading a gzip or br body would make Titanium decode and re-encode it, which changes the forwarded bytes.
             return;
         }
 
         var started = time.GetTimestamp();
-        var exchange = new CapturedExchange
-        {
-            Dialect = dialect,
-            GainProject = project,
-            Host = host,
-            IsModelCall = ProviderEndpoints.IsModelCall(dialect, request.Method, request.RequestUri.AbsolutePath)
-        };
-        var captureId = Guid.CreateVersion7().ToString("N");
-
-        var stage = time.GetTimestamp();
-        var body = await e.GetRequestBody(CancellationToken.None);
-        exchange.Stages.Add("body-read", time.GetElapsedTime(stage));
-        exchange.RequestBytes = body.Length;
-        exchange.ForwardedBytes = body.Length;
-        e.UserData = exchange;
+        var exchange = Start(request, provider, caller.Project);
+        var body = await ReadBodyAsync(e, exchange);
+        var encoded = IsZstd(request);
         var content = encoded ? Decode(exchange, request.RequestUri.Host, body) : body;
-
-        if (capture.Keeps)
+        await CaptureRequestAsync(e, exchange, provider.Dialect, content);
+        if (compression.Compresses && !provider.HarnessOnly && !encoded)
         {
-            stage = time.GetTimestamp();
-            if (await CaptureAsync(captureId, dialect, request.RequestUri, content))
-            {
-                exchange.CaptureId = captureId;
-                e.DataReceived += exchange.OnDataReceived;
-                e.UserData = exchange;
-            }
-
-            exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
-        }
-
-        if (compression.Compresses && !recordOnly && !encoded)
-        {
-            var plan = await ccr.DecideAsync(dialect, chatCcr, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
-            if (plan.Failure is { } failure)
-            {
-                Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
-                exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, project, "ccr-plan", failure.GetType().Name));
-                await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.CcrPlanFailed);
-                e.GenericResponse(
-                    CcrPlan.LedgerUnavailable,
-                    (HttpStatusCode)529,
-                    [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)],
-                    true);
-                return;
-            }
-
-            var compressed = await CompressAsync(exchange, dialect, request.ContentType, request.RequestUri.Host, body, plan.Mode);
-            if (plan.Relays)
-            {
-                await RelayAsync(e, exchange, plan, body, compressed);
-            }
-            else
-            {
-                Apply(e, exchange, compressed);
-                await RecordGainAsync(exchange, request.Method, body,
-                    compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
-            }
+            await CompressRequestAsync(e, exchange, provider, body);
         }
         else
         {
@@ -154,6 +73,128 @@ public sealed partial class ProviderRequestInspector(
 
         exchange.Stages.Add("inspector", time.GetElapsedTime(started));
     }
+
+    /// <summary>Reads the caller's project and credentials, then strips those headers so they never reach any upstream.</summary>
+    private static Caller TakeCaller(HttpWebClient client)
+    {
+        var headers = client.Request.Headers;
+        var requestCredential = ProjectCredential.Read(headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
+        var connectCredential = ProjectCredential.Read(client.ConnectRequest?.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
+        var project = ProjectCredential.Resolve(headers.GetFirstHeader(GainApi.ProjectHeader)?.Value, requestCredential, connectCredential);
+        headers.RemoveHeader(GainApi.ProjectHeader);
+        headers.RemoveHeader(HeaderNames.ProxyAuthorization);
+        return new Caller(project, requestCredential is not null || connectCredential is not null);
+    }
+
+    /// <summary>Whether a provider request is inspected: a harness-only host needs a credential and refuses a Codex WebSocket with 426.</summary>
+    private bool Admits(SessionEventArgs e, ProviderHost provider, Caller caller)
+    {
+        var request = e.HttpClient.Request;
+        switch (provider.HarnessOnly)
+        {
+            case true when !caller.Credentialed:
+                return false;
+            case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
+                Log.WebSocketRefused(logger, request.RequestUri.Host);
+                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>Whether the body is read: it must exist, fit the size cap and, on a harness-only host, stay byte-identical once read.</summary>
+    private static bool Inspects(Request request, ProviderHost provider)
+    {
+        if (!request.HasBody || request.ContentLength is < 0 or > MaxInspectedBodyBytes)
+        {
+            return false;
+        }
+
+        // Reading a gzip or br body would make Titanium decode and re-encode it, which changes the forwarded bytes.
+        var contentEncoding = request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value;
+        return !provider.HarnessOnly
+               || ZstdRequestBody.IsZstd(contentEncoding)
+               || string.IsNullOrWhiteSpace(contentEncoding)
+               || contentEncoding.Trim().Equals("identity", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsZstd(Request request) => ZstdRequestBody.IsZstd(request.Headers.GetFirstHeader(HeaderNames.ContentEncoding)?.Value);
+
+    private static CapturedExchange Start(Request request, ProviderHost provider, string? project) => new()
+    {
+        Dialect = provider.Dialect,
+        GainProject = project,
+        Host = request.RequestUri.Host,
+        IsModelCall = ProviderEndpoints.IsModelCall(provider.Dialect, request.Method, request.RequestUri.AbsolutePath)
+    };
+
+    /// <summary>Reads the request body, records its size and attaches the exchange to the session.</summary>
+    private async Task<byte[]> ReadBodyAsync(SessionEventArgs e, CapturedExchange exchange)
+    {
+        var stage = time.GetTimestamp();
+        var body = await e.GetRequestBody(CancellationToken.None);
+        exchange.Stages.Add("body-read", time.GetElapsedTime(stage));
+        exchange.RequestBytes = body.Length;
+        exchange.ForwardedBytes = body.Length;
+        e.UserData = exchange;
+        return body;
+    }
+
+    /// <summary>Keeps the decoded body when capture is on, and subscribes the exchange to the response it captures.</summary>
+    private async Task CaptureRequestAsync(SessionEventArgs e, CapturedExchange exchange, Dialect dialect, byte[] content)
+    {
+        if (!capture.Keeps)
+        {
+            return;
+        }
+
+        var stage = time.GetTimestamp();
+        var captureId = Guid.CreateVersion7().ToString("N");
+        if (await CaptureAsync(captureId, dialect, e.HttpClient.Request.RequestUri, content))
+        {
+            exchange.CaptureId = captureId;
+            e.DataReceived += exchange.OnDataReceived;
+        }
+
+        exchange.Stages.Add("capture-write", time.GetElapsedTime(stage));
+    }
+
+    /// <summary>Plans recoverable compression, then relays or forwards the compressed body and records its gain.</summary>
+    private async Task CompressRequestAsync(SessionEventArgs e, CapturedExchange exchange, ProviderHost provider, byte[] body)
+    {
+        var request = e.HttpClient.Request;
+        var plan = await ccr.DecideAsync(provider.Dialect, provider.ChatCcr, request.Method, request.RequestUri.AbsolutePath, body, CancellationToken.None);
+        if (plan.Failure is { } failure)
+        {
+            await RefuseUnplannedAsync(e, exchange, failure, body);
+            return;
+        }
+
+        var compressed = await CompressAsync(exchange, provider.Dialect, request.ContentType, request.RequestUri.Host, body, plan.Mode);
+        if (plan.Relays)
+        {
+            await RelayAsync(e, exchange, plan, body, compressed);
+            return;
+        }
+
+        Apply(e, exchange, compressed);
+        await RecordGainAsync(exchange, request.Method, body,
+            compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
+    }
+
+    /// <summary>Answers 529 when the CCR ledger cannot be read, so the request is never forwarded without its plan.</summary>
+    private async Task RefuseUnplannedAsync(SessionEventArgs e, CapturedExchange exchange, Exception failure, byte[] body)
+    {
+        var request = e.HttpClient.Request;
+        Log.LedgerLookupFailed(logger, request.RequestUri.Host, failure);
+        exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, "ccr-plan", failure.GetType().Name));
+        await RecordGainAsync(exchange, request.Method, body, body, GainLabels.Rules.CcrPlanFailed);
+        e.GenericResponse(CcrPlan.LedgerUnavailable, (HttpStatusCode)529, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
+    }
+
+    /// <summary>The project a request is billed to, and whether it carried an ai-proxy credential.</summary>
+    private sealed record Caller(string? Project, bool Credentialed);
 
     /// <summary>Returns the original-content handle when compression stored a request, and picks what a capture keeps of the body.</summary>
     public static Task BeforeResponseAsync(SessionEventArgs e)
