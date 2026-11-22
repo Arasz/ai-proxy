@@ -9,7 +9,7 @@ public interface IProxyClient
 {
     Task<RetrievalResponse> RetrieveAsync(string endpoint, RetrievalRequest request, CancellationToken cancellationToken = default);
     Task<GainReport> GetGainAsync(string endpoint, GainQuery query, CancellationToken cancellationToken = default);
-    Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, CancellationToken cancellationToken = default);
+    Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, string caller, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Calls the proxy's JSON API without opening its databases.</summary>
@@ -37,9 +37,11 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
                ?? throw new HttpRequestException("The proxy returned an empty gain response.");
     }
 
-    public async Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, CancellationToken cancellationToken = default)
+    public async Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, string caller, CancellationToken cancellationToken = default)
     {
-        using var response = await http.PostAsJsonAsync(ApiUri(endpoint, "gain/reset"), query, Json, cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(HttpMethod.Post, ApiUri(endpoint, "gain/reset")) { Content = JsonContent.Create(query, options: Json) };
+        request.Headers.TryAddWithoutValidation(GainApi.CallerHeader, caller);
+        using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainResetResult>(Json, cancellationToken).ConfigureAwait(false)
                ?? throw new HttpRequestException("The proxy returned an empty reset response.");

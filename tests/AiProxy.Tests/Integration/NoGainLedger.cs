@@ -30,7 +30,7 @@ internal sealed class NoGainLedger : IGainStore
         return ValueTask.FromResult(GainReportBuilder.Build(query, TimeProvider.System.GetUtcNow(), [], [], []));
     }
 
-    public ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken)
+    public ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken)
     {
         return ValueTask.FromResult(new GainResetResult(0, TimeProvider.System.GetUtcNow()));
     }

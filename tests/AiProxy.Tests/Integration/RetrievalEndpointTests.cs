@@ -107,7 +107,7 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
             throw new IOException("disk full");
         }
 
-        public ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken)
+        public ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken)
         {
             throw new IOException("disk full");
         }

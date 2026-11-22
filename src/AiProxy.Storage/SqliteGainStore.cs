@@ -6,7 +6,9 @@ using Microsoft.Data.Sqlite;
 namespace AiProxy.Storage;
 
 /// <summary>The metadata ledger's private database path.</summary>
-public sealed record GainStoreOptions(string DatabasePath);
+/// <param name="DatabasePath">The path of the database file.</param>
+/// <param name="OnOpen">Called with each connection the store opens; a seam for tests that watch the statements it runs.</param>
+public sealed record GainStoreOptions(string DatabasePath, Action<SqliteConnection>? OnOpen = null);
 
 /// <summary>Persists content-free statistics separately from originals and optional captures.</summary>
 public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time) : IGainStore
@@ -14,7 +16,12 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     /// <summary>How long a request-path writing waits for the ledger before it gives up; the request goes on unrecorded.</summary>
     private static readonly TimeSpan RequestWait = TimeSpan.FromSeconds(ContentSchema.RequestCommandTimeoutSeconds);
 
+    /// <summary>The file's name, for the error of a file that a newer build wrote.</summary>
+    public const string FileName = "gain.db";
+
     private static readonly string[] Attributions = ["method", "rule", "layer", "pipeline"];
+
+    private static readonly SchemaLadder Ladder = new([CreateEventTable, CreateResetAuditTable]);
 
     private readonly SemaphoreSlim _writer = new(1, 1);
     private bool _initialized;
@@ -60,19 +67,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
         connection.CreateCollation("ordinal", string.CompareOrdinal);
-        await using var transaction = connection.BeginTransaction(true);
-        var parameters = query.ToSqlParameters();
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
-            Sql.Aggregate, parameters, transaction, cancellationToken: cancellationToken))).ToArray();
-        var history = await DetailsAsync<GainHistoryEntry>(connection, transaction, parameters, Kinds.Request,
-            Sql.History, cancellationToken);
-        var failures = await DetailsAsync<GainFailure>(connection, transaction, parameters, Kinds.Failure,
-            Sql.Events, cancellationToken);
-        var recalls = await DetailsAsync<GainRecall>(connection, transaction, parameters, Kinds.Recall,
-            Sql.Events, cancellationToken);
-        var other = await connection.QuerySingleAsync<GainOtherTraffic>(new CommandDefinition(
-            Sql.OtherTraffic, parameters, transaction, cancellationToken: cancellationToken));
-        await transaction.CommitAsync(cancellationToken);
+            Sql.Report, query.ToSqlParameters(), cancellationToken: cancellationToken))).ToArray();
+        var history = Details<GainHistoryEntry>(rows, Views.History);
+        var failures = Details<GainFailure>(rows, Views.Failure);
+        var recalls = Details<GainRecall>(rows, Views.Recall);
+        var other = JsonSerializer.Deserialize<GainOtherTraffic>(rows.Single(static row => row.View == Views.Other).Totals)
+                    ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainOtherTraffic)}");
 
         var attributions = Attributions.SelectMany(dimension => GainReportBuilder.Attribute(dimension,
                 rows.Where(row => row.View == dimension).Select(row => new GainAttribution(dimension, row.Name ?? "", row.ConvertToTotals()))))
@@ -93,7 +94,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         };
     }
 
-    public async ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken)
+    public async ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken)
     {
         var cutoff = time.GetUtcNow();
         long removed = 0;
@@ -109,6 +110,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             removed = await connection.ExecuteAsync(new CommandDefinition(
                 Sql.DeleteThroughSnapshot, parameters,
                 transaction, cancellationToken: cancellationToken));
+            await connection.ExecuteAsync(new CommandDefinition(Sql.InsertResetAudit,
+                new { at = cutoff.UtcTicks, filter = JsonSerializer.Serialize(query), removed, caller },
+                transaction, cancellationToken: cancellationToken));
             await transaction.CommitAsync(cancellationToken);
         }, WritePath.Reset, cancellationToken);
         return new GainResetResult(removed, cutoff);
@@ -123,15 +127,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         ];
     }
 
-    private static async Task<T[]> DetailsAsync<T>(SqliteConnection connection, SqliteTransaction transaction,
-        object filters, string kind, string sql, CancellationToken cancellationToken) where T : class
+    private static T[] Details<T>(AggregateRow[] rows, string view) where T : class
     {
-        var parameters = new DynamicParameters(filters);
-        parameters.Add("Kind", kind);
-        var payloads = await connection.QueryAsync<string>(new CommandDefinition(
-            sql,
-            parameters, transaction, cancellationToken: cancellationToken));
-        return payloads.Select(static payload => JsonSerializer.Deserialize<T>(payload)).OfType<T>().ToArray();
+        return
+        [
+            .. rows.Where(row => row.View == view).OrderBy(static row => row.Start)
+                .Select(static row => JsonSerializer.Deserialize<T>(row.Totals)).OfType<T>()
+        ];
     }
 
     private static async Task InsertAsync(SqliteConnection connection, GainEventInput gainEvent,
@@ -186,7 +188,9 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Directory.CreateDirectory(directory);
         }
 
-        return ContentSchema.Open(options.DatabasePath);
+        var connection = ContentSchema.Open(options.DatabasePath);
+        options.OnOpen?.Invoke(connection);
+        return connection;
     }
 
     private async Task InitializeAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -196,9 +200,19 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             return;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(Sql.Schema, cancellationToken: cancellationToken));
-        await connection.ExecuteAsync(new CommandDefinition(Sql.NameLayers, cancellationToken: cancellationToken));
+        Ladder.Apply(connection, FileName, connection.DefaultTimeout);
         _initialized = true;
+    }
+
+    private static void CreateEventTable(SqliteConnection connection)
+    {
+        connection.Execute(Sql.Schema);
+        connection.Execute(Sql.NameLayers);
+    }
+
+    private static void CreateResetAuditTable(SqliteConnection connection)
+    {
+        connection.Execute(Sql.ResetAuditSchema);
     }
 
     private sealed record AggregateRow(string View, long Start, string? Name, string Host, string Totals)
@@ -242,6 +256,13 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                           WHERE layer = '{GainLabels.Unknown}';
                                           """;
 
+        public const string ResetAuditSchema = """
+                                               CREATE TABLE gain_reset (
+                                                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,at INTEGER NOT NULL,filter TEXT NOT NULL,removed INTEGER NOT NULL,caller TEXT NOT NULL);
+                                               """;
+
+        public const string InsertResetAudit = "INSERT INTO gain_reset(at,filter,removed,caller) VALUES(@at,@filter,@removed,@caller)";
+
         public const string Insert = """
                                      INSERT INTO gain_event(kind,id,at,project,provider,method,rule,layer,pipeline,payload)
                                      VALUES(@Kind,@Id,@at,@Project,@Provider,@Method,@Rule,@Layer,@Pipeline,@Payload)
@@ -253,18 +274,21 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                                      DELETE FROM gain_event WHERE sequence <= @Snapshot AND at <= @Cutoff AND {Predicate}
                                                      """;
 
-        public const string History = $"""
-                                       SELECT payload FROM gain_event WHERE kind = @Kind AND {Predicate} ORDER BY at DESC,id COLLATE ordinal,sequence LIMIT @HistoryLimit
-                                       """;
-
-        public const string Events = $"""
-                                      SELECT payload FROM gain_event WHERE kind = @Kind AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit
+        /// <summary>The whole report in one statement: the aggregate rows, then the newest payloads of three kinds (position in <c>Start</c>), then the other-traffic count.</summary>
+        public const string Report = $"""
+                                      {Aggregate}
+                                      UNION ALL SELECT '{Views.History}',Position,'','',payload FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,id COLLATE ordinal,sequence) AS Position FROM (
+                                              SELECT payload,at,id,sequence FROM gain_event WHERE kind = '{Kinds.Request}' AND {Predicate} ORDER BY at DESC,id COLLATE ordinal,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Failure}',Position,'','',payload FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
+                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Failure}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Recall}',Position,'','',payload FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
+                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Recall}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Other}',0,'','',json_object('Requests',COUNT(*),'Bytes',COALESCE(SUM(json_extract(payload,'$.Bytes')),0))
+                                          FROM gain_event WHERE kind = '{Kinds.Other}' AND {Predicate}
                                       """;
-
-        public const string OtherTraffic = $"""
-                                            SELECT COUNT(*) AS Requests,COALESCE(SUM(json_extract(payload,'$.Bytes')),0) AS Bytes
-                                            FROM gain_event WHERE kind = 'other' AND {Predicate}
-                                            """;
 
         public const string Predicate = """
                                         (@Project IS NULL OR project = @Project) AND (@From IS NULL OR at >= @From) AND (@To IS NULL OR at < @To)
@@ -304,7 +328,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                               """;
 
         public const string Aggregate = $"""
-                                         WITH metrics AS ({MetricsSelect})
+                                         WITH metrics AS MATERIALIZED ({MetricsSelect})
                                          SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
                                              '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
                                              '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
@@ -323,6 +347,15 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     {
         Request,
         Reset
+    }
+
+    /// <summary>The row types of the report statement that are not aggregates.</summary>
+    private static class Views
+    {
+        public const string History = "history";
+        public const string Failure = "failure";
+        public const string Recall = "recall";
+        public const string Other = "other";
     }
 
     /// <summary>The kinds of ledger rows.</summary>

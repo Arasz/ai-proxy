@@ -142,6 +142,16 @@ public sealed class GainCommandTests
         }
     }
 
+    [Fact]
+    public async Task Reset_names_the_cli_and_its_process_to_the_proxy()
+    {
+        using var fixture = new Fixture();
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "--reset", "--yes", "-f", "json"], TestContext.Current.CancellationToken);
+
+        Assert.Equal($"cli gain --reset pid {Environment.ProcessId}", Assert.Single(fixture.Handler.Callers));
+    }
+
     [Theory]
     [InlineData("-f|xml", "format")]
     [InlineData("--endpoint|file:///tmp/proxy", "endpoint")]
@@ -237,6 +247,7 @@ public sealed class GainCommandTests
     {
         public List<Uri> Uris { get; } = [];
         public List<string> PostBodies { get; } = [];
+        public List<string> Callers { get; } = [];
         public GainReport Report { get; set; } = new(1, DateTimeOffset.Parse("2026-10-25T00:00:00Z"), new GainQuery(), new GainMeasurement(), new GainTotals(1, EstimatedSavedTokens: 123), [], [], [], [], [], [], [], []);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -245,6 +256,7 @@ public sealed class GainCommandTests
             if (request.Method == HttpMethod.Post)
             {
                 PostBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+                Callers.Add(request.Headers.TryGetValues(GainApi.CallerHeader, out var values) ? string.Join(",", values) : "");
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new GainResetResult(7, DateTimeOffset.Parse("2026-10-25T00:00:00Z"))) };
             }
 

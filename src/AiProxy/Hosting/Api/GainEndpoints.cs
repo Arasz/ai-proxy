@@ -9,6 +9,8 @@ namespace AiProxy.Hosting.Api;
 /// <summary>Maps the proxy-owned retrieval and statistics API.</summary>
 public static partial class GainEndpoints
 {
+    private const int MaxCallerLength = 256;
+
     private static readonly JsonSerializerOptions RetrievalJson = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -17,12 +19,12 @@ public static partial class GainEndpoints
     public static void MapGainEndpoints(this WebApplication app)
     {
         app.MapGet("/gain", async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) => !TryQuery(request.Query, out var query, out var error) ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400) : Results.Json(await store.QueryAsync(query, cancellationToken)));
-        app.MapPost("/gain/reset", async (GainQuery query, IGainStore store, CancellationToken cancellationToken) =>
+        app.MapPost("/gain/reset", async (GainQuery query, HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
         {
             var error = Validate(query);
             return error is not null
                 ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400)
-                : Results.Json(await store.ResetAsync(query, cancellationToken));
+                : Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken));
         });
         app.MapPost("/retrieval", async (RetrievalRequest request, HttpContext context, IGainStore gain, TimeProvider time, CancellationToken cancellationToken) =>
         {
@@ -53,6 +55,13 @@ public static partial class GainEndpoints
 
             return Results.Json(new RetrievalResponse(answer.Text, answer.Error));
         });
+    }
+
+    /// <summary>The name the client gave itself; empty when it gave none. Cut to a length an audit row can hold.</summary>
+    private static string CallerOf(HttpRequest request)
+    {
+        var caller = request.Headers[GainApi.CallerHeader].ToString().Trim();
+        return caller.Length > MaxCallerLength ? caller[..MaxCallerLength] : caller;
     }
 
     private static bool TryQuery(IQueryCollection values, out GainQuery query, out string? error)
