@@ -168,6 +168,67 @@ public sealed class RootCertificateStorageTests
     }
 
     [Fact]
+    public async Task A_declined_trust_prompt_does_not_lose_the_old_thumbprint_and_the_next_start_untrusts_it()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            var declined = new RecordingTrust { DuringTrust = () => throw new InvalidOperationException("declined") };
+            await using (var first = CreateService(directory.Path, null, true, declined))
+            {
+                await Assert.ThrowsAsync<InvalidOperationException>(() => first.StartAsync(TestContext.Current.CancellationToken));
+            }
+
+            var accepted = new RecordingTrust();
+            await using var second = CreateService(directory.Path, null, true, accepted);
+            await second.StartAsync(TestContext.Current.CancellationToken);
+            await second.StopAsync(CancellationToken.None);
+
+            Assert.Contains($"untrust {oldThumbprint}", accepted.Calls);
+            Assert.Empty(Directory.EnumerateFiles(directory.Path, "root-ca.replaced*"));
+
+            var third = new RecordingTrust();
+            await using var again = CreateService(directory.Path, null, true, third);
+            await again.StartAsync(TestContext.Current.CancellationToken);
+            await again.StopAsync(CancellationToken.None);
+            Assert.DoesNotContain(third.Calls, call => call.StartsWith("untrust", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_untrust_keeps_the_record_for_the_next_start()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using (var first = CreateService(directory.Path, null, true, new RecordingTrust { UntrustFailure = new IOException("no tool") }))
+            {
+                await first.StartAsync(TestContext.Current.CancellationToken);
+                await first.StopAsync(CancellationToken.None);
+            }
+
+            var retry = new RecordingTrust();
+            await using var second = CreateService(directory.Path, null, true, retry);
+            await second.StartAsync(TestContext.Current.CancellationToken);
+            await second.StopAsync(CancellationToken.None);
+
+            Assert.Contains($"untrust {oldThumbprint}", retry.Calls);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
+    [Fact]
     public async Task A_root_made_for_the_current_hosts_is_kept_by_a_trusting_start_and_nothing_is_untrusted()
     {
         using var directory = new TemporaryDirectory();

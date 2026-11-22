@@ -75,11 +75,14 @@ public sealed class RootCertificateAuthorityTests
         Assert.True(RootCertificateAuthority.IsConstrained(root));
     }
 
-    [Fact]
-    public void A_leaf_for_a_provider_host_chain_builds_to_the_root()
+    public static TheoryData<string> CatalogHosts => [.. ProviderHostCatalog.Hosts];
+
+    [Theory]
+    [MemberData(nameof(CatalogHosts))]
+    public void A_leaf_for_a_provider_host_chain_builds_to_the_root(string host)
     {
         using var root = RootCertificateAuthority.Create(ProviderHostCatalog.Hosts, Now);
-        using var leaf = Leaf(root, "api.anthropic.com");
+        using var leaf = Leaf(root, host);
 
         using var chain = Chain(root);
         var built = chain.Build(leaf);

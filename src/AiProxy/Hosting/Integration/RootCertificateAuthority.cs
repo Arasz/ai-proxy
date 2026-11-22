@@ -43,6 +43,29 @@ internal static class RootCertificateAuthority
         return root.Extensions[NameConstraintsOid] is { } stored && Subtrees(stored.RawData).SetEquals(Subtrees(NameConstraints(hosts).RawData));
     }
 
+    /// <summary>Whether the root permits at least one of <paramref name="hosts" />, by an equal name or a parent domain.</summary>
+    public static bool CoversAnyHost(X509Certificate2 root, IEnumerable<string> hosts)
+    {
+        if (root.Extensions[NameConstraintsOid] is not { } stored)
+        {
+            return false;
+        }
+
+        var permitted = new AsnReader(stored.RawData, AsnEncodingRules.DER).ReadSequence().ReadSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true));
+        var dnsTag = new Asn1Tag(TagClass.ContextSpecific, 2);
+        var names = new List<string>();
+        while (permitted.HasData)
+        {
+            var subtree = permitted.ReadSequence();
+            if (subtree.PeekTag() == dnsTag)
+            {
+                names.Add(subtree.ReadCharacterString(UniversalTagNumber.IA5String, dnsTag));
+            }
+        }
+
+        return hosts.Any(host => names.Any(name => host.Equals(name, StringComparison.OrdinalIgnoreCase) || host.EndsWith($".{name}", StringComparison.OrdinalIgnoreCase)));
+    }
+
     private static HashSet<string> Subtrees(byte[] nameConstraints)
     {
         var outer = new AsnReader(nameConstraints, AsnEncodingRules.DER).ReadSequence();
