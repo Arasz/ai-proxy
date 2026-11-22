@@ -3,7 +3,10 @@ using ModelContextProtocol.Protocol;
 
 namespace AiProxy.Mcp;
 
-public sealed record McpServerOptions(string Endpoint);
+/// <summary>Where the server sends retrieval calls, and the data directory it reads the proxy's API token from at each call.</summary>
+/// <param name="Endpoint">The proxy API base URL.</param>
+/// <param name="DataDirectory">The proxy's data directory.</param>
+public sealed record McpServerOptions(string Endpoint, string DataDirectory);
 
 /// <summary>Runs <c>ai-proxy mcp</c>: the retrieval MCP server on stdio, logging to stderr only.</summary>
 public static class McpServerProcess
@@ -31,7 +34,7 @@ public static class McpServerProcess
     }
 
     /// <summary>Runs the stdio server against the configured proxy endpoint; at end of input it still answers requests in flight.</summary>
-    public static async Task<int> RunAsync(string endpoint, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(string endpoint, string dataDirectory, CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
         {
@@ -48,7 +51,7 @@ public static class McpServerProcess
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddProxyHttpClient();
-        builder.Services.AddSingleton(new McpServerOptions(endpoint));
+        builder.Services.AddSingleton(new McpServerOptions(endpoint, dataDirectory));
         using var drainLog = LoggerFactory.Create(static log => log.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace));
         var pending = new PendingRequests();
         var input = new DrainOnEofStream(Console.OpenStandardInput(), pending, TimeProvider.System, DrainBound, drainLog.CreateLogger<DrainOnEofStream>());

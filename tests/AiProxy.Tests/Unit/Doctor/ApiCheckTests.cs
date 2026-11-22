@@ -28,10 +28,73 @@ public sealed class ApiCheckTests
         return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
     }
 
-    private static Task<ApiProbe> Probe(HttpMessageHandler handler)
+    private sealed class TokenHandler(string token) : HttpMessageHandler
+    {
+        public List<string?> Authorizations { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath == HealthApi.Path)
+            {
+                return Task.FromResult(Json("""{"status":"ok","product":"ai-proxy","version":"1.2.3"}"""));
+            }
+
+            Authorizations.Add(request.Headers.Authorization?.ToString());
+            return Task.FromResult(request.Headers.Authorization?.ToString() == $"Bearer {token}" ? Json("{}") : Json("{}", HttpStatusCode.Unauthorized));
+        }
+    }
+
+    private static async Task<ApiProbe> Probe(HttpMessageHandler handler, string? dataDirectory = null)
     {
         using var client = new HttpClient(handler);
-        return new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3").ProbeAsync(TestContext.Current.CancellationToken);
+        return await new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3", dataDirectory ?? Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))).ProbeAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_current_proxy_that_refuses_the_token_fails()
+    {
+        using var directory = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName), "stale", TestContext.Current.CancellationToken);
+        var handler = new TokenHandler("fresh");
+
+        var probe = await Probe(handler, directory.Path);
+
+        Assert.Equal(CheckStatus.Fail, probe.Result.Status);
+        Assert.Contains($"refused the API token from {Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName)}", probe.Result.Detail);
+        Assert.Contains("Proxy__DataDirectory", probe.Result.Detail + probe.Result.Fix);
+        Assert.DoesNotContain("stale", probe.Result.Detail + probe.Result.Fix);
+        Assert.Equal(["Bearer stale"], handler.Authorizations);
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task An_unreadable_token_file_fails_the_check_instead_of_throwing()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "File modes are POSIX only.");
+        using var directory = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName);
+        await File.WriteAllTextAsync(path, "fresh", TestContext.Current.CancellationToken);
+        File.SetUnixFileMode(path, UnixFileMode.None);
+
+        var probe = await Probe(new TokenHandler("fresh"), directory.Path);
+
+        Assert.Equal(CheckStatus.Fail, probe.Result.Status);
+        Assert.Contains($"Cannot read the API token file {path}", probe.Result.Detail);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    [Fact]
+    public async Task A_current_proxy_that_accepts_the_token_from_the_data_directory_passes()
+    {
+        using var directory = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName), "fresh", TestContext.Current.CancellationToken);
+
+        var probe = await Probe(new TokenHandler("fresh"), directory.Path);
+
+        Assert.Equal(CheckStatus.Pass, probe.Result.Status);
     }
 
     [Fact]

@@ -9,6 +9,18 @@ public static class ProxyDataDirectory
         return Path.GetFullPath(string.IsNullOrWhiteSpace(chosen) ? ProxyRuntimeOptions.DefaultDataDirectory : chosen);
     }
 
+    /// <summary>Resolves with <paramref name="variable" /> standing in for the process environment, or from the environment itself when it is null.</summary>
+    public static string Resolve(string? option, Func<string, string?>? variable)
+    {
+        if (variable is null)
+        {
+            return FromEnvironment(option);
+        }
+
+        var chosen = !string.IsNullOrWhiteSpace(option) ? option : variable("Proxy__DataDirectory") ?? variable("PROXY__DATADIRECTORY");
+        return Path.GetFullPath(string.IsNullOrWhiteSpace(chosen) ? ProxyRuntimeOptions.DefaultDataDirectory : chosen);
+    }
+
     /// <summary>Resolves from the process environment; names match case-insensitively, as for serve.</summary>
     public static string FromEnvironment(string? option)
     {

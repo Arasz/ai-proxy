@@ -7,7 +7,7 @@ directory, never trusts a certificate and sends no HTTP request to a provider.
 
 | Check | What it tests | Fail | Warn | Unknown |
 |---|---|---|---|---|
-| `api` | `GET {endpoint}/health` answers as `ai-proxy`. | Nothing answers, or another server does. If the proxy port is also closed, one failure says the proxy is not running. | The running version differs from the command's. | An older proxy answers without `product`. |
+| `api` | `GET {endpoint}/health` answers as `ai-proxy`, then `GET {endpoint}/gain` accepts the token from `<data-directory>/api-token`. | Nothing answers, or another server does. If the proxy port is also closed, one failure says the proxy is not running. The API refuses the token (401): the file is missing, or the proxy runs on another data directory. | The running version differs from the command's. | An older proxy answers without `product`. |
 | `inspection` | `CONNECT {host}:443` through the proxy, then a TLS handshake only. The leaf must chain to `<data-directory>/root-ca.pem`. | The host is not decrypted, or the certificate does not chain to that root. | | The proxy answered the tunnel request with a status other than 200, the tunnel or handshake timed out or was reset (including when the proxy cannot reach an upstream), or the published root could not be read. Also reported (as "skipped") when the proxy is not running. |
 | `root` | Reads `<data-directory>/root-ca.pem` (at most 64 KiB). | Missing, holds a private key, not limited to the provider hosts, or outside its validity period. | Expires within 30 days, or the operating system does not trust it (advisory; `NODE_EXTRA_CA_CERTS` clients and Codex launched through `ai-proxy harness` are unaffected). | |
 | `environment` | `HTTPS_PROXY` and `HTTP_PROXY`, either case, against the proxy address. | A variable names another endpoint. | | |
@@ -23,7 +23,7 @@ assumed from `--data-directory`; doctor cannot ask a running proxy where its dir
 |---|---|---|
 | `--endpoint <URL>` | `http://127.0.0.1:17432` | The proxy's local API. |
 | `--proxy <URL>` | `http://127.0.0.1:{port}`, where the port comes from the `Proxy__Port` environment variable, or 8080 | The proxy listener. Overrides the default. |
-| `--data-directory <PATH>` | `~/.ai-proxy` | Where `root-ca.pem` lives. |
+| `--data-directory <PATH>` | `~/.ai-proxy` | Where `root-ca.pem` and the API token (`api-token`) live. |
 | `--host <HOST>` | `api.anthropic.com` | A provider host the proxy inspects. |
 | `--timeout <SECONDS>` | `5` | How long each network check may take, from 1 to 300. Raise it on a slow or busy machine: the first inspected handshake makes the proxy create a certificate. |
 | `-f, --format <text\|json>` | `text` | Table or JSON. |

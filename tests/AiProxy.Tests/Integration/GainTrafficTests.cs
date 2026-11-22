@@ -24,7 +24,7 @@ public sealed class GainTrafficTests
         };
         request.Headers.Add("X-Ai-Proxy-Project", "/project/a");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var report = await api.GetFromJsonAsync<GainReport>("/gain?project=%2Fproject%2Fa", TestContext.Current.CancellationToken);
         Assert.Equal(1, report!.Summary.Requests);
         Assert.Equal(0, report.Summary.EstimatedSavedTokens);
@@ -45,7 +45,7 @@ public sealed class GainTrafficTests
             new StringContent(telemetry, Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
         using var messages = await client.PostAsync(new Uri(upstream.BaseAddress, "/v1/messages"),
             new StringContent("{\"messages\":[]}", Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
 
         var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
 
@@ -76,7 +76,7 @@ public sealed class GainTrafficTests
         using var response = await client.PostAsync(new Uri(upstream.BaseAddress, "/v1/messages"),
             new StringContent(CcrRelayTests.StatelessRequest(), Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
         await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
 
         Assert.Equal(2, upstream.Requests.Count);

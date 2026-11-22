@@ -12,6 +12,19 @@ to move it; both commands then need `--endpoint` with the same URL. By default t
 and it answers only requests addressed to `localhost`, `127.0.0.1` or `[::1]`, so a web page cannot reach it
 by rebinding a domain name. Set `AllowedHosts` if you move it to another address on purpose.
 
+Every route except `/health` also needs a bearer token. At each start the proxy writes a new token
+to `api-token` in its data directory (mode 0600 on POSIX), and the old one stops working. `gain`
+and `mcp` read that file for each call. They find the directory in this order: the
+`--data-directory` option, then `Proxy__DataDirectory`, then `~/.ai-proxy`. A proxy on another
+data directory therefore needs `--data-directory` on both commands, for example
+`claude mcp add ai-proxy -- ai-proxy mcp --data-directory /path/to/data`. Without the right token
+the API answers 401. `gain`, the MCP tool and `doctor` then name the token file they read, or say
+that they found none. An unreadable token file is reported with its path and never sent.
+`ai-proxy status`, `stop` and `replay` need no token.
+
+Upgrading: after you upgrade ai-proxy, restart every MCP server (restart the Claude Code
+sessions). An `ai-proxy mcp` from an earlier version sends no token, so each retrieval gets 401.
+
 ## See what the proxy saved
 
 `ai-proxy gain` prints one table with a row for each harness that has data, and a `total` row when

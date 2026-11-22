@@ -29,7 +29,7 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
         const string text = "first\nneedle\nthird";
         var id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
         await proxy.Services.GetRequiredService<IOriginalStore>().KeepAsync(new KeptOriginal(id, text, 3), TestContext.Current.CancellationToken);
-        using var http = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var http = proxy.CreateApiClient();
         http.DefaultRequestHeaders.Add("X-Ai-Proxy-Project", "/caller");
         foreach (var (selection, expected, error) in new[]
                  {
@@ -71,7 +71,7 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
         const string text = "only line";
         var id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
         await proxy.Services.GetRequiredService<IOriginalStore>().KeepAsync(new KeptOriginal(id, text, 1), TestContext.Current.CancellationToken);
-        using var http = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var http = proxy.CreateApiClient();
 
         using var response = await http.PostAsJsonAsync("/retrieval", new RetrievalRequest(id, "whole"), TestContext.Current.CancellationToken);
 

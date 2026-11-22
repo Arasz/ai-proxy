@@ -14,7 +14,7 @@ public sealed class GainEndpointTests
     public async Task Gain_is_available_without_raw_capture_or_compression()
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         using var response = await client.GetAsync("/gain", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var report = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -34,7 +34,7 @@ public sealed class GainEndpointTests
     public async Task Invalid_filters_return_problem_details(string filter)
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         using var response = await client.GetAsync($"/gain?{filter}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -46,7 +46,7 @@ public sealed class GainEndpointTests
     public async Task A_request_named_for_another_host_is_refused_so_a_rebound_page_cannot_read_gain_or_originals(string host)
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/gain");
         request.Headers.Host = host;
 
@@ -61,7 +61,7 @@ public sealed class GainEndpointTests
     public async Task A_request_named_for_the_loopback_host_is_served(string host)
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/gain");
         request.Headers.Host = $"{host}:{proxy.BaseAddress.Port}";
 
@@ -82,7 +82,7 @@ public sealed class GainEndpointTests
             await seed.RecordAsync(new GainHistoryEntry(id, at, project, "anthropic", "POST", "log", "tool_result", "content", new GainTotals(1)), [], TestContext.Current.CancellationToken);
         }
 
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/gain/reset") { Content = JsonContent.Create(new GainQuery("/a")) };
         request.Headers.Add(GainApi.CallerHeader, "cli gain --reset pid 1234");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -100,7 +100,7 @@ public sealed class GainEndpointTests
     public async Task A_reset_without_a_caller_is_recorded_with_the_caller_empty()
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
 
         using var response = await client.PostAsJsonAsync("/gain/reset", new GainQuery(), TestContext.Current.CancellationToken);
 

@@ -24,6 +24,10 @@ public sealed class GainSettings : OptionValueSettings
     [Description("Base URL of the running proxy.")]
     public string Endpoint { get; init; } = GainApi.DefaultEndpoint;
 
+    [CommandOption("--data-directory <PATH>")]
+    [Description("The proxy's data directory, where the API token is (defaults to Proxy__DataDirectory, then ~/.ai-proxy).")]
+    public string? DataDirectory { get; init; }
+
     [CommandOption("-g|--graph")]
     [Description("Show an ASCII graph of daily estimated savings.")]
     public bool Graph { get; init; }

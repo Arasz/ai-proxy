@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using AiProxy.Client;
+using AiProxy.Hosting.Api;
 using AiProxy.Mcp;
 using ModelContextProtocol.Protocol;
 
@@ -42,9 +43,47 @@ public sealed class RetrievalToolsTests
         Assert.Contains("timed out", Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
     }
 
-    private static RetrievalTools NewTools(HttpClient http)
+    [Fact]
+    public async Task A_401_names_the_token_file_the_directory_rule_and_a_restart()
     {
-        return new RetrievalTools(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/"));
+        using var directory = new Integration.TemporaryDirectory();
+        using var http = new HttpClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized))));
+
+        var result = await NewTools(http, directory.Path).RetrieveOriginal("0123456789abcdef", "whole", cancellationToken: TestContext.Current.CancellationToken);
+
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        Assert.True(result.IsError);
+        Assert.Contains("HTTP 401", text, StringComparison.Ordinal);
+        Assert.Contains($"no API token at {Path.Combine(directory.Path, ApiToken.FileName)}", text, StringComparison.Ordinal);
+        Assert.Contains("Proxy__DataDirectory", text, StringComparison.Ordinal);
+        Assert.Contains("restart", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("--endpoint points", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task An_unreadable_token_file_is_a_tool_error_not_a_crash()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "File modes are POSIX only.");
+        using var directory = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, ApiToken.FileName);
+        await File.WriteAllTextAsync(path, "secret-token-value", TestContext.Current.CancellationToken);
+        File.SetUnixFileMode(path, UnixFileMode.None);
+        using var http = new HttpClient(new StubHandler((_, _) => throw new InvalidOperationException("no request expected")));
+
+        var result = await NewTools(http, directory.Path).RetrieveOriginal("0123456789abcdef", "whole", cancellationToken: TestContext.Current.CancellationToken);
+
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        Assert.True(result.IsError);
+        Assert.Contains($"Cannot read the API token file {path}", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-token-value", text, StringComparison.Ordinal);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
+    private static RetrievalTools NewTools(HttpClient http, string? dataDirectory = null)
+    {
+        return new RetrievalTools(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/", dataDirectory ?? Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))));
     }
 
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

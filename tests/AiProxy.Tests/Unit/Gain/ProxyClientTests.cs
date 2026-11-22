@@ -28,7 +28,7 @@ public sealed class ProxyClientTests
             return Json(JsonSerializer.Serialize(GainReportBuilder.Build(new GainQuery(), DateTimeOffset.UnixEpoch, [], [], []), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         })) { BaseAddress = new Uri("http://127.0.0.1:1") };
         var client = new ProxyClient(http);
-        const string endpoint = "http://127.0.0.1:1";
+        var endpoint = new ProxyApi("http://127.0.0.1:1", null, "/none/api-token");
         Assert.Equal("original", (await client.RetrieveAsync(endpoint, new RetrievalRequest("0123456789abcdef", "whole"), TestContext.Current.CancellationToken)).Text);
         Assert.Equal(0, (await client.GetGainAsync(endpoint, new GainQuery("/a&b", HistoryLimit: 7), TestContext.Current.CancellationToken)).Summary.Requests);
     }
@@ -40,8 +40,33 @@ public sealed class ProxyClientTests
         {
             Content = new StringContent("{\"title\":\"invalid_gain_filter\",\"detail\":\"from must be earlier than to.\"}")
         }))) { BaseAddress = new Uri("http://127.0.0.1:1") };
-        var error = await Assert.ThrowsAsync<HttpRequestException>(() => new ProxyClient(http).GetGainAsync("http://127.0.0.1:1", new GainQuery(), TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => new ProxyClient(http).GetGainAsync(new ProxyApi("http://127.0.0.1:1", null, "/none/api-token"), new GainQuery(), TestContext.Current.CancellationToken));
         Assert.Contains("from must be earlier than to", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Every_call_sends_the_token_as_a_bearer_header_and_none_without_one()
+    {
+        var seen = new List<string?>();
+        using var http = new HttpClient(new Handler((request, _) =>
+        {
+            seen.Add(request.Headers.Authorization?.ToString());
+            return Task.FromResult(request.RequestUri!.AbsolutePath switch
+            {
+                "/retrieval" => Json("{\"text\":\"original\",\"error\":null}"),
+                "/gain/reset" => Json("{\"removed\":0,\"cutoff\":\"2026-11-01T00:00:00Z\"}"),
+                _ => Json(JsonSerializer.Serialize(GainReportBuilder.Build(new GainQuery(), DateTimeOffset.UnixEpoch, [], [], []), new JsonSerializerOptions(JsonSerializerDefaults.Web)))
+            });
+        }));
+        var client = new ProxyClient(http);
+        var api = new ProxyApi("http://127.0.0.1:1", "abc", "/none/api-token");
+
+        await client.RetrieveAsync(api, new RetrievalRequest("0123456789abcdef", "whole"), TestContext.Current.CancellationToken);
+        await client.GetGainAsync(api, new GainQuery(), TestContext.Current.CancellationToken);
+        await client.ResetGainAsync(api, new GainQuery(), "test", TestContext.Current.CancellationToken);
+        await client.GetGainAsync(api with { Token = null }, new GainQuery(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Bearer abc", "Bearer abc", "Bearer abc", null], seen);
     }
 
     private static HttpResponseMessage Json(string json)

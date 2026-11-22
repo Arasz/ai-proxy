@@ -24,7 +24,7 @@ local process: a `curl -X POST .../gain/reset` against a probe instance returned
 holds for `POST /retrieval` (`GainEndpoints.cs:27`), which returns originals the user's agents
 sent.
 
-`/health` is mapped next to the other routes (`src/AiProxy/ProxyServiceExtensions.cs:194`).
+`/health` is mapped next to the other routes (`src/AiProxy/ProxyServiceExtensions.cs:148`).
 `ApiCheck` probes it (`src/AiProxy/Doctor/ApiCheck.cs:20`), and the MCP server probes it before
 it starts (`src/AiProxy/Mcp/McpServerProcess.cs:17`, called at `:42`). The data directory is
 created 0700 on POSIX (`src/AiProxy/Hosting/Integration/TitaniumProxyService.cs:373-384`).

@@ -170,7 +170,7 @@ launch directory and attributes the agent's provider traffic in `gain`; see
 <!-- trust:trustchecked evidence=src/AiProxy/ProxyServiceExtensions.cs:33#runtimeOptions -->
 | Variable | What it is |
 |---|---|
-| `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. |
+| `PROXY__DATADIRECTORY` | Directory for the root certificate, gain ledger, capture database, API token (`api-token`, rewritten at each start), and instance ownership files. Defaults to `~/.ai-proxy`. The compression database has its own setting. `gain` and `mcp` also read it to find the API token when `--data-directory` is not given. |
 | `PROXY__CONFIGURESYSTEMPROXY` | `false` leaves the operating system proxy settings alone. Defaults to `true`. |
 | `PROXY__ROOTCERTIFICATEPASSWORD` | The password that protects the root certificate `.pfx` file. Unset or empty keeps the built-in option. |
 | `PROXY__TRUSTROOTCERTIFICATE` | `false` creates the inspection certificate without adding it to operating system trust. Defaults to `true`. |
@@ -188,7 +188,7 @@ PROXY__PORT=0 ASPNETCORE_URLS=http://127.0.0.1:0 ai-proxy
 ```
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:41#RestartFlag -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:42#RestartFlag -->
 `ai-proxy --restart` selects the same data directory as normal startup. It requests a graceful
 stop through a same-user control pipe, waits for that exact process to exit, acquires ownership,
 and starts the replacement. The replacement remains in the foreground. It inherits the actual
@@ -210,7 +210,7 @@ different UTC timestamps. macOS and Windows use the native process start time. T
 PID remain part of the identity check.
 <!-- /trust:trustchecked -->
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:41#RestartFlag -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:42#RestartFlag -->
 The command validates proxy settings and API URLs before requesting shutdown. An explicitly
 requested port held by an unrelated listener produces an error before the owner is stopped.
 Port availability cannot prove ownership, and another process can still take a port between

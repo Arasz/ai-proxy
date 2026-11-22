@@ -1,13 +1,16 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using AiProxy.Core.Doctor;
+using AiProxy.Hosting.Api;
 
 namespace AiProxy.Doctor;
 
 /// <summary>The api check's result and whether anything answered at the endpoint.</summary>
 internal sealed record ApiProbe(CheckResult Result, bool Reachable);
 
-/// <summary>Asks the endpoint's <c>/health</c> who answers and which version it is.</summary>
-internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version)
+/// <summary>Asks the endpoint's <c>/health</c> who answers and which version it is, then whether the API accepts the token from the data directory.</summary>
+internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, string dataDirectory)
 {
     public const string Name = "api";
 
@@ -27,7 +30,39 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version)
                 false);
         }
 
-        return new ApiProbe(Judge(shown, body), true);
+        var result = Judge(shown, body);
+        return new ApiProbe(result.Status is CheckStatus.Pass or CheckStatus.Warn ? await CheckTokenAsync(shown, result, cancellationToken).ConfigureAwait(false) : result, true);
+    }
+
+    private async Task<CheckResult> CheckTokenAsync(string shown, CheckResult answered, CancellationToken cancellationToken)
+    {
+        string? token;
+        try
+        {
+            token = ApiToken.Read(dataDirectory);
+        }
+        catch (IOException exception)
+        {
+            return new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {exception.Message}", "Fix the token file's owner or mode, or restart ai-proxy so it writes a new one.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, "/gain?historyLimit=1"));
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        try
+        {
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.StatusCode == HttpStatusCode.Unauthorized
+                ? new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {ApiToken.Refused(Path.Combine(dataDirectory, ApiToken.FileName), token is not null)}", "Pass --data-directory with the directory the running proxy uses.")
+                : answered;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException && !cancellationToken.IsCancellationRequested)
+        {
+            return answered;
+        }
     }
 
     private CheckResult Judge(string shown, string body)

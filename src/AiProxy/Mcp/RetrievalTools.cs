@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Net;
 using System.Text.Json;
 using AiProxy.Ccr;
 using AiProxy.Client;
@@ -25,8 +26,16 @@ public sealed class RetrievalTools(IProxyClient client, McpServerOptions options
     {
         try
         {
-            var response = await client.RetrieveAsync(options.Endpoint, new RetrievalRequest(id, mode, start, end, pattern, context), cancellationToken).ConfigureAwait(false);
+            var response = await client.RetrieveAsync(ProxyApi.For(options.Endpoint, options.DataDirectory), new RetrievalRequest(id, mode, start, end, pattern, context), cancellationToken).ConfigureAwait(false);
             return new CallToolResult { IsError = response.Error is not null, Content = [new TextContentBlock { Text = response.Text }] };
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return Failed($"{exception.Message} An `ai-proxy mcp` server started before ai-proxy was upgraded sends no token: restart it (restart the Claude Code session).");
+        }
+        catch (IOException exception)
+        {
+            return Failed(exception.Message);
         }
         catch (HttpRequestException exception)
         {

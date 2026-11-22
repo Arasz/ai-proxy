@@ -60,6 +60,7 @@ public static partial class ProxyServiceExtensions
             services.AddSingleton(options);
             services.AddSingleton(TimeProvider.System);
             services.AddProblemDetails();
+            services.AddSingleton(ApiToken.Create());
             services.AddSingleton(new GainStoreOptions(Path.Combine(options.DataDirectory, "gain.db")));
             services.AddSingleton<IGainStore, SqliteGainStore>();
 
@@ -130,7 +131,7 @@ public static partial class ProxyServiceExtensions
 
     extension(WebApplication app)
     {
-        /// <summary>Adds request logging, the health endpoint, and the content endpoints when compression is on.</summary>
+        /// <summary>Adds request logging, the API token check, the health endpoint, and the content endpoints when compression is on.</summary>
         public WebApplication UseProxy()
         {
             var settings = app.Services.GetRequiredService<ProxySettings>();
@@ -143,6 +144,7 @@ public static partial class ProxyServiceExtensions
             app.UseExceptionHandler();
             app.UseStatusCodePages();
             app.UseMiddleware<RequestLoggingMiddleware>();
+            app.Use(app.Services.GetRequiredService<ApiToken>().CheckAsync);
             app.MapGet(HealthApi.Path, () => Results.Json(new { status = "ok", product = HealthApi.Product, version = EntryPoint.ProductVersion }));
             app.MapGainEndpoints();
 

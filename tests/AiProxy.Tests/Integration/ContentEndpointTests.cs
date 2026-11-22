@@ -34,7 +34,7 @@ public sealed class ContentEndpointTests : IAsyncDisposable
             ["Proxy:Compression:Enabled"] = "true",
             ["Proxy:Compression:Database"] = _databasePath
         });
-        using var client = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var client = proxy.CreateApiClient();
         var store = proxy.Services.GetRequiredService<IContentStore>();
         const string requestId = "request-1";
         await store.StoreAsync(

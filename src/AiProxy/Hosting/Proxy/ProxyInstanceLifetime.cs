@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using AiProxy.Configuration;
+using AiProxy.Hosting.Api;
 using AiProxy.Hosting.Integration;
 using AiProxy.Hosting.Marker;
 using AiProxy.Storage;
@@ -72,6 +73,7 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
     private async Task<int> StartProxyApplication(StartupLease startupLease)
     {
         await using var app = ProxyApplication.Create(Builder);
+        app.Services.GetRequiredService<ApiToken>().Write(DataDirectory);
         await app.StartAsync();
         using var process = Process.GetCurrentProcess();
         var proxyInfo = new ProxyControl.ProxyInfo(ProxyName,

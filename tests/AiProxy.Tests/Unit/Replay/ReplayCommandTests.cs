@@ -197,6 +197,19 @@ public sealed class ReplayCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Replay_needs_no_api_token_calls_no_api_and_creates_no_gain_database()
+    {
+        WriteCapture(ToolBody(Output));
+
+        var result = await ReplayAsync("--minimum", "300");
+
+        Assert.Equal(1, result.GetProperty("rowsWithPreview").GetInt32());
+        Assert.False(File.Exists(Db(Hosting.Api.ApiToken.FileName)));
+        Assert.False(File.Exists(Db(SqliteGainStore.FileName)));
+        Assert.Empty(_fixture.Handler.Uris);
+    }
+
+    [Fact]
     public async Task Replay_leaves_both_databases_byte_identical_and_a_write_through_its_connection_throws()
     {
         WriteContent(ToolBody(Output));
