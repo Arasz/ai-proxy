@@ -19,6 +19,7 @@ public sealed class SelfRequestTests
         using var response = await client.GetAsync(new Uri($"http://{host}:{proxy.ProxyAddress.Port}/v1/messages"), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("forward proxy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.DoesNotContain(logs.Entries, entry => entry.Level >= LogLevel.Error);
         Assert.Single(logs.Entries, entry => entry.EventId == 1309 && entry.Level == LogLevel.Warning);

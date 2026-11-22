@@ -391,6 +391,7 @@ public sealed class CcrRelayTests : IDisposable
         using var response = await sending.WaitAsync(SafetyBound, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]

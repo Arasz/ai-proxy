@@ -33,6 +33,8 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
     private const string SelfRequestMessage = "This port is the ai-proxy forward proxy, not an origin server. Set it as HTTP_PROXY/HTTPS_PROXY, not as a base URL.\n";
 
+    private static readonly HttpHeader[] PlainTextHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Text.Plain)];
+
     private readonly ISystemProxyGuardLauncher _guardLauncher;
     private readonly ProviderRequestInspector _inspector;
     private readonly ILogger<TitaniumProxyService> _logger;
@@ -401,7 +403,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
 
         var request = e.HttpClient.Request;
         Log.AddressedToSelf(_logger, request.Method, request.RequestUri.AbsolutePath, request.Headers.GetFirstHeader(HeaderNames.UserAgent)?.Value);
-        e.GenericResponse(SelfRequestMessage, HttpStatusCode.BadRequest, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+        e.GenericResponse(SelfRequestMessage, HttpStatusCode.BadRequest, PlainTextHeaders, true);
         return Task.CompletedTask;
     }
 

@@ -39,6 +39,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private const string EventStream = "text/event-stream";
     private const string Chunked = "chunked";
 
+    private static readonly HttpHeader[] JsonHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
+
     private static readonly HashSet<string> HopByHop =
     [
         with(StringComparer.OrdinalIgnoreCase),
@@ -95,14 +97,14 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         {
             Log.UpstreamSilent(logger, request.RequestUri.Host);
             var error = Encoding.UTF8.GetBytes(firstRound.Error(Messages.UpstreamSilent).Data);
-            e.GenericResponse(error, HttpStatusCode.GatewayTimeout, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
+            e.GenericResponse(error, HttpStatusCode.GatewayTimeout, JsonHeaders, true);
             return;
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException)
         {
             Log.UpstreamUnreachable(logger, request.RequestUri.Host, exception);
             var error = Encoding.UTF8.GetBytes(firstRound.Error(Messages.UpstreamUnreachable).Data);
-            e.GenericResponse(error, HttpStatusCode.BadGateway, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)], true);
+            e.GenericResponse(error, HttpStatusCode.BadGateway, JsonHeaders, true);
             return;
         }
 
