@@ -22,7 +22,7 @@ public sealed class ToolOutputRegionFinder
             return [];
         }
 
-        var found = FindToolOutputIndexes(body.Span);
+        var found = FindToolOutputIndexes(body);
         if (found.Indexes.Count == 0)
         {
             return [];
@@ -37,11 +37,11 @@ public sealed class ToolOutputRegionFinder
         return scan.Count > found.Count ? [] : scan.Regions;
     }
 
-    private static ToolOutputIndexes FindToolOutputIndexes(ReadOnlySpan<byte> body)
+    private static ToolOutputIndexes FindToolOutputIndexes(ReadOnlyMemory<byte> body)
     {
         var indexes = new Dictionary<int, FileRead?>();
 
-        using var document = JsonDocument.TryParse(body.ToArray());
+        using var document = JsonDocument.TryParse(body);
         if (document is null)
         {
             return new ToolOutputIndexes(indexes, 0);
