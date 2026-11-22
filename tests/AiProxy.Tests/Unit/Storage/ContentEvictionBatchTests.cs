@@ -103,6 +103,37 @@ public sealed class ContentEvictionBatchTests : IDisposable
     }
 
     [Theory]
+    [InlineData("ccr_original")]
+    [InlineData("ccr_thread")]
+    [InlineData("content_request")]
+    public async Task A_row_refreshed_between_the_pick_and_the_delete_survives_with_its_chunks(string table)
+    {
+        using (var setup = OpenReady())
+        {
+            setup.Execute(
+                "INSERT INTO ccr_original VALUES ('o', 't', 1, @old); INSERT INTO ccr_thread VALUES ('o', 'c', @old);" +
+                "INSERT INTO content_request VALUES ('o', @old, 'o', 'c', 1, 'p', 1); INSERT INTO content_chunk VALUES ('o', 1, 'Log', 'o', 'c', 'p', 1);",
+                new { old = DaysAgo(20) });
+        }
+
+        using var refresher = ContentSchema.Open(_path);
+        await using var connection = ContentSchema.Open(_path);
+        var rule = RetentionRules.Content.Single(candidate => candidate.Table == table);
+        await connection.EvictOlderThanAsync(
+            [rule],
+            _now - TimeSpan.FromDays(14),
+            TestContext.Current.CancellationToken,
+            afterPick: () => refresher.Execute($"UPDATE {table} SET {rule.Column} = '{DaysAgo(1)}';"));
+
+        using var check = OpenReady();
+        Assert.Equal(1, check.ExecuteScalar<int>($"SELECT count(*) FROM {table};"));
+        if (table == "content_request")
+        {
+            Assert.Equal(1, check.ExecuteScalar<int>("SELECT count(*) FROM content_chunk;"));
+        }
+    }
+
+    [Theory]
     [InlineData("content_request", "content_request_created")]
     [InlineData("ccr_original", "ccr_original_created")]
     [InlineData("ccr_thread", "ccr_thread_created")]

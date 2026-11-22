@@ -17,12 +17,15 @@ public static class ContentSchema
     public const int RequestCommandTimeoutSeconds = 1;
 
     /// <summary>Step N brings a file from version N-1 to N; every statement is idempotent, so a file that was stamped late is safe to run through.</summary>
-    private static readonly SchemaLadder Ladder = new(
-    [
-        connection => connection.Execute(Sql.Requests, RequestCommandTimeoutSeconds),
-        connection => connection.Execute(Sql.Ccr, RequestCommandTimeoutSeconds),
-        connection => connection.Execute(Sql.Retention, RequestCommandTimeoutSeconds)
-    ]);
+    private static SchemaLadder LadderFor(int commandTimeoutSeconds)
+    {
+        return new SchemaLadder(
+        [
+            connection => connection.Execute(Sql.Requests, commandTimeoutSeconds),
+            connection => connection.Execute(Sql.Ccr, commandTimeoutSeconds),
+            connection => connection.Execute(Sql.Retention, commandTimeoutSeconds)
+        ]);
+    }
 
     /// <summary>Opens a connection with the settings the store needs.</summary>
     /// <param name="path">The path of the database file.</param>
@@ -104,7 +107,7 @@ public static class ContentSchema
         /// <exception cref="InvalidOperationException">The file was written by a newer build.</exception>
         public void Ensure(int commandTimeoutSeconds = DefaultCommandTimeoutSeconds)
         {
-            Ladder.Apply(connection, Path.GetFileName(connection.DataSource), commandTimeoutSeconds);
+            LadderFor(commandTimeoutSeconds).Apply(connection, Path.GetFileName(connection.DataSource), commandTimeoutSeconds);
         }
 
         /// <summary>Runs a statement that returns nothing.</summary>

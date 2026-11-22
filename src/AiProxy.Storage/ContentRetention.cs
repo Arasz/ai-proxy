@@ -35,7 +35,8 @@ public static class ContentRetention
         /// <param name="cutoff">Rows dated before this are deleted.</param>
         /// <param name="cancellationToken">The token that stops the pass between batches.</param>
         /// <param name="afterBatch">Called after each batch is committed.</param>
-        public async Task<int> EvictOlderThanAsync(IReadOnlyList<RetentionRule> rules, DateTimeOffset cutoff, CancellationToken cancellationToken, Action? afterBatch = null)
+        /// <param name="afterPick">Called after a batch's rows are picked and before they are deleted.</param>
+        public async Task<int> EvictOlderThanAsync(IReadOnlyList<RetentionRule> rules, DateTimeOffset cutoff, CancellationToken cancellationToken, Action? afterBatch = null, Action? afterPick = null)
         {
             var cutoffText = cutoff.ToString("O", CultureInfo.InvariantCulture);
             var total = 0;
@@ -44,7 +45,7 @@ public static class ContentRetention
                 Batch batch;
                 do
                 {
-                    batch = await EvictBatchAsync(connection, rule, cutoffText, cancellationToken).ConfigureAwait(false);
+                    batch = await EvictBatchAsync(connection, rule, cutoffText, afterPick, cancellationToken).ConfigureAwait(false);
                     total += batch.Removed;
                     afterBatch?.Invoke();
                 }
@@ -55,7 +56,7 @@ public static class ContentRetention
         }
     }
 
-    private static async Task<Batch> EvictBatchAsync(SqliteConnection connection, RetentionRule rule, string cutoff, CancellationToken cancellationToken)
+    private static async Task<Batch> EvictBatchAsync(SqliteConnection connection, RetentionRule rule, string cutoff, Action? afterPick, CancellationToken cancellationToken)
     {
         var keys = await PickWithinBudgetAsync(connection, rule, cutoff, cancellationToken).ConfigureAwait(false);
         if (keys.Count == 0)
@@ -63,11 +64,12 @@ public static class ContentRetention
             return new Batch(0, 0);
         }
 
-        var parameters = new { Keys = keys };
+        afterPick?.Invoke();
+        var parameters = new { Keys = keys, Cutoff = cutoff };
         if (rule.ChildTable is null)
         {
             var rows = await connection.ExecuteAsync(new CommandDefinition(
-                $"DELETE FROM {rule.Table} WHERE rowid IN @Keys;",
+                $"DELETE FROM {rule.Table} WHERE rowid IN @Keys AND {rule.Column} < @Cutoff;",
                 parameters,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
             return new Batch(rows, rows);
@@ -77,12 +79,12 @@ public static class ContentRetention
         // request whose chunks are gone.
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var children = await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {rule.ChildTable} WHERE {rule.ChildKey} IN @Keys;",
+            $"DELETE FROM {rule.ChildTable} WHERE {rule.ChildKey} IN @Keys AND {rule.ChildKey} IN (SELECT {rule.ChildKey} FROM {rule.Table} WHERE {rule.ChildKey} IN @Keys AND {rule.Column} < @Cutoff);",
             parameters,
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         var parents = await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {rule.Table} WHERE {rule.ChildKey} IN @Keys;",
+            $"DELETE FROM {rule.Table} WHERE {rule.ChildKey} IN @Keys AND {rule.Column} < @Cutoff;",
             parameters,
             transaction,
             cancellationToken: cancellationToken)).ConfigureAwait(false);
