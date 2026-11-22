@@ -18,6 +18,7 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
+| [0.35.2](0.35.2-absent-values-are-union-cases.md) | Internal refactor: missing results are union cases (`CcrParseResult`, `CcrAnswer`, `Validation`), CLI settings checks throw, optional record fields are `init` properties. No behaviour change. | [#170](https://github.com/Arasz/ai-proxy/pull/170), #172 |
 | [0.35.1](0.35.1-request-path-copies.md) | Fewer body copies on the request path: the region finder parses in place, the pipeline copies only a changed body, and the inspector and capture use the body without a copy. | [#171](https://github.com/Arasz/ai-proxy/pull/171) |
 | [0.34.0](0.34.0-chat-completions-recoverable-compression.md) | Streamed Chat Completions requests to OpenRouter models (`anthropic/`, `openai/`, `google/`, `deepseek/`) get recoverable previews and in-request `proxy_retrieve`, as the Anthropic path does. | [#137](https://github.com/Arasz/ai-proxy/pull/137) |
 | [0.35.0](0.35.0-project-review-fixes.md) | Project review fixes: typos no longer start the proxy, capture keeps running at its cap, a rolling `proxy.log`, a loopback API token, a root that names the exact hosts, a gain reset audit row, tables that fit 80 columns, and schema versions for every store. | [#141](https://github.com/Arasz/ai-proxy/pull/141)-[#161](https://github.com/Arasz/ai-proxy/pull/161) |
