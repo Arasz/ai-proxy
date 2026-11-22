@@ -67,6 +67,13 @@ public sealed class DoctorSettings : OptionValueSettings
                 .WithMessage($"The host must be one of the provider hosts the proxy inspects: {string.Join(", ", InspectedHosts)}.");
         }
 
-        public static string? Error(DoctorSettings settings) => new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
+        /// <summary>Throws <see cref="ArgumentException"/> with the first validation message when the settings are invalid.</summary>
+        public static void Check(DoctorSettings settings)
+        {
+            if (new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage is { } message)
+            {
+                throw new ArgumentException(message);
+            }
+        }
     }
 }

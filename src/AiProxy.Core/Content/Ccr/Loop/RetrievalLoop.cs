@@ -121,7 +121,7 @@ public sealed class RetrievalLoop(IRetrievalRound first)
     }
 
     /// <summary>The tool results of the round being answered: retrievals from <paramref name="answers" />, every other call deferred.</summary>
-    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers) =>
+    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrAnswer> answers) =>
         Round.ToolCalls
             .Select(call => call.IsRetrieval ? ToolResult.Of(call.Id, answers[call.Id]) : ToolResult.Deferred(call.Id))
             .ToArray();

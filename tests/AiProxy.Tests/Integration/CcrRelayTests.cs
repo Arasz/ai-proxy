@@ -102,7 +102,9 @@ public sealed class CcrRelayTests : IDisposable
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         Assert.Equal(1, gain!.Summary.Requests);
         Assert.Equal(1, gain.Summary.Recalls);
-        Assert.Equal(Id, Assert.Single(gain.Recalls).PreviewId);
+        var recall = Assert.Single(gain.Recalls);
+        Assert.Equal(Id, recall.PreviewId);
+        Assert.Null(recall.Error);
         Assert.False(gain.Measurement.NetSavingsAvailable);
         Assert.Equal(Encoding.UTF8.GetByteCount(upstream.Requests[0].Body), gain.Summary.ForwardedBytes);
     }

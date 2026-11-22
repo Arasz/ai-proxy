@@ -30,10 +30,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
             throw new ArgumentException("--skip-env is not supported: gain is a statistics UI and launches no child processes.");
         }
 
-        if (GainSettings.Validator.Error(settings, runtime) is { } validationError)
-        {
-            throw new ArgumentException(validationError);
-        }
+        GainSettings.Validator.Check(settings, runtime);
 
         var query = Query(settings, runtime.Directory);
         if (query is { From: { } from, To: { } to } && from >= to)

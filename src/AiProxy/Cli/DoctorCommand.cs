@@ -13,10 +13,7 @@ public sealed class DoctorCommand : AsyncCommand<DoctorSettings>
     public override async Task<int> ExecuteAsync(CommandContext context, DoctorSettings settings, CancellationToken cancellationToken)
     {
         var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The doctor command was registered without its runtime.");
-        if (DoctorSettings.Validator.Error(settings) is { } validationError)
-        {
-            throw new ArgumentException(validationError);
-        }
+        DoctorSettings.Validator.Check(settings);
 
         try
         {

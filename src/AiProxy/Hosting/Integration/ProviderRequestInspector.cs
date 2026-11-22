@@ -298,7 +298,7 @@ public sealed partial class ProviderRequestInspector(
         try
         {
             var compressed = await compression.CompressAsync(new CompressionRequest(body, contentType, dialect) { Ccr = mode }, CancellationToken.None);
-            if (compressed.Failure is not null)
+            if (compressed.StoreFailure is not null)
             {
                 exchange.GainFailures.Add(new GainFailure(time.GetUtcNow(), exchange.GainId, exchange.GainProject, Stages.ContentStore, "content_store_failed"));
             }

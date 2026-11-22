@@ -12,14 +12,14 @@ public sealed record CompressionSummary(string RequestId, string Path, int Chunk
 /// <summary>The body a compression pipeline produced.</summary>
 /// <param name="Body">The body to forward.</param>
 /// <param name="Changed">Whether the pipeline changed the body at all.</param>
-/// <param name="Failure">What went wrong on the way, when something did and the body was still produced.</param>
-/// <param name="Summary">What the pipeline did, when it did something.</param>
-public sealed record CompressionResult(
-    ReadOnlyMemory<byte> Body,
-    bool Changed,
-    string? Failure = null,
-    CompressionSummary? Summary = null)
+public sealed record CompressionResult(ReadOnlyMemory<byte> Body, bool Changed)
 {
+    /// <summary>Why the content store failed, when it did and the body was still produced; null otherwise.</summary>
+    public string? StoreFailure { get; init; }
+
+    /// <summary>What the pipeline did, when it did something; null otherwise.</summary>
+    public CompressionSummary? Summary { get; init; }
+
     /// <summary>The parts whose reducer threw and that kept their original text; empty when every reducer ran.</summary>
     public IReadOnlyList<PartFailure> PartFailures { get; init; } = [];
 

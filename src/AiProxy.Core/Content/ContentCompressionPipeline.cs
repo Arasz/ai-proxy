@@ -124,7 +124,7 @@ public sealed class ContentCompressionPipeline(
 
         var summary = new CompressionSummary(requestId, path, parts.Count, ratio);
 
-        return new CompressionResult(compressed, true, failure, summary) { PartFailures = failures, Stages = stages.ToArray(), Originals = originals };
+        return new CompressionResult(compressed, true) { StoreFailure = failure, Summary = summary, PartFailures = failures, Stages = stages.ToArray(), Originals = originals };
     }
 
     /// <summary>Keeps the regions that do not overlap the one before them.</summary>
