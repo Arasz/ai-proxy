@@ -126,7 +126,7 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         var id = forwarded.Text == reduced.Text
             ? null
             : originals.Where(pair => pair.Value == original.Text).Select(static pair => pair.Key).FirstOrDefault() ?? "unidentified";
-        return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded), id) { Skipped = id is null && WasSkipped(original, Tokens(reduced)) };
+        return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded)) { PreviewId = id, Skipped = id is null && WasSkipped(original, Tokens(reduced)) };
     }
 
     private bool WasSkipped(ContentRegion original, int reducedTokens) => reducedTokens >= options.MinimumTokens && options.SkipsPreview(original.Text, reducedTokens);

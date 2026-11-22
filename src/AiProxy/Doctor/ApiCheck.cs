@@ -26,7 +26,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException && !cancellationToken.IsCancellationRequested)
         {
             return new ApiProbe(
-                new CheckResult(Name, CheckStatus.Fail, $"No answer from {shown}.", "Start ai-proxy, or pass --endpoint with the right address."),
+                new CheckResult(Name, CheckStatus.Fail, $"No answer from {shown}.") { Fix = "Start ai-proxy, or pass --endpoint with the right address." },
                 false);
         }
 
@@ -43,7 +43,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         }
         catch (IOException exception)
         {
-            return new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {exception.Message}", "Fix the token file's owner or mode, or restart ai-proxy so it writes a new one.");
+            return new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {exception.Message}") { Fix = "Fix the token file's owner or mode, or restart ai-proxy so it writes a new one." };
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, "/gain?historyLimit=1"));
@@ -56,7 +56,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         {
             using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response.StatusCode == HttpStatusCode.Unauthorized
-                ? new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {ApiToken.Refused(Path.Combine(dataDirectory, ApiToken.FileName), token is not null)}", "Pass --data-directory with the directory the running proxy uses.")
+                ? new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {ApiToken.Refused(Path.Combine(dataDirectory, ApiToken.FileName), token is not null)}") { Fix = "Pass --data-directory with the directory the running proxy uses." }
                 : answered;
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException && !cancellationToken.IsCancellationRequested)
@@ -79,7 +79,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
             if (!root.TryGetProperty("product", out var product))
             {
                 return root.TryGetProperty("status", out _)
-                    ? new CheckResult(Name, CheckStatus.Unknown, $"{shown} answers but does not say which product or version it is; it is probably an older ai-proxy.", "Restart ai-proxy on the current version.")
+                    ? new CheckResult(Name, CheckStatus.Unknown, $"{shown} answers but does not say which product or version it is; it is probably an older ai-proxy.") { Fix = "Restart ai-proxy on the current version." }
                     : Foreign(shown);
             }
 
@@ -91,7 +91,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
             var running = root.TryGetProperty("version", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             return running == version
                 ? new CheckResult(Name, CheckStatus.Pass, $"ai-proxy {running} answers at {shown}.")
-                : new CheckResult(Name, CheckStatus.Warn, $"ai-proxy {running ?? "(unknown version)"} answers at {shown}, but this command is {version}.", "Restart ai-proxy so the running proxy and the command match.");
+                : new CheckResult(Name, CheckStatus.Warn, $"ai-proxy {running ?? "(unknown version)"} answers at {shown}, but this command is {version}.") { Fix = "Restart ai-proxy so the running proxy and the command match." };
         }
         catch (JsonException)
         {
@@ -99,5 +99,5 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         }
     }
 
-    private static CheckResult Foreign(string shown) => new(Name, CheckStatus.Fail, $"{shown} answers, but not as ai-proxy.", "Pass --endpoint with the address ai-proxy listens on.");
+    private static CheckResult Foreign(string shown) => new(Name, CheckStatus.Fail, $"{shown} answers, but not as ai-proxy.") { Fix = "Pass --endpoint with the address ai-proxy listens on." };
 }

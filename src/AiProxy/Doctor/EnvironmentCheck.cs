@@ -30,7 +30,7 @@ internal sealed class EnvironmentCheck(Uri proxy, Func<string, string?> variable
         }
         else if (set.Find(setting => !Matches(setting.Shown)) is { } other)
         {
-            result = new CheckResult(Name, CheckStatus.Fail, $"{other.Name} points at {other.Shown}, not at the proxy {expected}.", $"Unset {other.Name}, or point it at {expected}.");
+            result = new CheckResult(Name, CheckStatus.Fail, $"{other.Name} points at {other.Shown}, not at the proxy {expected}.") { Fix = $"Unset {other.Name}, or point it at {expected}." };
         }
         else
         {
