@@ -34,6 +34,9 @@ public sealed partial class ProviderRequestInspector(
     TimeProvider time,
     IGainStore gain)
 {
+    private readonly List<HttpHeader> _plainTextResponseHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Text.Plain)];
+    private readonly IEnumerable<HttpHeader>? _jsonResponseHeaders = [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
+
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
     /// <summary>The Codex Responses path; a WebSocket upgrade to it on a harness-only host gets 426, so Codex falls back to HTTPS.</summary>
@@ -66,7 +69,7 @@ public sealed partial class ProviderRequestInspector(
                 return;
             case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
                 Log.WebSocketRefused(logger, host);
-                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
+                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, _plainTextResponseHeaders, true);
                 return;
         }
 
@@ -130,7 +133,7 @@ public sealed partial class ProviderRequestInspector(
                 e.GenericResponse(
                     CcrPlan.LedgerUnavailable,
                     (HttpStatusCode)529,
-                    [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)],
+                    _jsonResponseHeaders,
                     true);
                 return;
             }
