@@ -21,7 +21,7 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         return check switch
         {
             Invalid invalid => new CcrRefusal(invalid.Reason),
-            _ => Validate(root, options),
+            Valid => Validate(root, options),
         };
     }
 

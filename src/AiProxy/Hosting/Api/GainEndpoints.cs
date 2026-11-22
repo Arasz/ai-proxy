@@ -25,7 +25,7 @@ public static partial class GainEndpoints
             return Validate(query) switch
             {
                 Invalid invalid => Results.Problem(title: "invalid_gain_filter", detail: invalid.Reason, statusCode: 400),
-                _ => Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken)),
+                Valid => Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken)),
             };
         });
         app.MapPost("/retrieval", static async (RetrievalRequest request, HttpContext context, IGainStore gain, TimeProvider time, CancellationToken cancellationToken) =>
