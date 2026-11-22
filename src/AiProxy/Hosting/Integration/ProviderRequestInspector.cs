@@ -50,7 +50,7 @@ public sealed partial class ProviderRequestInspector(
     public async Task BeforeRequestAsync(SessionEventArgs e)
     {
         var request = e.HttpClient.Request;
-        var caller = TakeCaller(e.HttpClient);
+        var caller = ExtractCaller(e.HttpClient);
         if (providerHosts.Find(request.RequestUri.Host) is not ProviderHost provider || !Admits(e, provider, caller) || !Inspects(request, provider))
         {
             return;
@@ -75,7 +75,7 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>Reads the caller's project and credentials, then strips those headers so they never reach any upstream.</summary>
-    private static Caller TakeCaller(HttpWebClient client)
+    private static Caller ExtractCaller(HttpWebClient client)
     {
         var headers = client.Request.Headers;
         var requestCredential = ProjectCredential.Read(headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value);
