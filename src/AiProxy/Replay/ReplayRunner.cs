@@ -15,7 +15,7 @@ public sealed record ReplayRun(ReplayReport Report, int CaptureRows, long? GainR
     public const string ContentOnly = "content-only";
 
     /// <summary>The coverage label of samples that include captured requests.</summary>
-    public const string Captured = "capture";
+    private const string Captured = "capture";
 
     /// <summary>
     /// Whether the sample holds captured requests. <c>content.db</c> keeps only the bodies the pipeline changed, so a content-only
