@@ -10,8 +10,8 @@ cats={
 }
 rows=collections.defaultdict(list)
 for p in sorted(pathlib.Path('src').rglob('*.cs')):
-  if '/obj/' in str(p) or '/bin/' in str(p): continue
-  for i,l in enumerate(p.read_text().splitlines(),1):
+  if 'obj' in p.parts or 'bin' in p.parts: continue
+  for i,l in enumerate(p.read_text(encoding='utf-8').splitlines(),1):
     if l.strip().startswith('//'): continue
     for c,r in cats.items():
       if c=='record-param':
@@ -23,7 +23,7 @@ ps=sorted({proj(p) for v in rows.values() for p,_,_ in v})
 for c,v in rows.items():
   cnt=collections.Counter(proj(p) for p,_,_ in v)
   print(f'| {c} | '+' | '.join(str(cnt[x]) for x in ps)+f' | {len(v)} |')
-with open(sys.argv[1],'w') as f:
+with open(sys.argv[1],'w',encoding='utf-8') as f:
   for c,v in rows.items():
     f.write(f'\n## {c} ({len(v)})\n\n')
     for p,i,l in v: f.write(f'- `{p}:{i}` `{l[:140]}`\n')
