@@ -168,7 +168,7 @@ public sealed class GainLedgerTests
             var original = 1_000 + index * 137;
             var entry = new GainHistoryEntry($"req-{index:D2}", at, index % 2 == 0 ? "/a" : "/b", provider, "POST", rules[index % 2], "tool_result", "content",
                 GainReportBuilder.RequestTotals(original, original / 3, original * 2, original / 2), host);
-            var failures = index % 5 == 0 ? new[] { new GainFailure(at, entry.Id, entry.Project, "compression", "Failure " + index) } : [];
+            var failures = index % 5 == 0 ? new[] { new GainFailure(at, entry.Id, entry.Project, "compression", $"Failure {index}") } : [];
             await store.RecordAsync(entry, failures, cancellation);
         }
 

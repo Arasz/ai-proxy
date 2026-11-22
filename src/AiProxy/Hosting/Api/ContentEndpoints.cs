@@ -6,7 +6,7 @@ namespace AiProxy.Hosting.Api;
 public static class ContentEndpoints
 {
     /// <summary>The path the original of a compressed request is served from.</summary>
-    public const string Route = "/content/{requestId}";
+    private const string Route = "/content/{requestId}";
 
     /// <summary>Maps the endpoint that serves the original of a compressed request.</summary>
     /// <param name="app">The host to map it on.</param>

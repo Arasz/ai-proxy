@@ -65,8 +65,7 @@ public sealed class ContentEvictionBatchTests : IDisposable
         {
             LogDeletedBytes(setup, "ccr_original", "text");
             setup.Execute(
-                Series + "INSERT INTO ccr_original SELECT 'old' || value, replace(hex(zeroblob(@half)), '0', 'a'), 1, @old FROM s;" +
-                "INSERT INTO ccr_original VALUES ('young', 'keep', 1, @young);",
+                $"{Series}INSERT INTO ccr_original SELECT 'old' || value, replace(hex(zeroblob(@half)), '0', 'a'), 1, @old FROM s;INSERT INTO ccr_original VALUES ('young', 'keep', 1, @young);",
                 new { half = RowBytes / 2, count = RowCount, old = DaysAgo(20), young = DaysAgo(1) });
         }
 
@@ -85,8 +84,7 @@ public sealed class ContentEvictionBatchTests : IDisposable
         {
             LogDeletedBytes(setup, "content_chunk", "original_text");
             setup.Execute(
-                Series + "INSERT INTO content_request SELECT 'r' || value, @old, 'o', 'c', 1, 'p', 1 FROM s;" +
-                Series + "INSERT INTO content_chunk SELECT 'r' || value, 1, 'Log', replace(hex(zeroblob(@half)), '0', 'a'), 'c', 'p', 1 FROM s;",
+                $"{Series}INSERT INTO content_request SELECT 'r' || value, @old, 'o', 'c', 1, 'p', 1 FROM s;{Series}INSERT INTO content_chunk SELECT 'r' || value, 1, 'Log', replace(hex(zeroblob(@half)), '0', 'a'), 'c', 'p', 1 FROM s;",
                 new { half = RowBytes / 2, count = RowCount, old = DaysAgo(20) });
         }
 

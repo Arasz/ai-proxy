@@ -287,12 +287,7 @@ public sealed class RetrievalLoopTests
         public static JsonObject Usage(int completionTokens) => new() { ["completion_tokens"] = completionTokens, ["prompt_tokens"] = 3, ["total_tokens"] = 3 + completionTokens };
 
         public static string Message(string id, string finishReason, JsonObject delta, JsonObject usage) =>
-            string.Concat(
-                Chunk(id, new JsonObject { ["role"] = "assistant" }, null, null),
-                Chunk(id, delta, null, null),
-                Chunk(id, new JsonObject(), finishReason, null),
-                Chunk(id, null, null, usage),
-                "data: [DONE]\n\n");
+            $"{Chunk(id, new JsonObject { ["role"] = "assistant" }, null, null)}{Chunk(id, delta, null, null)}{Chunk(id, new JsonObject(), finishReason, null)}{Chunk(id, null, null, usage)}data: [DONE]\n\n";
 
         public static string Chunk(string id, JsonObject? delta, string? finishReason, JsonObject? usage)
         {

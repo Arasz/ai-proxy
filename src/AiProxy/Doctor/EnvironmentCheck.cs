@@ -34,7 +34,7 @@ internal sealed class EnvironmentCheck(Uri proxy, Func<string, string?> variable
         }
         else
         {
-            result = new CheckResult(Name, CheckStatus.Pass, string.Join(", ", set.Select(static setting => $"{setting.Name}={setting.Shown}")) + " matches the proxy.");
+            result = new CheckResult(Name, CheckStatus.Pass, $"{string.Join(", ", set.Select(static setting => $"{setting.Name}={setting.Shown}"))} matches the proxy.");
         }
 
         return Task.FromResult(result);

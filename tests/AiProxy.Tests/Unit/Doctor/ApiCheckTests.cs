@@ -38,7 +38,7 @@ public sealed class ApiCheckTests
     private static async Task<ApiProbe> Probe(HttpMessageHandler handler, string? dataDirectory = null)
     {
         using var client = new HttpClient(handler);
-        return await new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3", dataDirectory ?? Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))).ProbeAsync(TestContext.Current.CancellationToken);
+        return await new ApiCheck(client, new Uri("http://127.0.0.1:17432"), "1.2.3", dataDirectory ?? Path.Combine(Path.GetTempPath(), $"ai-proxy-no-token-{Guid.NewGuid():N}")).ProbeAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

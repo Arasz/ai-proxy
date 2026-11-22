@@ -117,8 +117,7 @@ public sealed class CcrChatRelayTests : IDisposable
     private static string ArgumentsOnly(int index, string fragment) => ChatSse.Chunk("gen-1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["function"] = new JsonObject { ["arguments"] = fragment } }) }, null, null);
 
     private static string Finished(params string[] chunks) =>
-        ChatSse.Chunk("gen-1", new JsonObject { ["role"] = "assistant", ["content"] = "" }, null, null) + string.Concat(chunks)
-                                                                                                        + ChatSse.Chunk("gen-1", null, null, ChatSse.Usage(4)) + "data: [DONE]\n\n";
+        $"{ChatSse.Chunk("gen-1", new JsonObject { ["role"] = "assistant", ["content"] = "" }, null, null)}{string.Concat(chunks)}{ChatSse.Chunk("gen-1", null, null, ChatSse.Usage(4))}data: [DONE]\n\n";
 
     private static async Task<string> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
@@ -199,13 +198,8 @@ public sealed class CcrChatRelayTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         var pieces = new[] { "{\"pa", "th\":\"", "a.cs\"}" };
-        var split = string.Concat(
-            ChatSse.Chunk("gen-2", new JsonObject { ["role"] = "assistant" }, null, null),
-            ChatSse.Chunk("gen-2", Calls((2, "call_c", "read", "")), null, null),
-            string.Concat(pieces.Select(piece => ChatSse.Chunk("gen-2", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = 2, ["function"] = new JsonObject { ["arguments"] = piece } }) }, null, null))),
-            ChatSse.Chunk("gen-2", new JsonObject(), "tool_calls", null),
-            ChatSse.Chunk("gen-2", null, null, ChatSse.Usage(5)),
-            "data: [DONE]\n\n");
+        var split =
+            $"{ChatSse.Chunk("gen-2", new JsonObject { ["role"] = "assistant" }, null, null)}{ChatSse.Chunk("gen-2", Calls((2, "call_c", "read", "")), null, null)}{string.Concat(pieces.Select(piece => ChatSse.Chunk("gen-2", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = 2, ["function"] = new JsonObject { ["arguments"] = piece } }) }, null, null)))}{ChatSse.Chunk("gen-2", new JsonObject(), "tool_calls", null)}{ChatSse.Chunk("gen-2", null, null, ChatSse.Usage(5))}data: [DONE]\n\n";
         upstream.Handler = Script(Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "tool_calls", 4), split);
         await using var proxy = await StartProxyAsync();
 
@@ -256,7 +250,7 @@ public sealed class CcrChatRelayTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         upstream.Handler = Script(
-            ChatSse.Chunk("gen-1", ChatSse.Text("part"), null, null) + "data: {\"error\":{\"message\":\"upstream boom\",\"code\":500}}\n\ndata: [DONE]\n\n");
+            $"{ChatSse.Chunk("gen-1", ChatSse.Text("part"), null, null)}data: {{\"error\":{{\"message\":\"upstream boom\",\"code\":500}}}}\n\ndata: [DONE]\n\n");
         await using var proxy = await StartProxyAsync();
 
         var client = await SendAsync(proxy, upstream, Request());
@@ -369,7 +363,7 @@ public sealed class CcrChatRelayTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         upstream.Handler = Script(
             Round("", Calls((0, "call_r", CcrRetrieval.Name, Retrieve)), "tool_calls", 4),
-            ChatSse.Chunk("gen-2", ChatSse.Text("part"), null, null) + "data: {\"error\":{\"message\":\"late boom\",\"code\":500}}\n\ndata: [DONE]\n\n");
+            $"{ChatSse.Chunk("gen-2", ChatSse.Text("part"), null, null)}data: {{\"error\":{{\"message\":\"late boom\",\"code\":500}}}}\n\ndata: [DONE]\n\n");
         await using var proxy = await StartProxyAsync();
 
         var client = await SendAsync(proxy, upstream, Request());

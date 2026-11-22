@@ -12,7 +12,7 @@ public sealed class PreviewSkipTests
         Numbered(1, 40),
         Numbered(240, 40),
         Numbered(1, 5),
-        Numbered(1, 5) + "\n"
+        $"{Numbered(1, 5)}\n"
     ];
 
     public static TheoryData<string> Diffs =>
@@ -32,10 +32,10 @@ public sealed class PreviewSkipTests
         "line one\nline two\nline three",
         "     1 \tnot a tab after digits? no: digits then space",
         "",
-        Numbered(1, 3) + "\nplain line",
-        Numbered(1, 4) + "\nplain fifth line",
+        $"{Numbered(1, 3)}\nplain line",
+        $"{Numbered(1, 4)}\nplain fifth line",
         Numbered(1, 4),
-        Numbered(1, 4) + "\n",
+        $"{Numbered(1, 4)}\n",
         "7\tonly one tabbed row"
     ];
 
@@ -46,7 +46,7 @@ public sealed class PreviewSkipTests
         "2026-11-06 build failed: see diff --git a/x b/x in the log",
         "---\ntitle: Notes\ntags: [a]\n---\nbody",
         "--- a/a.cs\n+++ b/a.cs\nno hunk header\n",
-        string.Join("\n", Enumerable.Repeat("filler", 60)) + "\ndiff --git a/a.cs b/a.cs"
+        $"{string.Join("\n", Enumerable.Repeat("filler", 60))}\ndiff --git a/a.cs b/a.cs"
     ];
 
     [Theory]
@@ -77,8 +77,8 @@ public sealed class PreviewSkipTests
     [Fact]
     public void A_diff_header_on_line_50_is_recognised_and_on_line_51_is_not()
     {
-        var onFifty = string.Join("\n", Enumerable.Repeat("filler", 49)) + "\ndiff --git a/a.cs b/a.cs";
-        var onFiftyOne = string.Join("\n", Enumerable.Repeat("filler", 50)) + "\ndiff --git a/a.cs b/a.cs";
+        var onFifty = $"{string.Join("\n", Enumerable.Repeat("filler", 49))}\ndiff --git a/a.cs b/a.cs";
+        var onFiftyOne = $"{string.Join("\n", Enumerable.Repeat("filler", 50))}\ndiff --git a/a.cs b/a.cs";
 
         Assert.True(PreviewSkip.IsDiff(onFifty));
         Assert.False(PreviewSkip.IsDiff(onFiftyOne));
@@ -87,7 +87,7 @@ public sealed class PreviewSkipTests
     [Fact]
     public void A_read_and_a_diff_with_windows_line_endings_are_recognised()
     {
-        Assert.True(PreviewSkip.IsNumberedRead(Numbered(1, 40).Replace("\n", "\r\n") + "\r\n"));
+        Assert.True(PreviewSkip.IsNumberedRead($"{Numbered(1, 40).Replace("\n", "\r\n")}\r\n"));
         Assert.True(PreviewSkip.IsDiff("diff --git a/a.cs b/a.cs\r\n--- a/a.cs\r\n+++ b/a.cs\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n"));
         Assert.True(PreviewSkip.IsDiff("--- a/a.cs\r\n+++ b/a.cs\r\n@@ -1 +1 @@\r\n-a\r\n+b\r\n"));
     }

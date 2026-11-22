@@ -210,7 +210,7 @@ public sealed class GainViewLayoutTests
 
         var output = Render(new GainSettings { History = true }, report);
 
-        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
+        Assert.Contains($"│ {folder} ", output, StringComparison.Ordinal);
         Assert.DoesNotContain("work", output, StringComparison.Ordinal);
     }
 
@@ -223,7 +223,7 @@ public sealed class GainViewLayoutTests
 
         var output = Render(new GainSettings { History = true }, report);
 
-        Assert.Contains("│ " + folder + " ", output, StringComparison.Ordinal);
+        Assert.Contains($"│ {folder} ", output, StringComparison.Ordinal);
     }
 
     [Theory]

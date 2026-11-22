@@ -63,7 +63,7 @@ public sealed class BuildOutputCompressionHandlerTests
     [Fact]
     public async Task A_long_invocation_keeps_its_head_and_names_what_it_dropped()
     {
-        var invocation = "  csc /noconfig " + string.Join(" ", Enumerable.Repeat("/reference:/packs/Microsoft.NETCore.App.Ref/ref/net10.0/System.Runtime.dll", 60));
+        var invocation = $"  csc /noconfig {string.Join(" ", Enumerable.Repeat("/reference:/packs/Microsoft.NETCore.App.Ref/ref/net10.0/System.Runtime.dll", 60))}";
         var text = string.Join("\n", "CoreCompile:", invocation, "Build succeeded.");
 
         var result = await Handler.HandleAsync(Part(text), CancellationToken.None);

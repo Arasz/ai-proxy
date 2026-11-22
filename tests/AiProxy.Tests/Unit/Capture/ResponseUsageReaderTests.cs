@@ -397,12 +397,12 @@ public sealed class ResponseUsageReaderTests
     [Fact]
     public void A_later_responses_terminal_event_without_some_counts_keeps_the_counts_read_earlier()
     {
-        var stream = ResponsesStream + """
-                                       event: response.failed
-                                       data: {"type":"response.failed","response":{"object":"response","usage":{"output_tokens":60}}}
+        var stream = $$$$"""
+                         {{{{ResponsesStream}}}}event: response.failed
+                         data: {"type":"response.failed","response":{"object":"response","usage":{"output_tokens":60}}}
 
 
-                                       """;
+                         """;
 
         var reading = ResponseUsageReader.Read(Encoding.UTF8.GetBytes(stream), EventStream, null, Dialect.OpenAi);
 

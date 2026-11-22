@@ -8,7 +8,7 @@ public sealed class ProjectCredentialTests
 {
     private static string Basic(string user, string password) => Basic(Encoding.UTF8.GetBytes($"{user}:{password}"));
 
-    private static string Basic(byte[] bytes) => "Basic " + Convert.ToBase64String(bytes);
+    private static string Basic(byte[] bytes) => $"Basic {Convert.ToBase64String(bytes)}";
 
     [Fact]
     public void Reads_path() => Assert.Equal("/project/a", ProjectCredential.Read(Basic("ai-proxy", "/project/a")));
@@ -45,7 +45,7 @@ public sealed class ProjectCredentialTests
     {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/p"));
 
-        Assert.Equal("/p", ProjectCredential.Read("bAsIc " + payload));
+        Assert.Equal("/p", ProjectCredential.Read($"bAsIc {payload}"));
     }
 
     [Fact]

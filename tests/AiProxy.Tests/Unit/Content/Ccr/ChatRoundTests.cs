@@ -26,7 +26,7 @@ public sealed class ChatRoundTests
         return ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(call) }, null, null);
     }
 
-    private static string Stream(params string[] chunks) => string.Concat(chunks) + "data: [DONE]\n\n";
+    private static string Stream(params string[] chunks) => $"{string.Concat(chunks)}data: [DONE]\n\n";
 
     private static string Finish(string reason) => ChatSse.Chunk("c1", new JsonObject(), reason, null);
 
@@ -151,7 +151,7 @@ public sealed class ChatRoundTests
         var next = (ChatRound)first.Round.Next();
 
         var (passed, _) = await ReadAsync(
-            ChatSse.Chunk("c2", new JsonObject { ["role"] = "assistant" }, null, null) + ChatSse.Chunk("c2", ChatSse.Text("more"), null, null) + "data: [DONE]\n\n", round: next);
+            $"{ChatSse.Chunk("c2", new JsonObject { ["role"] = "assistant" }, null, null)}{ChatSse.Chunk("c2", ChatSse.Text("more"), null, null)}data: [DONE]\n\n", round: next);
 
         var only = Assert.Single(passed);
         Assert.Equal("c1", JsonNode.Parse(only.Data)!["id"]!.GetValue<string>());
@@ -203,7 +203,7 @@ public sealed class ChatRoundTests
     [Fact]
     public async Task Comment_lines_are_forwarded_as_keep_alives_and_a_stream_without_done_has_not_ended()
     {
-        var (passed, round) = await ReadAsync(": OPENROUTER PROCESSING\n\n" + ChatSse.Chunk("c1", ChatSse.Text("hi"), null, null) + ": ping\n\n");
+        var (passed, round) = await ReadAsync($": OPENROUTER PROCESSING\n\n{ChatSse.Chunk("c1", ChatSse.Text("hi"), null, null)}: ping\n\n");
 
         Assert.Equal([SseEvent.CommentLine, SseEvent.CommentLine], passed.Where(static sse => sse.Name == SseEvent.Comment).ToArray());
         Assert.Single(passed, static sse => sse.Name != SseEvent.Comment);

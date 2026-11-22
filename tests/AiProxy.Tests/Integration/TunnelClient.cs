@@ -14,8 +14,7 @@ internal static class TunnelClient
 {
     public const string ProxyAuthorization = "Proxy-Authorization";
 
-    public static string Credential(string project) =>
-        "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{GainApi.ProxyUser}:{project}"));
+    public static string Credential(string project) => $"Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{GainApi.ProxyUser}:{project}"))}";
 
     /// <summary>Accepts one connection and reads the first TLS record whole: its 5-byte header and the length it names.</summary>
     public static async Task<byte[]> ReadOriginAsync(TcpListener origin, CancellationToken token)

@@ -18,15 +18,15 @@ public static partial class GainEndpoints
 
     public static void MapGainEndpoints(this WebApplication app)
     {
-        app.MapGet("/gain", async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) => !TryQuery(request.Query, out var query, out var error) ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400) : Results.Json(await store.QueryAsync(query, cancellationToken)));
-        app.MapPost("/gain/reset", async (GainQuery query, HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
+        app.MapGet("/gain", static async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) => !TryQuery(request.Query, out var query, out var error) ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400) : Results.Json(await store.QueryAsync(query, cancellationToken)));
+        app.MapPost("/gain/reset", static async (GainQuery query, HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
         {
             var error = Validate(query);
             return error is not null
                 ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400)
                 : Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken));
         });
-        app.MapPost("/retrieval", async (RetrievalRequest request, HttpContext context, IGainStore gain, TimeProvider time, CancellationToken cancellationToken) =>
+        app.MapPost("/retrieval", static async (RetrievalRequest request, HttpContext context, IGainStore gain, TimeProvider time, CancellationToken cancellationToken) =>
         {
             var store = context.RequestServices.GetService<IOriginalStore>();
             var retriever = context.RequestServices.GetService<CcrRetriever>();
@@ -44,8 +44,8 @@ public static partial class GainEndpoints
             var project = context.Request.Headers[GainApi.ProjectHeader].FirstOrDefault();
             try
             {
-                await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id ?? "", project, project is null ? GainLabels.Unknown : GainLabels.Attributions.Caller,
-                        request.Mode ?? "", answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
+                await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id, project, project is null ? GainLabels.Unknown : GainLabels.Attributions.Caller,
+                        request.Mode, answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
                     null, GainLabels.RetrieveOriginal, GainLabels.Unknown, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, cancellationToken);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
@@ -68,11 +68,6 @@ public static partial class GainEndpoints
     {
         query = new GainQuery();
         error = null;
-
-        string? Value(string key)
-        {
-            return values.TryGetValue(key, out var value) ? value.ToString() : null;
-        }
 
         DateTimeOffset? from = null;
         DateTimeOffset? to = null;
@@ -108,6 +103,8 @@ public static partial class GainEndpoints
         query = new GainQuery(Value("project"), from, to, Value("provider"), Value("method"), Value("rule"), Value("layer"), Value("pipeline"), limit);
         error = Validate(query);
         return error is null;
+
+        string? Value(string key) => values.TryGetValue(key, out var value) ? value.ToString() : null;
     }
 
     private static string? Validate(GainQuery query)
@@ -122,7 +119,8 @@ public static partial class GainEndpoints
             return "from must be earlier than to.";
         }
 
-        foreach (var value in new[] { query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline })
+        var filters = (string?[])[query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline];
+        foreach (var value in filters)
         {
             if (value is not null && (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl)))
             {

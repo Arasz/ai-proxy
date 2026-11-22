@@ -38,10 +38,8 @@ public sealed class ReplayCommandTests : IDisposable
         Enumerable.Range(0, 60).Select(index => new Dictionary<string, object?> { ["id"] = index, ["name"] = $"item{index}", ["tags"] = new[] { "a", "b" }, ["nested"] = new Dictionary<string, object?> { ["x"] = index, ["y"] = null } }),
         new JsonSerializerOptions { WriteIndented = true, IndentSize = 4 });
 
-    private static readonly string CodeFile = "using System;\n\nnamespace Demo;\n\n/// <summary>The demo type.</summary>\npublic sealed class Example\n{\n"
-                                              + string.Concat(Enumerable.Range(0, 40).Select(index =>
-                                                  $"    /// <summary>Returns the number {index} after doing a fair amount of careful work that the comment goes on to describe at length.</summary>\n    public int Value{index}()\n    {{\n        var total = {index};\n        for (var step = 0; step < 10; step++)\n        {{\n            total += step * {index};\n        }}\n\n        return total;\n    }}\n\n"))
-                                              + "}\n";
+    private static readonly string CodeFile = $"using System;\n\nnamespace Demo;\n\n/// <summary>The demo type.</summary>\npublic sealed class Example\n{{\n{string.Concat(Enumerable.Range(0, 40).Select(index =>
+        $"    /// <summary>Returns the number {index} after doing a fair amount of careful work that the comment goes on to describe at length.</summary>\n    public int Value{index}()\n    {{\n        var total = {index};\n        for (var step = 0; step < 10; step++)\n        {{\n            total += step * {index};\n        }}\n\n        return total;\n    }}\n\n"))}}}\n";
 
     private static byte[] ReadBody(string path, string output) =>
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -195,7 +193,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Replay_leaves_both_databases_byte_identical_and_a_write_through_its_connection_throws()
     {
         WriteContent(ToolBody(Output));
-        WriteCapture(ToolBody(Output + "\nextra"));
+        WriteCapture(ToolBody($"{Output}\nextra"));
         var before = Hashes();
 
         await ReplayAsync("--minimum", "300");
@@ -354,9 +352,9 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task Since_keeps_the_rows_at_and_after_the_time_and_drops_the_ones_before()
     {
-        WriteCaptureAt(Stamp.AddSeconds(-1), "api.anthropic.com", ToolBody(Output + "\nbefore"));
-        WriteCaptureAt(Stamp, "api.anthropic.com", ToolBody(Output + "\nat"));
-        WriteCaptureAt(Stamp.AddSeconds(1), "api.anthropic.com", ToolBody(Output + "\nafter"));
+        WriteCaptureAt(Stamp.AddSeconds(-1), "api.anthropic.com", ToolBody($"{Output}\nbefore"));
+        WriteCaptureAt(Stamp, "api.anthropic.com", ToolBody($"{Output}\nat"));
+        WriteCaptureAt(Stamp.AddSeconds(1), "api.anthropic.com", ToolBody($"{Output}\nafter"));
 
         var result = await ReplayAsync("--minimum", "300", "--since", Stamp.ToString("O"));
 
@@ -367,7 +365,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Source_content_reads_no_capture_rows()
     {
         WriteContent(ToolBody(Output));
-        WriteCapture(ToolBody(Output + "\nother"));
+        WriteCapture(ToolBody($"{Output}\nother"));
 
         var result = await ReplayAsync("--minimum", "300", "--source", "content");
 
@@ -412,7 +410,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Rows_are_counted_per_host_and_a_content_row_has_no_host()
     {
         WriteContent(ToolBody(Output));
-        WriteCaptureAt(Stamp, "api.openai.com", ToolBody(Output + "\none"), ToolBody(Output + "\ntwo"));
+        WriteCaptureAt(Stamp, "api.openai.com", ToolBody($"{Output}\none"), ToolBody($"{Output}\ntwo"));
 
         var result = await ReplayAsync("--minimum", "300");
 

@@ -102,7 +102,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_file_holding_a_private_key_fails()
     {
         using var root = Root(Now);
-        WritePem(root.ExportCertificatePem() + "\n" + root.GetRSAPrivateKey()!.ExportPkcs8PrivateKeyPem());
+        WritePem($"{root.ExportCertificatePem()}\n{root.GetRSAPrivateKey()!.ExportPkcs8PrivateKeyPem()}");
         var result = await Run();
         Assert.Equal(CheckStatus.Fail, result.Status);
         Assert.DoesNotContain("BEGIN", result.Detail + result.Fix);
@@ -112,7 +112,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_valid_root_followed_by_more_than_64_KiB_of_padding_fails_as_too_large()
     {
         using var root = Root(Now);
-        WritePem(root.ExportCertificatePem() + "\n" + new string(' ', 65 * 1024));
+        WritePem($"{root.ExportCertificatePem()}\n{new string(' ', 65 * 1024)}");
         var result = await Run();
         Assert.Equal(CheckStatus.Fail, result.Status);
         Assert.Contains("larger than 64 KiB", result.Detail);
@@ -122,7 +122,7 @@ public sealed class RootCheckTests : IDisposable
     public async Task A_valid_root_with_padding_just_under_the_bound_passes()
     {
         using var root = Root(Now);
-        var pem = root.ExportCertificatePem() + "\n";
+        var pem = $"{root.ExportCertificatePem()}\n";
         WritePem(pem + new string(' ', 64 * 1024 - pem.Length - 10));
         Assert.Equal(CheckStatus.Pass, (await Run()).Status);
     }

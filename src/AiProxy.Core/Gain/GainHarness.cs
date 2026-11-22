@@ -39,5 +39,5 @@ public static class GainHarness
         };
     }
 
-    private static bool IsOrSubdomainOf(string host, string domain) => host.Equals(domain, StringComparison.OrdinalIgnoreCase) || host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase);
+    private static bool IsOrSubdomainOf(string host, string domain) => host.Equals(domain, StringComparison.OrdinalIgnoreCase) || host.EndsWith($".{domain}", StringComparison.OrdinalIgnoreCase);
 }

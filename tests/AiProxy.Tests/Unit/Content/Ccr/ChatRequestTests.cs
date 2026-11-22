@@ -63,7 +63,7 @@ public sealed class ChatRequestTests
         Assert.Equal(CcrRetrieval.Name, tools[1].GetProperty("function").GetProperty("name").GetString());
         Assert.Equal("object", tools[1].GetProperty("function").GetProperty("parameters").GetProperty("type").GetString());
         Assert.True(document.RootElement.GetProperty("stream_options").GetProperty("include_usage").GetBoolean());
-        var expected = body.Insert(body.IndexOf("],\"messages\"", StringComparison.Ordinal), "," + CcrRetrieval.ChatDefinition)[..^1] + ",\"stream_options\":{\"include_usage\":true}}";
+        var expected = $"{body.Insert(body.IndexOf("],\"messages\"", StringComparison.Ordinal), $",{CcrRetrieval.ChatDefinition}")[..^1]},\"stream_options\":{{\"include_usage\":true}}}}";
         Assert.Equal(expected, prepared);
     }
 

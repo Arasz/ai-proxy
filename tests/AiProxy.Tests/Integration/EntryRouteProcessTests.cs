@@ -8,7 +8,7 @@ namespace AiProxy.Tests.Integration;
 /// <summary>Real child processes on a throwaway home and an unused port: a rejected command line must exit before anything starts.</summary>
 public sealed class EntryRouteProcessTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "ai-proxy-entry-route-" + Guid.NewGuid().ToString("N"));
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"ai-proxy-entry-route-{Guid.NewGuid():N}");
 
     public EntryRouteProcessTests()
     {
@@ -49,7 +49,7 @@ public sealed class EntryRouteProcessTests : IDisposable
     [InlineData("replay", "--home")]
     public async Task Option_with_no_value_is_rejected_by_name_and_binds_no_folder(string command, string option)
     {
-        string[] arguments = command == "gain" ? [command, "--endpoint", "http://127.0.0.1:" + FreePort(), option] : [command, option];
+        string[] arguments = command == "gain" ? [command, "--endpoint", $"http://127.0.0.1:{FreePort()}", option] : [command, option];
         await using var child = Start(arguments);
         await child.ExitAsync(TimeSpan.FromSeconds(10));
 

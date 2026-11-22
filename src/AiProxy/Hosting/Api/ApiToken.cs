@@ -13,7 +13,7 @@ public sealed class ApiToken(string value)
     private const string Scheme = "Bearer ";
 
     /// <summary>How a client finds the data directory, for messages that tell a person where to look.</summary>
-    public const string DirectoryRule = "Clients find the data directory from --data-directory, then Proxy__DataDirectory, then ~/.ai-proxy; point it at the directory the running proxy uses.";
+    private const string DirectoryRule = "Clients find the data directory from --data-directory, then Proxy__DataDirectory, then ~/.ai-proxy; point it at the directory the running proxy uses.";
 
     private readonly byte[] _expected = Encoding.UTF8.GetBytes(value);
 
@@ -69,7 +69,7 @@ public sealed class ApiToken(string value)
     }
 
     /// <summary>True when <paramref name="authorization" /> is <c>Bearer</c>, in any case, and this token; compares the token in constant time.</summary>
-    public bool Accepts(string? authorization) =>
+    private bool Accepts(string? authorization) =>
         authorization is not null
         && authorization.StartsWith(Scheme, StringComparison.OrdinalIgnoreCase)
         && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(authorization[Scheme.Length..]), _expected);

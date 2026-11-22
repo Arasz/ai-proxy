@@ -22,7 +22,7 @@ public sealed class ZstdRequestBodyTests
     [Fact]
     public void A_body_cut_short_does_not_decode()
     {
-        var encoded = Encode(Encoding.UTF8.GetBytes(new string('x', 10_000) + "tail"));
+        var encoded = Encode(Encoding.UTF8.GetBytes($"{new string('x', 10_000)}tail"));
 
         Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode(encoded[..(encoded.Length / 2)]));
     }

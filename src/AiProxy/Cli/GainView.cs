@@ -250,7 +250,7 @@ public sealed class GainView
             return "<-999%";
         }
 
-        return value.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        return $"{value.ToString("0.0", CultureInfo.InvariantCulture)}%";
     }
 
     private static string Stamp(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);

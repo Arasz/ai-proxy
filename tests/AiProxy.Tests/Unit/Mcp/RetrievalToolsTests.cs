@@ -81,7 +81,8 @@ public sealed class RetrievalToolsTests
         File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
-    private static RetrievalTools NewTools(HttpClient http, string? dataDirectory = null) => new(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/", dataDirectory ?? Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))));
+    private static RetrievalTools NewTools(HttpClient http, string? dataDirectory = null) => new(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/", dataDirectory ?? Path.Combine(Path.GetTempPath(),
+        $"ai-proxy-no-token-{Guid.NewGuid():N}")));
 
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {

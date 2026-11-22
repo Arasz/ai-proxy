@@ -332,7 +332,7 @@ public sealed class ContentCompressionPipelineTests
     public async Task Characters_JSON_does_not_require_escaping_are_forwarded_as_they_are(string fragment)
     {
         var (pipeline, _) = Build();
-        var body = Encoding.UTF8.GetBytes(Body(ToolOutput + $"\n2026-03-12 10:00:06 INFO worker=api-1 {fragment}"));
+        var body = Encoding.UTF8.GetBytes(Body($"{ToolOutput}\n2026-03-12 10:00:06 INFO worker=api-1 {fragment}"));
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),
