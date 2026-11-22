@@ -66,7 +66,7 @@ without a `Content-Length`, are not kept; see
 
 ## Restart, status and stop
 
-<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:40#RestartFlag -->
+<!-- trust:trustchecked evidence=src/AiProxy/Hosting/Proxy/ProxyInstanceLifetime.cs:41#RestartFlag -->
 To replace the running instance gracefully, keep the same data directory and run:
 
 ```bash
