@@ -5,7 +5,7 @@ using AiProxy.Hosting.Proxy;
 namespace AiProxy.Cli;
 
 /// <summary>What <c>ai-proxy status</c> shows about a running owner; carries no nonce or start token.</summary>
-internal sealed record StatusView(int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string DataDirectory)
+internal sealed record StatusView(int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string DataDirectory, string LogFile, ProxyControl.CaptureInfo? Capture)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
@@ -13,7 +13,7 @@ internal sealed record StatusView(int Pid, DateTime StartUtc, string ProxyUrl, s
 
     public static StatusView From(ProxyControl.ProxyInfo owner, string dataDirectory)
     {
-        return new StatusView(owner.Pid, owner.StartUtc, owner.ProxyUrl, owner.ApiUrls, dataDirectory);
+        return new StatusView(owner.Pid, owner.StartUtc, owner.ProxyUrl, owner.ApiUrls, dataDirectory, Path.Combine(dataDirectory, ProxyLogFile.FileName), owner.Capture);
     }
 
     public string Json()
@@ -25,11 +25,32 @@ internal sealed record StatusView(int Pid, DateTime StartUtc, string ProxyUrl, s
     {
         var uptime = now - new DateTimeOffset(StartUtc);
         return string.Join(Environment.NewLine,
-            "ai-proxy is running",
+            ["ai-proxy is running",
             $"  pid:     {Pid.ToString(CultureInfo.InvariantCulture)}",
             $"  started: {StartUtc:u} (up {(int)uptime.TotalHours}h {uptime.Minutes}m {uptime.Seconds}s)",
             $"  proxy:   {ProxyUrl}",
             $"  api:     {string.Join(", ", ApiUrls)}",
-            $"  data:    {DataDirectory}");
+            $"  data:    {DataDirectory}",
+            .. CaptureLines(),
+            $"  log:     {LogFile}"]);
+    }
+
+    private IEnumerable<string> CaptureLines()
+    {
+        switch (Capture)
+        {
+            case null:
+                return ["  capture: unknown (the running proxy does not report it)"];
+            case { State: { } state }:
+                return
+                [
+                    $"  capture: on, {CaptureText.Size(state)}",
+                    $"    oldest row:       {CaptureText.Time(state.OldestRowAt)}",
+                    $"    last eviction:    {CaptureText.Time(state.LastEvictionAt)}",
+                    $"    last write error: {state.LastWriteError ?? "none"}{(state.LastWriteErrorAt is null ? "" : $" (at {CaptureText.Time(state.LastWriteErrorAt)})")}"
+                ];
+            default:
+                return [Capture.Enabled ? "  capture: on" : "  capture: off"];
+        }
     }
 }

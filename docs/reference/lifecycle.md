@@ -14,8 +14,11 @@ neither guesses from a listening port, and neither starts a proxy.
 
 ## status
 
-Prints the pid, start time and uptime, proxy URL, API URLs and data directory. The JSON form
-has `running`, `pid`, `startUtc`, `proxyUrl`, `apiUrls` and `dataDirectory`. It never shows the
+Prints the pid, start time and uptime, proxy URL, API URLs, data directory, the capture state
+and the path of `proxy.log`. The capture state is on or off; when on, it adds the live size
+against the cap, the oldest row, the last eviction and the last write error with its time. An
+owner from before capture reporting shows `capture: unknown`. The JSON form
+has `running`, `pid`, `startUtc`, `proxyUrl`, `apiUrls`, `dataDirectory`, `logFile` and `capture`. It never shows the
 owner's shutdown nonce or process start token, and it takes no lock, so it is safe to run at
 any moment.
 

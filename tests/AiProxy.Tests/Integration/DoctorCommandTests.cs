@@ -56,10 +56,10 @@ public sealed class DoctorCommandTests
 
         using var json = JsonDocument.Parse(outcome.Json);
         var names = json.RootElement.GetProperty("checks").EnumerateArray().Select(static check => check.GetProperty("name").GetString()).ToArray();
-        Assert.Equal(["api", "inspection", "root", "environment"], names);
+        Assert.Equal(["api", "inspection", "root", "environment", "capture"], names);
         Assert.Equal(outcome.Exit, json.RootElement.GetProperty("exitCode").GetInt32());
         var statuses = json.RootElement.GetProperty("checks").EnumerateArray().Select(static check => check.GetProperty("status").GetString()).ToArray();
-        Assert.Equal(["pass", "pass", "warn", "pass"], statuses);
+        Assert.Equal(["pass", "pass", "warn", "pass", "pass"], statuses);
         Assert.Equal(2, outcome.Exit);
         Assert.Equal("", outcome.Error);
     }

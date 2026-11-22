@@ -12,7 +12,7 @@ internal static class ControlPipeClient
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>What an owner answers to <c>info</c>, including the secret nonce.</summary>
-    public sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string? ProcessStartToken = null);
+    public sealed record Info(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string? ProcessStartToken = null, object? Capture = null);
 
     public static string PipeName(string directory)
     {
