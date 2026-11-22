@@ -16,7 +16,7 @@ public sealed class DoctorCommandTests
 
     private sealed class NamedHosts : IProviderHosts
     {
-        public ProviderHost? Find(string host) => host == Host ? new ProviderHost(Dialect.Anthropic, HarnessOnly: false) : null;
+        public ProviderHostMatch Find(string host) => host == Host ? new ProviderHost(Dialect.Anthropic, HarnessOnly: false) : NoneProviderHost.Instance;
         public IReadOnlyCollection<string> Hosts { get; } = [Host];
     }
 

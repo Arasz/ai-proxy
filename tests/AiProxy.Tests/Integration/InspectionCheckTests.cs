@@ -14,7 +14,7 @@ public sealed class InspectionCheckTests
 
     private sealed class NamedHosts(params string[] hosts) : IProviderHosts
     {
-        public ProviderHost? Find(string host) => hosts.Contains(host) ? new ProviderHost(Dialect.Anthropic, HarnessOnly: false) : null;
+        public ProviderHostMatch Find(string host) => hosts.Contains(host) ? new ProviderHost(Dialect.Anthropic, HarnessOnly: false) : NoneProviderHost.Instance;
         public IReadOnlyCollection<string> Hosts { get; } = hosts;
     }
 

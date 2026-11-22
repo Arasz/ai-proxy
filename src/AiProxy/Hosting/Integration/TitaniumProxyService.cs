@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Mime;
 using System.Security.Cryptography;
 using AiProxy.Core.Gain;
+using AiProxy.Core.Providers;
 using AiProxy.Hosting.Guard;
 using AiProxy.Hosting.Marker;
 using AiProxy.Hosting.Proxy;
@@ -412,10 +413,10 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
             return false;
         }
 
-        return target.IsLoopback || (IPAddress.TryParse(target.Host, out var address) && address.Equals(_options.ListenAddress));
+        return target.IsLoopback || IPAddress.TryParse(target.Host, out var address) && address.Equals(_options.ListenAddress);
     }
 
-    private Task BeforeResponseAsync(object sender, SessionEventArgs e) => ProviderRequestInspector.BeforeResponseAsync(e);
+    private static Task BeforeResponseAsync(object sender, SessionEventArgs e) => ProviderRequestInspector.BeforeResponseAsync(e);
 
     private async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {
@@ -469,11 +470,14 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         var connect = e.HttpClient.ConnectRequest;
         var provider = !string.IsNullOrWhiteSpace(connect?.Host) && Uri.TryCreate($"https://{connect.Host}", UriKind.Absolute, out var address)
             ? _providerHosts.Find(address.Host)
-            : null;
-        e.DecryptSsl = provider is not null &&
-                       (!provider.HarnessOnly ||
-                        ProjectCredential.Read(connect!.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null);
-        if (e.DecryptSsl && provider!.HarnessOnly)
+            : NoneProviderHost.Instance;
+        e.DecryptSsl = provider switch
+        {
+            ProviderHost { HarnessOnly: false } => true,
+            ProviderHost => ProjectCredential.Read(connect?.Headers.GetFirstHeader(HeaderNames.ProxyAuthorization)?.Value) is not null,
+            NoneProviderHost => false
+        };
+        if (e.DecryptSsl && provider is ProviderHost { HarnessOnly: true })
         {
             e.UpstreamHttpProtocol = UpstreamHttpProtocol.Http11;
         }

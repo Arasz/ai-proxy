@@ -5,8 +5,8 @@ namespace AiProxy.Hosting;
 /// <summary>Decides which request hosts are provider APIs the proxy inspects.</summary>
 public interface IProviderHosts
 {
-    /// <summary>Returns the host's dialect and harness-only flag, or null to pass the request through untouched.</summary>
-    ProviderHost? Find(string host);
+    /// <summary>Returns the host's provider settings, or <see cref="NoneProviderHost" /> to pass the request through untouched.</summary>
+    ProviderHostMatch Find(string host);
 
     /// <summary>Every host <see cref="Find" /> recognises; the root certificate's name constraint is derived from them.</summary>
     IReadOnlyCollection<string> Hosts { get; }
@@ -16,7 +16,7 @@ public interface IProviderHosts
 public sealed class CanonicalProviderHosts : IProviderHosts
 {
     /// <inheritdoc />
-    public ProviderHost? Find(string host) => ProviderHostCatalog.Lookup(host);
+    public ProviderHostMatch Find(string host) => ProviderHostCatalog.Lookup(host) is { } provider ? provider : NoneProviderHost.Instance;
 
     /// <inheritdoc />
     public IReadOnlyCollection<string> Hosts => ProviderHostCatalog.Hosts;

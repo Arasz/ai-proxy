@@ -158,7 +158,7 @@ public sealed class UpstreamDropTests
 
     private sealed class NoProviderHosts : IProviderHosts
     {
-        public ProviderHost? Find(string host) => null;
+        public ProviderHostMatch Find(string host) => NoneProviderHost.Instance;
 
         public IReadOnlyCollection<string> Hosts { get; } = [];
     }

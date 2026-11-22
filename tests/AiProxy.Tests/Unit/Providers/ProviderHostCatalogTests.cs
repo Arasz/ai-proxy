@@ -55,5 +55,10 @@ public sealed class ProviderHostCatalogTests
     [InlineData("chatgpt.com", Dialect.OpenAi, true)]
     [InlineData("api.openai.com", Dialect.OpenAi, false)]
     [InlineData("api.anthropic.com", Dialect.Anthropic, false)]
-    public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly) => Assert.Equal(new ProviderHost(dialect, harnessOnly, host == "openrouter.ai"), new CanonicalProviderHosts().Find(host));
+    public void The_canonical_hosts_give_the_dialect_and_the_harness_only_flag_together(string host, Dialect dialect, bool harnessOnly) => Assert.Equal(new ProviderHost(dialect, harnessOnly, host == "openrouter.ai"), new CanonicalProviderHosts().Find(host).Value);
+
+    [Theory]
+    [InlineData("example.test")]
+    [InlineData("www.chatgpt.com")]
+    public void An_unknown_host_finds_no_provider_host(string host) => Assert.IsType<NoneProviderHost>(new CanonicalProviderHosts().Find(host).Value);
 }

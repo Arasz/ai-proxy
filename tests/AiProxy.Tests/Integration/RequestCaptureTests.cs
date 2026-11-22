@@ -868,7 +868,7 @@ public sealed class RequestCaptureTests : IDisposable
     /// <summary>Treats one host as a provider and every other host as pass-through traffic.</summary>
     private sealed class SingleProviderHost(string host, Dialect dialect) : IProviderHosts
     {
-        public ProviderHost? Find(string candidate) => string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? new ProviderHost(dialect, HarnessOnly: false) : null;
+        public ProviderHostMatch Find(string candidate) => string.Equals(candidate, host, StringComparison.OrdinalIgnoreCase) ? new ProviderHost(dialect, HarnessOnly: false) : NoneProviderHost.Instance;
 
         public IReadOnlyCollection<string> Hosts { get; } = [host];
     }

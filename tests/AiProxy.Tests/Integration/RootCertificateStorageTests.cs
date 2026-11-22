@@ -531,7 +531,7 @@ public sealed class RootCertificateStorageTests
     {
         public IReadOnlyCollection<string> Hosts => hosts;
 
-        public ProviderHost? Find(string host) => null;
+        public ProviderHostMatch Find(string host) => NoneProviderHost.Instance;
     }
 
     /// <summary>Records trust calls instead of touching a certificate store.</summary>

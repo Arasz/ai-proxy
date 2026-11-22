@@ -454,6 +454,6 @@ public sealed class HarnessOnlyHostTests : IDisposable
     {
         public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 
-        public ProviderHost? Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(Dialect.OpenAi, HarnessOnly: true) : null;
+        public ProviderHostMatch Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(Dialect.OpenAi, HarnessOnly: true) : NoneProviderHost.Instance;
     }
 }

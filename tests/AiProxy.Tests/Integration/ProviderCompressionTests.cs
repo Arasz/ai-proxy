@@ -142,7 +142,7 @@ public sealed class ProviderCompressionTests : IDisposable
 /// <summary>Treats loopback hosts as a provider, so a local upstream stands in for a provider API.</summary>
 internal sealed class LoopbackProviderHosts(Dialect dialect, bool chatCcr = false) : IProviderHosts
 {
-    public ProviderHost? Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(dialect, HarnessOnly: false, chatCcr) : null;
+    public ProviderHostMatch Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(dialect, HarnessOnly: false, chatCcr) : NoneProviderHost.Instance;
 
     public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 }
