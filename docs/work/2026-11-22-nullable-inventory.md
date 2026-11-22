@@ -22,7 +22,7 @@ Counts are from before wave 1. Uses (`?.`, `??`, `is null`) are not counted. The
 | Group | Examples | Shape | Wave |
 |---|---|---|---|
 | Result or refusal | `CcrParseResult(Request?, Reason)` | union of the value and a refusal record | 1 (done) |
-| Optional argument | `IDecompositor.Decompose(..., string? filePath = null)` | two overloads, the second non-nullable | 1 (done) |
+| Optional argument | `IDecompositor.Decompose(..., string? filePath = null)` | two overloads, the second non-nullable. Deferred: both production callers (`ContentCompressionPipeline.cs:243`, `ReplayEngine.cs:138`) pass `region.FilePath`, which is nullable, so an overload only moves the check. Do it after `ContentRegion` carries a file/no-file union. | 2 |
 | Optional record field | `CheckResult.Fix`, `HandledContent.RetrievalId`, `ContentRegion.FilePath`, `ReplayBlock.PreviewId`, `ReplayRow.Host` | `init` property | 1 (done) |
 | Validation message | `DoctorSettings.Error`, `GainSettings.Error`, `ReplaySettings.Error`, `StatusSettings.Error`, `RetrievalArgumentSchema.Violation`, `IToolArgumentSchema.Violation`, `GainEndpoints.Validate` | one shared `Valid` / `Invalid(string Reason)` union | 2 |
 | Result with an error text | `CcrRetrieval(Text, Error?)`, `CompressionResult(Failure?, Summary?)`, `CcrPreviewer`, `SourceCodeCompressionHandler.View` | union of success and failure records | 2 |

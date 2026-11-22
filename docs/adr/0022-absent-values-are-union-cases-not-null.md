@@ -27,7 +27,7 @@ from a bug. `ProviderHost.cs` already shows the other shape: `ProviderHostMatch`
 4. Null stays where it is the honest boundary type: JSON and SQLite readers, configuration
    binding, BCL `Try*` shapes, and counts a provider can leave out (`ResponseUsage`).
 
-The work goes in waves. Wave 1 applies one example of each rule in `AiProxy.Core`; the inventory
+The work goes in waves. Wave 1 applies rules 1 and 3 in `AiProxy.Core`; rule 2 waits for its callers to hold a non-nullable path; the inventory
 lists the candidates for later waves.
 
 ## Consequences
