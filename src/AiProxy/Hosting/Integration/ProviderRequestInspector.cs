@@ -194,7 +194,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         e.DataReceived -= exchange.OnDataReceived;
-        var kept = exchange.Response ?? ResponseBuffer.For(null, null);
+        var kept = exchange.Response ?? ResponseBuffer.Create();
         try
         {
             var response = e.HttpClient.Response;

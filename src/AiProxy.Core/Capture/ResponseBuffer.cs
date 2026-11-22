@@ -35,6 +35,9 @@ public sealed class ResponseBuffer
     /// <summary>The bytes to read usage from; empty when <see cref="OverCap" /> or released.</summary>
     public ReadOnlyMemory<byte> Body => _strategy?.Body ?? ReadOnlyMemory<byte>.Empty;
 
+    /// <summary>A buffer for a response with no known content type or encoding: kept whole up to the cap.</summary>
+    public static ResponseBuffer Create() => For(null, null);
+
     /// <summary>
     ///     A plain (not content-encoded) event stream keeps only its head and tail, where Anthropic puts
     ///     <c>message_start</c> and the final <c>message_delta</c>; any other body is kept whole up to the cap.
