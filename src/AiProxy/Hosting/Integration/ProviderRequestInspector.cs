@@ -35,7 +35,7 @@ public sealed partial class ProviderRequestInspector(
     IGainStore gain)
 {
     private readonly List<HttpHeader> _plainTextResponseHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Text.Plain)];
-    private readonly IEnumerable<HttpHeader>? _jsonResponseHeaders = [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
+    private readonly List<HttpHeader> _jsonResponseHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
 
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
