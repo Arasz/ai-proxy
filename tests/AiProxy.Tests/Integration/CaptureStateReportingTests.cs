@@ -2,7 +2,7 @@ using System.Text.Json;
 using AiProxy.Cli;
 using AiProxy.Client;
 using AiProxy.Hosting.Proxy;
-using AiProxy.Storage;
+using AiProxy.Core.Capture;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Spectre.Console.Testing;

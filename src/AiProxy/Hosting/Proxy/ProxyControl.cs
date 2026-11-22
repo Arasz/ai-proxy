@@ -4,7 +4,7 @@ using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using AiProxy.Storage;
+using AiProxy.Core.Capture;
 
 namespace AiProxy.Hosting.Proxy;
 
