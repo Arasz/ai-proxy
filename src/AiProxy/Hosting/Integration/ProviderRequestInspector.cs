@@ -364,7 +364,7 @@ public sealed partial class ProviderRequestInspector(
     }
 
     /// <summary>The body to forward: the compressed one when compression changed it, else the body as sent.</summary>
-    private static byte[] Forwarded(byte[] body, CompressionResult? compressed) => compressed is { Changed: true } ? compressed.Body.ToArray() : body;
+    private static byte[] Forwarded(byte[] body, CompressionResult? compressed) => compressed is { Changed: true } ? BodyBytes.Array(compressed.Body) : body;
 
     /// <summary>Logs the parts that failed and forwards the compressed body when it changed.</summary>
     private void Apply(SessionEventArgs e, CapturedExchange exchange, CompressionResult? compressed, byte[] forwarded)
