@@ -4,13 +4,15 @@ using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using AiProxy.Core.Capture;
 
 namespace AiProxy.Hosting.Proxy;
 
 /// <summary>The same-user control connection for one leased proxy process.</summary>
-internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo proxyInfo, IHostApplicationLifetime lifetime) : IAsyncDisposable
+internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo proxyInfo, IHostApplicationLifetime lifetime, Func<CancellationToken, Task<ProxyControl.CaptureInfo>>? capture = null) : IAsyncDisposable
 {
     internal const int DefaultProtocol = 1;
+    private const int MaximumErrorChars = 512;
     private static readonly TimeSpan ConnectionDeadline = TimeSpan.FromSeconds(3);
 
     // Binding may unlink a stale Unix socket; the caller already holds both leases.
@@ -86,13 +88,31 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
 
     private async Task HandleStopCommandAsync(NamedPipeServerStream pipe, CancellationTokenSource deadline)
     {
-        await pipe.WriteAsync(proxyInfo, deadline.Token);
+        var reply = capture is null ? proxyInfo : proxyInfo with { Capture = await ReadCaptureAsync(deadline.Token) };
+        await pipe.WriteAsync(reply, deadline.Token);
         var stop = await pipe.ReadAsync<Request>(deadline.Token);
         var accepted = stop is { Command: "stop", Protocol: DefaultProtocol } && stop.Nonce == proxyInfo.Nonce;
         await pipe.WriteAsync(new Reply(accepted), deadline.Token);
         if (accepted)
         {
             lifetime.StopApplication();
+        }
+    }
+
+    private async Task<CaptureInfo> ReadCaptureAsync(CancellationToken token)
+    {
+        try
+        {
+            var info = await capture!(token);
+            return info.State is { LastWriteError.Length: > MaximumErrorChars } state
+                ? info with { State = state with { LastWriteError = state.LastWriteError![..MaximumErrorChars] } }
+                : info;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Capture state is a courtesy; a store that cannot be read must not stop the pipe answering.
+            var reason = exception.Message.Length > MaximumErrorChars ? exception.Message[..MaximumErrorChars] : exception.Message;
+            return new CaptureInfo(true, new CaptureState(0, 0, null, null, reason, DateTimeOffset.UtcNow));
         }
     }
 
@@ -224,7 +244,10 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
 
     internal sealed record OwnerReading(OwnerState State, ProxyInfo? Owner = null);
 
-    internal sealed record ProxyInfo(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken);
+    internal sealed record ProxyInfo(string Product, int Protocol, string Nonce, int Pid, DateTime StartUtc, string ProxyUrl, string[] ApiUrls, string ProcessStartToken, CaptureInfo? Capture = null);
+
+    /// <summary>Whether the owner captures requests and, when it does, what its capture file holds; absent from an owner that predates it.</summary>
+    internal sealed record CaptureInfo(bool Enabled, CaptureState? State);
 
     private sealed record Request(string Command, int Protocol, string? Nonce = null);
 

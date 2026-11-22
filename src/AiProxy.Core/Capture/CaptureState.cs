@@ -1,4 +1,4 @@
-namespace AiProxy.Storage;
+namespace AiProxy.Core.Capture;
 
 /// <summary>What the capture file holds now and how its last writes went.</summary>
 /// <param name="LiveBytes">The bytes of the pages in use, not the size of the file.</param>

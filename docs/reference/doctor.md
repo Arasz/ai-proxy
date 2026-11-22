@@ -11,6 +11,7 @@ directory, never trusts a certificate and sends no HTTP request to a provider.
 | `inspection` | `CONNECT {host}:443` through the proxy, then a TLS handshake only. The leaf must chain to `<data-directory>/root-ca.pem`. | The host is not decrypted, or the certificate does not chain to that root. | | The proxy answered the tunnel request with a status other than 200, the tunnel or handshake timed out or was reset (including when the proxy cannot reach an upstream), or the published root could not be read. Also reported (as "skipped") when the proxy is not running. |
 | `root` | Reads `<data-directory>/root-ca.pem` (at most 64 KiB). | Missing, holds a private key, not limited to the provider hosts, or outside its validity period. | Expires within 30 days, or the operating system does not trust it (advisory; `NODE_EXTRA_CA_CERTS` clients and Codex launched through `ai-proxy harness` are unaffected). | |
 | `environment` | `HTTPS_PROXY` and `HTTP_PROXY`, either case, against the proxy address. | A variable names another endpoint. | | |
+| `capture` | Asks the running proxy for its capture state over the control pipe. | | The last capture write failed within the last hour, or capture is off in the proxy while `Proxy__Capture` asks for it on. | No proxy answered on the pipe, or the proxy predates capture reporting. |
 
 An unset variable passes: clients that use the system proxy are covered. Output shows only
 `scheme://host:port` of a proxy variable, never credentials, path or query. The root path is

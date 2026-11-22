@@ -11,6 +11,8 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
 {
     private const string ProxyPortVariable = "Proxy__Port";
     private const string LegacyProxyPortVariable = "PROXY__PORT";
+    private const string CaptureVariable = "Proxy__Capture";
+    private const string LegacyCaptureVariable = "PROXY__CAPTURE";
 
     private readonly TimeSpan _timeout = TimeSpan.FromSeconds(settings.Timeout);
 
@@ -36,7 +38,13 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
 
         var root = await new RootCheck(dataDirectory, time, new SystemRootTrust()).RunAsync(cancellationToken).ConfigureAwait(false);
         var environment = await new EnvironmentCheck(proxy, variable).RunAsync(cancellationToken).ConfigureAwait(false);
-        return new DoctorReport([first, inspection, root, environment]);
+        var capture = await new CaptureCheck(dataDirectory, time, IsConfiguredOn()).RunAsync(cancellationToken).ConfigureAwait(false);
+        return new DoctorReport([first, inspection, root, environment, capture]);
+    }
+
+    private bool IsConfiguredOn()
+    {
+        return bool.TryParse(variable(CaptureVariable) ?? variable(LegacyCaptureVariable), out var on) && on;
     }
 
     private Uri ProxyAddress()

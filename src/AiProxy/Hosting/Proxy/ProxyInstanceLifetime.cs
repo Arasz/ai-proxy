@@ -3,6 +3,7 @@ using System.Globalization;
 using AiProxy.Configuration;
 using AiProxy.Hosting.Integration;
 using AiProxy.Hosting.Marker;
+using AiProxy.Storage;
 
 namespace AiProxy.Hosting.Proxy;
 
@@ -82,7 +83,10 @@ internal sealed record ProxyInstanceLifetime(string DataDirectory, WebApplicatio
             [.. app.Urls],
             new ProcessIdentity(process).StartToken);
 
-        await using var control = new ProxyControl(DataDirectory, proxyInfo, app.Lifetime);
+        var captureStore = app.Services.GetService<SqliteCaptureStore>();
+        await using var control = new ProxyControl(DataDirectory, proxyInfo, app.Lifetime, captureStore is null
+            ? _ => Task.FromResult(new ProxyControl.CaptureInfo(false, null))
+            : async token => new ProxyControl.CaptureInfo(true, await captureStore.GetStateAsync(token)));
         await control.Start(startupLease);
         await app.WaitForShutdownAsync();
         return 0;
