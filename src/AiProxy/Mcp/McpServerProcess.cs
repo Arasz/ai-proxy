@@ -17,9 +17,9 @@ public static class McpServerProcess
     public const string Command = "mcp";
 
     /// <summary>True when <c>GET {endpoint}/health</c> answers success within two seconds; never throws for an unreachable proxy.</summary>
-    public static async Task<bool> IsReachableAsync(string endpoint, HttpMessageHandler handler, CancellationToken cancellationToken)
+    public static async Task<bool> IsReachableAsync(string endpoint, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
     {
-        using var http = new HttpClient(handler, false);
+        using var http = httpClientFactory.CreateClient(ProxyClientServiceCollectionExtensions.ProxyClientName);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(2));
         try
@@ -41,12 +41,6 @@ public static class McpServerProcess
             throw new InvalidOperationException("--endpoint must be an absolute HTTP or HTTPS proxy URL.");
         }
 
-        using var probe = new SocketsHttpHandler { UseProxy = false };
-        if (!await IsReachableAsync(endpoint, probe, cancellationToken).ConfigureAwait(false))
-        {
-            await Console.Error.WriteLineAsync($"ai-proxy: warning: no proxy answers at {endpoint}; retrieval calls fail until it starts.").ConfigureAwait(false);
-        }
-
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole(static console => console.LogToStandardErrorThreshold = LogLevel.Trace);
@@ -62,6 +56,11 @@ public static class McpServerProcess
             .WithStreamServerTransport(input, new BufferedStream(Console.OpenStandardOutput()))
             .WithTools([RetrievalTools.CreateTool()]);
         using var host = builder.Build();
+        if (!await IsReachableAsync(endpoint, host.Services.GetRequiredService<IHttpClientFactory>(), cancellationToken).ConfigureAwait(false))
+        {
+            await Console.Error.WriteLineAsync($"ai-proxy: warning: no proxy answers at {endpoint}; retrieval calls fail until it starts.", cancellationToken).ConfigureAwait(false);
+        }
+
         await host.RunAsync(cancellationToken).ConfigureAwait(false);
         return 0;
     }
