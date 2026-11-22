@@ -6,7 +6,7 @@ namespace AiProxy.Core.Capture;
 public sealed class ResponseBuffer
 {
     /// <summary>The most bytes kept of a body that is kept whole.</summary>
-    public const int MaxBytes = 4 * 1024 * 1024;
+    private const int MaxBytes = 4 * 1024 * 1024;
 
     /// <summary>The bytes kept from the start of a plain event stream.</summary>
     public const int HeadBytes = 64 * 1024;
@@ -95,6 +95,7 @@ public sealed class ResponseBuffer
     private sealed class Window : IStrategy
     {
         private const int LineHeadBytes = 64;
+        private const byte NewLineByte = (byte)'\n';
 
         private static readonly byte[][] TerminalStarts =
         [
@@ -133,8 +134,8 @@ public sealed class ResponseBuffer
                 var tail = new byte[TailBytes];
                 _tail.AsSpan(start).CopyTo(tail);
                 _tail.AsSpan(0, start).CopyTo(tail.AsSpan(TailBytes - start));
-                var headEnd = head.LastIndexOf((byte)'\n') + 1;
-                var tailStart = tail.AsSpan().IndexOf((byte)'\n') + 1;
+                var headEnd = head.LastIndexOf(NewLineByte) + 1;
+                var tailStart = tail.AsSpan().IndexOf(NewLineByte) + 1;
                 var kept = _position - TailBytes;
                 if (_terminalStart >= 0 && _terminalStart < kept && (_terminalEnd < 0 || _terminalEnd >= kept))
                 {
@@ -143,7 +144,7 @@ public sealed class ResponseBuffer
 
                 var stitched = new byte[headEnd + 1 + (TailBytes - tailStart)];
                 head[..headEnd].CopyTo(stitched);
-                stitched[headEnd] = (byte)'\n';
+                stitched[headEnd] = NewLineByte;
                 tail.AsSpan(tailStart).CopyTo(stitched.AsSpan(headEnd + 1));
                 return stitched;
             }
@@ -158,12 +159,12 @@ public sealed class ResponseBuffer
             var at = 0;
             head.CopyTo(stitched);
             at += head.Length;
-            stitched[at++] = (byte)'\n';
+            stitched[at++] = NewLineByte;
             marker.CopyTo(stitched.AsSpan(at));
             at += marker.Length;
             tail[..end].CopyTo(stitched.AsSpan(at));
             at += end;
-            stitched[at++] = (byte)'\n';
+            stitched[at++] = NewLineByte;
             rest.CopyTo(stitched.AsSpan(at));
             return stitched;
         }
@@ -186,22 +187,11 @@ public sealed class ResponseBuffer
         {
             while (!bytes.IsEmpty)
             {
-                var newline = bytes.IndexOf((byte)'\n');
+                var newline = bytes.IndexOf(NewLineByte);
                 var part = newline < 0 ? bytes : bytes[..newline];
                 if (!_lineChecked)
                 {
-                    var count = Math.Min(part.Length, LineHeadBytes - _lineHeadCount);
-                    part[..count].CopyTo(_lineHead.AsSpan(_lineHeadCount));
-                    _lineHeadCount += count;
-                    if (_lineHeadCount == LineHeadBytes || newline >= 0)
-                    {
-                        _lineChecked = true;
-                        if (IsTerminal(_lineHead.AsSpan(0, _lineHeadCount)))
-                        {
-                            _terminalStart = _lineStart;
-                            _terminalEnd = -1;
-                        }
-                    }
+                    CheckLine(part, newline);
                 }
 
                 if (newline < 0)
@@ -221,6 +211,26 @@ public sealed class ResponseBuffer
                 _lineChecked = false;
                 bytes = bytes[(newline + 1)..];
             }
+        }
+
+        private void CheckLine(ReadOnlySpan<byte> part, int newline)
+        {
+            var count = Math.Min(part.Length, LineHeadBytes - _lineHeadCount);
+            part[..count].CopyTo(_lineHead.AsSpan(_lineHeadCount));
+            _lineHeadCount += count;
+            if (_lineHeadCount != LineHeadBytes && newline < 0)
+            {
+                return;
+            }
+
+            _lineChecked = true;
+            if (!IsTerminal(_lineHead.AsSpan(0, _lineHeadCount)))
+            {
+                return;
+            }
+
+            _terminalStart = _lineStart;
+            _terminalEnd = -1;
         }
 
         public bool Append(ReadOnlySpan<byte> bytes)
