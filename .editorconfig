@@ -83,3 +83,6 @@ csharp_style_namespace_declarations = file_scoped:warning
 # `dotnet format whitespace` — means giving that up, which is a separate decision
 # with a repo-wide reformat attached, not a hook.
 dotnet_diagnostic.IDE0055.severity = None
+
+# CS8655: The switch expression does not handle some null inputs.
+dotnet_diagnostic.CS8655.severity = silent
