@@ -39,4 +39,4 @@
         <None Include="../../scripts/reducer_scoring/preregistration.json" Link="ReducerScoring/preregistration.json" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
-</Project>
+<ItemGroup><None Include="Unit/Gain/Baselines/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>

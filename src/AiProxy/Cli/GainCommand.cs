@@ -56,7 +56,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         var client = runtime.Client;
         if (settings.Reset)
         {
-            var reset = await client.ResetGainAsync(settings.Endpoint, query, cancellationToken).ConfigureAwait(false);
+            var reset = await client.ResetGainAsync(settings.Endpoint, query, $"cli gain --reset pid {Environment.ProcessId}", cancellationToken).ConfigureAwait(false);
             if (settings.Format == GainFormats.Json)
             {
                 await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(reset, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);

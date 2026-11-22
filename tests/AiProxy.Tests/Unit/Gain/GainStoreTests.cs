@@ -205,7 +205,7 @@ public sealed class GainStoreTests
         await store.RecordAsync(Entry("old", "2026-11-01T10:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
         await store.RecordAsync(Entry("new", "2026-11-01T13:00Z", "/a", "log", 289, 100), [], TestContext.Current.CancellationToken);
         await store.RecordAsync(Entry("other", "2026-11-01T10:00Z", "/b", "log", 289, 100), [], TestContext.Current.CancellationToken);
-        var result = await store.ResetAsync(new GainQuery("/a"), TestContext.Current.CancellationToken);
+        var result = await store.ResetAsync(new GainQuery("/a"), "test", TestContext.Current.CancellationToken);
         Assert.Equal(1, result.Removed);
         Assert.Equal(clock.GetUtcNow(), result.Cutoff);
         var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
@@ -224,7 +224,7 @@ public sealed class GainStoreTests
         await store.RecordAsync(Entry("exact", "2026-11-01T10:00Z", "/a", "json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
         await store.RecordAsync(Entry("below", "2026-11-01T10:00Z", "/a", "below-minimum,json.compact,ccr.preview", 289, 100), [], TestContext.Current.CancellationToken);
 
-        await store.ResetAsync(new GainQuery(Rule: rule), TestContext.Current.CancellationToken);
+        await store.ResetAsync(new GainQuery(Rule: rule), "test", TestContext.Current.CancellationToken);
 
         var report = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
         Assert.Equal(remaining, report.History.Select(static row => row.Id).ToArray());
@@ -279,7 +279,7 @@ public sealed class GainStoreTests
         };
 
         var report = await store.QueryAsync(query, TestContext.Current.CancellationToken);
-        var reset = await store.ResetAsync(query, TestContext.Current.CancellationToken);
+        var reset = await store.ResetAsync(query, "test", TestContext.Current.CancellationToken);
 
         Assert.Equal("kept", Assert.Single(report.History).Id);
         Assert.Equal(1, reset.Removed);
@@ -354,7 +354,7 @@ public sealed class GainStoreTests
         Assert.Equal(1, projectA.Summary.Requests);
         Assert.Equal(new GainOtherTraffic(2, 1_500), projectA.OtherTraffic);
 
-        await store.ResetAsync(new GainQuery("/a"), TestContext.Current.CancellationToken);
+        await store.ResetAsync(new GainQuery("/a"), "test", TestContext.Current.CancellationToken);
         var afterReset = await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken);
         Assert.Equal(1, afterReset.Summary.Requests);
         Assert.Equal(new GainOtherTraffic(1, 70), afterReset.OtherTraffic);
@@ -580,9 +580,11 @@ public sealed class GainStoreTests
             await using var command = connection.CreateCommand();
             command.CommandText = "UPDATE gain_event SET layer = 'unknown' WHERE kind = 'other'";
             Assert.Equal(1, await command.ExecuteNonQueryAsync(cancellation));
+            // A file of 0.34.0 has no version stamp and no audit table; the ladder runs from its first step.
+            command.CommandText = "DROP TABLE gain_reset; PRAGMA user_version = 0;";
+            await command.ExecuteNonQueryAsync(cancellation);
         }
 
-        await new SqliteGainStore(new GainStoreOptions(path), clock).QueryAsync(new GainQuery(), cancellation);
         var store = new SqliteGainStore(new GainStoreOptions(path), clock);
         var report = await store.QueryAsync(new GainQuery(), cancellation);
 

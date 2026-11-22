@@ -152,5 +152,5 @@ public interface IGainStore
     ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken);
     ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken);
     ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken);
-    ValueTask<GainResetResult> ResetAsync(GainQuery query, CancellationToken cancellationToken);
+    ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken);
 }
