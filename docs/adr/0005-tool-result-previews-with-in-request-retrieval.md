@@ -1,7 +1,7 @@
 # 0005: Tool result previews with retrieval answered inside the request
 
 Date: 2026-10-25
-Status: Accepted (owner, 2026-10-25); amended by [0015](0015-size-scaled-previews-read-and-diff-skip-and-a-replay-tool.md) (floor, budget, read and diff skip) and [0016](0016-recoverable-compression-for-chat-completions-on-openrouter.md) (Chat Completions on OpenRouter), 2026-11-20
+Status: Accepted (owner, 2026-10-25); amended by [0015](0015-size-scaled-previews-read-and-diff-skip-and-a-replay-tool.md) (floor, budget, read and diff skip) and [0016](0016-recoverable-compression-for-chat-completions-on-openrouter.md) (Chat Completions on OpenRouter), 2026-11-20; follow-up deadline amendment 2026-11-21
 
 ## Context
 
@@ -86,7 +86,7 @@ Streaming: `message_start`, thinking and text blocks pass through as they arrive
 
 Thread streaming needs one more step. The client has already seen the first message id, but the thread now continues from the last one. The host records the pair in the thread ledger before it releases `message_stop`. When that client's next `continue` names the first id, the host rewrites `previous_message_id` to the last. If the ledger write fails, the client gets an `error` event instead of a message it could not continue from. The semantics of `previous_message_id` across a hidden turn are an assumption. A first captured Claude Code session through the loop must show a continuation that works before the thread path is enabled.
 
-Amended 2026-11-21 ([project review](../work/2026-11-21-project-review.md) F8): a retrieval follow-up send gets the same `HeadersDeadline` as the first send (`src/AiProxy/Ccr/CcrRelay.cs:38`, today applied only at `:89-100`, not in `SendWithPingsAsync` at `:433-442`); when it expires, the relay stops the pings and ends the turn with one `error` event.
+Amended 2026-11-21 ([project review](../work/2026-11-21-project-review.md) F8): a retrieval follow-up send gets the same `HeadersDeadline` as the first send (`src/AiProxy/Ccr/CcrRelay.cs:38`; in 0.34.0 it applied only at `:89-100`, not in `SendWithPingsAsync` at `:433-442`); when it expires, the relay stops the pings and ends the turn with one `error` event. Shipped in 0.35.0.
 
 ### Cache placement
 

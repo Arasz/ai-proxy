@@ -52,6 +52,7 @@ Something off? `ai-proxy doctor` checks the setup and changes nothing.
 
 ## What's new
 
+- Project review fixes: a loopback API token, a rolling `proxy.log`, capture that evicts its oldest rows at the cap, a root that names the exact hosts, and typos that exit 1 instead of starting the proxy (0.35.0). Read the upgrade steps first. [Release notes](docs/changelog/0.35.0-project-review-fixes.md)
 - Streamed Chat Completions requests to OpenRouter get recoverable previews and in-request `proxy_retrieve`, as Anthropic requests do (0.34.0). [Release notes](docs/changelog/0.34.0-chat-completions-recoverable-compression.md)
 - Previews start at 1,000 tokens (was 3,000), scale to the block, and skip small numbered reads and diffs (0.33.0). [Release notes](docs/changelog/0.33.0-preview-floor-1000.md)
 - `ai-proxy replay` runs stored requests through today's compression pipeline, read-only, and prints the saving per content kind (0.32.0). [Release notes](docs/changelog/0.32.0-replay-command.md)

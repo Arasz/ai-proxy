@@ -61,8 +61,10 @@ this file is the only place the notes live. Amended at the end of each wave.
   write failure in the last hour, or capture off while `Proxy__Capture` asks for it. A capture
   fault never stops the control pipe. (P13, #155)
 
-## In review
+- **Root names exact hosts.** The root permits only the decrypted hosts and is replaced once;
+  macOS shows one trust prompt. (P7, #158)
+- **Loopback API token** on every route except `/health`. (P6b, #159)
+- **Join review fixes.** (#160, #161)
 
-- P7 root names exact hosts and rotates once. At the first start after release the root is
-  replaced, and macOS shows one trust prompt.
-- P6b loopback API token.
+Released as 0.35.0 (#162): [release notes](../changelog/0.35.0-project-review-fixes.md). This draft
+is closed.

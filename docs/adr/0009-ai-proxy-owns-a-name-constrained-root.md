@@ -1,6 +1,6 @@
 # 0009 - ai-proxy makes its own name-constrained root
 
-Status: Accepted (owner ruling R2, 2026-10-30)
+Status: Accepted (owner ruling R2, 2026-10-30); amended by [0017](0017-root-names-exact-hosts-and-rotates-once.md) (exact hosts, password wording), 2026-11-21
 
 Supersedes, in [ADR 0003](0003-machine-wide-forward-proxy-and-provider-inspection.md):
 
