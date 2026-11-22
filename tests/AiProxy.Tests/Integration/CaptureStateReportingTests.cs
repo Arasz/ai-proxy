@@ -184,6 +184,44 @@ public sealed class CaptureStateReportingTests
         Assert.Equal(new ProxyControl.CaptureInfo(true, sent), reading.Owner!.Capture);
     }
 
+    [Fact]
+    public async Task A_capture_provider_that_throws_does_not_stop_the_pipe_answering()
+    {
+        using var directory = new TemporaryDirectory();
+        using var dummy = new DummyOwner();
+        await using var control = StartControl(directory.Path, dummy, _ => throw new UnauthorizedAccessException("capture.db belongs to another user"));
+        await control.Start(StartupLease.NoOpLease);
+
+        var first = await ProxyControl.ReadOwnerAsync(directory.Path, TestContext.Current.CancellationToken);
+        var second = await ProxyControl.ReadOwnerAsync(directory.Path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ProxyControl.OwnerState.Running, first.State);
+        Assert.Contains("another user", first.Owner!.Capture!.State!.LastWriteError);
+        Assert.Equal(ProxyControl.OwnerState.Running, second.State);
+    }
+
+    [Fact]
+    public async Task A_long_capture_error_is_cut_so_the_reply_fits_its_frame()
+    {
+        using var directory = new TemporaryDirectory();
+        using var dummy = new DummyOwner();
+        var huge = AtItsCapWithARecentError() with { LastWriteError = new string('x', 20 * 1024) };
+        await using var control = StartControl(directory.Path, dummy, _ => Task.FromResult(new ProxyControl.CaptureInfo(true, huge)));
+        await control.Start(StartupLease.NoOpLease);
+
+        var reading = await ProxyControl.ReadOwnerAsync(directory.Path, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ProxyControl.OwnerState.Running, reading.State);
+        Assert.InRange(reading.Owner!.Capture!.State!.LastWriteError!.Length, 1, 512);
+    }
+
+    private static ProxyControl StartControl(string directory, DummyOwner dummy, Func<CancellationToken, Task<ProxyControl.CaptureInfo>> capture)
+    {
+        var fakeInfo = dummy.Info();
+        var info = new ProxyControl.ProxyInfo(fakeInfo.Product, fakeInfo.Protocol, fakeInfo.Nonce, fakeInfo.Pid, fakeInfo.StartUtc, fakeInfo.ProxyUrl, fakeInfo.ApiUrls, fakeInfo.ProcessStartToken!);
+        return new ProxyControl(directory, info, new StubLifetime(), capture);
+    }
+
     private static async Task<JsonElement> RunDoctorCaptureCheckAsync(string directory, Dictionary<string, string> environment)
     {
         var outcome = await RunAsync(["doctor", "--data-directory", directory, "--timeout", "2", "--format", "json", "--endpoint", "http://127.0.0.1:1", "--proxy", "http://127.0.0.1:2"], environment);
