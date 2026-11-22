@@ -91,7 +91,7 @@ public sealed class ProviderCompressionTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.TryGetValues("x-ai-proxy-content-id", out var values));
         var id = Assert.Single(values);
-        using var content = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var content = proxy.CreateApiClient();
         Assert.Equal(body, await content.GetStringAsync($"/content/{id}", TestContext.Current.CancellationToken));
     }
 

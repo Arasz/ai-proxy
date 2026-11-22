@@ -44,7 +44,7 @@ public sealed class RetrievalToolsTests
 
     private static RetrievalTools NewTools(HttpClient http)
     {
-        return new RetrievalTools(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/"));
+        return new RetrievalTools(new ProxyClient(http), new McpServerOptions("http://127.0.0.1/", Path.Combine(Path.GetTempPath(), "ai-proxy-no-token-" + Guid.NewGuid().ToString("N"))));
     }
 
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

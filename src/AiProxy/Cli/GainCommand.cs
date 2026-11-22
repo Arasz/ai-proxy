@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
+using AiProxy.Client;
 using AiProxy.Core.Gain;
+using AiProxy.Hosting.Api;
+using AiProxy.Hosting.Proxy;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -54,9 +57,10 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         }
 
         var client = runtime.Client;
+        var api = new ProxyApi(settings.Endpoint, ApiToken.Read(ProxyDataDirectory.Resolve(settings.DataDirectory, runtime.Variable)));
         if (settings.Reset)
         {
-            var reset = await client.ResetGainAsync(settings.Endpoint, query, $"cli gain --reset pid {Environment.ProcessId}", cancellationToken).ConfigureAwait(false);
+            var reset = await client.ResetGainAsync(api, query, $"cli gain --reset pid {Environment.ProcessId}", cancellationToken).ConfigureAwait(false);
             if (settings.Format == GainFormats.Json)
             {
                 await runtime.Output.WriteLineAsync(JsonSerializer.Serialize(reset, new JsonSerializerOptions(JsonSerializerDefaults.Web))).ConfigureAwait(false);
@@ -73,10 +77,10 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
             return 0;
         }
 
-        var report = await client.GetGainAsync(settings.Endpoint, query, cancellationToken).ConfigureAwait(false);
+        var report = await client.GetGainAsync(api, query, cancellationToken).ConfigureAwait(false);
         if (settings is { Watch: true, Text: false })
         {
-            await new GainWatch(runtime).RunAsync(client, query, settings, report, cancellationToken).ConfigureAwait(false);
+            await new GainWatch(runtime).RunAsync(client, api, query, settings, report, cancellationToken).ConfigureAwait(false);
             return 0;
         }
 

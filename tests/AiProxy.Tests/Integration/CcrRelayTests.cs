@@ -99,7 +99,7 @@ public sealed class CcrRelayTests : IDisposable
             Assert.DoesNotContain(sent.Headers.Keys, key => key.Equals("X-Ai-Proxy-Project", StringComparison.OrdinalIgnoreCase));
         }
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         Assert.Equal(1, gain!.Summary.Requests);
         Assert.Equal(1, gain.Summary.Recalls);
@@ -319,7 +319,7 @@ public sealed class CcrRelayTests : IDisposable
         {
         }
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         var row = Assert.Single(gain!.History);
         Assert.Equal("ccr.tool", row.Rule);
@@ -480,7 +480,7 @@ public sealed class CcrRelayTests : IDisposable
         {
         }
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         var recall = Assert.Single(gain!.Recalls);
         Assert.Equal("", recall.PreviewId);
@@ -503,7 +503,7 @@ public sealed class CcrRelayTests : IDisposable
         {
         }
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var gain = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
         var recall = Assert.Single(gain!.Recalls);
         Assert.Equal(Id, recall.PreviewId);
@@ -663,7 +663,7 @@ public sealed class CcrRelayTests : IDisposable
             query.Add($"to={Uri.EscapeDataString(end.ToString("O"))}");
         }
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         return (await api.GetFromJsonAsync<GainReport>($"/gain?{string.Join('&', query)}", TestContext.Current.CancellationToken))!;
     }
 

@@ -386,7 +386,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
 
     private static async Task<GainReport> ReportAsync(ProxyHost proxy)
     {
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         return (await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken))!;
     }
 

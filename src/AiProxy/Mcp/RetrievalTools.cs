@@ -3,6 +3,7 @@ using System.Text.Json;
 using AiProxy.Ccr;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
+using AiProxy.Hosting.Api;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -25,7 +26,7 @@ public sealed class RetrievalTools(IProxyClient client, McpServerOptions options
     {
         try
         {
-            var response = await client.RetrieveAsync(options.Endpoint, new RetrievalRequest(id, mode, start, end, pattern, context), cancellationToken).ConfigureAwait(false);
+            var response = await client.RetrieveAsync(new ProxyApi(options.Endpoint, ApiToken.Read(options.DataDirectory)), new RetrievalRequest(id, mode, start, end, pattern, context), cancellationToken).ConfigureAwait(false);
             return new CallToolResult { IsError = response.Error is not null, Content = [new TextContentBlock { Text = response.Text }] };
         }
         catch (HttpRequestException exception)

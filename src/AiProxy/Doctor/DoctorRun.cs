@@ -22,7 +22,7 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
         var dataDirectory = Path.GetFullPath(settings.DataDirectory ?? ProxyRuntimeOptions.DefaultDataDirectory);
         using var handler = new HttpClientHandler { UseProxy = false };
         using var http = new HttpClient(handler) { Timeout = _timeout };
-        var api = await new ApiCheck(http, new Uri(settings.Endpoint), EntryPoint.ProductVersion).ProbeAsync(cancellationToken).ConfigureAwait(false);
+        var api = await new ApiCheck(http, new Uri(settings.Endpoint), EntryPoint.ProductVersion, dataDirectory).ProbeAsync(cancellationToken).ConfigureAwait(false);
 
         CheckResult first = api.Result;
         CheckResult inspection;

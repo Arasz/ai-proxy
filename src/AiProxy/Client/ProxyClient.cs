@@ -1,15 +1,21 @@
 using System.Globalization;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiProxy.Core.Gain;
 
 namespace AiProxy.Client;
 
+/// <summary>Where the proxy's API answers and the bearer token it expects; a null token sends no Authorization header.</summary>
+/// <param name="Endpoint">The API base URL.</param>
+/// <param name="Token">The token from the proxy's data directory, or null when there is none.</param>
+public sealed record ProxyApi(string Endpoint, string? Token);
+
 public interface IProxyClient
 {
-    Task<RetrievalResponse> RetrieveAsync(string endpoint, RetrievalRequest request, CancellationToken cancellationToken = default);
-    Task<GainReport> GetGainAsync(string endpoint, GainQuery query, CancellationToken cancellationToken = default);
-    Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, string caller, CancellationToken cancellationToken = default);
+    Task<RetrievalResponse> RetrieveAsync(ProxyApi api, RetrievalRequest request, CancellationToken cancellationToken = default);
+    Task<GainReport> GetGainAsync(ProxyApi api, GainQuery query, CancellationToken cancellationToken = default);
+    Task<GainResetResult> ResetGainAsync(ProxyApi api, GainQuery query, string caller, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Calls the proxy's JSON API without opening its databases.</summary>
@@ -20,26 +26,30 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public async Task<RetrievalResponse> RetrieveAsync(string endpoint, RetrievalRequest request, CancellationToken cancellationToken = default)
+    public async Task<RetrievalResponse> RetrieveAsync(ProxyApi api, RetrievalRequest request, CancellationToken cancellationToken = default)
     {
-        using var response = await http.PostAsJsonAsync(ApiUri(endpoint, "retrieval"), request, Json, cancellationToken).ConfigureAwait(false);
+        using var message = Request(api, HttpMethod.Post, "retrieval");
+        message.Content = JsonContent.Create(request, options: Json);
+        using var response = await http.SendAsync(message, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<RetrievalResponse>(Json, cancellationToken).ConfigureAwait(false)
                      ?? throw new HttpRequestException("The proxy returned an empty retrieval response.");
         return result.Text is null ? throw new HttpRequestException("The proxy returned an invalid retrieval response.") : result;
     }
 
-    public async Task<GainReport> GetGainAsync(string endpoint, GainQuery query, CancellationToken cancellationToken = default)
+    public async Task<GainReport> GetGainAsync(ProxyApi api, GainQuery query, CancellationToken cancellationToken = default)
     {
-        using var response = await http.GetAsync(ApiUri(endpoint, $"gain{QueryString(query)}"), cancellationToken).ConfigureAwait(false);
+        using var message = Request(api, HttpMethod.Get, $"gain{QueryString(query)}");
+        using var response = await http.SendAsync(message, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainReport>(Json, cancellationToken).ConfigureAwait(false)
                ?? throw new HttpRequestException("The proxy returned an empty gain response.");
     }
 
-    public async Task<GainResetResult> ResetGainAsync(string endpoint, GainQuery query, string caller, CancellationToken cancellationToken = default)
+    public async Task<GainResetResult> ResetGainAsync(ProxyApi api, GainQuery query, string caller, CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, ApiUri(endpoint, "gain/reset")) { Content = JsonContent.Create(query, options: Json) };
+        using var request = Request(api, HttpMethod.Post, "gain/reset");
+        request.Content = JsonContent.Create(query, options: Json);
         request.Headers.TryAddWithoutValidation(GainApi.CallerHeader, caller);
         using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
@@ -69,6 +79,17 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
         }
 
         throw new HttpRequestException($"Proxy API returned {(int)response.StatusCode}: {detail}", null, response.StatusCode);
+    }
+
+    private static HttpRequestMessage Request(ProxyApi api, HttpMethod method, string path)
+    {
+        var request = new HttpRequestMessage(method, ApiUri(api.Endpoint, path));
+        if (api.Token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", api.Token);
+        }
+
+        return request;
     }
 
     private static Uri ApiUri(string endpoint, string path)

@@ -356,7 +356,7 @@ public sealed class CcrChatRelayTests : IDisposable
 
         await SendAsync(proxy, upstream, Request());
 
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         var report = (await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken))!;
         Assert.Equal(1, report.Summary.FollowUps);
         Assert.Equal(1, report.Summary.Recalls);

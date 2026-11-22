@@ -50,7 +50,7 @@ public sealed class ClientsAgainstProxyTests : IDisposable
         await SendAsync(proxy, upstream, Request(Stateless, false));
         var endpoint = proxy.BaseAddress.ToString().TrimEnd('/');
 
-        var gain = await RunAsync(null, "gain", "--endpoint", endpoint, "--format", "json");
+        var gain = await RunAsync(null, "gain", "--endpoint", endpoint, "--format", "json", "--data-directory", proxy.DataDirectory);
         Assert.True(gain.ExitCode == 0, gain.Error);
         using var report = JsonDocument.Parse(gain.Output);
         var summary = Property(report.RootElement, "summary");
@@ -62,7 +62,7 @@ public sealed class ClientsAgainstProxyTests : IDisposable
             + Notification("notifications/initialized")
             + Rpc(2, "tools/call", new { name = "retrieve_original", arguments = new { id = CcrView.IdOf(Thread), mode = "whole" } })
             + Rpc(3, "tools/call", new { name = "retrieve_original", arguments = new { id = CcrView.IdOf(Stateless), mode = "whole" } }),
-            "mcp", "--endpoint", endpoint);
+            "mcp", "--endpoint", endpoint, "--data-directory", proxy.DataDirectory);
         var answers = mcp.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(static line => JsonNode.Parse(line)!).ToDictionary(static node => node["id"]!.GetValue<int>());
         var kept = answers[2]["result"]!;
         Assert.NotEqual(true, kept["isError"]?.GetValue<bool>());

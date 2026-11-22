@@ -19,7 +19,7 @@ public sealed class ProxyCredentialAttributionTests
 
     private static async Task<string?> OnlyProjectAsync(ProxyHost proxy)
     {
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         for (var attempt = 0; ; attempt++)
         {
             var report = await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken);
@@ -34,7 +34,7 @@ public sealed class ProxyCredentialAttributionTests
 
     private static async Task<GainReport> ReportAsync(ProxyHost proxy)
     {
-        using var api = new HttpClient { BaseAddress = proxy.BaseAddress };
+        using var api = proxy.CreateApiClient();
         return (await api.GetFromJsonAsync<GainReport>("/gain", TestContext.Current.CancellationToken))!;
     }
 

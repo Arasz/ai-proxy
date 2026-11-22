@@ -181,9 +181,12 @@ internal sealed class ProxyStub(WebApplication app, string endpoint) : IAsyncDis
     }
 }
 
-internal sealed class McpProcess(string endpoint) : IAsyncDisposable
+/// <summary>A real <c>ai-proxy mcp</c> process under a throwaway home, given <c>--data-directory</c> only when <paramref name="dataDirectory" /> is set.</summary>
+internal sealed class McpProcess(string endpoint, string? dataDirectory = null) : IAsyncDisposable
 {
-    private readonly Launched _launched = Start(endpoint);
+    private static readonly string[] DataDirectoryVariables = ["Proxy__DataDirectory", "PROXY__DATADIRECTORY"];
+
+    private readonly Launched _launched = Start(endpoint, dataDirectory);
     private int _id;
 
     private Process Server => _launched.Process;
@@ -200,17 +203,33 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
 
         await Server.WaitForExitAsync();
         Server.Dispose();
+        _launched.Home.Dispose();
     }
 
-    private static Launched Start(string endpoint)
+    private static Launched Start(string endpoint, string? dataDirectory)
     {
+        var home = new TemporaryDirectory();
+        Directory.CreateDirectory(home.Path);
         var start = new ProcessStartInfo("dotnet") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "AiProxy.dll"));
         start.ArgumentList.Add("mcp");
         start.ArgumentList.Add("--endpoint");
         start.ArgumentList.Add(endpoint);
+        if (dataDirectory is not null)
+        {
+            start.ArgumentList.Add("--data-directory");
+            start.ArgumentList.Add(dataDirectory);
+        }
+
+        start.Environment["HOME"] = home.Path;
+        start.Environment["USERPROFILE"] = home.Path;
+        foreach (var name in DataDirectoryVariables)
+        {
+            start.Environment.Remove(name);
+        }
+
         var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start the MCP server.");
-        return new Launched(process, process.StandardError.ReadToEndAsync());
+        return new Launched(process, process.StandardError.ReadToEndAsync(), home);
     }
 
     public static string Initialize(int id) => Request(id, "initialize", new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "wire-test", version = "1" } });
@@ -265,6 +284,6 @@ internal sealed class McpProcess(string endpoint) : IAsyncDisposable
         }
     }
 
-    /// <summary>The server process and its stderr, read from the start so the pipe never fills.</summary>
-    private sealed record Launched(Process Process, Task<string> Errors);
+    /// <summary>The server process, its stderr read from the start so the pipe never fills, and the home it runs under.</summary>
+    private sealed record Launched(Process Process, Task<string> Errors, TemporaryDirectory Home);
 }

@@ -5,6 +5,7 @@ using System.Threading.Channels;
 using AiProxy.Cli;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
+using AiProxy.Hosting.Api;
 using Microsoft.Extensions.Time.Testing;
 using Spectre.Console.Testing;
 
@@ -22,6 +23,23 @@ public sealed class GainCommandTests
         Assert.Equal(123, json.RootElement.GetProperty("summary").GetProperty("estimatedSavedTokens").GetInt64());
         Assert.Contains("project=%2Fwork%2Fproject", fixture.Handler.Uris.Single().Query);
         Assert.Equal("", fixture.Error.ToString());
+    }
+
+    [Fact]
+    public async Task The_token_comes_from_data_directory_before_the_environment_and_a_reset_sends_it_too()
+    {
+        using var fixture = new Fixture();
+        using var option = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(option.Path);
+        Directory.CreateDirectory(fixture.DataDirectory);
+        await File.WriteAllTextAsync(Path.Combine(option.Path, ApiToken.FileName), "from-option", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(fixture.DataDirectory, ApiToken.FileName), "from-environment", TestContext.Current.CancellationToken);
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "json", "--data-directory", option.Path], TestContext.Current.CancellationToken);
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "json"], TestContext.Current.CancellationToken);
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "--reset", "--yes", "--data-directory", option.Path], TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Bearer from-option", "Bearer from-environment", "Bearer from-option"], fixture.Handler.Authorizations);
     }
 
     [Theory]
@@ -232,7 +250,11 @@ public sealed class GainCommandTests
         public StringWriter Error { get; } = new();
         public TestConsole Console { get; } = new();
         public RecordingHandler Handler { get; } = new();
-        public GainRuntime Runtime => new(Console, Output, Error, new ProxyClient(new HttpClient(Handler, false)), "/work/project", false, TimeProvider.System);
+        /// <summary>The data directory <c>Proxy__DataDirectory</c> names for the command; it holds no token unless a test writes one.</summary>
+        public string DataDirectory { get; } = Path.Combine(Path.GetTempPath(), "ai-proxy-gain-tests", Guid.NewGuid().ToString("N"));
+
+        public GainRuntime Runtime => new(Console, Output, Error, new ProxyClient(new HttpClient(Handler, false)), "/work/project", false, TimeProvider.System, null,
+            name => name == "Proxy__DataDirectory" ? DataDirectory : null);
 
         public void Dispose()
         {
@@ -240,12 +262,17 @@ public sealed class GainCommandTests
             Error.Dispose();
             Console.Dispose();
             Handler.Dispose();
+            if (Directory.Exists(DataDirectory))
+            {
+                Directory.Delete(DataDirectory, true);
+            }
         }
     }
 
     internal sealed class RecordingHandler : HttpMessageHandler
     {
         public List<Uri> Uris { get; } = [];
+        public List<string?> Authorizations { get; } = [];
         public List<string> PostBodies { get; } = [];
         public List<string> Callers { get; } = [];
         public GainReport Report { get; set; } = new(1, DateTimeOffset.Parse("2026-10-25T00:00:00Z"), new GainQuery(), new GainMeasurement(), new GainTotals(1, EstimatedSavedTokens: 123), [], [], [], [], [], [], [], []);
@@ -253,6 +280,7 @@ public sealed class GainCommandTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Uris.Add(request.RequestUri!);
+            Authorizations.Add(request.Headers.Authorization?.ToString());
             if (request.Method == HttpMethod.Post)
             {
                 PostBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));

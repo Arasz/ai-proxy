@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using AiProxy.Core.Capture;
 using AiProxy.Core.Compression;
 using AiProxy.Hosting;
+using AiProxy.Hosting.Api;
 using AiProxy.Hosting.Proxy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -37,6 +39,17 @@ internal sealed class ProxyHost : IAsyncDisposable
 
     /// <summary>The host services used by the integration fixture.</summary>
     public IServiceProvider Services => _app.Services;
+
+    /// <summary>The bearer token the proxy's API expects; it is also in the data directory, as a started proxy leaves it.</summary>
+    public string ApiToken => _app.Services.GetRequiredService<ApiToken>().Value;
+
+    /// <summary>A client for the proxy's API that sends the token the proxy expects.</summary>
+    public HttpClient CreateApiClient()
+    {
+        var client = new HttpClient { BaseAddress = BaseAddress };
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiToken);
+        return client;
+    }
 
     /// <summary>Stops the proxy.</summary>
     public async ValueTask DisposeAsync()
@@ -102,6 +115,8 @@ internal sealed class ProxyHost : IAsyncDisposable
             },
             new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, false, directory.Path));
 
+        Directory.CreateDirectory(directory.Path);
+        app.Services.GetRequiredService<ApiToken>().Write(directory.Path);
         await app.StartAsync();
 
         var addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();
