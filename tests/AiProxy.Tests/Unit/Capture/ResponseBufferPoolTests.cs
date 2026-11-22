@@ -67,8 +67,29 @@ public sealed class ResponseBufferPoolTests
         Assert.Equal("data: {\"type\":\"message_start\"}\n\n", Encoding.UTF8.GetString(body.Span));
     }
 
+    [Fact]
+    public void A_pool_that_lends_longer_arrays_keeps_the_same_body()
+    {
+        var stream = new StringBuilder();
+        for (var index = 0; index < 20_000; index++)
+        {
+            stream.Append("data: {\"type\":\"delta\",\"n\":").Append(index).Append("}\n\n");
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(stream.ToString());
+        Assert.True(bytes.Length > ResponseBuffer.HeadBytes + 2 * ResponseBuffer.TailBytes, "the tail must wrap");
+        var exact = ResponseBuffer.For(EventStream, ResponseBuffer.IdentityEncoding, new RecordingPool());
+        var longer = ResponseBuffer.For(EventStream, ResponseBuffer.IdentityEncoding, new RecordingPool(extra: ResponseBuffer.TailBytes));
+
+        exact.Append(bytes);
+        longer.Append(bytes);
+
+        Assert.Equal(exact.Body.ToArray(), longer.Body.ToArray());
+    }
+
     /// <summary>Hands out new arrays and records what was rented and returned.</summary>
-    private sealed class RecordingPool : ArrayPool<byte>
+    /// <param name="extra">How many bytes longer than asked each array is.</param>
+    private sealed class RecordingPool(int extra = 0) : ArrayPool<byte>
     {
         public List<byte[]> Rented { get; } = [];
 
@@ -76,7 +97,7 @@ public sealed class ResponseBufferPoolTests
 
         public override byte[] Rent(int minimumLength)
         {
-            var array = new byte[minimumLength];
+            var array = new byte[minimumLength + extra];
             Rented.Add(array);
             return array;
         }

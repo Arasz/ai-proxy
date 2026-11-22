@@ -63,7 +63,7 @@ public sealed class ResponseBuffer
     public static ResponseBuffer For(string contentType, string contentEncoding = IdentityEncoding) => For(contentType, contentEncoding, ArrayPool<byte>.Shared);
 
     /// <summary>As <see cref="For(string, string)" />, renting an event stream's head and tail from <paramref name="pool" />.</summary>
-    public static ResponseBuffer For(string contentType, string contentEncoding, ArrayPool<byte> pool)
+    internal static ResponseBuffer For(string contentType, string contentEncoding, ArrayPool<byte> pool)
     {
         var isUnencoded = string.IsNullOrWhiteSpace(contentEncoding) || contentEncoding.Trim().Equals(IdentityEncoding, StringComparison.OrdinalIgnoreCase);
         var isEventStream = contentType.Contains(EventStreamMediaType, StringComparison.OrdinalIgnoreCase);
@@ -189,7 +189,7 @@ public sealed class ResponseBuffer
                 // Bytes were dropped between the two: cut each side back to a whole line.
                 var start = (int)(_afterHead % TailBytes);
                 var tail = new byte[TailBytes];
-                _tail.AsSpan(start).CopyTo(tail);
+                _tail.AsSpan(start, TailBytes - start).CopyTo(tail);
                 _tail.AsSpan(0, start).CopyTo(tail.AsSpan(TailBytes - start));
                 var headEnd = head.LastIndexOf(NewLineByte) + 1;
                 var tailStart = tail.AsSpan().IndexOf(NewLineByte) + 1;

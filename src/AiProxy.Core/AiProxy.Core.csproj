@@ -10,4 +10,8 @@
 
 <ItemGroup>
   <PackageReference Include="CommunityToolkit.Diagnostics" />
-</ItemGroup></Project>
+</ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="AiProxy.Tests"/>
+    </ItemGroup>
+</Project>
