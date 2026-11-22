@@ -28,7 +28,7 @@ public sealed class ProxyClientTests
             return Json(JsonSerializer.Serialize(GainReportBuilder.Build(new GainQuery(), DateTimeOffset.UnixEpoch, [], [], []), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         })) { BaseAddress = new Uri("http://127.0.0.1:1") };
         var client = new ProxyClient(http);
-        var endpoint = new ProxyApi("http://127.0.0.1:1", null);
+        var endpoint = new ProxyApi("http://127.0.0.1:1", null, "/none/api-token");
         Assert.Equal("original", (await client.RetrieveAsync(endpoint, new RetrievalRequest("0123456789abcdef", "whole"), TestContext.Current.CancellationToken)).Text);
         Assert.Equal(0, (await client.GetGainAsync(endpoint, new GainQuery("/a&b", HistoryLimit: 7), TestContext.Current.CancellationToken)).Summary.Requests);
     }
@@ -40,7 +40,7 @@ public sealed class ProxyClientTests
         {
             Content = new StringContent("{\"title\":\"invalid_gain_filter\",\"detail\":\"from must be earlier than to.\"}")
         }))) { BaseAddress = new Uri("http://127.0.0.1:1") };
-        var error = await Assert.ThrowsAsync<HttpRequestException>(() => new ProxyClient(http).GetGainAsync(new ProxyApi("http://127.0.0.1:1", null), new GainQuery(), TestContext.Current.CancellationToken));
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => new ProxyClient(http).GetGainAsync(new ProxyApi("http://127.0.0.1:1", null, "/none/api-token"), new GainQuery(), TestContext.Current.CancellationToken));
         Assert.Contains("from must be earlier than to", error.Message, StringComparison.Ordinal);
     }
 
@@ -59,7 +59,7 @@ public sealed class ProxyClientTests
             });
         }));
         var client = new ProxyClient(http);
-        var api = new ProxyApi("http://127.0.0.1:1", "abc");
+        var api = new ProxyApi("http://127.0.0.1:1", "abc", "/none/api-token");
 
         await client.RetrieveAsync(api, new RetrievalRequest("0123456789abcdef", "whole"), TestContext.Current.CancellationToken);
         await client.GetGainAsync(api, new GainQuery(), TestContext.Current.CancellationToken);

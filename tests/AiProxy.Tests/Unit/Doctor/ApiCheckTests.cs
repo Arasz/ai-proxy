@@ -61,8 +61,28 @@ public sealed class ApiCheckTests
         var probe = await Probe(handler, directory.Path);
 
         Assert.Equal(CheckStatus.Fail, probe.Result.Status);
-        Assert.Contains("token", probe.Result.Detail);
+        Assert.Contains($"refused the API token from {Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName)}", probe.Result.Detail);
+        Assert.Contains("Proxy__DataDirectory", probe.Result.Detail + probe.Result.Fix);
+        Assert.DoesNotContain("stale", probe.Result.Detail + probe.Result.Fix);
         Assert.Equal(["Bearer stale"], handler.Authorizations);
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task An_unreadable_token_file_fails_the_check_instead_of_throwing()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "File modes are POSIX only.");
+        using var directory = new Integration.TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        var path = Path.Combine(directory.Path, AiProxy.Hosting.Api.ApiToken.FileName);
+        await File.WriteAllTextAsync(path, "fresh", TestContext.Current.CancellationToken);
+        File.SetUnixFileMode(path, UnixFileMode.None);
+
+        var probe = await Probe(new TokenHandler("fresh"), directory.Path);
+
+        Assert.Equal(CheckStatus.Fail, probe.Result.Status);
+        Assert.Contains($"Cannot read the API token file {path}", probe.Result.Detail);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     [Fact]

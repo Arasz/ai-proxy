@@ -1,15 +1,25 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiProxy.Core.Gain;
+using AiProxy.Hosting.Api;
 
 namespace AiProxy.Client;
 
 /// <summary>Where the proxy's API answers and the bearer token it expects; a null token sends no Authorization header.</summary>
 /// <param name="Endpoint">The API base URL.</param>
 /// <param name="Token">The token from the proxy's data directory, or null when there is none.</param>
-public sealed record ProxyApi(string Endpoint, string? Token);
+/// <param name="TokenFile">The token file the client read, named when the API refuses the token.</param>
+public sealed record ProxyApi(string Endpoint, string? Token, string TokenFile)
+{
+    /// <summary>The API at <paramref name="endpoint" /> with the token read from <paramref name="dataDirectory" />.</summary>
+    public static ProxyApi For(string endpoint, string dataDirectory)
+    {
+        return new ProxyApi(endpoint, ApiToken.Read(dataDirectory), Path.Combine(dataDirectory, ApiToken.FileName));
+    }
+}
 
 public interface IProxyClient
 {
@@ -31,7 +41,7 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
         using var message = Request(api, HttpMethod.Post, "retrieval");
         message.Content = JsonContent.Create(request, options: Json);
         using var response = await http.SendAsync(message, cancellationToken).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        await EnsureSuccessAsync(api, response, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<RetrievalResponse>(Json, cancellationToken).ConfigureAwait(false)
                      ?? throw new HttpRequestException("The proxy returned an empty retrieval response.");
         return result.Text is null ? throw new HttpRequestException("The proxy returned an invalid retrieval response.") : result;
@@ -41,7 +51,7 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
     {
         using var message = Request(api, HttpMethod.Get, $"gain{QueryString(query)}");
         using var response = await http.SendAsync(message, cancellationToken).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        await EnsureSuccessAsync(api, response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainReport>(Json, cancellationToken).ConfigureAwait(false)
                ?? throw new HttpRequestException("The proxy returned an empty gain response.");
     }
@@ -52,16 +62,21 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
         request.Content = JsonContent.Create(query, options: Json);
         request.Headers.TryAddWithoutValidation(GainApi.CallerHeader, caller);
         using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        await EnsureSuccessAsync(api, response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<GainResetResult>(Json, cancellationToken).ConfigureAwait(false)
                ?? throw new HttpRequestException("The proxy returned an empty reset response.");
     }
 
-    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    private static async Task EnsureSuccessAsync(ProxyApi api, HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
         {
             return;
+        }
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new HttpRequestException(ApiToken.Refused(api.TokenFile, api.Token is not null), null, response.StatusCode);
         }
 
         var detail = response.ReasonPhrase;

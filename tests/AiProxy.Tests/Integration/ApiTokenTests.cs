@@ -94,6 +94,47 @@ public sealed class ApiTokenTests : IDisposable
         Assert.Equal("Bearer", client.DefaultRequestHeaders.Authorization?.Scheme);
     }
 
+    [Theory]
+    [InlineData("/health", 200)]
+    [InlineData("/HEALTH", 200)]
+    [InlineData("/health/", 401)]
+    [InlineData("//gain", 401)]
+    [InlineData("/health/../gain", 401)]
+    [InlineData("/health/%2e%2e/gain", 401)]
+    [InlineData("/gain", 401)]
+    public async Task Only_the_exact_health_path_is_open_whatever_the_path_tricks(string path, int expected)
+    {
+        await using var proxy = await StartWithEveryRouteAsync();
+
+        Assert.Equal(expected, await RawGetStatusAsync(proxy.BaseAddress, path, null));
+    }
+
+    [Theory]
+    [InlineData("bearer")]
+    [InlineData("BEARER")]
+    [InlineData("Bearer")]
+    public async Task The_scheme_matches_in_any_case_and_the_token_still_must_match(string scheme)
+    {
+        await using var proxy = await StartWithEveryRouteAsync();
+
+        Assert.Equal(200, await RawGetStatusAsync(proxy.BaseAddress, "/gain", $"{scheme} {proxy.ApiToken}"));
+        Assert.Equal(401, await RawGetStatusAsync(proxy.BaseAddress, "/gain", $"{scheme} {proxy.ApiToken.ToUpperInvariant()}"));
+        Assert.Equal(401, await RawGetStatusAsync(proxy.BaseAddress, "/gain", $"{scheme}{proxy.ApiToken}"));
+    }
+
+    /// <summary>Sends one GET with the path exactly as written, so no client normalises it first, and returns the status code.</summary>
+    private static async Task<int> RawGetStatusAsync(Uri baseAddress, string path, string? authorization)
+    {
+        using var tcp = new System.Net.Sockets.TcpClient();
+        await tcp.ConnectAsync(baseAddress.Host, baseAddress.Port, TestContext.Current.CancellationToken);
+        await using var stream = tcp.GetStream();
+        var header = authorization is null ? "" : $"Authorization: {authorization}\r\n";
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{baseAddress.Port}\r\n{header}Connection: close\r\n\r\n"), TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(stream, Encoding.ASCII);
+        var status = await reader.ReadLineAsync(TestContext.Current.CancellationToken);
+        return int.Parse(status!.Split(' ')[1], System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     private Task<ProxyHost> StartWithEveryRouteAsync()
     {
         return ProxyHost.StartAsync(new Dictionary<string, string>

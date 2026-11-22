@@ -12,7 +12,10 @@ public sealed class ApiToken(string value)
 
     private const string Scheme = "Bearer ";
 
-    private readonly byte[] _expected = Encoding.UTF8.GetBytes(Scheme + value);
+    /// <summary>How a client finds the data directory, for messages that tell a person where to look.</summary>
+    public const string DirectoryRule = "Clients find the data directory from --data-directory, then Proxy__DataDirectory, then ~/.ai-proxy; point it at the directory the running proxy uses.";
+
+    private readonly byte[] _expected = Encoding.UTF8.GetBytes(value);
 
     /// <summary>The token text a client sends after <c>Bearer</c>.</summary>
     public string Value => value;
@@ -23,18 +26,30 @@ public sealed class ApiToken(string value)
         return new ApiToken(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)));
     }
 
-    /// <summary>The token a running proxy wrote to <paramref name="dataDirectory" />, or null when there is none.</summary>
+    /// <summary>The token a running proxy wrote to <paramref name="dataDirectory" />, or null when there is none; an unreadable file is an <see cref="IOException" /> that names the file.</summary>
     public static string? Read(string dataDirectory)
     {
+        var path = Path.Combine(dataDirectory, FileName);
         try
         {
-            var text = File.ReadAllText(Path.Combine(dataDirectory, FileName)).Trim();
+            var text = File.ReadAllText(path).Trim();
             return text.Length == 0 ? null : text;
         }
         catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
         {
             return null;
         }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        {
+            throw new IOException($"Cannot read the API token file {path} ({exception.GetType().Name}). Check its owner and mode; the proxy writes it for the user that runs it.", exception);
+        }
+    }
+
+    /// <summary>What to tell a person whose request the API refused with 401: which token file the client read, or that it found none.</summary>
+    public static string Refused(string tokenFile, bool found)
+    {
+        var what = found ? $"The proxy refused the API token from {tokenFile} (HTTP 401)." : $"The proxy needs an API token (HTTP 401), and there is no API token at {tokenFile}.";
+        return $"{what} {DirectoryRule}";
     }
 
     /// <summary>Replaces the token file in <paramref name="dataDirectory" />; on POSIX only the owner can read it.</summary>
@@ -56,10 +71,12 @@ public sealed class ApiToken(string value)
         File.Move(temporary, path, true);
     }
 
-    /// <summary>True when <paramref name="authorization" /> is <c>Bearer</c> and this token; compares in constant time.</summary>
+    /// <summary>True when <paramref name="authorization" /> is <c>Bearer</c>, in any case, and this token; compares the token in constant time.</summary>
     public bool Accepts(string? authorization)
     {
-        return authorization is not null && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(authorization), _expected);
+        return authorization is not null
+               && authorization.StartsWith(Scheme, StringComparison.OrdinalIgnoreCase)
+               && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(authorization[Scheme.Length..]), _expected);
     }
 
     /// <summary>The API middleware: answers 401 to a request without this token, except <c>/health</c>.</summary>

@@ -36,8 +36,18 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
 
     private async Task<CheckResult> CheckTokenAsync(string shown, CheckResult answered, CancellationToken cancellationToken)
     {
+        string? token;
+        try
+        {
+            token = ApiToken.Read(dataDirectory);
+        }
+        catch (IOException exception)
+        {
+            return new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {exception.Message}", "Fix the token file's owner or mode, or restart ai-proxy so it writes a new one.");
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, "/gain?historyLimit=1"));
-        if (ApiToken.Read(dataDirectory) is { } token)
+        if (token is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
@@ -46,7 +56,7 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         {
             using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response.StatusCode == HttpStatusCode.Unauthorized
-                ? new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but refuses the API token from {Path.Combine(dataDirectory, ApiToken.FileName)}.", "Pass --data-directory with the directory the running proxy uses.")
+                ? new CheckResult(Name, CheckStatus.Fail, $"ai-proxy answers at {shown}, but: {ApiToken.Refused(Path.Combine(dataDirectory, ApiToken.FileName), token is not null)}", "Pass --data-directory with the directory the running proxy uses.")
                 : answered;
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or IOException && !cancellationToken.IsCancellationRequested)

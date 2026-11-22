@@ -42,6 +42,56 @@ public sealed class GainCommandTests
         Assert.Equal(["Bearer from-option", "Bearer from-environment", "Bearer from-option"], fixture.Handler.Authorizations);
     }
 
+    [Fact]
+    public async Task A_401_names_the_token_file_it_read_and_how_the_directory_is_found()
+    {
+        using var fixture = new Fixture();
+        fixture.Handler.Status = HttpStatusCode.Unauthorized;
+        Directory.CreateDirectory(fixture.DataDirectory);
+        await File.WriteAllTextAsync(Path.Combine(fixture.DataDirectory, ApiToken.FileName), "secret-token-value", TestContext.Current.CancellationToken);
+
+        var code = await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "json"], TestContext.Current.CancellationToken);
+
+        var error = fixture.Error.ToString();
+        Assert.Equal(1, code);
+        Assert.Contains("401", error, StringComparison.Ordinal);
+        Assert.Contains($"refused the API token from {Path.Combine(fixture.DataDirectory, ApiToken.FileName)}", error, StringComparison.Ordinal);
+        Assert.Contains("--data-directory", error, StringComparison.Ordinal);
+        Assert.Contains("Proxy__DataDirectory", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-token-value", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_401_with_no_token_file_says_none_was_found()
+    {
+        using var fixture = new Fixture();
+        fixture.Handler.Status = HttpStatusCode.Unauthorized;
+
+        await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "json"], TestContext.Current.CancellationToken);
+
+        Assert.Contains($"no API token at {Path.Combine(fixture.DataDirectory, ApiToken.FileName)}", fixture.Error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task An_unreadable_token_file_is_a_clear_error_and_no_request_is_sent()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "File modes are POSIX only.");
+        using var fixture = new Fixture();
+        Directory.CreateDirectory(fixture.DataDirectory);
+        var path = Path.Combine(fixture.DataDirectory, ApiToken.FileName);
+        await File.WriteAllTextAsync(path, "secret-token-value", TestContext.Current.CancellationToken);
+        File.SetUnixFileMode(path, UnixFileMode.None);
+
+        var code = await new CliApplication(fixture.Runtime).RunAsync(["gain", "-f", "json"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, code);
+        Assert.Contains($"Cannot read the API token file {path}", fixture.Error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-token-value", fixture.Error.ToString(), StringComparison.Ordinal);
+        Assert.Empty(fixture.Handler.Uris);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
     [Theory]
     [InlineData("", "estimated initial-request")]
     [InlineData("--history", "uest-one")]
@@ -275,12 +325,18 @@ public sealed class GainCommandTests
         public List<string?> Authorizations { get; } = [];
         public List<string> PostBodies { get; } = [];
         public List<string> Callers { get; } = [];
+        public HttpStatusCode? Status { get; set; }
         public GainReport Report { get; set; } = new(1, DateTimeOffset.Parse("2026-10-25T00:00:00Z"), new GainQuery(), new GainMeasurement(), new GainTotals(1, EstimatedSavedTokens: 123), [], [], [], [], [], [], [], []);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Uris.Add(request.RequestUri!);
             Authorizations.Add(request.Headers.Authorization?.ToString());
+            if (Status is { } status)
+            {
+                return new HttpResponseMessage(status);
+            }
+
             if (request.Method == HttpMethod.Post)
             {
                 PostBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));

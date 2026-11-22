@@ -18,8 +18,12 @@ and `mcp` read that file for each call. They find the directory in this order: t
 `--data-directory` option, then `Proxy__DataDirectory`, then `~/.ai-proxy`. A proxy on another
 data directory therefore needs `--data-directory` on both commands, for example
 `claude mcp add ai-proxy -- ai-proxy mcp --data-directory /path/to/data`. Without the right token
-the API answers 401: `gain` exits 1 with `Proxy API returned 401`, and the MCP tool says the
-retrieval API is unavailable (HTTP 401). `ai-proxy status`, `stop` and `replay` need no token.
+the API answers 401. `gain`, the MCP tool and `doctor` then name the token file they read, or say
+that they found none. An unreadable token file is reported with its path and never sent.
+`ai-proxy status`, `stop` and `replay` need no token.
+
+Upgrading: after you upgrade ai-proxy, restart every MCP server (restart the Claude Code
+sessions). An `ai-proxy mcp` from an earlier version sends no token, so each retrieval gets 401.
 
 ## See what the proxy saved
 

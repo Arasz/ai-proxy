@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.Json;
 using AiProxy.Client;
 using AiProxy.Core.Gain;
-using AiProxy.Hosting.Api;
 using AiProxy.Hosting.Proxy;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -57,7 +56,7 @@ public sealed class GainCommand : AsyncCommand<GainSettings>
         }
 
         var client = runtime.Client;
-        var api = new ProxyApi(settings.Endpoint, ApiToken.Read(ProxyDataDirectory.Resolve(settings.DataDirectory, runtime.Variable)));
+        var api = ProxyApi.For(settings.Endpoint, ProxyDataDirectory.Resolve(settings.DataDirectory, runtime.Variable));
         if (settings.Reset)
         {
             var reset = await client.ResetGainAsync(api, query, $"cli gain --reset pid {Environment.ProcessId}", cancellationToken).ConfigureAwait(false);
