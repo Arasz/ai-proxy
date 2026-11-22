@@ -105,4 +105,19 @@ public sealed class ToolOutputRegionFinderTests
 
         Assert.ThrowsAny<InvalidOperationException>(() => Finder.Find(body).ToArray());
     }
+
+    [Fact]
+    public void Finding_regions_does_not_copy_the_body()
+    {
+        var prose = new string('a', 1024 * 1024);
+        var body = Encoding.UTF8.GetBytes($$"""{"messages":[{"role":"user","content":"{{prose}}"},{"role":"tool","content":"the tool said this"}]}""");
+        Finder.Find(body);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var regions = Finder.Find(body);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Single(regions);
+        Assert.True(allocated < body.Length / 4, $"Find allocated {allocated} bytes for a {body.Length}-byte body");
+    }
 }

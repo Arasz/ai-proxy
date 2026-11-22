@@ -181,9 +181,9 @@ public sealed partial class ProviderRequestInspector(
             return;
         }
 
-        Apply(e, exchange, compressed);
-        await RecordGainAsync(exchange, request.Method, body,
-            compressed is { Changed: true } ? compressed.Body.ToArray() : body, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
+        var forwarded = Forwarded(body, compressed);
+        Apply(e, exchange, compressed, forwarded);
+        await RecordGainAsync(exchange, request.Method, body, forwarded, compressed?.Summary?.Path ?? GainLabels.Rules.Unchanged);
     }
 
     /// <summary>Answers 529 when the CCR ledger cannot be read, so the request is never forwarded without its plan.</summary>
@@ -326,7 +326,7 @@ public sealed partial class ProviderRequestInspector(
     private async Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, CcrPlan plan, byte[] body, CompressionResult? compressed)
     {
         LogFailures(e, compressed);
-        var forwarded = compressed is { Changed: true } ? compressed.Body.ToArray() : body;
+        var forwarded = Forwarded(body, compressed);
         if (compressed is { Changed: true, Summary: { } summary })
         {
             exchange.ContentId = summary.RequestId;
@@ -363,8 +363,11 @@ public sealed partial class ProviderRequestInspector(
         }
     }
 
+    /// <summary>The body to forward: the compressed one when compression changed it, else the body as sent.</summary>
+    private static byte[] Forwarded(byte[] body, CompressionResult? compressed) => compressed is { Changed: true } ? BodyBytes.Array(compressed.Body) : body;
+
     /// <summary>Logs the parts that failed and forwards the compressed body when it changed.</summary>
-    private void Apply(SessionEventArgs e, CapturedExchange exchange, CompressionResult? compressed)
+    private void Apply(SessionEventArgs e, CapturedExchange exchange, CompressionResult? compressed, byte[] forwarded)
     {
         if (compressed is null)
         {
@@ -379,7 +382,6 @@ public sealed partial class ProviderRequestInspector(
         }
 
         var stage = time.GetTimestamp();
-        var forwarded = compressed.Body.ToArray();
         e.SetRequestBody(forwarded);
         exchange.Stages.Add(Stages.SetBody, time.GetElapsedTime(stage));
         exchange.ForwardedBytes = forwarded.Length;

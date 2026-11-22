@@ -340,4 +340,44 @@ public sealed class ContentCompressionPipelineTests
         Assert.True(result.Changed);
         Assert.Contains(fragment, Encoding.UTF8.GetString(result.Body.ToArray()), StringComparison.Ordinal);
     }
+
+    private static string WithProse(string toolOutput) =>
+        $$"""{"messages":[{"role":"user","content":"{{new string('a', 1024 * 1024)}}"},{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
+
+    private static async Task<long> AllocatedBy(ContentCompressionPipeline pipeline, byte[] body)
+    {
+        var request = new CompressionRequest(body, "application/json", Dialect.OpenAi);
+        await pipeline.CompressAsync(request, CancellationToken.None);
+        var thread = Environment.CurrentManagedThreadId;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        await pipeline.CompressAsync(request, CancellationToken.None);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // The count covers one thread only; a pipeline that resumed elsewhere would hide its copies.
+        Assert.Equal(thread, Environment.CurrentManagedThreadId);
+        return allocated;
+    }
+
+    [Fact]
+    public async Task A_body_the_pipeline_leaves_alone_is_not_copied()
+    {
+        var (pipeline, _) = Build();
+        var body = Encoding.UTF8.GetBytes(WithProse("the tool said this"));
+
+        var allocated = await AllocatedBy(pipeline, body);
+
+        Assert.True(allocated < body.Length / 4, $"CompressAsync allocated {allocated} bytes for an unchanged {body.Length}-byte body");
+    }
+
+    [Fact]
+    public async Task A_changed_body_costs_its_kept_text_and_one_output_array()
+    {
+        var (pipeline, _) = Build();
+        var body = Encoding.UTF8.GetBytes(WithProse(ToolOutput));
+
+        var allocated = await AllocatedBy(pipeline, body);
+
+        // The record keeps the original and the compressed text (two UTF-16 strings, about 4N), plus the N-byte output.
+        Assert.True(allocated < body.Length * 11 / 2, $"CompressAsync allocated {allocated} bytes for a changed {body.Length}-byte body");
+    }
 }

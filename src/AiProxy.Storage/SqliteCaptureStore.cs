@@ -126,7 +126,7 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
             Provider = request.Provider.ToString(),
             request.Host,
             request.Path,
-            Body = request.Body.ToArray()
+            Body = BodyBytes.Array(request.Body)
         };
 
         var payloadBytes = parameters.Body.Length + request.Host.Length + request.Path.Length + RowOverheadBytes;
