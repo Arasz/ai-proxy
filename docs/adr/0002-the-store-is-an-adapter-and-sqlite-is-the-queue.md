@@ -1,7 +1,7 @@
 # 0002 — The store is an adapter, and SQLite is the queue
 
 **Date:** 2026-10-22
-**Status:** Accepted (2026-10-30; reflects shipped code)
+**Status:** Accepted (2026-10-30; reflects shipped code); amended by [0021](0021-sqlite-stores-open-through-a-schema-ladder.md) (schema ladder), 2026-11-21
 
 ## Context
 

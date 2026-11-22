@@ -1,6 +1,6 @@
 # 0006 - One tool, with local gain and retrieval clients
 
-Status: Accepted (drafted 2026-10-26; accepted 2026-11-04, shipped in 0.15.0)
+Status: Accepted (drafted 2026-10-26; accepted 2026-11-04, shipped in 0.15.0); amended by [0018](0018-loopback-api-token-and-gain-reset-audit.md) (API token), 2026-11-21
 
 ## Context
 

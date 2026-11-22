@@ -70,7 +70,7 @@ is made up (system prompt, tool definitions, turns, tool results, thinking block
 | Variable | What it is |
 |---|---|
 | `PROXY__CAPTURE` | `true` keeps every provider request body the proxy reads, exactly as the client sent it. Anything else, or unset, keeps nothing. |
-| `PROXY__CAPTUREMAXBYTES` | The live bytes of `capture.db` above which capture stops. The default is `1073741824` (1 GB). Live bytes count the pages in use, `(page_count - freelist_count) x page_size`, not the size of the file, because a delete never shrinks the file. Capture resumes by itself once eviction frees pages. |
+| `PROXY__CAPTUREMAXBYTES` | The live bytes `capture.db` may hold. The default is `1073741824` (1 GB). A write that would pass the cap first deletes the oldest whole request and response pairs, in the same transaction; a single write larger than the cap is rejected and logged. Live bytes count the pages in use, `(page_count - freelist_count) x page_size`, not the size of the file, because a delete never shrinks the file. |
 
 Each request becomes one row of `capture_request` in `~/.ai-proxy/capture.db`: a request id, the
 time, the provider, the host, the path without its query string, and the body as bytes. The body
@@ -80,8 +80,8 @@ compression. Bodies over 8 MiB, or sent without a `Content-Length`, are not read
 Headers and the query string are not stored, so `Authorization`, `x-api-key`, cookies and a
 `?key=` parameter stay out of the file. The body itself is stored in full: prompts, source code,
 file contents and tool output the agent sent, and any secret that sits inside them. On Linux and
-macOS the file is `0600` and its directory `0700`. Rows older than 14 days are deleted, once at start and then every hour, and capture stops at the
-ceiling above (a warning is logged once when it stops and once when it resumes). Delete the file when the
+macOS the file is `0600` and its directory `0700`. Rows older than 14 days are deleted, once at start and then every hour, and at the
+cap above the oldest pairs make room for new ones. `ai-proxy status` shows the size against the cap, the oldest row and the last eviction. Delete the file when the
 measurement is over to give the disk space back; a delete frees pages for reuse but does not shrink the file. A failed write is logged as a warning and the request goes out regardless.
 
 Each captured request also gets one row of `capture_response`, under the same `request_id`, once

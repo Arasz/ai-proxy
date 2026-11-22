@@ -1,6 +1,6 @@
 # 0010 - Status and stop reuse the control pipe
 
-Status: Accepted
+Status: Accepted; amended by [0018](0018-loopback-api-token-and-gain-reset-audit.md) (no token on the pipe) and [0019](0019-capture-evicts-oldest-rows-at-its-cap.md) (capture state in `info`), 2026-11-21
 
 ## Context
 
