@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
@@ -43,6 +44,8 @@ internal sealed class ProxyHost : IAsyncDisposable
     {
         await _app.StopAsync();
         await _app.DisposeAsync();
+        // Pooled connections keep the .db and -shm files open; Windows cannot delete them until the pools are closed.
+        SqliteConnection.ClearAllPools();
         _directory.Dispose();
     }
 
