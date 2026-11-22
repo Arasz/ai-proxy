@@ -76,7 +76,7 @@ public sealed class ReplayRunner(ReplayReader reader, ReplayEngine engine) : IDi
     {
         var encoded = stored.Bytes.AsSpan().StartsWith(ZstdMagic);
         var row = await ReplayBodyAsync(stored, encoded, seen, includeEncoded, cancellationToken).ConfigureAwait(false);
-        return row with { Provider = stored.Provider, Host = stored.Host, Encoded = encoded };
+        return row with { Host = stored.Host };
     }
 
     private async Task<ReplayRow> ReplayBodyAsync(StoredBody stored, bool encoded, HashSet<string> seen, bool includeEncoded, CancellationToken cancellationToken)

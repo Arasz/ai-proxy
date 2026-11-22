@@ -58,10 +58,8 @@ public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int Reduc
 /// <summary>The result of replaying one stored request.</summary>
 /// <param name="Outcome">What the row turned out to be.</param>
 /// <param name="Blocks">The tool output regions of a replayed row; empty for every other outcome.</param>
-/// <param name="Provider">The provider the request was captured for, or null when the source does not say.</param>
 /// <param name="Host">The host the request was captured for, or null when the source does not say.</param>
-/// <param name="Encoded">Whether the stored body carried a content encoding.</param>
-public sealed record ReplayRow(ReplayOutcome Outcome, IReadOnlyList<ReplayBlock> Blocks, string? Provider = null, string? Host = null, bool Encoded = false)
+public sealed record ReplayRow(ReplayOutcome Outcome, IReadOnlyList<ReplayBlock> Blocks, string? Host = null)
 {
     /// <summary>A row with no blocks.</summary>
     public static ReplayRow Of(ReplayOutcome outcome)
