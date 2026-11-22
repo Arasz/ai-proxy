@@ -75,7 +75,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         exchange.Relayed = true;
         if (exchange.CaptureId is not null)
         {
-            exchange.Response = ResponseBuffer.For(EventStream, null);
+            exchange.Response = ResponseBuffer.For(EventStream);
         }
 
         IRetrievalRound firstRound = plan.Wire switch

@@ -210,7 +210,7 @@ public sealed partial class ProviderRequestInspector(
         var response = e.HttpClient.Response;
         if (exchange.CaptureId is not null)
         {
-            exchange.Response = ResponseBuffer.For(response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value);
+            exchange.Response = ResponseBuffer.For(response.ContentType ?? string.Empty, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value ?? string.Empty);
         }
 
         if (exchange.ContentId is { } contentId)
@@ -230,7 +230,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         e.DataReceived -= exchange.OnDataReceived;
-        var kept = exchange.Response ?? ResponseBuffer.For(null, null);
+        var kept = exchange.Response ?? ResponseBuffer.Create();
         try
         {
             var response = e.HttpClient.Response;

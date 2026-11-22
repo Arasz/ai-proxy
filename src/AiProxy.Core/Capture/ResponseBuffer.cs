@@ -20,6 +20,12 @@ public sealed class ResponseBuffer
     /// </summary>
     internal const string CutTerminalLine = ":ai-proxy-cut-terminal ";
 
+    /// <summary>The media type of a server-sent event stream.</summary>
+    public const string EventStreamMediaType = "text/event-stream";
+
+    /// <summary>The content encoding that means the body is sent as is.</summary>
+    public const string IdentityEncoding = "identity";
+
     private IStrategy? _strategy;
 
     private ResponseBuffer()
@@ -35,15 +41,19 @@ public sealed class ResponseBuffer
     /// <summary>The bytes to read usage from; empty when <see cref="OverCap" /> or released.</summary>
     public ReadOnlyMemory<byte> Body => _strategy?.Body ?? ReadOnlyMemory<byte>.Empty;
 
+    /// <summary>A buffer for a response with no known content type or encoding: kept whole up to the cap.</summary>
+    public static ResponseBuffer Create() => new() { _strategy = new WholeBody() };
+
     /// <summary>
     ///     A plain (not content-encoded) event stream keeps only its head and tail, where Anthropic puts
     ///     <c>message_start</c> and the final <c>message_delta</c>; any other body is kept whole up to the cap.
+    ///     An empty <paramref name="contentEncoding" /> means the body is not encoded.
     /// </summary>
-    public static ResponseBuffer For(string? contentType, string? contentEncoding)
+    public static ResponseBuffer For(string contentType, string contentEncoding = IdentityEncoding)
     {
-        var plain = string.IsNullOrWhiteSpace(contentEncoding) || contentEncoding.Trim().Equals("identity", StringComparison.OrdinalIgnoreCase);
-        var stream = contentType is not null && contentType.Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
-        return new ResponseBuffer { _strategy = plain && stream ? new Window() : new Whole() };
+        var isUnencoded = string.IsNullOrWhiteSpace(contentEncoding) || contentEncoding.Trim().Equals(IdentityEncoding, StringComparison.OrdinalIgnoreCase);
+        var isEventStream = contentType.Contains(EventStreamMediaType, StringComparison.OrdinalIgnoreCase);
+        return new ResponseBuffer { _strategy = isUnencoded && isEventStream ? new HeadAndTail() : new WholeBody() };
     }
 
     /// <summary>Copies passing bytes; never parses, so it costs the stream a copy and no more.</summary>
@@ -62,15 +72,18 @@ public sealed class ResponseBuffer
     /// <summary>Lets the kept bytes go once usage has been read.</summary>
     public void Release() => _strategy = null;
 
+    /// <summary>How a buffer keeps the bytes that pass; dropped once it reports they no longer fit.</summary>
     private interface IStrategy
     {
+        /// <summary>The kept bytes, as the usage reader sees them.</summary>
         ReadOnlyMemory<byte> Body { get; }
 
         /// <summary>Keeps the bytes; false when they no longer fit.</summary>
         bool Append(ReadOnlySpan<byte> bytes);
     }
 
-    private sealed class Whole : IStrategy
+    /// <summary>Keeps every byte up to <see cref="MaxBytes" />; past that it reports the body no longer fits.</summary>
+    private sealed class WholeBody : IStrategy
     {
         private readonly MemoryStream _bytes = new();
 
@@ -92,15 +105,21 @@ public sealed class ResponseBuffer
     ///     The first <see cref="HeadBytes" /> and a rolling last <see cref="TailBytes" />. It also notes where the last
     ///     Responses terminal event line starts and ends, so a terminal event longer than the tail keeps its end.
     /// </summary>
-    private sealed class Window : IStrategy
+    private sealed class HeadAndTail : IStrategy
     {
         private const int LineHeadBytes = 64;
         private const byte NewLineByte = (byte)'\n';
+        private const string ResponseCompleted = "response.completed";
+        private const string ResponseIncomplete = "response.incomplete";
+        private const string ResponseFailed = "response.failed";
+        private const string DataPrefix = "data:";
+        private const string SpacedDataPrefix = "data: ";
 
+        /// <summary>The line starts of a Responses terminal event, with and without the optional space after <c>data:</c>.</summary>
         private static readonly byte[][] TerminalStarts =
         [
-            .. new[] { "response.completed", "response.incomplete", "response.failed" }
-                .SelectMany(static type => new[] { $"data: {{\"type\":\"{type}\"", $"data:{{\"type\":\"{type}\"" })
+            .. new[] { ResponseCompleted, ResponseIncomplete, ResponseFailed }
+                .SelectMany(static type => new[] { SpacedDataPrefix, DataPrefix }.Select(prefix => $"{prefix}{{\"type\":\"{type}\""))
                 .Select(static start => Encoding.UTF8.GetBytes(start))
         ];
 

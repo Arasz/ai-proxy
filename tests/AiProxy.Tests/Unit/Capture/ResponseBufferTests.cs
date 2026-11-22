@@ -27,9 +27,22 @@ public sealed class ResponseBufferTests
     }
 
     [Fact]
+    public void A_buffer_with_no_content_headers_keeps_the_body_whole_up_to_the_cap()
+    {
+        var buffer = ResponseBuffer.Create();
+        var body = Encoding.UTF8.GetBytes(Stream(20_000));
+        Assert.True(body.Length > ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes, "the body must be larger than a head-and-tail window");
+
+        Append(buffer, body, 7919);
+
+        Assert.False(buffer.OverCap);
+        Assert.True(buffer.Body.Span.SequenceEqual(body));
+    }
+
+    [Fact]
     public void One_byte_over_the_cap_drops_the_body_and_keeps_counting()
     {
-        var buffer = ResponseBuffer.For("application/json", null);
+        var buffer = ResponseBuffer.For("application/json");
 
         Append(buffer, new byte[FourMiB + 1], 65536);
         buffer.Append(new byte[10]);
@@ -64,7 +77,7 @@ public sealed class ResponseBufferTests
     [Fact]
     public void A_plain_event_stream_far_over_the_cap_keeps_its_head_and_tail_and_still_reads_whole()
     {
-        var buffer = ResponseBuffer.For(EventStream, null);
+        var buffer = ResponseBuffer.For(EventStream);
         var stream = Encoding.UTF8.GetBytes(Stream(60_000));
         Assert.True(stream.Length > FourMiB + 1024, $"the stream is {stream.Length} bytes; it must be over the cap");
 
@@ -96,7 +109,7 @@ public sealed class ResponseBufferTests
         var stream = Encoding.UTF8.GetBytes(text);
         const string copy = "data: {\\\"type";
         Assert.Equal(copy, Encoding.UTF8.GetString(stream, stream.Length - ResponseBuffer.TailBytes, copy.Length));
-        var buffer = ResponseBuffer.For(EventStream, null);
+        var buffer = ResponseBuffer.For(EventStream);
 
         Append(buffer, stream, 4096);
 
@@ -115,7 +128,7 @@ public sealed class ResponseBufferTests
         var terminalStart = Encoding.UTF8.GetString(stream).IndexOf($"event: {type}", StringComparison.Ordinal);
         Assert.True(terminalStart > ResponseBuffer.HeadBytes, "the terminal event must start after the head window");
         Assert.True(stream.Length - terminalStart > ResponseBuffer.TailBytes, "the terminal event must be longer than the tail window");
-        var buffer = ResponseBuffer.For(EventStream, null);
+        var buffer = ResponseBuffer.For(EventStream);
 
         Append(buffer, stream, 4093);
 
@@ -129,7 +142,7 @@ public sealed class ResponseBufferTests
     public void A_cut_responses_event_that_is_not_terminal_gives_no_usage()
     {
         var stream = Encoding.UTF8.GetBytes(ResponsesStream("response.in_progress", 3 * ResponseBuffer.TailBytes));
-        var buffer = ResponseBuffer.For(EventStream, null);
+        var buffer = ResponseBuffer.For(EventStream);
 
         Append(buffer, stream, 4093);
 
@@ -140,7 +153,7 @@ public sealed class ResponseBufferTests
     public void A_cut_anthropic_line_is_still_dropped_even_when_it_ends_in_a_responses_usage()
     {
         var stream = Encoding.UTF8.GetBytes(ResponsesStream("response.completed", 3 * ResponseBuffer.TailBytes));
-        var buffer = ResponseBuffer.For(EventStream, null);
+        var buffer = ResponseBuffer.For(EventStream);
 
         Append(buffer, stream, 4093);
 
@@ -150,7 +163,7 @@ public sealed class ResponseBufferTests
     [Fact]
     public void A_released_buffer_holds_nothing()
     {
-        var buffer = ResponseBuffer.For("application/json", null);
+        var buffer = ResponseBuffer.For("application/json");
         buffer.Append("{}"u8);
 
         buffer.Release();
