@@ -6,7 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace AiProxy.Hosting.Integration;
 
-/// <summary>Makes the inspection root: a CA whose name constraint permits only the provider domains and no IP address.</summary>
+/// <summary>Makes the inspection root: a CA whose name constraint permits only the provider hosts and no IP address.</summary>
 internal static class RootCertificateAuthority
 {
     /// <summary>The root's common name, distinct from every other Titanium-based tool's root.</summary>
@@ -15,7 +15,7 @@ internal static class RootCertificateAuthority
     private const string NameConstraintsOid = "2.5.29.30";
     private const string InvalidDomain = "invalid";
 
-    /// <summary>Creates the root, with an exportable private key, constrained to the registrable parents of <paramref name="hosts" />.</summary>
+    /// <summary>Creates the root, with an exportable private key, constrained to exactly <paramref name="hosts" />.</summary>
     /// <param name="hosts">The provider hosts the proxy inspects.</param>
     /// <param name="now">The current time; the root is valid from a day before it for ten years.</param>
     public static X509Certificate2 Create(IEnumerable<string> hosts, DateTimeOffset now)
@@ -41,6 +41,29 @@ internal static class RootCertificateAuthority
     public static bool PermitsExactly(X509Certificate2 root, IReadOnlyCollection<string> hosts)
     {
         return root.Extensions[NameConstraintsOid] is { } stored && Subtrees(stored.RawData).SetEquals(Subtrees(NameConstraints(hosts).RawData));
+    }
+
+    /// <summary>Whether the root permits at least one of <paramref name="hosts" />, by an equal name or a parent domain.</summary>
+    public static bool CoversAnyHost(X509Certificate2 root, IEnumerable<string> hosts)
+    {
+        if (root.Extensions[NameConstraintsOid] is not { } stored)
+        {
+            return false;
+        }
+
+        var permitted = new AsnReader(stored.RawData, AsnEncodingRules.DER).ReadSequence().ReadSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true));
+        var dnsTag = new Asn1Tag(TagClass.ContextSpecific, 2);
+        var names = new List<string>();
+        while (permitted.HasData)
+        {
+            var subtree = permitted.ReadSequence();
+            if (subtree.PeekTag() == dnsTag)
+            {
+                names.Add(subtree.ReadCharacterString(UniversalTagNumber.IA5String, dnsTag));
+            }
+        }
+
+        return hosts.Any(host => names.Any(name => host.Equals(name, StringComparison.OrdinalIgnoreCase) || host.EndsWith($".{name}", StringComparison.OrdinalIgnoreCase)));
     }
 
     private static HashSet<string> Subtrees(byte[] nameConstraints)
@@ -124,13 +147,13 @@ internal static class RootCertificateAuthority
         }
     }
 
-    /// <summary>The DNS domains the root permits: the last two labels of each host name, or <c>invalid</c> when there is none.</summary>
+    /// <summary>The DNS domains the root permits: each host name as named, lower case and without a trailing dot, or <c>invalid</c> when there is none.</summary>
     public static IReadOnlyCollection<string> PermittedDomains(IEnumerable<string> hosts)
     {
         var domains = hosts
             .Select(static host => host.Trim('[', ']').TrimEnd('.'))
             .Where(static host => !IPAddress.TryParse(host, out _))
-            .Select(static host => string.Join('.', host.Split('.').TakeLast(2)).ToLowerInvariant())
+            .Select(static host => host.ToLowerInvariant())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         return domains.Length == 0 ? [InvalidDomain] : domains;

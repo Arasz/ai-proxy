@@ -53,9 +53,14 @@ internal sealed class RootCheck(string dataDirectory, TimeProvider time, IRootTr
             return new CheckResult(Name, CheckStatus.Fail, $"{where} holds no certificate.", "Delete the file and restart ai-proxy to publish a new root.");
         }
 
-        if (!RootCertificateAuthority.IsConstrained(root) || !RootCertificateAuthority.PermitsExactly(root, [.. ProviderHostCatalog.Hosts]))
+        if (!RootCertificateAuthority.IsConstrained(root) || !RootCertificateAuthority.CoversAnyHost(root, ProviderHostCatalog.Hosts))
         {
             return new CheckResult(Name, CheckStatus.Fail, $"The root at {where} is not limited to the provider hosts.", "Delete the root files in the data directory and restart ai-proxy to create a constrained root.");
+        }
+
+        if (!RootCertificateAuthority.PermitsExactly(root, [.. ProviderHostCatalog.Hosts]))
+        {
+            return new CheckResult(Name, CheckStatus.Warn, $"The root at {where} permits names other than the current provider hosts.", "Restart ai-proxy to replace it with a root that permits exactly those hosts.");
         }
 
         var now = time.GetUtcNow();

@@ -144,6 +144,150 @@ public sealed class RootCertificateStorageTests
     }
 
     [Fact]
+    public async Task A_root_that_names_registrable_parents_is_replaced_once_and_only_its_thumbprint_is_untrusted()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var trust = new RecordingTrust();
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using var service = CreateService(directory.Path, null, true, trust);
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+
+        Assert.Equal(["load", "check", "trust", "check", $"untrust {oldThumbprint}"], trust.Calls);
+        using var after = LoadRoot(directory.Path, StoredPassword(directory.Path));
+        Assert.NotEqual(oldThumbprint, after.Thumbprint);
+        Assert.True(RootCertificateAuthority.PermitsExactly(after, [.. ProviderHostCatalog.Hosts]));
+    }
+
+    [Fact]
+    public async Task A_declined_trust_prompt_does_not_lose_the_old_thumbprint_and_the_next_start_untrusts_it()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            var declined = new RecordingTrust { DuringTrust = () => throw new InvalidOperationException("declined") };
+            await using (var first = CreateService(directory.Path, null, true, declined))
+            {
+                await Assert.ThrowsAsync<InvalidOperationException>(() => first.StartAsync(TestContext.Current.CancellationToken));
+            }
+
+            var accepted = new RecordingTrust();
+            await using var second = CreateService(directory.Path, null, true, accepted);
+            await second.StartAsync(TestContext.Current.CancellationToken);
+            await second.StopAsync(CancellationToken.None);
+
+            Assert.Contains($"untrust {oldThumbprint}", accepted.Calls);
+            Assert.Empty(Directory.EnumerateFiles(directory.Path, "root-ca.replaced*"));
+
+            var third = new RecordingTrust();
+            await using var again = CreateService(directory.Path, null, true, third);
+            await again.StartAsync(TestContext.Current.CancellationToken);
+            await again.StopAsync(CancellationToken.None);
+            Assert.DoesNotContain(third.Calls, call => call.StartsWith("untrust", StringComparison.Ordinal));
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_untrust_keeps_the_record_for_the_next_start()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using (var first = CreateService(directory.Path, null, true, new RecordingTrust { UntrustFailure = new IOException("no tool") }))
+            {
+                await first.StartAsync(TestContext.Current.CancellationToken);
+                await first.StopAsync(CancellationToken.None);
+            }
+
+            var retry = new RecordingTrust();
+            await using var second = CreateService(directory.Path, null, true, retry);
+            await second.StartAsync(TestContext.Current.CancellationToken);
+            await second.StopAsync(CancellationToken.None);
+
+            Assert.Contains($"untrust {oldThumbprint}", retry.Calls);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
+    [Fact]
+    public async Task A_root_made_for_the_current_hosts_is_kept_by_a_trusting_start_and_nothing_is_untrusted()
+    {
+        using var directory = new TemporaryDirectory();
+        await StartAndStopAsync(directory.Path, null);
+        var password = StoredPassword(directory.Path);
+        string first;
+        using (var root = LoadRoot(directory.Path, password))
+        {
+            first = root.Thumbprint;
+        }
+
+        var trust = new RecordingTrust();
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using var service = CreateService(directory.Path, null, true, trust);
+            await service.StartAsync(TestContext.Current.CancellationToken);
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+
+        Assert.DoesNotContain(trust.Calls, call => call.StartsWith("untrust", StringComparison.Ordinal));
+        using var second = LoadRoot(directory.Path, password);
+        Assert.Equal(first, second.Thumbprint);
+    }
+
+    [Fact]
+    public async Task After_a_rotation_a_leaf_for_a_provider_host_chains_to_the_new_root_and_not_the_old_one()
+    {
+        using var directory = new TemporaryDirectory();
+        var oldThumbprint = WriteParentRoot(directory.Path);
+        var suppressed = CertificateManager.SuppressInteractiveRootStoreMutations;
+        try
+        {
+            await using var service = CreateService(directory.Path, null, true, new RecordingTrust());
+            await service.StartAsync(TestContext.Current.CancellationToken);
+
+            using var leaf = await service.Server.CertificateManager.CreateServerCertificate("api.anthropic.com");
+
+            var current = service.Server.CertificateManager.RootCertificate;
+            Assert.NotNull(leaf);
+            Assert.NotEqual(oldThumbprint, current?.Thumbprint);
+            using var chain = new X509Chain();
+            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+            chain.ChainPolicy.CustomTrustStore.Add(current!);
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            Assert.True(chain.Build(leaf), string.Join(", ", chain.ChainStatus.Select(status => status.Status)));
+            await service.StopAsync(CancellationToken.None);
+        }
+        finally
+        {
+            CertificateManager.SuppressInteractiveRootStoreMutations = suppressed;
+        }
+    }
+
+    [Fact]
     public async Task The_same_hosts_in_another_order_keep_the_root_and_untrust_nothing()
     {
         using var directory = new TemporaryDirectory();
@@ -327,6 +471,18 @@ public sealed class RootCertificateStorageTests
         var request = new CertificateRequest(OldRootName, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
         using var old = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1));
+        File.WriteAllBytes(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName), old.Export(X509ContentType.Pfx, password));
+        return old.Thumbprint;
+    }
+
+    /// <summary>Writes the 0.34.0-style root: constrained to the registrable parent of each catalog host, opened by the stored password.</summary>
+    private static string WriteParentRoot(string dataDirectory)
+    {
+        Directory.CreateDirectory(dataDirectory);
+        string[] parents = [.. ProviderHostCatalog.Hosts.Select(static host => string.Join('.', host.Split('.').TakeLast(2))).Distinct()];
+        using var old = RootCertificateAuthority.Create(parents, DateTimeOffset.UtcNow);
+        const string password = "stored-test-password";
+        File.WriteAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePasswordFileName), password);
         File.WriteAllBytes(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificateFileName), old.Export(X509ContentType.Pfx, password));
         return old.Thumbprint;
     }

@@ -85,3 +85,18 @@ against its source. Rule 3 states the outcome, and the P7 gate proves it either 
   `src/AiProxy/Hosting/Integration/RootCertificateFiles.cs`,
   `src/AiProxy/Hosting/Integration/TitaniumProxyService.cs`, `src/AiProxy/Hosting/IProviderHosts.cs`,
   `src/AiProxy.Core/Providers/ProviderHostCatalog.cs`
+
+## Amendment 2026-11-22
+
+- A dNSName name constraint also permits every subdomain of the named domain (RFC 5280, section
+  4.2.1.10). So `openrouter.ai` and `chatgpt.com` permit their subdomains too. Rule 1 means "no
+  name beyond the catalog hosts and the subdomains of a host that is itself a registrable name".
+- Rule 3 holds without a code clear of Titanium's leaf cache. Rotation happens only at start, the
+  root is set before any leaf exists, and `SaveFakeCertificates` is false, so no leaf signed by
+  the old root can be reused.
+- Rule 2 also covers a declined trust prompt. Before the old root files are overwritten, its
+  thumbprint is written to `root-ca.replaced` in the data directory (mode 0600). Every start that
+  trusts the current root untrusts each recorded thumbprint and deletes a record only after its
+  untrust succeeds.
+- Rule 5: `doctor` fails on a root that permits none of the catalog hosts, and warns on a root that
+  covers them but differs from the set.

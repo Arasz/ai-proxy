@@ -27,6 +27,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     /// <summary>File name of the generated pfx password, used when <c>Proxy:RootCertificatePassword</c> is not set.</summary>
     public const string RootCertificatePasswordFileName = "root-ca.password";
 
+    /// <summary>Thumbprints of replaced roots not yet untrusted, kept so a declined trust prompt does not lose them.</summary>
+    public const string ReplacedRootsFileName = "root-ca.replaced";
+
     private const string SelfRequestMessage = "This port is the ai-proxy forward proxy, not an origin server. Set it as HTTP_PROXY/HTTPS_PROXY, not as a base URL.\n";
 
     private readonly ISystemProxyGuardLauncher _guardLauncher;
@@ -140,9 +143,12 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         {
             var trust = _rootCertificate(Server.CertificateManager);
             trust.EnsureTrusted();
-            if (root.ReplacedThumbprint is { } old)
+            foreach (var old in root.Files.PendingUntrust().Where(pending => !string.Equals(pending, root.Root.Thumbprint, StringComparison.OrdinalIgnoreCase)))
             {
-                Untrust(trust, old);
+                if (Untrust(trust, old))
+                {
+                    root.Files.Forget(old);
+                }
             }
         }
 
@@ -341,15 +347,17 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
     }
 
     /// <summary>Removes a replaced root; a failure leaves it trusted but never stops the start, because the new root already works.</summary>
-    private void Untrust(IRootCertificate trust, string thumbprint)
+    private bool Untrust(IRootCertificate trust, string thumbprint)
     {
         try
         {
             trust.Untrust(thumbprint);
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception or CryptographicException)
         {
             Log.UntrustFailed(_logger, thumbprint, exception.Message);
+            return false;
         }
     }
 

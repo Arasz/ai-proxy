@@ -95,6 +95,23 @@ public sealed class DoctorCommandTests
     }
 
     [Fact]
+    public async Task A_data_directory_holding_an_old_style_parent_root_gets_the_warn_status_for_the_root_check()
+    {
+        using var directory = new TemporaryDirectory();
+        Directory.CreateDirectory(directory.Path);
+        string[] parents = [.. Core.Providers.ProviderHostCatalog.Hosts.Select(static host => string.Join('.', host.Split('.').TakeLast(2))).Distinct()];
+        using var root = RootCertificateAuthority.Create(parents, DateTimeOffset.UtcNow);
+        File.WriteAllText(Path.Combine(directory.Path, "root-ca.pem"), root.ExportCertificatePem());
+        var outcome = await RunAsync([], "--endpoint", $"http://127.0.0.1:{ClosedPort()}", "--proxy", $"http://127.0.0.1:{ClosedPort()}", "--data-directory", directory.Path, "--format", "json");
+
+        using var json = JsonDocument.Parse(outcome.Json);
+        var check = json.RootElement.GetProperty("checks")[2];
+        Assert.Equal("root", check.GetProperty("name").GetString());
+        Assert.Equal("warn", check.GetProperty("status").GetString());
+        Assert.Contains("restart", check.GetProperty("fix").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task An_environment_proxy_secret_never_reaches_text_or_json_output()
     {
         await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());

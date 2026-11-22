@@ -3,6 +3,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using AiProxy.Core.Providers;
+using AiProxy.Hosting;
 using AiProxy.Hosting.Integration;
 
 namespace AiProxy.Tests.Unit;
@@ -13,11 +14,41 @@ public sealed class RootCertificateAuthorityTests
     private static readonly DateTimeOffset Now = new(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void The_permitted_domains_are_the_registrable_parents_of_the_provider_hosts()
+    public void A_root_permits_exactly_the_hosts_it_is_made_for_and_no_parent()
     {
-        var domains = RootCertificateAuthority.PermittedDomains(ProviderHostCatalog.Hosts);
+        using var root = RootCertificateAuthority.Create(["api.anthropic.com", "chatgpt.com"], Now);
 
-        Assert.Equal(["anthropic.com", "chatgpt.com", "googleapis.com", "openai.com", "openrouter.ai"], domains.Order(StringComparer.Ordinal));
+        Assert.Equal(["api.anthropic.com", "chatgpt.com"], PermittedDnsNames(root).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void A_host_is_permitted_in_lower_case_and_without_a_trailing_dot()
+    {
+        Assert.Equal(["api.anthropic.com"], RootCertificateAuthority.PermittedDomains(["API.Anthropic.com."]));
+    }
+
+    [Fact]
+    public void A_root_made_from_the_canonical_host_source_permits_every_catalog_host_and_nothing_else()
+    {
+        using var root = RootCertificateAuthority.Create(new CanonicalProviderHosts().Hosts, Now);
+
+        Assert.Equal(ProviderHostCatalog.Hosts.Order(StringComparer.Ordinal), PermittedDnsNames(root).Order(StringComparer.Ordinal));
+        Assert.Contains("chatgpt.com", PermittedDnsNames(root));
+    }
+
+    [Theory]
+    [InlineData("auth.openai.com")]
+    [InlineData("oauth2.googleapis.com")]
+    [InlineData("anthropic.com")]
+    public void A_leaf_for_a_sibling_or_parent_of_a_provider_host_fails_the_name_constraint(string host)
+    {
+        using var root = RootCertificateAuthority.Create(ProviderHostCatalog.Hosts, Now);
+        using var leaf = Leaf(root, host);
+
+        using var chain = Chain(root);
+
+        Assert.False(chain.Build(leaf));
+        Assert.Contains(ExpectedNameConstraintFailure(), chain.ChainStatus.Select(status => status.Status));
     }
 
     [Fact]
@@ -44,11 +75,14 @@ public sealed class RootCertificateAuthorityTests
         Assert.True(RootCertificateAuthority.IsConstrained(root));
     }
 
-    [Fact]
-    public void A_leaf_for_a_provider_host_chain_builds_to_the_root()
+    public static TheoryData<string> CatalogHosts => [.. ProviderHostCatalog.Hosts];
+
+    [Theory]
+    [MemberData(nameof(CatalogHosts))]
+    public void A_leaf_for_a_provider_host_chain_builds_to_the_root(string host)
     {
         using var root = RootCertificateAuthority.Create(ProviderHostCatalog.Hosts, Now);
-        using var leaf = Leaf(root, "api.anthropic.com");
+        using var leaf = Leaf(root, host);
 
         using var chain = Chain(root);
         var built = chain.Build(leaf);
@@ -119,6 +153,24 @@ public sealed class RootCertificateAuthorityTests
         using var titanium = request.CreateSelfSigned(Now.AddDays(-1), Now.AddYears(1));
 
         Assert.False(RootCertificateAuthority.IsConstrained(titanium));
+    }
+
+    /// <summary>The DNS names in the root's permitted subtrees, read straight from the extension.</summary>
+    private static string[] PermittedDnsNames(X509Certificate2 root)
+    {
+        var constraint = Assert.Single(root.Extensions.Cast<X509Extension>(), extension => extension.Oid?.Value == "2.5.29.30");
+        var permitted = new AsnReader(constraint.RawData, AsnEncodingRules.DER).ReadSequence().ReadSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true));
+        var names = new List<string>();
+        while (permitted.HasData)
+        {
+            var subtree = permitted.ReadSequence();
+            if (subtree.PeekTag() == new Asn1Tag(TagClass.ContextSpecific, 2))
+            {
+                names.Add(subtree.ReadCharacterString(UniversalTagNumber.IA5String, new Asn1Tag(TagClass.ContextSpecific, 2)));
+            }
+        }
+
+        return [.. names];
     }
 
     /// <summary>The flag a chain reports for an address inside an excluded subtree.</summary>

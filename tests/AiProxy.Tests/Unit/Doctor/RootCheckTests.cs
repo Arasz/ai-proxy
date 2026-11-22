@@ -84,11 +84,30 @@ public sealed class RootCheckTests : IDisposable
     }
 
     [Fact]
-    public async Task A_root_constrained_to_other_hosts_fails()
+    public async Task A_root_that_permits_none_of_the_provider_hosts_fails()
     {
         using var root = Root(Now, ["example.com"]);
         WritePem(root.ExportCertificatePem());
         Assert.Equal(CheckStatus.Fail, (await Run()).Status);
+    }
+
+    [Fact]
+    public async Task A_root_that_covers_the_hosts_but_differs_from_them_warns_and_says_to_restart()
+    {
+        using var root = Root(Now, [.. ProviderHostCatalog.Hosts, "extra.example"]);
+        WritePem(root.ExportCertificatePem());
+        var result = await Run();
+        Assert.Equal(CheckStatus.Warn, result.Status);
+        Assert.Contains("restart", result.Fix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task A_root_that_names_the_registrable_parents_of_the_hosts_warns()
+    {
+        string[] parents = [.. ProviderHostCatalog.Hosts.Select(static host => string.Join('.', host.Split('.').TakeLast(2))).Distinct()];
+        using var root = Root(Now, parents);
+        WritePem(root.ExportCertificatePem());
+        Assert.Equal(CheckStatus.Warn, (await Run()).Status);
     }
 
     [Fact]
