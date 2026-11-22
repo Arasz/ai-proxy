@@ -292,18 +292,13 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         public long Bytes { get; init; }
     }
 
-    private static async Task<bool> RequestRowExistsAsync(SqliteConnection connection, string requestId, CancellationToken cancellationToken)
-    {
-        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+    private static async Task<bool> RequestRowExistsAsync(SqliteConnection connection, string requestId, CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             "SELECT COUNT(*) FROM capture_request WHERE request_id = @requestId;",
             new { requestId },
             cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
-    }
 
-    private static Task BeginAsync(SqliteConnection connection, CancellationToken cancellationToken)
-    {
-        return connection.ExecuteAsync(new CommandDefinition("BEGIN IMMEDIATE;", commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken));
-    }
+    private static Task BeginAsync(SqliteConnection connection, CancellationToken cancellationToken) => connection.ExecuteAsync(new CommandDefinition("BEGIN IMMEDIATE;", commandTimeout: ContentSchema.RequestCommandTimeoutSeconds, cancellationToken: cancellationToken));
 
     /// <summary>The pages a row of the estimated size takes, with room for its index entries and overflow links.</summary>
     private static long PagesFor(long payloadBytes, long pageSize)
@@ -312,10 +307,7 @@ public sealed partial class SqliteCaptureStore(string databasePath, long maxLive
         return pages + (pages / 32) + 2;
     }
 
-    private static async Task<long> PageSizeAsync(SqliteConnection connection, CancellationToken cancellationToken)
-    {
-        return await connection.ExecuteScalarAsync<long>(new CommandDefinition("PRAGMA page_size;", cancellationToken: cancellationToken)).ConfigureAwait(false);
-    }
+    private static async Task<long> PageSizeAsync(SqliteConnection connection, CancellationToken cancellationToken) => await connection.ExecuteScalarAsync<long>(new CommandDefinition("PRAGMA page_size;", cancellationToken: cancellationToken)).ConfigureAwait(false);
 
     /// <summary>The pages in use, not the size of the file: a delete moves pages to the free list and never shrinks the file.</summary>
     private static async Task<long> LivePagesAsync(SqliteConnection connection, CancellationToken cancellationToken)

@@ -59,10 +59,7 @@ public sealed record GainTotals(
     /// <summary>Net tokens as a percentage of the original, to one decimal; zero when there was no original.</summary>
     public decimal NetPercent => Percent(EstimatedNetTokens);
 
-    private decimal Percent(long tokens)
-    {
-        return EstimatedOriginalTokens == 0 ? 0m : Math.Round(tokens * 100m / EstimatedOriginalTokens, 1);
-    }
+    private decimal Percent(long tokens) => EstimatedOriginalTokens == 0 ? 0m : Math.Round(tokens * 100m / EstimatedOriginalTokens, 1);
 }
 
 /// <summary>Provider-host calls that are not model requests, such as telemetry; counted here and never in the savings totals.</summary>

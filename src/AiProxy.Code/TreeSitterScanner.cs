@@ -191,15 +191,13 @@ internal static class TreeSitterScanner
         }
     }
 
-    private static CodeTokenKind GapKind(char character)
-    {
-        return character switch
+    private static CodeTokenKind GapKind(char character) =>
+        character switch
         {
             ' ' or '\t' or '\f' => CodeTokenKind.Whitespace,
             '\r' or '\n' => CodeTokenKind.NewLine,
             _ => CodeTokenKind.Other
         };
-    }
 
     private static int LineBreaks(string text, int start, int length)
     {
@@ -284,22 +282,13 @@ internal static class TreeSitterScanner
         return true;
     }
 
-    private static CodeLexResult Unsupported()
-    {
-        return new CodeLexResult(false, []);
-    }
+    private static CodeLexResult Unsupported() => new(false, []);
 
     /// <summary>One pending scan step: a node to visit, or the literal text between <c>Start</c> and <c>End</c>.</summary>
     private sealed record ScanItem(Node? Node, int Start, int End)
     {
-        public static ScanItem Visit(Node node)
-        {
-            return new ScanItem(node, 0, 0);
-        }
+        public static ScanItem Visit(Node node) => new(node, 0, 0);
 
-        public static ScanItem Literal(int start, int end)
-        {
-            return new ScanItem(null, start, end);
-        }
+        public static ScanItem Literal(int start, int end) => new(null, start, end);
     }
 }

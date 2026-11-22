@@ -135,15 +135,12 @@ public sealed class GainView
         }
     }
 
-    private static IRenderable[] SummaryRow(string name, GainTotals totals)
-    {
-        return
-        [
-            Plain(name == GainHarness.OpenAiHostUnknown ? "openai (no host)" : name), Plain(Compact(totals.Requests)), Plain(Compact(totals.EstimatedOriginalTokens)), Plain(Compact(totals.EstimatedForwardedTokens)),
-            Signed(totals.EstimatedSavedTokens), Plain(Compact(totals.EstimatedRetrievedTokens)), Plain(Compact(totals.EstimatedFollowUpTokens)),
-            Signed(totals.EstimatedNetTokens), Signed(totals.SavedPercent, Percent(totals.SavedPercent)), Signed(totals.NetPercent, Percent(totals.NetPercent))
-        ];
-    }
+    private static IRenderable[] SummaryRow(string name, GainTotals totals) =>
+    [
+        Plain(name == GainHarness.OpenAiHostUnknown ? "openai (no host)" : name), Plain(Compact(totals.Requests)), Plain(Compact(totals.EstimatedOriginalTokens)), Plain(Compact(totals.EstimatedForwardedTokens)),
+        Signed(totals.EstimatedSavedTokens), Plain(Compact(totals.EstimatedRetrievedTokens)), Plain(Compact(totals.EstimatedFollowUpTokens)),
+        Signed(totals.EstimatedNetTokens), Signed(totals.SavedPercent, Percent(totals.SavedPercent)), Signed(totals.NetPercent, Percent(totals.NetPercent))
+    ];
 
     private static void AddBuckets(List<IRenderable> views, string title, IReadOnlyList<GainBucket> buckets)
     {
@@ -155,20 +152,11 @@ public sealed class GainView
     /// <summary>A table column; numbers align right.</summary>
     private sealed record Column(string Header, bool Right = false);
 
-    private static Markup Title(string text)
-    {
-        return new Markup($"[bold]{Markup.Escape(text)}[/]\n");
-    }
+    private static Markup Title(string text) => new($"[bold]{Markup.Escape(text)}[/]\n");
 
-    private static IRenderable Plain(string value)
-    {
-        return new Text(value);
-    }
+    private static IRenderable Plain(string value) => new Text(value);
 
-    private static IRenderable Signed(long value)
-    {
-        return Signed(value, Compact(value));
-    }
+    private static IRenderable Signed(long value) => Signed(value, Compact(value));
 
     private static IRenderable Signed(decimal value, string text)
     {
@@ -176,10 +164,7 @@ public sealed class GainView
         return new Markup($"[{colour}]{Markup.Escape(text)}[/]");
     }
 
-    private static string Tail(string value)
-    {
-        return value.Length <= 8 ? value : value[^8..];
-    }
+    private static string Tail(string value) => value.Length <= 8 ? value : value[^8..];
 
     private static string Folder(string? project)
     {
@@ -194,15 +179,9 @@ public sealed class GainView
     }
 
     /// <summary>A drive path (<c>C:\</c>) or a UNC path (<c>\\server</c>); only these split on backslashes.</summary>
-    private static bool IsWindowsPath(string path)
-    {
-        return path.StartsWith(@"\\", StringComparison.Ordinal) || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] is '\\' or '/');
-    }
+    private static bool IsWindowsPath(string path) => path.StartsWith(@"\\", StringComparison.Ordinal) || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] is '\\' or '/');
 
-    private static string ShortStamp(DateTimeOffset value)
-    {
-        return value.UtcDateTime.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-    }
+    private static string ShortStamp(DateTimeOffset value) => value.UtcDateTime.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
     /// <summary>A table; <paramref name="tight"/> drops the outer border and all padding so the ten summary columns fit an 80-column terminal.</summary>
     private static Table Table(Column[] columns, IEnumerable<IRenderable[]> rows, bool tight = false)
@@ -256,10 +235,7 @@ public sealed class GainView
         return scaled.ToString("0.0", CultureInfo.InvariantCulture) + suffix;
     }
 
-    private static string Number(long value)
-    {
-        return value.ToString("N0", CultureInfo.InvariantCulture);
-    }
+    private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
     /// <summary>One decimal, capped at 999% either way so a wild ratio cannot widen the table.</summary>
     private static string Percent(decimal value)
@@ -277,8 +253,5 @@ public sealed class GainView
         return value.ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 
-    private static string Stamp(DateTimeOffset value)
-    {
-        return value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-    }
+    private static string Stamp(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 }

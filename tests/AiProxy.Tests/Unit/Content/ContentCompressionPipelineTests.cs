@@ -25,10 +25,7 @@ public sealed class ContentCompressionPipelineTests
                                       2026-03-12 10:00:05 INFO worker=api-1 nothing to see
                                       """;
 
-    private static string Body(string toolOutput)
-    {
-        return $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
-    }
+    private static string Body(string toolOutput) => $$"""{"messages":[{"role":"tool","content":{{JsonSerializer.Serialize(toolOutput)}}}]}""";
 
     private static (ContentCompressionPipeline Pipeline, RecordingContentStore Store) Build(
         IContentStore? store = null,
@@ -287,10 +284,7 @@ public sealed class ContentCompressionPipelineTests
     /// <summary>Runs another handler and moves the clock on, so a stage has a known duration.</summary>
     private sealed class SlowHandler(ICompressionHandler inner, FakeTimeProvider time, TimeSpan cost) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return inner.CanHandle(type);
-        }
+        public bool CanHandle(ContentType type) => inner.CanHandle(type);
 
         public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
         {
@@ -301,15 +295,9 @@ public sealed class ContentCompressionPipelineTests
 
     private sealed class ThrowingLogHandler(bool cancelled = false) : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return type == ContentType.Log;
-        }
+        public bool CanHandle(ContentType type) => type == ContentType.Log;
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-        {
-            return cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
-        }
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => cancelled ? throw new OperationCanceledException(cancellationToken) : throw new InvalidOperationException("boom");
     }
 
     private sealed class RecordingContentStore : IContentStore
@@ -333,10 +321,7 @@ public sealed class ContentCompressionPipelineTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
     }
 
     [Theory]

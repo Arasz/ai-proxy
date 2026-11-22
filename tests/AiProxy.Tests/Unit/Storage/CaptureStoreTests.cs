@@ -251,10 +251,7 @@ public sealed class CaptureStoreTests : IDisposable
         return rows.ToList();
     }
 
-    private static CapturedRequest Capture(string requestId)
-    {
-        return new CapturedRequest(requestId, DateTimeOffset.UnixEpoch, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", "{}"u8.ToArray());
-    }
+    private static CapturedRequest Capture(string requestId) => new(requestId, DateTimeOffset.UnixEpoch, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", "{}"u8.ToArray());
 
     private async Task<IReadOnlyList<CaptureRow>> ReadRowsAsync()
     {

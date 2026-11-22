@@ -28,10 +28,7 @@ internal sealed class ProxyChild(Process process) : IAsyncDisposable
     }
 
     /// <summary>Starts the proxy, optionally with <c>--restart</c> and extra arguments.</summary>
-    public static ProxyChild Start(string directory, bool restart, bool ephemeral = true, params string[] extra)
-    {
-        return StartWith(directory, [.. restart ? ["--restart"] : Array.Empty<string>(), .. extra], ephemeral);
-    }
+    public static ProxyChild Start(string directory, bool restart, bool ephemeral = true, params string[] extra) => StartWith(directory, [.. restart ? ["--restart"] : Array.Empty<string>(), .. extra], ephemeral);
 
     /// <summary>Starts the executable with exactly <paramref name="arguments" /> and an isolated environment.</summary>
     public static ProxyChild StartWith(string directory, string[] arguments, bool ephemeral = true, IReadOnlyDictionary<string, string?>? environment = null, string? workingDirectory = null)

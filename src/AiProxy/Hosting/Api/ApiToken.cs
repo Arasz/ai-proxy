@@ -21,10 +21,7 @@ public sealed class ApiToken(string value)
     public string Value => value;
 
     /// <summary>A new token from the platform's cryptographic random source.</summary>
-    public static ApiToken Create()
-    {
-        return new ApiToken(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)));
-    }
+    public static ApiToken Create() => new(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)));
 
     /// <summary>The token a running proxy wrote to <paramref name="dataDirectory" />, or null when there is none; an unreadable file is an <see cref="IOException" /> that names the file.</summary>
     public static string? Read(string dataDirectory)
@@ -72,12 +69,10 @@ public sealed class ApiToken(string value)
     }
 
     /// <summary>True when <paramref name="authorization" /> is <c>Bearer</c>, in any case, and this token; compares the token in constant time.</summary>
-    public bool Accepts(string? authorization)
-    {
-        return authorization is not null
-               && authorization.StartsWith(Scheme, StringComparison.OrdinalIgnoreCase)
-               && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(authorization[Scheme.Length..]), _expected);
-    }
+    public bool Accepts(string? authorization) =>
+        authorization is not null
+        && authorization.StartsWith(Scheme, StringComparison.OrdinalIgnoreCase)
+        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(authorization[Scheme.Length..]), _expected);
 
     /// <summary>The API middleware: answers 401 to a request without this token, except <c>/health</c>.</summary>
     public Task CheckAsync(HttpContext context, RequestDelegate next)

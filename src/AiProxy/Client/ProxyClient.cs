@@ -15,10 +15,7 @@ namespace AiProxy.Client;
 public sealed record ProxyApi(string Endpoint, string? Token, string TokenFile)
 {
     /// <summary>The API at <paramref name="endpoint" /> with the token read from <paramref name="dataDirectory" />.</summary>
-    public static ProxyApi For(string endpoint, string dataDirectory)
-    {
-        return new ProxyApi(endpoint, ApiToken.Read(dataDirectory), Path.Combine(dataDirectory, ApiToken.FileName));
-    }
+    public static ProxyApi For(string endpoint, string dataDirectory) => new(endpoint, ApiToken.Read(dataDirectory), Path.Combine(dataDirectory, ApiToken.FileName));
 }
 
 public interface IProxyClient
@@ -107,10 +104,7 @@ public sealed class ProxyClient(HttpClient http) : IProxyClient
         return request;
     }
 
-    private static Uri ApiUri(string endpoint, string path)
-    {
-        return new Uri(new Uri($"{endpoint.TrimEnd('/')}/", UriKind.Absolute), path);
-    }
+    private static Uri ApiUri(string endpoint, string path) => new(new Uri($"{endpoint.TrimEnd('/')}/", UriKind.Absolute), path);
 
     private static string QueryString(GainQuery query)
     {

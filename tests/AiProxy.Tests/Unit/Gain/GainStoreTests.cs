@@ -607,9 +607,7 @@ public sealed class GainStoreTests
         }
     }
 
-    private static GainHistoryEntry Entry(string id, string at, string project, string rule, long original, long forwarded)
-    {
-        return new GainHistoryEntry(id, DateTimeOffset.Parse(at), project, "anthropic", "POST", rule, "tool_result", "content",
+    private static GainHistoryEntry Entry(string id, string at, string project, string rule, long original, long forwarded) =>
+        new(id, DateTimeOffset.Parse(at), project, "anthropic", "POST", rule, "tool_result", "content",
             GainReportBuilder.RequestTotals(original, forwarded, original, forwarded));
-    }
 }

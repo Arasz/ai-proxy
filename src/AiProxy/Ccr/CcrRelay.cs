@@ -58,10 +58,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     };
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        _http.Dispose();
-    }
+    public void Dispose() => _http.Dispose();
 
     /// <summary>Sends the request upstream and makes the session answer the client from the proxy.</summary>
     /// <param name="e">The Titanium session of the client request.</param>
@@ -176,9 +173,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
 
-        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> CopyAsync(HttpResponseMessage response) =>
+            async (client, cancellationToken) =>
             {
                 using (response)
                 {
@@ -192,11 +188,9 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     }
                 }
             };
-        }
 
-        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first)
-        {
-            return async (client, cancellationToken) =>
+        public Func<Stream, CancellationToken, Task> RunAsync(HttpResponseMessage first) =>
+            async (client, cancellationToken) =>
             {
                 _client = client;
                 _cancellation = cancellationToken;
@@ -210,7 +204,6 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                     await WriteFailureAsync(_loop.Failure(Messages.ResponseLost));
                 }
             };
-        }
 
         private async Task LoopAsync(HttpResponseMessage first)
         {

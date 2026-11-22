@@ -211,10 +211,7 @@ public sealed class ClientCommandTests
 
     private sealed record FakeRun(ProcessResult Result, string Ca, int Port);
 
-    private static Task<ProcessResult> RunAsync(params string[] arguments)
-    {
-        return RunAsync(arguments, new Dictionary<string, string?>());
-    }
+    private static Task<ProcessResult> RunAsync(params string[] arguments) => RunAsync(arguments, new Dictionary<string, string?>());
 
     private static async Task<ProcessResult> RunAsync(string[] arguments, IReadOnlyDictionary<string, string?> environment, string? workingDirectory = null)
     {
@@ -243,10 +240,7 @@ public sealed class ClientCommandTests
     }
 
     /// <summary>The text without ANSI styling, which a terminal or CI log detection may add.</summary>
-    private static string Plain(string text)
-    {
-        return Regex.Replace(text, "\u001b\\[[0-9;]*m", "");
-    }
+    private static string Plain(string text) => Regex.Replace(text, "\u001b\\[[0-9;]*m", "");
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

@@ -66,10 +66,7 @@ public sealed partial class ContentDecompositor
         }
 
         /// <summary>It looks for a JSON value or an XML element, while the failed attempts are still within the cap.</summary>
-        private bool TakeStructure(Line line)
-        {
-            return _failedAttempts < MaxFailedStructureAttempts && (TakeJson(line) || TakeXml(line));
-        }
+        private bool TakeStructure(Line line) => _failedAttempts < MaxFailedStructureAttempts && (TakeJson(line) || TakeXml(line));
 
         private bool TakeJson(Line line)
         {

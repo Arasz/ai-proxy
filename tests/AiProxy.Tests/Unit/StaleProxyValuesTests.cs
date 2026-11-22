@@ -450,16 +450,10 @@ public sealed class StaleProxyValuesTests
     [Theory]
     [InlineData(null)]
     [InlineData("not an endpoint")]
-    public void The_stale_set_is_the_own_endpoint_alone_when_the_previous_endpoint_is_missing_or_unparseable(string? previousEndpoint)
-    {
-        Assert.Equal([Own], StaleProxyValues.Endpoints(Own, previousEndpoint));
-    }
+    public void The_stale_set_is_the_own_endpoint_alone_when_the_previous_endpoint_is_missing_or_unparseable(string? previousEndpoint) => Assert.Equal([Own], StaleProxyValues.Endpoints(Own, previousEndpoint));
 
     [Fact]
-    public void The_stale_set_holds_the_previous_endpoint_and_the_own_endpoint()
-    {
-        Assert.Equal([Dead, Own], StaleProxyValues.Endpoints(Own, "127.0.0.1:9"));
-    }
+    public void The_stale_set_holds_the_previous_endpoint_and_the_own_endpoint() => Assert.Equal([Dead, Own], StaleProxyValues.Endpoints(Own, "127.0.0.1:9"));
 
     /// <summary>Asserts the Windows <c>originalValues</c> of two snapshots are equal, derived fields included.</summary>
     private static void AssertWindowsValues(string expected, string actual) =>

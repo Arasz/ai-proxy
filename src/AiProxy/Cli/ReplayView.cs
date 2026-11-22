@@ -103,8 +103,5 @@ public sealed class ReplayView(string home, ReplaySettings settings, ReplayRun r
         console.WriteLine($"previews: {Number(report.Previews.Count)} ids sent {Number(sends)} times, saving {Number(report.PreviewSavedTokens)} estimated tokens in all on top of the reducers.");
     }
 
-    private static string Number(long value)
-    {
-        return value.ToString("N0", CultureInfo.InvariantCulture);
-    }
+    private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 }

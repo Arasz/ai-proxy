@@ -34,32 +34,18 @@ public sealed class TypeScriptCodeLexer(
     }
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath)
-    {
-        return filePath is not null
-               && (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) || IsTsx(filePath));
-    }
+    public bool SupportsPath(string? filePath) =>
+        filePath is not null
+        && (filePath.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) || IsTsx(filePath));
 
     /// <summary>JavaScript keywords and globals plus TypeScript type keywords and utility types.</summary>
-    public bool IsKeyword(string text)
-    {
-        return JavaScriptCodeLexer.Keywords.Contains(text) || TypeKeywords.Contains(text);
-    }
+    public bool IsKeyword(string text) => JavaScriptCodeLexer.Keywords.Contains(text) || TypeKeywords.Contains(text);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text)
-    {
-        return Lex(text, null);
-    }
+    public CodeLexResult Lex(string text) => Lex(text, null);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text, string? filePath)
-    {
-        return TreeSitterScanner.Lex(text, filePath is not null && IsTsx(filePath) ? tsx : typeScript, Grammar, IsKeyword);
-    }
+    public CodeLexResult Lex(string text, string? filePath) => TreeSitterScanner.Lex(text, filePath is not null && IsTsx(filePath) ? tsx : typeScript, Grammar, IsKeyword);
 
-    private static bool IsTsx(string filePath)
-    {
-        return filePath.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsTsx(string filePath) => filePath.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase);
 }

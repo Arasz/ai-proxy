@@ -178,15 +178,9 @@ public sealed class RetrievalLoopTests
         return written;
     }
 
-    private static JsonElement Data(SseEvent sse)
-    {
-        return JsonDocument.Parse(sse.Data).RootElement.Clone();
-    }
+    private static JsonElement Data(SseEvent sse) => JsonDocument.Parse(sse.Data).RootElement.Clone();
 
-    private static string Wire(IEnumerable<SseEvent> events)
-    {
-        return string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
-    }
+    private static string Wire(IEnumerable<SseEvent> events) => string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
 
     [Fact]
     public async Task Chat_chunks_built_by_the_test_builder_parse_back_as_a_tool_call_round()
@@ -227,45 +221,35 @@ public sealed class RetrievalLoopTests
     /// <summary>Builds Messages streams the way the API sends them.</summary>
     internal static class Sse
     {
-        public static string Wire(params SseEvent[] events)
-        {
-            return string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
-        }
+        public static string Wire(params SseEvent[] events) => string.Concat(events.Select(sse => Encoding.UTF8.GetString(sse.ToBytes())));
 
-        public static Func<int, SseEvent[]> Text(string text)
-        {
-            return index =>
+        public static Func<int, SseEvent[]> Text(string text) =>
+            index =>
             [
                 Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "text", ["text"] = "" } }),
                 Delta(index, new JsonObject { ["type"] = "text_delta", ["text"] = text }),
                 Stop(index)
             ];
-        }
 
-        public static Func<int, SseEvent[]> Thinking(string thinking, string signature)
-        {
-            return index =>
+        public static Func<int, SseEvent[]> Thinking(string thinking, string signature) =>
+            index =>
             [
                 Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "thinking", ["thinking"] = "", ["signature"] = "" } }),
                 Delta(index, new JsonObject { ["type"] = "thinking_delta", ["thinking"] = thinking }),
                 Delta(index, new JsonObject { ["type"] = "signature_delta", ["signature"] = signature }),
                 Stop(index)
             ];
-        }
 
-        public static Func<int, SseEvent[]> Tool(string id, string name, string input)
-        {
-            return index =>
+        public static Func<int, SseEvent[]> Tool(string id, string name, string input) =>
+            index =>
             [
                 Event("content_block_start", new JsonObject { ["type"] = "content_block_start", ["index"] = index, ["content_block"] = new JsonObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = new JsonObject() } }),
                 .. input.Length == 0 ? Array.Empty<SseEvent>() : [Delta(index, new JsonObject { ["type"] = "input_json_delta", ["partial_json"] = input })],
                 Stop(index)
             ];
-        }
 
-        public static string Message(string id, string stopReason, int outputTokens, params Func<int, SseEvent[]>[] blocks)
-        {
-            return Wire(
+        public static string Message(string id, string stopReason, int outputTokens, params Func<int, SseEvent[]>[] blocks) =>
+            Wire(
             [
                 Event("message_start",
                     new JsonObject
@@ -281,54 +265,34 @@ public sealed class RetrievalLoopTests
                     }),
                 new SseEvent("message_stop", """{"type":"message_stop"}""")
             ]);
-        }
 
-        private static SseEvent Event(string name, JsonObject data)
-        {
-            return new SseEvent(name, data.ToJsonString());
-        }
+        private static SseEvent Event(string name, JsonObject data) => new(name, data.ToJsonString());
 
-        private static SseEvent Delta(int index, JsonObject delta)
-        {
-            return Event("content_block_delta", new JsonObject { ["type"] = "content_block_delta", ["index"] = index, ["delta"] = delta });
-        }
+        private static SseEvent Delta(int index, JsonObject delta) => Event("content_block_delta", new JsonObject { ["type"] = "content_block_delta", ["index"] = index, ["delta"] = delta });
 
-        private static SseEvent Stop(int index)
-        {
-            return Event("content_block_stop", new JsonObject { ["type"] = "content_block_stop", ["index"] = index });
-        }
+        private static SseEvent Stop(int index) => Event("content_block_stop", new JsonObject { ["type"] = "content_block_stop", ["index"] = index });
     }
 
     /// <summary>Builds Chat Completions streams the way the API sends them: unnamed <c>chat.completion.chunk</c> data lines and <c>[DONE]</c>.</summary>
     internal static class ChatSse
     {
-        public static JsonObject ToolCall(int index, string id, string name, string arguments)
-        {
-            return new JsonObject
+        public static JsonObject ToolCall(int index, string id, string name, string arguments) =>
+            new()
             {
                 ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["id"] = id, ["type"] = "function", ["function"] = new JsonObject { ["name"] = name, ["arguments"] = arguments } })
             };
-        }
 
-        public static JsonObject Text(string text)
-        {
-            return new JsonObject { ["content"] = text };
-        }
+        public static JsonObject Text(string text) => new() { ["content"] = text };
 
-        public static JsonObject Usage(int completionTokens)
-        {
-            return new JsonObject { ["completion_tokens"] = completionTokens, ["prompt_tokens"] = 3, ["total_tokens"] = 3 + completionTokens };
-        }
+        public static JsonObject Usage(int completionTokens) => new() { ["completion_tokens"] = completionTokens, ["prompt_tokens"] = 3, ["total_tokens"] = 3 + completionTokens };
 
-        public static string Message(string id, string finishReason, JsonObject delta, JsonObject usage)
-        {
-            return string.Concat(
+        public static string Message(string id, string finishReason, JsonObject delta, JsonObject usage) =>
+            string.Concat(
                 Chunk(id, new JsonObject { ["role"] = "assistant" }, null, null),
                 Chunk(id, delta, null, null),
                 Chunk(id, new JsonObject(), finishReason, null),
                 Chunk(id, null, null, usage),
                 "data: [DONE]\n\n");
-        }
 
         public static string Chunk(string id, JsonObject? delta, string? finishReason, JsonObject? usage)
         {
@@ -351,20 +315,15 @@ public sealed class RetrievalLoopTests
     /// <summary>Builds Responses API streams the way the API sends them: named <c>response.*</c> events.</summary>
     internal static class ResponsesSse
     {
-        public static JsonObject FunctionCall(string itemId, string callId, string name, string arguments)
-        {
-            return new JsonObject { ["type"] = "function_call", ["id"] = itemId, ["call_id"] = callId, ["name"] = name, ["arguments"] = arguments };
-        }
+        public static JsonObject FunctionCall(string itemId, string callId, string name, string arguments) => new() { ["type"] = "function_call", ["id"] = itemId, ["call_id"] = callId, ["name"] = name, ["arguments"] = arguments };
 
-        public static string Message(string id, JsonObject item, int outputTokens)
-        {
-            return string.Concat(
+        public static string Message(string id, JsonObject item, int outputTokens) =>
+            string.Concat(
                 Event("response.created", new JsonObject { ["response"] = new JsonObject { ["id"] = id, ["status"] = "in_progress" } }),
                 Event("response.output_item.added", new JsonObject { ["output_index"] = 0, ["item"] = item.DeepClone() }),
                 Event("response.function_call_arguments.done", new JsonObject { ["output_index"] = 0, ["arguments"] = item["arguments"]!.GetValue<string>() }),
                 Event("response.output_item.done", new JsonObject { ["output_index"] = 0, ["item"] = item.DeepClone() }),
                 Event("response.completed", new JsonObject { ["response"] = new JsonObject { ["id"] = id, ["status"] = "completed", ["usage"] = new JsonObject { ["output_tokens"] = outputTokens } } }));
-        }
 
         private static string Event(string name, JsonObject data)
         {

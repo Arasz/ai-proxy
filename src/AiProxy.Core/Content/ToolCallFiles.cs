@@ -88,11 +88,9 @@ internal sealed class ToolCallFiles
         }
     }
 
-    private void AddCall(string id, FileRead? path)
-    {
+    private void AddCall(string id, FileRead? path) =>
         // A second call with the same id makes both ambiguous, so the id keeps no path.
         _calls[id] = _calls.ContainsKey(id) ? null : path;
-    }
 
     private static string? ResultId(JsonElement element)
     {

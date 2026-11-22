@@ -7,15 +7,9 @@ public sealed class CcrPreviewBudgetTests
 {
     private static readonly CcrOptions Options = CcrOptions.Default;
 
-    private static string Log(int lines)
-    {
-        return string.Join("\n", Enumerable.Range(1, lines).Select(index => $"step {index}: compiling module m{index} in the usual way"));
-    }
+    private static string Log(int lines) => string.Join("\n", Enumerable.Range(1, lines).Select(index => $"step {index}: compiling module m{index} in the usual way"));
 
-    private static CcrPreview? Build(string original, CcrOptions options, int reducedTokens, CcrPreviewBuilder? builder = null)
-    {
-        return (builder ?? new CcrPreviewBuilder(new CcrPreviewOverlay())).Build(original, options, reducedTokens);
-    }
+    private static CcrPreview? Build(string original, CcrOptions options, int reducedTokens, CcrPreviewBuilder? builder = null) => (builder ?? new CcrPreviewBuilder(new CcrPreviewOverlay())).Build(original, options, reducedTokens);
 
     [Theory]
     [InlineData(120)]

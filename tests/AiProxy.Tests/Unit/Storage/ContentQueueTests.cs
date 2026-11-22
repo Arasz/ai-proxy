@@ -33,9 +33,8 @@ public sealed class ContentQueueTests : IDisposable
         }
     }
 
-    private static ContentRecord Record(string requestId)
-    {
-        return new ContentRecord(
+    private static ContentRecord Record(string requestId) =>
+        new(
             requestId,
             new DateTimeOffset(2026, 10, 25, 11, 0, 0, TimeSpan.Zero),
             "original",
@@ -44,7 +43,6 @@ public sealed class ContentQueueTests : IDisposable
             "log.signal-filter",
             1,
             [new CompressedPart(1, ContentType.Log, "short", "original", "log.signal-filter", 0.5)]);
-    }
 
     private SqliteConnection OpenReady()
     {

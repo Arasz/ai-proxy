@@ -69,12 +69,10 @@ internal sealed partial class NssCertificateStore
     }
 
     /// <summary>Finds direct child profile directories that contain an SQL NSS database.</summary>
-    private static IEnumerable<string> Profiles(string directory)
-    {
-        return Directory.Exists(directory)
+    private static IEnumerable<string> Profiles(string directory) =>
+        Directory.Exists(directory)
             ? Directory.EnumerateDirectories(directory).Where(static path => File.Exists(Path.Combine(path, "cert9.db")))
             : [];
-    }
 
     /// <summary>Lists certificate nicknames in one NSS database.</summary>
     private static IEnumerable<string> Nicknames(string database, string certutil)

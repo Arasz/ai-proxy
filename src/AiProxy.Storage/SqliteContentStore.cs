@@ -18,10 +18,7 @@ public sealed class SqliteContentStore(ContentStoreOptions options, ContentQueue
     private readonly string _databasePath = options.ResolvedDatabasePath;
 
     /// <inheritdoc />
-    public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
-    {
-        return queue.PublishAsync(record, cancellationToken);
-    }
+    public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => queue.PublishAsync(record, cancellationToken);
 
     /// <inheritdoc />
     public async ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)

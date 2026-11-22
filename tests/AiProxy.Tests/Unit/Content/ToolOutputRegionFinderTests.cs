@@ -11,10 +11,7 @@ public sealed class ToolOutputRegionFinderTests
 {
     private static readonly ToolOutputRegionFinder Finder = new();
 
-    private static ContentRegion[] Find(string body)
-    {
-        return Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
-    }
+    private static ContentRegion[] Find(string body) => Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
 
     [Fact]
     public void The_tool_result_of_an_anthropic_message_is_a_region()
@@ -63,16 +60,10 @@ public sealed class ToolOutputRegionFinderTests
     }
 
     [Fact]
-    public void A_body_that_is_not_json_has_no_regions()
-    {
-        Assert.Empty(Find("not json at all"));
-    }
+    public void A_body_that_is_not_json_has_no_regions() => Assert.Empty(Find("not json at all"));
 
     [Fact]
-    public void A_json_body_without_tool_output_has_no_regions()
-    {
-        Assert.Empty(Find("""{"messages":[{"role":"user","content":"hello"}]}"""));
-    }
+    public void A_json_body_without_tool_output_has_no_regions() => Assert.Empty(Find("""{"messages":[{"role":"user","content":"hello"}]}"""));
 
     [Fact]
     public void The_region_covers_exactly_the_tool_output_in_the_body()

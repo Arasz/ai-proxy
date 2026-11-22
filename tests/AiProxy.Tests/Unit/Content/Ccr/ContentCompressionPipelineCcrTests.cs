@@ -14,9 +14,8 @@ public sealed class ContentCompressionPipelineCcrTests
     private const string Small = "one line of output";
     private static readonly string Large = string.Join("\n", Enumerable.Range(1, 600).Select(index => $"step {index:D4}: compiled module m{index} into obj/m{index}.o"));
 
-    private static byte[] Body(params string[] outputs)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] Body(params string[] outputs) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new[]
             {
@@ -27,11 +26,9 @@ public sealed class ContentCompressionPipelineCcrTests
                 }
             }
         }));
-    }
 
-    private static ContentCompressionPipeline Build(MemoryOriginalStore store)
-    {
-        return new ContentCompressionPipeline(
+    private static ContentCompressionPipeline Build(MemoryOriginalStore store) =>
+        new(
             new ToolOutputRegionFinder(),
             new ContentDecompositor(),
             new CompressionExecutor(new ContentRouter([], new PassThroughCompressionHandler())),
@@ -40,11 +37,9 @@ public sealed class ContentCompressionPipelineCcrTests
             CompressionOptions.Default,
             TimeProvider.System,
             new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
-    }
 
-    private static ContentCompressionPipeline Build(ICompressionHandler handler)
-    {
-        return new ContentCompressionPipeline(
+    private static ContentCompressionPipeline Build(ICompressionHandler handler) =>
+        new(
             new ToolOutputRegionFinder(),
             new ContentDecompositor(),
             new CompressionExecutor(new ContentRouter([handler], new PassThroughCompressionHandler())),
@@ -53,7 +48,6 @@ public sealed class ContentCompressionPipelineCcrTests
             CompressionOptions.Default,
             TimeProvider.System,
             new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), CcrOptions.Default));
-    }
 
     private static string[] ToolResults(CompressionResult result)
     {
@@ -142,41 +136,23 @@ public sealed class ContentCompressionPipelineCcrTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<ContentRecord?>(null);
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
     }
 
     private sealed class EveryOtherLine : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return true;
-        }
+        public bool CanHandle(ContentType type) => true;
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(new HandledContent(string.Join("\n", part.Text.Split('\n').Where(static (_, index) => index % 2 == 0)), "every-other-line"));
-        }
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => ValueTask.FromResult(new HandledContent(string.Join("\n", part.Text.Split('\n').Where(static (_, index) => index % 2 == 0)), "every-other-line"));
     }
 
     private sealed class Throwing : ICompressionHandler
     {
-        public bool CanHandle(ContentType type)
-        {
-            return true;
-        }
+        public bool CanHandle(ContentType type) => true;
 
-        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-        {
-            throw new InvalidOperationException("the reducer failed");
-        }
+        public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => throw new InvalidOperationException("the reducer failed");
     }
 
     /// <summary>F23: a tool output quoting a preview header anywhere is never previewed, even when it is large.</summary>

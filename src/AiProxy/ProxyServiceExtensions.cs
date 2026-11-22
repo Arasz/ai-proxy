@@ -153,10 +153,7 @@ public static partial class ProxyServiceExtensions
         }
     }
 
-    private static string CapturePath(ProxyRuntimeOptions options)
-    {
-        return Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
-    }
+    private static string CapturePath(ProxyRuntimeOptions options) => Path.Combine(options.DataDirectory, SqliteCaptureStore.FileName);
 
     private static partial class Log
     {

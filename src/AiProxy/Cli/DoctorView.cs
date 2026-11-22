@@ -22,18 +22,13 @@ public sealed class DoctorView
         return table;
     }
 
-    public string Json(DoctorReport report)
-    {
-        return JsonSerializer.Serialize(new
+    public string Json(DoctorReport report) =>
+        JsonSerializer.Serialize(new
         {
             status = Label(report.Status),
             exitCode = report.ExitCode,
             checks = report.Checks.Select(static check => new { name = check.Name, status = Label(check.Status), detail = check.Detail, fix = check.Fix })
         }, JsonOptions);
-    }
 
-    private static string Label(CheckStatus status)
-    {
-        return status.ToString().ToLowerInvariant();
-    }
+    private static string Label(CheckStatus status) => status.ToString().ToLowerInvariant();
 }

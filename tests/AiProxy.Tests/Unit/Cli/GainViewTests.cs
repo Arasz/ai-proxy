@@ -185,10 +185,7 @@ public sealed class GainViewTests
     [InlineData(2_500_000_000, "2.5B")]
     [InlineData(-30, "-30")]
     [InlineData(-12_345, "-12.3K")]
-    public void Table_numbers_are_exact_below_ten_thousand_and_compact_above(long value, string expected)
-    {
-        Assert.Equal(expected, GainView.Compact(value));
-    }
+    public void Table_numbers_are_exact_below_ten_thousand_and_compact_above(long value, string expected) => Assert.Equal(expected, GainView.Compact(value));
 
     [Theory]
     [InlineData(80)]

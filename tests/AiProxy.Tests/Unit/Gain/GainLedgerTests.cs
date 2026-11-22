@@ -180,10 +180,7 @@ public sealed class GainLedgerTests
         return store;
     }
 
-    private static string Baseline(string name)
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Unit", "Gain", "Baselines", name)).TrimEnd('\n');
-    }
+    private static string Baseline(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Unit", "Gain", "Baselines", name)).TrimEnd('\n');
 
     private static async Task<long> CountEventsAsync(string path, string? project, long atOrBefore = long.MaxValue)
     {
@@ -210,8 +207,7 @@ public sealed class GainLedgerTests
 
         public IReadOnlyList<string> Texts => _texts;
 
-        public void Watch(SqliteConnection connection)
-        {
+        public void Watch(SqliteConnection connection) =>
             SQLitePCL.raw.sqlite3_trace(connection.Handle, static (state, text) =>
             {
                 var self = (Statements)state;
@@ -220,6 +216,5 @@ public sealed class GainLedgerTests
                     self._texts.Add(text.utf8_to_string());
                 }
             }, this);
-        }
     }
 }

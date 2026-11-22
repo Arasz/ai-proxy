@@ -53,12 +53,10 @@ internal sealed class RootCertificateFiles(string dataDirectory, string? configu
     private string ReplacedPath => Path.Combine(dataDirectory, TitaniumProxyService.ReplacedRootsFileName);
 
     /// <summary>Thumbprints of replaced roots that may still be trusted, one per line.</summary>
-    public IReadOnlyList<string> PendingUntrust()
-    {
-        return File.Exists(ReplacedPath)
+    public IReadOnlyList<string> PendingUntrust() =>
+        File.Exists(ReplacedPath)
             ? [.. File.ReadAllLines(ReplacedPath).Select(static line => line.Trim()).Where(static line => line.Length > 0).Distinct(StringComparer.Ordinal)]
             : [];
-    }
 
     /// <summary>Drops a thumbprint from the record once its root is no longer trusted.</summary>
     public void Forget(string thumbprint)
@@ -91,10 +89,7 @@ internal sealed class RootCertificateFiles(string dataDirectory, string? configu
         return password;
     }
 
-    private void WritePem(X509Certificate2 root)
-    {
-        File.WriteAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
-    }
+    private void WritePem(X509Certificate2 root) => File.WriteAllText(Path.Combine(dataDirectory, TitaniumProxyService.RootCertificatePemFileName), $"{root.ExportCertificatePem()}\n");
 
     private static X509Certificate2? TryOpen(byte[] pfx, string password)
     {

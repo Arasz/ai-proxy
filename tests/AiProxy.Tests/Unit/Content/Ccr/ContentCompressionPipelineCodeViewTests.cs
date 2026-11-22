@@ -18,9 +18,8 @@ public sealed class ContentCompressionPipelineCodeViewTests
     private const string Second =
         "using System.Linq;\nusing System.Collections.Generic;\n\n/// <summary>The second file's type; this doc comment is also long enough that the view is smaller than the file.</summary>\npublic sealed class Example\n{\n    public int Value => 2;\n}\n";
 
-    private static byte[] Body(params ReadFile[] files)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] Body(params ReadFile[] files) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new object[]
             {
@@ -36,11 +35,9 @@ public sealed class ContentCompressionPipelineCodeViewTests
                 }
             }
         }));
-    }
 
-    private static ContentCompressionPipeline Build(MemoryOriginalStore store, CcrOptions? options = null)
-    {
-        return new ContentCompressionPipeline(
+    private static ContentCompressionPipeline Build(MemoryOriginalStore store, CcrOptions? options = null) =>
+        new(
             new ToolOutputRegionFinder(),
             new ContentDecompositor(),
             new CompressionExecutor(new ContentRouter([new SourceCodeCompressionHandler([new CSharpCodeLexer(), new JavaScriptCodeLexer()])], new PassThroughCompressionHandler())),
@@ -49,17 +46,10 @@ public sealed class ContentCompressionPipelineCodeViewTests
             CompressionOptions.WithMinimum(1),
             TimeProvider.System,
             new CcrPreviewer(store, () => new CcrPreviewBuilder(new CcrPreviewOverlay()), options ?? CcrOptions.Default));
-    }
 
-    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrMode mode, params ReadFile[] files)
-    {
-        return CompressAsync(store, CcrOptions.Default, mode, files);
-    }
+    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrMode mode, params ReadFile[] files) => CompressAsync(store, CcrOptions.Default, mode, files);
 
-    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrOptions options, CcrMode mode, params ReadFile[] files)
-    {
-        return Build(store, options).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
-    }
+    private static Task<CompressionResult> CompressAsync(MemoryOriginalStore store, CcrOptions options, CcrMode mode, params ReadFile[] files) => Build(store, options).CompressAsync(new CompressionRequest(Body(files), "application/json", Dialect.Anthropic) { Ccr = mode }, CancellationToken.None).AsTask();
 
     private static string[] ToolResults(CompressionResult result)
     {
@@ -192,14 +182,8 @@ public sealed class ContentCompressionPipelineCodeViewTests
 
     private sealed class NullContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<ContentRecord?>(null);
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
     }
 }

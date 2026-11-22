@@ -141,18 +141,13 @@ public sealed class UpstreamDropTests
         Assert.IsType<MissingMethodException>(error.Exception);
     }
 
-    private static Task<ProxyHost> StartProxyAsync(bool provider, bool capture, ILoggerProvider? logs = null)
-    {
-        return ProxyHost.StartAsync(
+    private static Task<ProxyHost> StartProxyAsync(bool provider, bool capture, ILoggerProvider? logs = null) =>
+        ProxyHost.StartAsync(
             capture ? new Dictionary<string, string> { ["Proxy:Capture"] = "true" } : new Dictionary<string, string>(),
             providerHosts: provider ? new LoopbackProviderHosts(Dialect.Anthropic) : new NoProviderHosts(),
             logging: logs);
-    }
 
-    private static StringContent Json()
-    {
-        return new StringContent("""{"model":"m","stream":true}""", Encoding.UTF8, "application/json");
-    }
+    private static StringContent Json() => new("""{"model":"m","stream":true}""", Encoding.UTF8, "application/json");
 
     private static async Task<byte[]> SendAsync(HttpClient client, Uri upstream)
     {
@@ -163,10 +158,7 @@ public sealed class UpstreamDropTests
 
     private sealed class NoProviderHosts : IProviderHosts
     {
-        public ProviderHost? Find(string host)
-        {
-            return null;
-        }
+        public ProviderHost? Find(string host) => null;
 
         public IReadOnlyCollection<string> Hosts { get; } = [];
     }

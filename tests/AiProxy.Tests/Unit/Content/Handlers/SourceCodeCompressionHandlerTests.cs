@@ -129,8 +129,5 @@ public sealed class SourceCodeCompressionHandlerTests
         Assert.Contains("     5\tpublic sealed class Example", result.Text, StringComparison.Ordinal);
     }
 
-    private static ContentPart Part(string text, string? path)
-    {
-        return new ContentPart("request", 1, ContentType.SourceCode, text, path, SourceCodeFiles.LanguageOf(path), CcrMode.Stateless);
-    }
+    private static ContentPart Part(string text, string? path) => new("request", 1, ContentType.SourceCode, text, path, SourceCodeFiles.LanguageOf(path), CcrMode.Stateless);
 }

@@ -13,10 +13,7 @@ public sealed class RegionMinimumTests
 {
     private const string BelowMinimum = "below-minimum";
 
-    private static string Of(char letter, int length)
-    {
-        return new string(letter, length);
-    }
+    private static string Of(char letter, int length) => new(letter, length);
 
     private static async Task<(CompressionResult Result, List<CompressedPart> Parts, List<int> Reduced, byte[] Body)> RunAsync(
         params (ContentType Type, string Text)[] fragments)
@@ -126,9 +123,6 @@ public sealed class RegionMinimumTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult(Records.FirstOrDefault(record => record.RequestId == requestId));
     }
 }

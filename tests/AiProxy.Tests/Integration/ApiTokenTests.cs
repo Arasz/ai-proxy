@@ -134,14 +134,12 @@ public sealed class ApiTokenTests : IDisposable
         return int.Parse(status!.Split(' ')[1], System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private Task<ProxyHost> StartWithEveryRouteAsync()
-    {
-        return ProxyHost.StartAsync(new Dictionary<string, string>
+    private Task<ProxyHost> StartWithEveryRouteAsync() =>
+        ProxyHost.StartAsync(new Dictionary<string, string>
         {
             ["Proxy:Compression:Enabled"] = "true",
             ["Proxy:Compression:Database"] = _databasePath
         });
-    }
 
     private static List<(string Method, string Path)> Routes(ProxyHost proxy)
     {

@@ -33,10 +33,7 @@ public sealed class DoctorCommandTests
         return new Outcome(exit, console.Output, output.ToString(), error.ToString());
     }
 
-    private static string[] Options(ProxyHost proxy, string? host = null)
-    {
-        return ["--endpoint", proxy.BaseAddress.ToString(), "--proxy", proxy.ProxyAddress.ToString(), "--data-directory", proxy.DataDirectory, "--host", host ?? "api.anthropic.com", "--timeout", "60"];
-    }
+    private static string[] Options(ProxyHost proxy, string? host = null) => ["--endpoint", proxy.BaseAddress.ToString(), "--proxy", proxy.ProxyAddress.ToString(), "--data-directory", proxy.DataDirectory, "--host", host ?? "api.anthropic.com", "--timeout", "60"];
 
     private static int ClosedPort()
     {

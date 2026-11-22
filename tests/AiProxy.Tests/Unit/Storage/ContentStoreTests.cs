@@ -38,9 +38,8 @@ public sealed class ContentStoreTests : IDisposable
         }
     }
 
-    private static ContentRecord Record()
-    {
-        return new ContentRecord(
+    private static ContentRecord Record() =>
+        new(
             "request-1",
             new DateTimeOffset(2026, 3, 12, 10, 0, 0, TimeSpan.Zero),
             "the original bödy",
@@ -49,7 +48,6 @@ public sealed class ContentStoreTests : IDisposable
             "log.signal-filter",
             1,
             [new CompressedPart(1, ContentType.Log, "the compressed part", "the original part", "log.signal-filter", 0.5)]);
-    }
 
     [Fact]
     public async Task A_publish_on_a_fresh_file_under_a_held_lock_gives_up_within_its_bound()

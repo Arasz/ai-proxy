@@ -20,10 +20,7 @@ public sealed class EntryRouteProcessTests : IDisposable
 
     private string WorkingDirectory => Path.Combine(_root, "cwd");
 
-    public void Dispose()
-    {
-        Directory.Delete(_root, true);
-    }
+    public void Dispose() => Directory.Delete(_root, true);
 
     [Theory]
     [InlineData("stauts")]

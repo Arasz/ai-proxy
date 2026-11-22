@@ -9,16 +9,10 @@ namespace AiProxy.Hosting.Integration;
 internal static class SystemProxySnapshotCodec
 {
     /// <summary>Serializes a value of <paramref name="type" /> to JSON text.</summary>
-    public static string Write(object? value, Type type)
-    {
-        return Encode(value, type)?.ToJsonString() ?? "null";
-    }
+    public static string Write(object? value, Type type) => Encode(value, type)?.ToJsonString() ?? "null";
 
     /// <summary>Rebuilds a value of <paramref name="type" /> from JSON text written by <see cref="Write" />.</summary>
-    public static object? Read(string json, Type type)
-    {
-        return Decode(JsonNode.Parse(json), type);
-    }
+    public static object? Read(string json, Type type) => Decode(JsonNode.Parse(json), type);
 
     /// <summary>Encodes scalars, enums, sequences, dictionaries and records as JSON nodes.</summary>
     private static JsonNode? Encode(object? value, Type type)
@@ -169,11 +163,9 @@ internal static class SystemProxySnapshotCodec
     }
 
     /// <summary>The readable, non-indexed instance properties that make up a value.</summary>
-    private static IEnumerable<PropertyInfo> Properties(Type type)
-    {
-        return type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+    private static IEnumerable<PropertyInfo> Properties(Type type) =>
+        type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Where(property => property.Name != "EqualityContract" && property.GetIndexParameters().Length == 0 && property.GetMethod is not null);
-    }
 
     /// <summary>True for primitives, value types and strings, which serialize directly.</summary>
     private static bool IsScalar(Type type)

@@ -5,16 +5,10 @@ namespace AiProxy.Hosting.Integration;
 internal sealed partial class TitaniumLoggerFactory(ILoggerFactory inner) : ILoggerFactory
 {
     /// <inheritdoc />
-    public ILogger CreateLogger(string categoryName)
-    {
-        return new TitaniumLogger(inner.CreateLogger(categoryName));
-    }
+    public ILogger CreateLogger(string categoryName) => new TitaniumLogger(inner.CreateLogger(categoryName));
 
     /// <inheritdoc />
-    public void AddProvider(ILoggerProvider provider)
-    {
-        inner.AddProvider(provider);
-    }
+    public void AddProvider(ILoggerProvider provider) => inner.AddProvider(provider);
 
     /// <inheritdoc />
     public void Dispose()
@@ -26,15 +20,10 @@ internal sealed partial class TitaniumLoggerFactory(ILoggerFactory inner) : ILog
         private const string CertificateFailure = "Certificate operation failed";
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return logger.BeginScope(state);
-        }
+            where TState : notnull =>
+            logger.BeginScope(state);
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return logger.IsEnabled(logLevel);
-        }
+        public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
@@ -47,10 +36,7 @@ internal sealed partial class TitaniumLoggerFactory(ILoggerFactory inner) : ILog
             logger.Log(logLevel, eventId, state, exception, formatter);
         }
 
-        private static string Describe(Exception exception)
-        {
-            return exception.InnerException is { } cause ? $"{exception.Message}: {cause.Message}" : exception.Message;
-        }
+        private static string Describe(Exception exception) => exception.InnerException is { } cause ? $"{exception.Message}: {cause.Message}" : exception.Message;
     }
 
     private static partial class Log

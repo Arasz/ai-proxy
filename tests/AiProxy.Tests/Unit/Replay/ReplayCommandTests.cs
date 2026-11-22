@@ -43,9 +43,8 @@ public sealed class ReplayCommandTests : IDisposable
                                                   $"    /// <summary>Returns the number {index} after doing a fair amount of careful work that the comment goes on to describe at length.</summary>\n    public int Value{index}()\n    {{\n        var total = {index};\n        for (var step = 0; step < 10; step++)\n        {{\n            total += step * {index};\n        }}\n\n        return total;\n    }}\n\n"))
                                               + "}\n";
 
-    private static byte[] ReadBody(string path, string output)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] ReadBody(string path, string output) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new object[]
             {
@@ -53,33 +52,22 @@ public sealed class ReplayCommandTests : IDisposable
                 new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = output } } }
             }
         }));
-    }
 
-    private static byte[] TwoToolBody(string first, string second)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] TwoToolBody(string first, string second) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new[] { new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = first }, new { type = "tool_result", tool_use_id = "t2", content = second } } } }
         }));
-    }
 
-    private static byte[] ToolBody(string output)
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    private static byte[] ToolBody(string output) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             messages = new[] { new { role = "user", content = new[] { new { type = "tool_result", tool_use_id = "t1", content = output } } } }
         }));
-    }
 
-    private string Db(string file)
-    {
-        return Path.Combine(_home.Path, file);
-    }
+    private string Db(string file) => Path.Combine(_home.Path, file);
 
-    private void WriteContent(params byte[][] originals)
-    {
-        WriteContentAt(Stamp, originals);
-    }
+    private void WriteContent(params byte[][] originals) => WriteContentAt(Stamp, originals);
 
     private void WriteContentAt(DateTimeOffset at, params byte[][] originals)
     {
@@ -95,10 +83,7 @@ public sealed class ReplayCommandTests : IDisposable
         }
     }
 
-    private void WriteCapture(params byte[][] bodies)
-    {
-        WriteCaptureAt(Stamp, "api.anthropic.com", bodies);
-    }
+    private void WriteCapture(params byte[][] bodies) => WriteCaptureAt(Stamp, "api.anthropic.com", bodies);
 
     private void WriteCaptureAt(DateTimeOffset at, string host, params byte[][] bodies)
     {
@@ -148,10 +133,7 @@ public sealed class ReplayCommandTests : IDisposable
         return JsonDocument.Parse(_fixture.Output.ToString()).RootElement.Clone();
     }
 
-    private string Hashes()
-    {
-        return string.Join(",", new[] { "content.db", "capture.db" }.Select(file => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Db(file))))));
-    }
+    private string Hashes() => string.Join(",", new[] { "content.db", "capture.db" }.Select(file => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Db(file))))));
 
     [Fact]
     public async Task The_minimum_option_reaches_the_pipeline_so_the_same_body_previews_only_when_it_is_low_enough()

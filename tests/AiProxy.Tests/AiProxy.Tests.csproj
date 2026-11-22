@@ -9,6 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Diagnostics" />
         <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
         <PackageReference Include="Spectre.Console.Testing"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>

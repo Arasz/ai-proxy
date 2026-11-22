@@ -13,10 +13,7 @@ public sealed class ShellTranscriptCompressionHandler : ICompressionHandler
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.ShellTranscript;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.ShellTranscript;
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

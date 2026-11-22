@@ -31,17 +31,11 @@ internal static class RootCertificateAuthority
     }
 
     /// <summary>Whether a root carries a name constraint, which only roots made here do.</summary>
-    public static bool IsConstrained(X509Certificate2 root)
-    {
-        return root.Extensions[NameConstraintsOid] is not null;
-    }
+    public static bool IsConstrained(X509Certificate2 root) => root.Extensions[NameConstraintsOid] is not null;
 
     /// <summary>Whether a root carries the same permitted and excluded subtrees that <paramref name="hosts" /> would give a new root, in any order.</summary>
     /// <remarks>Compares subtrees as sets, so a root encoded in another host order (0.19.0 wrote catalog order) is kept.</remarks>
-    public static bool PermitsExactly(X509Certificate2 root, IReadOnlyCollection<string> hosts)
-    {
-        return root.Extensions[NameConstraintsOid] is { } stored && Subtrees(stored.RawData).SetEquals(Subtrees(NameConstraints(hosts).RawData));
-    }
+    public static bool PermitsExactly(X509Certificate2 root, IReadOnlyCollection<string> hosts) => root.Extensions[NameConstraintsOid] is { } stored && Subtrees(stored.RawData).SetEquals(Subtrees(NameConstraints(hosts).RawData));
 
     /// <summary>Whether the root permits at least one of <paramref name="hosts" />, by an equal name or a parent domain.</summary>
     public static bool CoversAnyHost(X509Certificate2 root, IEnumerable<string> hosts)

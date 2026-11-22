@@ -115,10 +115,7 @@ public sealed class ProviderInspectionFailureTests
 
     private sealed class ThrowingCompressionPipeline : ICompressionPipeline
     {
-        public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
-        {
-            throw new InvalidOperationException("pipeline broke");
-        }
+        public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken) => throw new InvalidOperationException("pipeline broke");
     }
 
     private sealed record LogEntry(string Category, LogLevel Level, Exception? Exception);
@@ -129,10 +126,7 @@ public sealed class ProviderInspectionFailureTests
 
         public IReadOnlyCollection<LogEntry> Entries => _entries.ToArray();
 
-        public ILogger CreateLogger(string categoryName)
-        {
-            return new RecordingLogger(categoryName, _entries);
-        }
+        public ILogger CreateLogger(string categoryName) => new RecordingLogger(categoryName, _entries);
 
         public void AddProvider(ILoggerProvider provider)
         {
@@ -146,20 +140,12 @@ public sealed class ProviderInspectionFailureTests
     private sealed class RecordingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull =>
+            null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            entries.Enqueue(new LogEntry(category, logLevel, exception));
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => entries.Enqueue(new LogEntry(category, logLevel, exception));
     }
 
     /// <summary>F7: one lone surrogate in a tool result sends the whole body upstream unchanged and logs the failure.</summary>

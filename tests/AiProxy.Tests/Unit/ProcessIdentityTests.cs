@@ -15,8 +15,5 @@ public sealed class ProcessIdentityTests
     [InlineData("")]
     [InlineData("123 agent S 1 2")]
     [InlineData("123 (agent) S 1 2")]
-    public void An_unavailable_kernel_start_identity_fails_closed(string stat)
-    {
-        Assert.Throws<IOException>(() => ProcessIdentity.ParseLinuxStat(stat));
-    }
+    public void An_unavailable_kernel_start_identity_fails_closed(string stat) => Assert.Throws<IOException>(() => ProcessIdentity.ParseLinuxStat(stat));
 }

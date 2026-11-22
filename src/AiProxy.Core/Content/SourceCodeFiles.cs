@@ -31,8 +31,5 @@ public static class SourceCodeFiles
 
     /// <summary>Whether the path names a file whose extension is a known source language.</summary>
     /// <param name="path">The path of the file, or null when it is not known.</param>
-    public static bool IsSourceCode(string? path)
-    {
-        return LanguageOf(path) is not null;
-    }
+    public static bool IsSourceCode(string? path) => LanguageOf(path) is not null;
 }

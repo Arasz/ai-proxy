@@ -17,8 +17,5 @@ public sealed class SystemProxyBypassTests
     }
 
     [Fact]
-    public void The_bypass_rules_are_added_to_the_ones_already_set()
-    {
-        Assert.Equal(SystemProxyBypassRuleMode.Merge, TitaniumSystemProxyRegistrar.BypassSettings().BypassRuleMode);
-    }
+    public void The_bypass_rules_are_added_to_the_ones_already_set() => Assert.Equal(SystemProxyBypassRuleMode.Merge, TitaniumSystemProxyRegistrar.BypassSettings().BypassRuleMode);
 }

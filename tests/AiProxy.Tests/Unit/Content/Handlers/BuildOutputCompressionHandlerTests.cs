@@ -12,28 +12,17 @@ public sealed class BuildOutputCompressionHandlerTests
     private static readonly string LongDiagnostic =
         $"/src/App/Program.cs(12,9): error CS1503: Argument 1: cannot convert from '{string.Join(", ", Enumerable.Repeat("System.Collections.Generic.Dictionary<string, int>", 40))}' to 'int' [/src/App/App.csproj]";
 
-    public static TheoryData<string> BuildLogs()
-    {
-        return new TheoryData<string>(
+    public static TheoryData<string> BuildLogs() =>
+        new(
             Payload("dotnet_build_failure"),
             Payload("dotnet_build_failure_verbose"),
             string.Join("\n", "  Determining projects to restore...", "  All projects are up-to-date for restore.", LongDiagnostic, "", "Build FAILED.", "", LongDiagnostic, "    0 Warning(s)", "    1 Error(s)"));
-    }
 
-    private static string Payload(string name)
-    {
-        return File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ReducerScoring", "payloads", $"{name}.txt"));
-    }
+    private static string Payload(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ReducerScoring", "payloads", $"{name}.txt"));
 
-    private static ContentPart Part(string text)
-    {
-        return new ContentPart("request", 1, ContentType.BuildOutput, text);
-    }
+    private static ContentPart Part(string text) => new("request", 1, ContentType.BuildOutput, text);
 
-    private static bool IsDiagnostic(string line)
-    {
-        return line.Contains("): error ", StringComparison.Ordinal) || line.Contains("): warning ", StringComparison.Ordinal);
-    }
+    private static bool IsDiagnostic(string line) => line.Contains("): error ", StringComparison.Ordinal) || line.Contains("): warning ", StringComparison.Ordinal);
 
     [Theory]
     [MemberData(nameof(BuildLogs))]
@@ -117,10 +106,7 @@ public sealed class BuildOutputCompressionHandlerTests
     }
 
     [Fact]
-    public void Build_output_is_worth_compressing_from_the_log_minimum()
-    {
-        Assert.Equal(CompressionOptions.Default.MinimumFor(ContentType.Log), CompressionOptions.Default.MinimumFor(ContentType.BuildOutput));
-    }
+    public void Build_output_is_worth_compressing_from_the_log_minimum() => Assert.Equal(CompressionOptions.Default.MinimumFor(ContentType.Log), CompressionOptions.Default.MinimumFor(ContentType.BuildOutput));
 
     [Fact]
     public void It_claims_build_output_only()

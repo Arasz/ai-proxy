@@ -9,11 +9,9 @@ public sealed class GainRuleSplitTests
 {
     private static readonly DateTimeOffset At = DateTimeOffset.Parse("2026-11-02T12:00Z");
 
-    private static GainHistoryEntry Entry(string id, string rule, long saved = 10)
-    {
-        return new GainHistoryEntry(id, At, "/p", "anthropic", "POST", rule, "tool_result", "content",
+    private static GainHistoryEntry Entry(string id, string rule, long saved = 10) =>
+        new(id, At, "/p", "anthropic", "POST", rule, "tool_result", "content",
             new GainTotals(1, 100, 50, 100, 50, 30, 20, saved));
-    }
 
     [Fact]
     public void A_request_with_several_rules_counts_once_under_each_rule()

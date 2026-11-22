@@ -40,9 +40,7 @@ public static class RetrievalFollowUp
         return JsonSerializer.SerializeToUtf8Bytes(request, MessagesApi.Json);
     }
 
-    private static JsonObject RequestOf(ReadOnlySpan<byte> forwarded)
-    {
-        return JsonNode.Parse(forwarded) as JsonObject
-               ?? throw new InvalidOperationException("The forwarded request is not a JSON object.");
-    }
+    private static JsonObject RequestOf(ReadOnlySpan<byte> forwarded) =>
+        JsonNode.Parse(forwarded) as JsonObject
+        ?? throw new InvalidOperationException("The forwarded request is not a JSON object.");
 }

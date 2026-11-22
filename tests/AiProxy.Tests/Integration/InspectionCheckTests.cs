@@ -24,10 +24,7 @@ public sealed class InspectionCheckTests
     // Tests that expect the check to give up use a short bound, so they do not wait a minute.
     private static readonly TimeSpan Short = TimeSpan.FromSeconds(5);
 
-    private static InspectionCheck Check(Uri proxy, string host, string dataDirectory, TimeSpan? timeout = null)
-    {
-        return new InspectionCheck(proxy, host, dataDirectory, timeout ?? Generous);
-    }
+    private static InspectionCheck Check(Uri proxy, string host, string dataDirectory, TimeSpan? timeout = null) => new(proxy, host, dataDirectory, timeout ?? Generous);
 
     [Fact]
     public async Task A_decrypted_tunnel_whose_leaf_chains_to_the_published_root_passes_even_with_the_upstream_unreachable()

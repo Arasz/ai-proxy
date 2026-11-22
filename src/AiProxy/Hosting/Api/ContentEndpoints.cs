@@ -10,9 +10,7 @@ public static class ContentEndpoints
 
     /// <summary>Maps the endpoint that serves the original of a compressed request.</summary>
     /// <param name="app">The host to map it on.</param>
-    public static void MapContentEndpoints(this WebApplication app)
-    {
-
+    public static void MapContentEndpoints(this WebApplication app) =>
         app.MapGet(Route, static async (
             string requestId,
             IContentStore store,
@@ -30,5 +28,4 @@ public static class ContentEndpoints
 
             return Results.Text(record.Original);
         });
-    }
 }

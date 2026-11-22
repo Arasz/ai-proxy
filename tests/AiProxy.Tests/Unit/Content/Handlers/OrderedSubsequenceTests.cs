@@ -4,26 +4,14 @@ namespace AiProxy.Tests.Unit.Content.Handlers;
 public sealed class OrderedSubsequenceTests
 {
     [Fact]
-    public void Dropped_characters_keep_the_subsequence()
-    {
-        Assert.True(OrderedSubsequence.Holds("ac", "abc"));
-    }
+    public void Dropped_characters_keep_the_subsequence() => Assert.True(OrderedSubsequence.Holds("ac", "abc"));
 
     [Fact]
-    public void An_inserted_character_breaks_the_subsequence()
-    {
-        Assert.False(OrderedSubsequence.Holds("abXc", "abc"));
-    }
+    public void An_inserted_character_breaks_the_subsequence() => Assert.False(OrderedSubsequence.Holds("abXc", "abc"));
 
     [Fact]
-    public void A_swapped_order_breaks_the_subsequence()
-    {
-        Assert.False(OrderedSubsequence.Holds("ca", "abc"));
-    }
+    public void A_swapped_order_breaks_the_subsequence() => Assert.False(OrderedSubsequence.Holds("ca", "abc"));
 
     [Fact]
-    public void The_overlay_block_is_excused()
-    {
-        OrderedSubsequence.AssertHolds("ac\n[retained identifiers] zzz", "abc");
-    }
+    public void The_overlay_block_is_excused() => OrderedSubsequence.AssertHolds("ac\n[retained identifiers] zzz", "abc");
 }

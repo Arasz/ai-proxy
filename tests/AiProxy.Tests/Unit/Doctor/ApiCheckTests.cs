@@ -9,24 +9,15 @@ public sealed class ApiCheckTests
 {
     private sealed class StubHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(respond());
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(respond());
     }
 
     private sealed class RefusingHandler : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            throw new HttpRequestException("Connection refused");
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => throw new HttpRequestException("Connection refused");
     }
 
-    private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK)
-    {
-        return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-    }
+    private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private sealed class TokenHandler(string token) : HttpMessageHandler
     {

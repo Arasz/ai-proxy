@@ -117,10 +117,7 @@ internal sealed class ProxyControl(string directory, ProxyControl.ProxyInfo prox
     }
 
     /// <summary>Reads the running owner's identity without stopping it; null when no compatible owner answers within the deadline.</summary>
-    internal static async Task<ProxyInfo?> TryReadOwnerAsync(string directory, CancellationToken token)
-    {
-        return (await ReadOwnerAsync(directory, token)).Owner;
-    }
+    internal static async Task<ProxyInfo?> TryReadOwnerAsync(string directory, CancellationToken token) => (await ReadOwnerAsync(directory, token)).Owner;
 
     /// <summary>Reads the owner's identity and says why none was read: no peer, a silent peer, or an incompatible one.</summary>
     internal static async Task<OwnerReading> ReadOwnerAsync(string directory, CancellationToken token)

@@ -7,21 +7,13 @@ public sealed class CcrPreviewSkipTests
 {
     private static readonly CcrOptions Options = CcrOptions.Default;
 
-    private static string Read(int lines)
-    {
-        return string.Join("\n", Enumerable.Range(240, lines).Select(number => $"{number,6}\tstep {number}: compiling module m{number} in the usual way"));
-    }
+    private static string Read(int lines) => string.Join("\n", Enumerable.Range(240, lines).Select(number => $"{number,6}\tstep {number}: compiling module m{number} in the usual way"));
 
-    private static string Diff(int hunks)
-    {
-        return "diff --git a/a.cs b/a.cs\n--- a/a.cs\n+++ b/a.cs\n"
-               + string.Concat(Enumerable.Range(1, hunks).Select(index => $"@@ -{index},3 +{index},3 @@\n context line number {index} of the change\n-the old line {index} that was removed here\n+the new line {index} that was added here\n"));
-    }
+    private static string Diff(int hunks) =>
+        "diff --git a/a.cs b/a.cs\n--- a/a.cs\n+++ b/a.cs\n"
+        + string.Concat(Enumerable.Range(1, hunks).Select(index => $"@@ -{index},3 +{index},3 @@\n context line number {index} of the change\n-the old line {index} that was removed here\n+the new line {index} that was added here\n"));
 
-    private static CcrPreviewer Previewer(CcrOptions options)
-    {
-        return new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), options);
-    }
+    private static CcrPreviewer Previewer(CcrOptions options) => new(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), options);
 
     [Fact]
     public async Task A_numbered_read_of_eight_thousand_tokens_is_previewed_with_the_default_options()

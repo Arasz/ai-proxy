@@ -37,26 +37,18 @@ public sealed partial class JavaScriptCodeLexer([FromKeyedServices(TreeSitterLan
     }
 
     /// <inheritdoc />
-    public bool SupportsPath(string? filePath)
-    {
-        return filePath is not null
-               && (filePath.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
-                   || filePath.EndsWith(".mjs", StringComparison.OrdinalIgnoreCase)
-                   || filePath.EndsWith(".cjs", StringComparison.OrdinalIgnoreCase)
-                   || filePath.EndsWith(".jsx", StringComparison.OrdinalIgnoreCase));
-    }
+    public bool SupportsPath(string? filePath) =>
+        filePath is not null
+        && (filePath.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+            || filePath.EndsWith(".mjs", StringComparison.OrdinalIgnoreCase)
+            || filePath.EndsWith(".cjs", StringComparison.OrdinalIgnoreCase)
+            || filePath.EndsWith(".jsx", StringComparison.OrdinalIgnoreCase));
 
     /// <inheritdoc />
-    public bool IsKeyword(string text)
-    {
-        return Keywords.Contains(text);
-    }
+    public bool IsKeyword(string text) => Keywords.Contains(text);
 
     /// <inheritdoc />
-    public CodeLexResult Lex(string text)
-    {
-        return TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
-    }
+    public CodeLexResult Lex(string text) => TreeSitterScanner.Lex(text, language, Grammar, IsKeyword);
 
     /// <summary>The JavaScript-family mapping, extended with a dialect's identifier and literal node types.</summary>
     internal static TreeSitterGrammar Script(IEnumerable<string> identifiers, IReadOnlyDictionary<string, string?> strings)

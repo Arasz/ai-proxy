@@ -7,6 +7,7 @@
         <ImplicitUsings>disable</ImplicitUsings>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Diagnostics" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
     </ItemGroup>
     <ItemGroup>

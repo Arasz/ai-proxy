@@ -38,16 +38,10 @@ public sealed class ReplayRunner(ReplayReader reader, ReplayEngine engine) : IDi
     /// <param name="minimumSavingTokens">The least a preview must save, or null for the proxy's own.</param>
     /// <param name="skipUnderTokens">The skip band for numbered reads and diffs in estimated tokens, or null for the proxy's own.</param>
     /// <param name="configuration">The configuration the compression settings are bound from.</param>
-    public static ReplayRunner Create(string home, int? minimumTokens, decimal? budgetShare, int? minimumSavingTokens, int? skipUnderTokens, IConfiguration configuration)
-    {
-        return new ReplayRunner(new ReplayReader(home), ReplayEngine.Create(minimumTokens, budgetShare, minimumSavingTokens, skipUnderTokens, configuration));
-    }
+    public static ReplayRunner Create(string home, int? minimumTokens, decimal? budgetShare, int? minimumSavingTokens, int? skipUnderTokens, IConfiguration configuration) => new(new ReplayReader(home), ReplayEngine.Create(minimumTokens, budgetShare, minimumSavingTokens, skipUnderTokens, configuration));
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        engine.Dispose();
-    }
+    public void Dispose() => engine.Dispose();
 
     /// <summary>Replays every stored body in the window; a body already counted (same decoded bytes) is reported as a duplicate.</summary>
     /// <param name="sources">The databases to read, in order.</param>

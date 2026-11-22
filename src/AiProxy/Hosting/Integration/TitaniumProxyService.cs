@@ -415,10 +415,7 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         return target.IsLoopback || (IPAddress.TryParse(target.Host, out var address) && address.Equals(_options.ListenAddress));
     }
 
-    private Task BeforeResponseAsync(object sender, SessionEventArgs e)
-    {
-        return _inspector.BeforeResponseAsync(sender, e);
-    }
+    private Task BeforeResponseAsync(object sender, SessionEventArgs e) => _inspector.BeforeResponseAsync(sender, e);
 
     private async Task AfterResponseAsync(object sender, SessionEventArgs e)
     {

@@ -32,16 +32,10 @@ public sealed class RedundantNullCheckAnalyzerTests
     [InlineData("class C { void M<T>(T x) { System.ArgumentNullException.ThrowIfNull(x); } }")]
     [InlineData("class C { void M(int x) { System.ArgumentNullException.ThrowIfNull(x); } }")]
     [InlineData("class C { void M(string x) { System.ArgumentException.ThrowIfNullOrWhiteSpace(x); } }")]
-    public async Task Null_check_on_a_nullable_or_unconstrained_value_is_allowed(string source)
-    {
-        Assert.Empty(await Analyze(source));
-    }
+    public async Task Null_check_on_a_nullable_or_unconstrained_value_is_allowed(string source) => Assert.Empty(await Analyze(source));
 
     [Fact]
-    public async Task Null_check_where_nullable_context_is_off_is_allowed()
-    {
-        Assert.Empty(await Analyze("class C { void M(string x) { System.ArgumentNullException.ThrowIfNull(x); } }", NullableContextOptions.Disable));
-    }
+    public async Task Null_check_where_nullable_context_is_off_is_allowed() => Assert.Empty(await Analyze("class C { void M(string x) { System.ArgumentNullException.ThrowIfNull(x); } }", NullableContextOptions.Disable));
 
     private static async Task<IReadOnlyList<Diagnostic>> Analyze(string source, NullableContextOptions nullable = NullableContextOptions.Enable)
     {

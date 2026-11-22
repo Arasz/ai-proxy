@@ -23,15 +23,9 @@ public sealed class CaptureLadderTests : IDisposable
         }
     }
 
-    private SqliteCaptureStore Store()
-    {
-        return new SqliteCaptureStore(DatabasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
-    }
+    private SqliteCaptureStore Store() => new(DatabasePath, SqliteCaptureStore.DefaultMaxLiveBytes, TimeProvider.System, NullLogger<SqliteCaptureStore>.Instance);
 
-    private static CapturedRequest Request(string id)
-    {
-        return new CapturedRequest(id, DateTimeOffset.UtcNow, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[10]);
-    }
+    private static CapturedRequest Request(string id) => new(id, DateTimeOffset.UtcNow, Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[10]);
 
     private long UserVersion()
     {

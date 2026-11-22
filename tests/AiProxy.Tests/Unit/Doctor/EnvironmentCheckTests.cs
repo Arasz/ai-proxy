@@ -7,10 +7,7 @@ public sealed class EnvironmentCheckTests
 {
     private static readonly Uri Proxy = new("http://127.0.0.1:8080");
 
-    private static Task<CheckResult> Run(Dictionary<string, string> environment)
-    {
-        return new EnvironmentCheck(Proxy, name => environment.GetValueOrDefault(name)).RunAsync(TestContext.Current.CancellationToken);
-    }
+    private static Task<CheckResult> Run(Dictionary<string, string> environment) => new EnvironmentCheck(Proxy, name => environment.GetValueOrDefault(name)).RunAsync(TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task Unset_variables_pass_with_a_note_about_the_system_proxy()

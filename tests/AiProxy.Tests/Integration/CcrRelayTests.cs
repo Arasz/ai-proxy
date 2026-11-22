@@ -328,19 +328,12 @@ public sealed class CcrRelayTests : IDisposable
         Assert.Equal(-gain.Summary.EstimatedToolTokens, gain.Summary.EstimatedNetTokens);
     }
 
-    private static string ToolResultOf(string body)
-    {
-        return Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? "";
-    }
+    private static string ToolResultOf(string body) => Json(body).GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0].GetProperty("content").GetString() ?? "";
 
-    private static JsonObject CodeRequest()
-    {
-        return CodeRequest("src/Example.cs", CodeFile);
-    }
+    private static JsonObject CodeRequest() => CodeRequest("src/Example.cs", CodeFile);
 
-    private static JsonObject CodeRequest(string path, string text)
-    {
-        return new JsonObject
+    private static JsonObject CodeRequest(string path, string text) =>
+        new()
         {
             ["model"] = "m",
             ["max_tokens"] = 5,
@@ -358,21 +351,13 @@ public sealed class CcrRelayTests : IDisposable
                     ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = text })
                 })
         };
-    }
 
-    internal static string StatelessRequest()
-    {
-        return Request().ToJsonString();
-    }
+    internal static string StatelessRequest() => Request().ToJsonString();
 
-    private static string CreateRequest()
-    {
-        return Request().Also(request => request["thread"] = new JsonObject { ["type"] = "create" }).ToJsonString();
-    }
+    private static string CreateRequest() => Request().Also(request => request["thread"] = new JsonObject { ["type"] = "create" }).ToJsonString();
 
-    private static JsonObject Request()
-    {
-        return new JsonObject
+    private static JsonObject Request() =>
+        new()
         {
             ["model"] = "m",
             ["max_tokens"] = 5,
@@ -384,12 +369,8 @@ public sealed class CcrRelayTests : IDisposable
                 ["content"] = new JsonArray(new JsonObject { ["type"] = "tool_result", ["tool_use_id"] = "t0", ["content"] = Large })
             })
         };
-    }
 
-    private static JsonElement Json(string body)
-    {
-        return JsonDocument.Parse(body).RootElement.Clone();
-    }
+    private static JsonElement Json(string body) => JsonDocument.Parse(body).RootElement.Clone();
 
     [Fact]
     public async Task An_upstream_that_never_sends_headers_is_answered_with_a_gateway_timeout_once_the_deadline_passes()
@@ -676,14 +657,10 @@ public sealed class CcrRelayTests : IDisposable
         };
     }
 
-    private Task<ProxyHost> StartProxyAsync(params KeyValuePair<string, string>[] extra)
-    {
-        return StartProxyAsync(null, extra);
-    }
+    private Task<ProxyHost> StartProxyAsync(params KeyValuePair<string, string>[] extra) => StartProxyAsync(null, extra);
 
-    private Task<ProxyHost> StartProxyAsync(TimeProvider? time, params KeyValuePair<string, string>[] extra)
-    {
-        return ProxyHost.StartAsync(
+    private Task<ProxyHost> StartProxyAsync(TimeProvider? time, params KeyValuePair<string, string>[] extra) =>
+        ProxyHost.StartAsync(
             new Dictionary<string, string>(extra)
             {
                 ["Proxy:Compression:Enabled"] = "true",
@@ -691,7 +668,6 @@ public sealed class CcrRelayTests : IDisposable
             },
             providerHosts: new LoopbackProviderHosts(Dialect.Anthropic),
             time: time);
-    }
 
     private static async Task<ResponseRow> ReadResponseRowAsync(string path)
     {

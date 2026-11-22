@@ -18,15 +18,13 @@ public static class GainHarness
     /// The harness of a request: Anthropic is Claude; an OpenAI-dialect request is told apart by host, and one without a host
     /// (written before the ledger kept it) is <see cref="OpenAiHostUnknown"/>; anything else is <see cref="Other"/>.
     /// </summary>
-    public static string Of(string? provider, string? host)
-    {
-        return provider switch
+    public static string Of(string? provider, string? host) =>
+        provider switch
         {
             "anthropic" => Claude,
             "openai" => OfOpenAiHost(host),
             _ => Other
         };
-    }
 
     private static string OfOpenAiHost(string? host)
     {
@@ -41,8 +39,5 @@ public static class GainHarness
         };
     }
 
-    private static bool IsOrSubdomainOf(string host, string domain)
-    {
-        return host.Equals(domain, StringComparison.OrdinalIgnoreCase) || host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool IsOrSubdomainOf(string host, string domain) => host.Equals(domain, StringComparison.OrdinalIgnoreCase) || host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase);
 }

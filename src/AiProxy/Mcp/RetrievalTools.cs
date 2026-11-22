@@ -61,8 +61,5 @@ public sealed class RetrievalTools(IProxyClient client, McpServerOptions options
         return tool;
     }
 
-    private static CallToolResult Failed(string text)
-    {
-        return new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = text }] };
-    }
+    private static CallToolResult Failed(string text) => new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
 }

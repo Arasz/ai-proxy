@@ -32,8 +32,5 @@ public sealed class StageTimings
     }
 
     /// <summary>The stages so far, in the order they first ran.</summary>
-    public StageTiming[] ToArray()
-    {
-        return [.. _stages];
-    }
+    public StageTiming[] ToArray() => [.. _stages];
 }

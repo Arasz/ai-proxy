@@ -104,16 +104,10 @@ public sealed class HarnessOnlyHostTests : IDisposable
     }
 
     [Fact]
-    public async Task A_decrypted_harness_only_tunnel_negotiates_http11_so_no_origin_http2_settings_reach_the_client()
-    {
-        Assert.Equal(SslApplicationProtocol.Http11, await NegotiatedAsync(new HarnessLoopbackHosts()));
-    }
+    public async Task A_decrypted_harness_only_tunnel_negotiates_http11_so_no_origin_http2_settings_reach_the_client() => Assert.Equal(SslApplicationProtocol.Http11, await NegotiatedAsync(new HarnessLoopbackHosts()));
 
     [Fact]
-    public async Task A_decrypted_tunnel_to_any_other_host_keeps_http2_so_the_pin_check_can_fail()
-    {
-        Assert.Equal(SslApplicationProtocol.Http2, await NegotiatedAsync(new LoopbackProviderHosts(Dialect.OpenAi)));
-    }
+    public async Task A_decrypted_tunnel_to_any_other_host_keeps_http2_so_the_pin_check_can_fail() => Assert.Equal(SslApplicationProtocol.Http2, await NegotiatedAsync(new LoopbackProviderHosts(Dialect.OpenAi)));
 
     [Fact]
     public async Task A_websocket_upgrade_to_codex_responses_gets_426_from_the_proxy_and_never_reaches_upstream()
@@ -300,11 +294,9 @@ public sealed class HarnessOnlyHostTests : IDisposable
         return tls.NegotiatedApplicationProtocol;
     }
 
-    private static string Upgrade(string path, int port)
-    {
-        return $"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-               "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
-    }
+    private static string Upgrade(string path, int port) =>
+        $"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
 
     private static ByteArrayContent JsonContent(byte[] body)
     {
@@ -313,10 +305,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
         return content;
     }
 
-    private static string ResponsesBody(string output)
-    {
-        return $$"""{"model":"gpt-5","stream":true,"input":[{"type":"function_call_output","call_id":"call_1","output":{{JsonSerializer.Serialize(output)}}}]}""";
-    }
+    private static string ResponsesBody(string output) => $$"""{"model":"gpt-5","stream":true,"input":[{"type":"function_call_output","call_id":"call_1","output":{{JsonSerializer.Serialize(output)}}}]}""";
 
     private static byte[] Zstd(byte[] bytes)
     {
@@ -337,10 +326,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
         return content;
     }
 
-    private static HttpRequestMessage ZstdPost(Uri uri, byte[] encoded)
-    {
-        return new HttpRequestMessage(HttpMethod.Post, uri) { Content = ZstdContent(encoded) };
-    }
+    private static HttpRequestMessage ZstdPost(Uri uri, byte[] encoded) => new(HttpMethod.Post, uri) { Content = ZstdContent(encoded) };
 
     private static async Task<HttpResponseMessage> PlainPostAsync(ProxyHost proxy, FakeUpstream upstream, HttpContent content, string? credential)
     {
@@ -355,14 +341,12 @@ public sealed class HarnessOnlyHostTests : IDisposable
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
-    private static void TrustUpstream(ProxyHost proxy, X509Certificate2 upstreamCertificate)
-    {
+    private static void TrustUpstream(ProxyHost proxy, X509Certificate2 upstreamCertificate) =>
         proxy.Services.GetRequiredService<TitaniumProxyService>().Server.ServerCertificateValidationCallback += (_, e) =>
         {
             e.IsValid = e.Certificate is not null && e.Certificate.GetCertHashString() == upstreamCertificate.GetCertHashString();
             return Task.CompletedTask;
         };
-    }
 
     private static async Task<string> ReadHeadAsync(Stream stream, CancellationToken token)
     {
@@ -439,9 +423,6 @@ public sealed class HarnessOnlyHostTests : IDisposable
     {
         public IReadOnlyCollection<string> Hosts { get; } = ["127.0.0.1", "localhost", "::1"];
 
-        public ProviderHost? Find(string host)
-        {
-            return host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(Dialect.OpenAi, HarnessOnly: true) : null;
-        }
+        public ProviderHost? Find(string host) => host is "127.0.0.1" or "localhost" or "::1" or "[::1]" ? new ProviderHost(Dialect.OpenAi, HarnessOnly: true) : null;
     }
 }

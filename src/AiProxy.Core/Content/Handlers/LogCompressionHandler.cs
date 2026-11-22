@@ -17,10 +17,7 @@ public sealed class LogCompressionHandler : ICompressionHandler
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.Log;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.Log;
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)

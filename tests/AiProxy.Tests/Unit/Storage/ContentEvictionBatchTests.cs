@@ -24,10 +24,7 @@ public sealed class ContentEvictionBatchTests : IDisposable
         }
     }
 
-    private string DaysAgo(int days)
-    {
-        return (_now - TimeSpan.FromDays(days)).ToString("O", CultureInfo.InvariantCulture);
-    }
+    private string DaysAgo(int days) => (_now - TimeSpan.FromDays(days)).ToString("O", CultureInfo.InvariantCulture);
 
     private SqliteConnection OpenReady()
     {
@@ -37,13 +34,11 @@ public sealed class ContentEvictionBatchTests : IDisposable
     }
 
     /// <summary>Logs the bytes of each deleted row; the observer sums and clears the log after every batch.</summary>
-    private static void LogDeletedBytes(SqliteConnection connection, string table, string column)
-    {
+    private static void LogDeletedBytes(SqliteConnection connection, string table, string column) =>
         connection.Execute($"""
                             CREATE TABLE deleted_bytes (n INTEGER NOT NULL);
                             CREATE TRIGGER log_{table} AFTER DELETE ON {table} BEGIN INSERT INTO deleted_bytes VALUES (length(old.{column})); END;
                             """);
-    }
 
     private async Task<List<long>> EvictRecordingBatchesAsync()
     {

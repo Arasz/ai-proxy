@@ -37,8 +37,5 @@ public sealed class DoctorReportTests
     [InlineData("http://user:SENTINEL@127.0.0.1:8080/path?k=SENTINEL2", "http://127.0.0.1:8080")]
     [InlineData("localhost:8080", "http://localhost:8080")]
     [InlineData("not a url at all SENTINEL", "(unparseable)")]
-    public void Endpoint_text_keeps_only_scheme_host_and_port(string value, string expected)
-    {
-        Assert.Equal(expected, EndpointText.Safe(value));
-    }
+    public void Endpoint_text_keeps_only_scheme_host_and_port(string value, string expected) => Assert.Equal(expected, EndpointText.Safe(value));
 }

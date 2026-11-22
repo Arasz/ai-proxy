@@ -31,10 +31,7 @@ public sealed class RestartTests : IDisposable
     [InlineData("123\n456\n", null)]
     [InlineData("invalid\n", null)]
     [InlineData("123\n123\n", 123)]
-    public void Marker_pid_is_reported_only_for_one_unambiguous_process(string output, int? expected)
-    {
-        Assert.Equal(expected, UnixMarkerOwnerSearch.MarkerOwnerPid(output));
-    }
+    public void Marker_pid_is_reported_only_for_one_unambiguous_process(string output, int? expected) => Assert.Equal(expected, UnixMarkerOwnerSearch.MarkerOwnerPid(output));
 
     [Fact]
     public async Task Missing_marker_discovery_tool_does_not_invent_a_pid()

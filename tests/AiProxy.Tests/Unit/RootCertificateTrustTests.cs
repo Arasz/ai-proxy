@@ -48,10 +48,7 @@ public sealed class RootCertificateTrustTests
 
         public List<string> Calls { get; } = [];
 
-        public void Load()
-        {
-            Calls.Add("load");
-        }
+        public void Load() => Calls.Add("load");
 
         public bool IsTrusted()
         {
@@ -65,9 +62,6 @@ public sealed class RootCertificateTrustTests
             _state = trustTakes;
         }
 
-        public void Untrust(string thumbprint)
-        {
-            Calls.Add($"untrust {thumbprint}");
-        }
+        public void Untrust(string thumbprint) => Calls.Add($"untrust {thumbprint}");
     }
 }

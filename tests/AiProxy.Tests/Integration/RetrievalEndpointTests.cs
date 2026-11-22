@@ -81,34 +81,16 @@ public sealed class RetrievalEndpointTests : IAsyncDisposable
 
     private sealed class FailingGainStore : IGainStore
     {
-        public ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken) => throw new IOException("disk full");
 
-        public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask RecordOtherAsync(GainOtherEntry entry, CancellationToken cancellationToken) => throw new IOException("disk full");
 
-        public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask RecallAsync(GainRecall recall, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) => throw new IOException("disk full");
 
-        public ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask FollowUpAsync(GainFollowUp followUp, string? provider, string method, string rule, string layer, string pipeline, CancellationToken cancellationToken) => throw new IOException("disk full");
 
-        public ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask<GainReport> QueryAsync(GainQuery query, CancellationToken cancellationToken) => throw new IOException("disk full");
 
-        public ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken)
-        {
-            throw new IOException("disk full");
-        }
+        public ValueTask<GainResetResult> ResetAsync(GainQuery query, string caller, CancellationToken cancellationToken) => throw new IOException("disk full");
     }
 }

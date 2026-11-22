@@ -91,13 +91,7 @@ public sealed class GainCsv
         csv.AppendJoin(',', fields.Select(Escape)).Append("\r\n");
     }
 
-    private static string Escape(string value)
-    {
-        return value.IndexOfAny([',', '"', '\r', '\n']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
-    }
+    private static string Escape(string value) => value.IndexOfAny([',', '"', '\r', '\n']) < 0 ? value : $"\"{value.Replace("\"", "\"\"")}\"";
 
-    private static string Stamp(DateTimeOffset value)
-    {
-        return value.ToString("O", CultureInfo.InvariantCulture);
-    }
+    private static string Stamp(DateTimeOffset value) => value.ToString("O", CultureInfo.InvariantCulture);
 }

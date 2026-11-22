@@ -5,10 +5,7 @@ namespace AiProxy.Tests.Unit.Content.Ccr;
 /// <summary>Numbered reads and diffs are recognised by line-anchored shape, and nothing else is.</summary>
 public sealed class PreviewSkipTests
 {
-    private static string Numbered(int start, int count)
-    {
-        return string.Join("\n", Enumerable.Range(start, count).Select(number => $"{number,6}\tline {number}"));
-    }
+    private static string Numbered(int start, int count) => string.Join("\n", Enumerable.Range(start, count).Select(number => $"{number,6}\tline {number}"));
 
     public static TheoryData<string> Reads =>
     [
@@ -54,31 +51,19 @@ public sealed class PreviewSkipTests
 
     [Theory]
     [MemberData(nameof(Reads))]
-    public void A_numbered_read_is_recognised(string text)
-    {
-        Assert.True(PreviewSkip.IsNumberedRead(text));
-    }
+    public void A_numbered_read_is_recognised(string text) => Assert.True(PreviewSkip.IsNumberedRead(text));
 
     [Theory]
     [MemberData(nameof(NotReads))]
-    public void Tabbed_rows_that_are_not_consecutive_line_numbers_are_not_a_read(string text)
-    {
-        Assert.False(PreviewSkip.IsNumberedRead(text));
-    }
+    public void Tabbed_rows_that_are_not_consecutive_line_numbers_are_not_a_read(string text) => Assert.False(PreviewSkip.IsNumberedRead(text));
 
     [Theory]
     [MemberData(nameof(Diffs))]
-    public void A_diff_is_recognised(string text)
-    {
-        Assert.True(PreviewSkip.IsDiff(text));
-    }
+    public void A_diff_is_recognised(string text) => Assert.True(PreviewSkip.IsDiff(text));
 
     [Theory]
     [MemberData(nameof(NotDiffs))]
-    public void Text_that_only_mentions_diff_markers_is_not_a_diff(string text)
-    {
-        Assert.False(PreviewSkip.IsDiff(text));
-    }
+    public void Text_that_only_mentions_diff_markers_is_not_a_diff(string text) => Assert.False(PreviewSkip.IsDiff(text));
 
     [Fact]
     public void Shortlog_output_is_neither_a_read_nor_a_diff()

@@ -28,22 +28,13 @@ public sealed class ZstdRequestBodyTests
     }
 
     [Fact]
-    public void Bytes_that_are_not_zstd_do_not_decode()
-    {
-        Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode([0x28, 0xB5, 0x2F, 0xFD, 0xFF, 0x00, 0x13, 0x37]));
-    }
+    public void Bytes_that_are_not_zstd_do_not_decode() => Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode([0x28, 0xB5, 0x2F, 0xFD, 0xFF, 0x00, 0x13, 0x37]));
 
     [Fact]
-    public void A_body_that_decodes_past_the_limit_is_refused()
-    {
-        Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode(Encode(new byte[SixteenMiB + 1])));
-    }
+    public void A_body_that_decodes_past_the_limit_is_refused() => Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode(Encode(new byte[SixteenMiB + 1])));
 
     [Fact]
-    public void A_body_that_decodes_to_exactly_the_limit_is_decoded()
-    {
-        Assert.Equal(SixteenMiB, ZstdRequestBody.Decode(Encode(new byte[SixteenMiB])).Length);
-    }
+    public void A_body_that_decodes_to_exactly_the_limit_is_decoded() => Assert.Equal(SixteenMiB, ZstdRequestBody.Decode(Encode(new byte[SixteenMiB])).Length);
 
     [Fact]
     public void A_frame_declaring_a_window_above_the_decoder_cap_is_refused_even_when_its_content_is_small()
@@ -67,10 +58,7 @@ public sealed class ZstdRequestBodyTests
     [InlineData("gzip", false)]
     [InlineData("zstd, gzip", false)]
     [InlineData(null, false)]
-    public void Only_a_lone_zstd_encoding_is_decoded(string? encoding, bool expected)
-    {
-        Assert.Equal(expected, ZstdRequestBody.IsZstd(encoding));
-    }
+    public void Only_a_lone_zstd_encoding_is_decoded(string? encoding, bool expected) => Assert.Equal(expected, ZstdRequestBody.IsZstd(encoding));
 
     private static byte[] Encode(byte[] bytes, int? windowLog = null)
     {

@@ -18,10 +18,7 @@ public sealed class BuildOutputCompressionHandler : ICompressionHandler
     private static readonly LogCompressionHandler Fallback = new();
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.BuildOutput;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.BuildOutput;
 
     /// <inheritdoc />
     public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
@@ -64,8 +61,5 @@ public sealed class BuildOutputCompressionHandler : ICompressionHandler
         return tokens.Count(static token => token.StartsWith('-') || token.Contains('/') || token.Contains('\\')) * 2 >= tokens.Length;
     }
 
-    private static string Shorten(string line)
-    {
-        return $"{line[..HeadLength]} [{line.Length - HeadLength} characters dropped]";
-    }
+    private static string Shorten(string line) => $"{line[..HeadLength]} [{line.Length - HeadLength} characters dropped]";
 }

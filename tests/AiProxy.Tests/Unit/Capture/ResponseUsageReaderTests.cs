@@ -310,10 +310,7 @@ public sealed class ResponseUsageReaderTests
         Assert.Equal(ResponseUsageReader.Truncated, reading.Error);
     }
 
-    private static string LongMessageBody()
-    {
-        return $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
-    }
+    private static string LongMessageBody() => $$"""{"usage":{"input_tokens":11,"output_tokens":22},"content":[{{string.Join(",", Enumerable.Range(0, 400).Select(index => $$"""{"type":"text","text":"line {{index}} of a long answer"}"""))}}]}""";
 
     [Theory]
     [InlineData(Json, "{\"usage\":{\"input_tokens\":1,")]

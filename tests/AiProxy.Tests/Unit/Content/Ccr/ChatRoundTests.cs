@@ -26,20 +26,11 @@ public sealed class ChatRoundTests
         return ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(call) }, null, null);
     }
 
-    private static string Stream(params string[] chunks)
-    {
-        return string.Concat(chunks) + "data: [DONE]\n\n";
-    }
+    private static string Stream(params string[] chunks) => string.Concat(chunks) + "data: [DONE]\n\n";
 
-    private static string Finish(string reason)
-    {
-        return ChatSse.Chunk("c1", new JsonObject(), reason, null);
-    }
+    private static string Finish(string reason) => ChatSse.Chunk("c1", new JsonObject(), reason, null);
 
-    private static string Usage(int completionTokens)
-    {
-        return ChatSse.Chunk("c1", null, null, ChatSse.Usage(completionTokens));
-    }
+    private static string Usage(int completionTokens) => ChatSse.Chunk("c1", null, null, ChatSse.Usage(completionTokens));
 
     private static async Task<(IReadOnlyList<SseEvent> Passed, ChatRound Round)> ReadAsync(string wire, bool clientUsage = false, ChatRound? round = null)
     {
@@ -248,10 +239,7 @@ public sealed class ChatRoundTests
         return ChatSse.Chunk("c1", extras, null, null);
     }
 
-    private static string CallWithoutIndex(string arguments)
-    {
-        return ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["function"] = new JsonObject { ["arguments"] = arguments } }) }, null, null);
-    }
+    private static string CallWithoutIndex(string arguments) => ChatSse.Chunk("c1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["function"] = new JsonObject { ["arguments"] = arguments } }) }, null, null);
 
     private static JsonObject FollowUpOf(ChatRound round, params ToolResult[] results)
     {

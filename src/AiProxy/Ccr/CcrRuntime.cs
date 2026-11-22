@@ -23,30 +23,18 @@ public interface ICcrRuntime
 public sealed class CcrRuntime(CcrSettings settings, IOriginalStore store, CcrRelay relay) : ICcrRuntime
 {
     /// <inheritdoc />
-    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
-    {
-        return CcrPlan.DecideAsync(settings, store, dialect, chatHost, method, path, body, cancellationToken);
-    }
+    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken) => CcrPlan.DecideAsync(settings, store, dialect, chatHost, method, path, body, cancellationToken);
 
     /// <inheritdoc />
-    public Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals)
-    {
-        return relay.RelayAsync(e, exchange, body, plan, originals);
-    }
+    public Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals) => relay.RelayAsync(e, exchange, body, plan, originals);
 }
 
 /// <summary>Recoverable compression switched off with compression: every request is forwarded as before.</summary>
 public sealed class CcrOff : ICcrRuntime
 {
     /// <inheritdoc />
-    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(CcrPlan.Forward);
-    }
+    public Task<CcrPlan> DecideAsync(Dialect dialect, bool chatHost, string method, string path, ReadOnlyMemory<byte> body, CancellationToken cancellationToken) => Task.FromResult(CcrPlan.Forward);
 
     /// <inheritdoc />
-    public Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals)
-    {
-        throw new InvalidOperationException("CCR is off; no request is relayed.");
-    }
+    public Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals) => throw new InvalidOperationException("CCR is off; no request is relayed.");
 }

@@ -79,10 +79,7 @@ public static partial class MustKeepOverlay
     }
 
     /// <summary>Whether a line carries a failure verdict, an exit status or a state transition.</summary>
-    public static bool CarriesSignal(string line)
-    {
-        return DecisionPatterns[0].IsMatch(line) || DecisionPatterns[1].IsMatch(line) || DecisionPatterns[2].IsMatch(line);
-    }
+    public static bool CarriesSignal(string line) => DecisionPatterns[0].IsMatch(line) || DecisionPatterns[1].IsMatch(line) || DecisionPatterns[2].IsMatch(line);
 
     /// <summary>The tokens a reduction may never lose, decision tokens first, each once, in text order.</summary>
     public static IReadOnlyList<string> Identifiers(string text)

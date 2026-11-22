@@ -40,10 +40,7 @@ public sealed class CaptureCapTests : IDisposable
         return new CapturedRequest(id, _time.GetUtcNow(), Dialect.Anthropic, "api.anthropic.com", "/v1/messages", new byte[bodyBytes]);
     }
 
-    private CapturedResponse Response(string id)
-    {
-        return new CapturedResponse(id, _time.GetUtcNow(), 200, 1, 1, 1, null, null, []);
-    }
+    private CapturedResponse Response(string id) => new(id, _time.GetUtcNow(), 200, 1, 1, 1, null, null, []);
 
     private List<string> Ids(string table)
     {

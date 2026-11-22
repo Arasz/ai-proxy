@@ -12,25 +12,13 @@ public sealed class ToolOutputFilePathTests
 {
     private static readonly ToolOutputRegionFinder Finder = new();
 
-    private static ContentRegion[] Find(string body)
-    {
-        return Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
-    }
+    private static ContentRegion[] Find(string body) => Finder.Find(Encoding.UTF8.GetBytes(body)).ToArray();
 
-    private static string AnthropicCall(string id, string input)
-    {
-        return $$"""{"type":"tool_use","id":"{{id}}","name":"Read","input":{{input}}}""";
-    }
+    private static string AnthropicCall(string id, string input) => $$"""{"type":"tool_use","id":"{{id}}","name":"Read","input":{{input}}}""";
 
-    private static string AnthropicResult(string id, string text)
-    {
-        return $$"""{"type":"tool_result","tool_use_id":"{{id}}","content":"{{text}}"}""";
-    }
+    private static string AnthropicResult(string id, string text) => $$"""{"type":"tool_result","tool_use_id":"{{id}}","content":"{{text}}"}""";
 
-    private static string AnthropicBody(string calls, string results)
-    {
-        return $$"""{"messages":[{"role":"assistant","content":[{{calls}}]},{"role":"user","content":[{{results}}]}]}""";
-    }
+    private static string AnthropicBody(string calls, string results) => $$"""{"messages":[{"role":"assistant","content":[{{calls}}]},{"role":"user","content":[{{results}}]}]}""";
 
     [Fact]
     public void Two_anthropic_results_in_reversed_order_each_carry_the_path_of_their_own_call()
@@ -158,17 +146,12 @@ public sealed class ToolOutputFilePathTests
         Assert.Null(Assert.Single(Find(body)).FilePath);
     }
 
-    private static string Numbered(int from, int count)
-    {
-        return string.Join("\n", Enumerable.Range(from, count).Select(number => $"{number}\tline {number}"));
-    }
+    private static string Numbered(int from, int count) => string.Join("\n", Enumerable.Range(from, count).Select(number => $"{number}\tline {number}"));
 
-    private static string NumberedBody(string input, string content)
-    {
-        return AnthropicBody(
+    private static string NumberedBody(string input, string content) =>
+        AnthropicBody(
             AnthropicCall("call-a", input),
             $$"""{"type":"tool_result","tool_use_id":"call-a","content":{{JsonSerializer.Serialize(content)}}}""");
-    }
 
     [Theory]
     [InlineData(3)]

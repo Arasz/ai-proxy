@@ -46,6 +46,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Diagnostics" />
         <PackageReference Include="FluentValidation"/>
         <PackageReference Include="JetBrains.Annotations"/>
         <PackageReference Include="JsonSchema.Net"/>

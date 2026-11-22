@@ -121,12 +121,10 @@ public sealed class RetrievalLoop(IRetrievalRound first)
     }
 
     /// <summary>The tool results of the round being answered: retrievals from <paramref name="answers" />, every other call deferred.</summary>
-    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers)
-    {
-        return Round.ToolCalls
+    public IReadOnlyList<ToolResult> ToolResults(IReadOnlyDictionary<string, CcrRetrieval> answers) =>
+        Round.ToolCalls
             .Select(call => call.IsRetrieval ? ToolResult.Of(call.Id, answers[call.Id]) : ToolResult.Deferred(call.Id))
             .ToArray();
-    }
 
     /// <summary>Starts the round of the follow-up response; its <c>message_start</c> is dropped and its blocks continue the numbering.</summary>
     public IRetrievalRound NextRound()
@@ -137,10 +135,7 @@ public sealed class RetrievalLoop(IRetrievalRound first)
     }
 
     /// <summary>The held tool calls and the closing events of a released message.</summary>
-    public IReadOnlyList<SseEvent> Finish()
-    {
-        return Round.Finish(Answered, _outputTokens);
-    }
+    public IReadOnlyList<SseEvent> Finish() => Round.Finish(Answered, _outputTokens);
 
     /// <summary>The error event of a failed loop.</summary>
     public SseEvent Failure(string message)

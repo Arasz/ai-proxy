@@ -18,25 +18,13 @@ public sealed class RootCheckTests : IDisposable
         public bool IsTrusted(X509Certificate2 root) => trusted;
     }
 
-    public void Dispose()
-    {
-        Directory.Delete(_directory, true);
-    }
+    public void Dispose() => Directory.Delete(_directory, true);
 
-    private static X509Certificate2 Root(DateTimeOffset createdAt, IEnumerable<string>? hosts = null)
-    {
-        return RootCertificateAuthority.Create(hosts ?? ProviderHostCatalog.Hosts, createdAt);
-    }
+    private static X509Certificate2 Root(DateTimeOffset createdAt, IEnumerable<string>? hosts = null) => RootCertificateAuthority.Create(hosts ?? ProviderHostCatalog.Hosts, createdAt);
 
-    private void WritePem(string text)
-    {
-        File.WriteAllText(Path.Combine(_directory, "root-ca.pem"), text);
-    }
+    private void WritePem(string text) => File.WriteAllText(Path.Combine(_directory, "root-ca.pem"), text);
 
-    private Task<CheckResult> Run(bool trusted = true)
-    {
-        return new RootCheck(_directory, new FakeTimeProvider(Now), new FixedTrust(trusted)).RunAsync(TestContext.Current.CancellationToken);
-    }
+    private Task<CheckResult> Run(bool trusted = true) => new RootCheck(_directory, new FakeTimeProvider(Now), new FixedTrust(trusted)).RunAsync(TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task A_constrained_current_trusted_root_passes()
@@ -160,10 +148,8 @@ public sealed class RootCheckTests : IDisposable
         Assert.Equal(before, Snapshot());
     }
 
-    private string[] Snapshot()
-    {
-        return [.. Directory.EnumerateFileSystemEntries(_directory, "*", SearchOption.AllDirectories)
-            .Order(StringComparer.Ordinal)
-            .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}:{File.GetLastWriteTimeUtc(path).Ticks}")];
-    }
+    private string[] Snapshot() =>
+    [.. Directory.EnumerateFileSystemEntries(_directory, "*", SearchOption.AllDirectories)
+        .Order(StringComparer.Ordinal)
+        .Select(path => $"{path}:{(File.Exists(path) ? File.ReadAllText(path).GetHashCode() : 0)}:{File.GetLastWriteTimeUtc(path).Ticks}")];
 }

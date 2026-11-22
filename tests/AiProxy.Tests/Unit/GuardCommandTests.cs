@@ -216,10 +216,7 @@ public sealed class GuardCommandTests
         Assert.Equal(expected, GuardCommand.IsRequested(args));
     }
 
-    private static string MarkerPath(TemporaryDirectory directory)
-    {
-        return Path.Combine(directory.Path, SystemProxyMarker.FileName);
-    }
+    private static string MarkerPath(TemporaryDirectory directory) => Path.Combine(directory.Path, SystemProxyMarker.FileName);
 
     [Fact]
     public async Task A_parent_that_died_after_recording_its_applied_settings_hands_them_to_the_restore()

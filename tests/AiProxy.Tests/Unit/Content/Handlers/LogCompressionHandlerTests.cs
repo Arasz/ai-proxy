@@ -19,15 +19,9 @@ public sealed class LogCompressionHandlerTests
 
     private static readonly LogCompressionHandler Handler = new();
 
-    private static ContentPart Part(string text)
-    {
-        return new ContentPart("request", 1, ContentType.Log, text);
-    }
+    private static ContentPart Part(string text) => new("request", 1, ContentType.Log, text);
 
-    private static string[] Lines(string reduced)
-    {
-        return reduced.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal)).ToArray();
-    }
+    private static string[] Lines(string reduced) => reduced.Split('\n').Where(line => !line.StartsWith("[retained identifiers]", StringComparison.Ordinal)).ToArray();
 
     [Fact]
     public async Task The_line_that_carries_the_failure_survives_even_at_info_level()

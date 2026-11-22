@@ -135,10 +135,7 @@ public sealed class ReplayReport
         }
     }
 
-    private int Count(ReplayOutcome outcome)
-    {
-        return _outcomes.GetValueOrDefault(outcome);
-    }
+    private int Count(ReplayOutcome outcome) => _outcomes.GetValueOrDefault(outcome);
 
     private readonly record struct Counts(int Seen, int Previewed, int Skipped, long Original, long ReducerSaved, long PreviewSaved);
 

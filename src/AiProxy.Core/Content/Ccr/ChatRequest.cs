@@ -33,10 +33,7 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
     public bool Qualifies => Streamed && HasTools && Choices <= 1 && CanRetrieve && KnownPrefixes.Any(prefix => Model.StartsWith(prefix, StringComparison.Ordinal));
 
     /// <summary>Whether the path is a Chat Completions endpoint.</summary>
-    public static bool IsChatPath(string path)
-    {
-        return path.TrimEnd('/').EndsWith(PathEnding, StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsChatPath(string path) => path.TrimEnd('/').EndsWith(PathEnding, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Reads the request, or returns null when the body is not a JSON object.</summary>
     public static ChatRequest? Read(ReadOnlyMemory<byte> body)
@@ -63,10 +60,7 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
     ///     leaving every other byte as it was so the provider's prompt cache keeps matching. Returns null when the body
     ///     has no non-empty <c>tools</c> array or is not a whole JSON object: there is nothing to append to.
     /// </summary>
-    public static byte[]? Prepare(ReadOnlySpan<byte> body)
-    {
-        return Prepare(body, out _);
-    }
+    public static byte[]? Prepare(ReadOnlySpan<byte> body) => Prepare(body, out _);
 
     /// <summary>As <see cref="Prepare(ReadOnlySpan{byte})" />, and reports how many characters the tool append added, without the usage option.</summary>
     public static byte[]? Prepare(ReadOnlySpan<byte> body, out int toolCharacters)
@@ -133,16 +127,14 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
         return n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out var count) ? count : UnreadableChoices;
     }
 
-    private static bool AllowsRetrieval(JsonElement choice)
-    {
-        return choice.ValueKind switch
+    private static bool AllowsRetrieval(JsonElement choice) =>
+        choice.ValueKind switch
         {
             JsonValueKind.String => choice.GetString() != NoToolChoice,
             JsonValueKind.Object => choice.TryGetProperty(ChatApi.Fields.Function, out var function) && function.ValueKind == JsonValueKind.Object
-                                    && function.TryGetProperty(ChatApi.Fields.Name, out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == CcrRetrieval.Name,
+                                                                                                     && function.TryGetProperty(ChatApi.Fields.Name, out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == CcrRetrieval.Name,
             _ => true
         };
-    }
 
     private static BodyScan? Scan(ReadOnlySpan<byte> body)
     {

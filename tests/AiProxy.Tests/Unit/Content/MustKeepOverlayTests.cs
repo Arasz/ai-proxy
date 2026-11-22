@@ -180,8 +180,5 @@ public sealed class MustKeepOverlayTests
     [InlineData("10\t2\tsrc/a.cs", "2")]
     [InlineData("port\t8080\tok", "8080")]
     [InlineData("retries: 3\t# max", "3")]
-    public void A_number_in_a_tab_separated_line_is_kept(string line, string number)
-    {
-        Assert.Contains(number, MustKeepOverlay.Identifiers(line));
-    }
+    public void A_number_in_a_tab_separated_line_is_kept(string line, string number) => Assert.Contains(number, MustKeepOverlay.Identifiers(line));
 }

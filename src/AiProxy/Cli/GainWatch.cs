@@ -7,11 +7,9 @@ namespace AiProxy.Cli;
 /// <summary>Refreshes the same gain view in an alternate terminal screen until cancelled.</summary>
 public sealed class GainWatch(GainRuntime runtime)
 {
-    public Task RunAsync(IProxyClient client, ProxyApi api, GainQuery query, GainSettings settings, GainReport initial, CancellationToken cancellationToken)
-    {
-        return Task.Run(() => runtime.Console.AlternateScreen(() =>
+    public Task RunAsync(IProxyClient client, ProxyApi api, GainQuery query, GainSettings settings, GainReport initial, CancellationToken cancellationToken) =>
+        Task.Run(() => runtime.Console.AlternateScreen(() =>
             RefreshAsync(client, api, query, settings, initial, cancellationToken).GetAwaiter().GetResult()), cancellationToken);
-    }
 
     private async Task RefreshAsync(IProxyClient client, ProxyApi api, GainQuery query, GainSettings settings, GainReport initial, CancellationToken cancellationToken)
     {

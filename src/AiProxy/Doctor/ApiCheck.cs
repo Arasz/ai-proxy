@@ -99,8 +99,5 @@ internal sealed class ApiCheck(HttpClient http, Uri endpoint, string version, st
         }
     }
 
-    private static CheckResult Foreign(string shown)
-    {
-        return new CheckResult(Name, CheckStatus.Fail, $"{shown} answers, but not as ai-proxy.", "Pass --endpoint with the address ai-proxy listens on.");
-    }
+    private static CheckResult Foreign(string shown) => new(Name, CheckStatus.Fail, $"{shown} answers, but not as ai-proxy.", "Pass --endpoint with the address ai-proxy listens on.");
 }

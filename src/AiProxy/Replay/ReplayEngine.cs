@@ -5,6 +5,7 @@ using AiProxy.Core.Content;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Providers;
 using AiProxy.Core.Replay;
+using CommunityToolkit.Diagnostics;
 
 namespace AiProxy.Replay;
 
@@ -112,25 +113,13 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         }
     }
 
-    private static IReadOnlyList<ContentRegion> ToolOutputRegions(IReadOnlyList<ContentRegion> regions)
-    {
-        return ContentCompressionPipeline.WithoutOverlaps(regions);
-    }
+    private static IReadOnlyList<ContentRegion> ToolOutputRegions(IReadOnlyList<ContentRegion> regions) => ContentCompressionPipeline.WithoutOverlaps(regions);
 
-    private static bool Aligned(IReadOnlyList<ContentRegion> original, IReadOnlyList<ContentRegion> after)
-    {
-        return after.Count == original.Count && after.Zip(after.Skip(1)).All(static pair => pair.First.Start < pair.Second.Start);
-    }
+    private static bool Aligned(IReadOnlyList<ContentRegion> original, IReadOnlyList<ContentRegion> after) => after.Count == original.Count && after.Zip(after.Skip(1)).All(static pair => pair.First.Start < pair.Second.Start);
 
-    private static ValueTask<CompressionResult> CompressAsync(ICompressionPipeline pipeline, byte[] body, CancellationToken cancellationToken)
-    {
-        return pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Unknown) { Ccr = CcrMode.Stateless }, cancellationToken);
-    }
+    private static ValueTask<CompressionResult> CompressAsync(ICompressionPipeline pipeline, byte[] body, CancellationToken cancellationToken) => pipeline.CompressAsync(new CompressionRequest(body, "application/json", Dialect.Unknown) { Ccr = CcrMode.Stateless }, cancellationToken);
 
-    private IReadOnlyList<ContentRegion> RegionsAfter(CompressionResult result, IReadOnlyList<ContentRegion> unchanged)
-    {
-        return result.Changed ? ToolOutputRegions(finder.Find(result.Body)) : unchanged;
-    }
+    private IReadOnlyList<ContentRegion> RegionsAfter(CompressionResult result, IReadOnlyList<ContentRegion> unchanged) => result.Changed ? ToolOutputRegions(finder.Find(result.Body)) : unchanged;
 
     private ReplayBlock Block(ContentRegion original, ContentRegion reduced, ContentRegion forwarded, IReadOnlyDictionary<string, string> originals)
     {
@@ -140,55 +129,31 @@ public sealed class ReplayEngine(ToolOutputRegionFinder finder, IDecompositor de
         return new ReplayBlock(KindOf(original), Tokens(original), Tokens(reduced), Tokens(forwarded), id) { Skipped = id is null && WasSkipped(original, Tokens(reduced)) };
     }
 
-    private bool WasSkipped(ContentRegion original, int reducedTokens)
-    {
-        return reducedTokens >= options.MinimumTokens && options.SkipsPreview(original.Text, reducedTokens);
-    }
+    private bool WasSkipped(ContentRegion original, int reducedTokens) => reducedTokens >= options.MinimumTokens && options.SkipsPreview(original.Text, reducedTokens);
 
-    private int Tokens(ContentRegion region)
-    {
-        return options.TokensOf(region.Text.Length);
-    }
+    private int Tokens(ContentRegion region) => options.TokensOf(region.Text.Length);
 
     private ContentType KindOf(ContentRegion region)
     {
         var parts = decomposer.Decompose(region.Text, "replay", region.FilePath).Parts;
-        return parts.Count == 0 ? ContentType.Unknown : parts.MaxBy(static part => part.Text.Length)!.Type;
+        return parts.Count == 0 ? ContentType.Unknown : parts.MaxBy(static part => part.Text.Length)?.Type ?? ThrowHelper.ThrowInvalidDataException<ContentType>($"Null {nameof(ContentPart)} returned by decomposer");
     }
 
     private sealed class DiscardingContentStore : IContentStore
     {
-        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask StoreAsync(ContentRecord record, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<ContentRecord?>(null);
-        }
+        public ValueTask<ContentRecord?> GetAsync(string requestId, CancellationToken cancellationToken) => ValueTask.FromResult<ContentRecord?>(null);
     }
 
     private sealed class DiscardingOriginalStore : IOriginalStore
     {
-        public ValueTask KeepAsync(KeptOriginal original, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask KeepAsync(KeptOriginal original, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask<string?> FindAsync(string id, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<string?>(null);
-        }
+        public ValueTask<string?> FindAsync(string id, CancellationToken cancellationToken) => ValueTask.FromResult<string?>(null);
 
-        public ValueTask<string?> FindThreadAsync(string messageId, CancellationToken cancellationToken)
-        {
-            return ValueTask.FromResult<string?>(null);
-        }
+        public ValueTask<string?> FindThreadAsync(string messageId, CancellationToken cancellationToken) => ValueTask.FromResult<string?>(null);
 
-        public ValueTask LinkThreadAsync(string messageId, string continueFrom, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask LinkThreadAsync(string messageId, string continueFrom, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
 }

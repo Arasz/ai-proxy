@@ -80,16 +80,14 @@ public sealed class CcrChatRelayTests : IDisposable
         return string.Concat(chunks);
     }
 
-    private static JsonObject Calls(params (int Index, string Id, string Name, string Arguments)[] calls)
-    {
-        return new JsonObject
+    private static JsonObject Calls(params (int Index, string Id, string Name, string Arguments)[] calls) =>
+        new()
         {
             ["tool_calls"] = new JsonArray(calls.Select(call => (JsonNode)new JsonObject
             {
                 ["index"] = call.Index, ["id"] = call.Id, ["type"] = "function", ["function"] = new JsonObject { ["name"] = call.Name, ["arguments"] = call.Arguments }
             }).ToArray())
         };
-    }
 
     private static Func<FakeUpstream, HttpContext, Task> Script(params string[] streams)
     {
@@ -112,22 +110,15 @@ public sealed class CcrChatRelayTests : IDisposable
         return ProxyHost.StartAsync(settings, providerHosts: new LoopbackProviderHosts(Dialect.OpenAi, chatHost), logging: logs, time: time);
     }
 
-    private static JsonNode[] ChunksOf(string client)
-    {
-        return client.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Where(static block => block.StartsWith("data: ", StringComparison.Ordinal))
+    private static JsonNode[] ChunksOf(string client) =>
+        client.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Where(static block => block.StartsWith("data: ", StringComparison.Ordinal))
             .Select(static block => block["data: ".Length..]).Where(static data => data != "[DONE]").Select(Json).ToArray();
-    }
 
-    private static string ArgumentsOnly(int index, string fragment)
-    {
-        return ChatSse.Chunk("gen-1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["function"] = new JsonObject { ["arguments"] = fragment } }) }, null, null);
-    }
+    private static string ArgumentsOnly(int index, string fragment) => ChatSse.Chunk("gen-1", new JsonObject { ["tool_calls"] = new JsonArray(new JsonObject { ["index"] = index, ["function"] = new JsonObject { ["arguments"] = fragment } }) }, null, null);
 
-    private static string Finished(params string[] chunks)
-    {
-        return ChatSse.Chunk("gen-1", new JsonObject { ["role"] = "assistant", ["content"] = "" }, null, null) + string.Concat(chunks)
-               + ChatSse.Chunk("gen-1", null, null, ChatSse.Usage(4)) + "data: [DONE]\n\n";
-    }
+    private static string Finished(params string[] chunks) =>
+        ChatSse.Chunk("gen-1", new JsonObject { ["role"] = "assistant", ["content"] = "" }, null, null) + string.Concat(chunks)
+                                                                                                        + ChatSse.Chunk("gen-1", null, null, ChatSse.Usage(4)) + "data: [DONE]\n\n";
 
     private static async Task<string> SendAsync(ProxyHost proxy, FakeUpstream upstream, string body)
     {
@@ -143,15 +134,9 @@ public sealed class CcrChatRelayTests : IDisposable
         return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
     }
 
-    private static JsonNode Json(string text)
-    {
-        return JsonNode.Parse(text)!;
-    }
+    private static JsonNode Json(string text) => JsonNode.Parse(text)!;
 
-    private static int Count(string text, string needle)
-    {
-        return text.Split(needle).Length - 1;
-    }
+    private static int Count(string text, string needle) => text.Split(needle).Length - 1;
 
     [Fact]
     public async Task A_retrieval_is_answered_inside_the_request_and_the_client_gets_one_stream_with_one_done()

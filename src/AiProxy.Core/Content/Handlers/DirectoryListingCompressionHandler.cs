@@ -7,15 +7,8 @@ public sealed class DirectoryListingCompressionHandler : ICompressionHandler
     public const string HandlerPath = "listing.pass-through";
 
     /// <inheritdoc />
-    public bool CanHandle(ContentType type)
-    {
-        return type == ContentType.DirectoryListing;
-    }
+    public bool CanHandle(ContentType type) => type == ContentType.DirectoryListing;
 
     /// <inheritdoc />
-    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken)
-    {
-
-        return ValueTask.FromResult(new HandledContent(part.Text, HandlerPath));
-    }
+    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => ValueTask.FromResult(new HandledContent(part.Text, HandlerPath));
 }

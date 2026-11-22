@@ -45,14 +45,8 @@ public static class ProjectCredential
     }
 
     /// <summary>The proxy URL for an endpoint with the project as the percent-encoded password of <see cref="GainApi.ProxyUser" />.</summary>
-    public static string ProxyUrl(Uri endpoint, string project)
-    {
-        return $"{endpoint.Scheme}://{GainApi.ProxyUser}:{Uri.EscapeDataString(project)}@{endpoint.Authority}";
-    }
+    public static string ProxyUrl(Uri endpoint, string project) => $"{endpoint.Scheme}://{GainApi.ProxyUser}:{Uri.EscapeDataString(project)}@{endpoint.Authority}";
 
     /// <summary>Picks the project: the header, else the request credential, else the tunnel's credential.</summary>
-    public static string? Resolve(string? header, string? requestCredential, string? connectCredential)
-    {
-        return !string.IsNullOrWhiteSpace(header) ? header : requestCredential ?? connectCredential;
-    }
+    public static string? Resolve(string? header, string? requestCredential, string? connectCredential) => !string.IsNullOrWhiteSpace(header) ? header : requestCredential ?? connectCredential;
 }

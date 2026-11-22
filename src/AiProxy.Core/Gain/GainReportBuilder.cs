@@ -20,18 +20,13 @@ public static class GainReportBuilder
             .ToArray();
     }
 
-    public static long Tokens(long characters)
-    {
-        return (long)(characters / CharactersPerToken);
-    }
+    public static long Tokens(long characters) => (long)(characters / CharactersPerToken);
 
     /// <summary>Totals of one request; <paramref name="toolCharacters"/> of the forwarded body are the injected tool definition, which is costed apart from what was saved.</summary>
-    public static GainTotals RequestTotals(long originalCharacters, long forwardedCharacters, long originalBytes, long forwardedBytes, long toolCharacters = 0)
-    {
-        return new GainTotals(1, originalCharacters, forwardedCharacters, originalBytes, forwardedBytes,
+    public static GainTotals RequestTotals(long originalCharacters, long forwardedCharacters, long originalBytes, long forwardedBytes, long toolCharacters = 0) =>
+        new(1, originalCharacters, forwardedCharacters, originalBytes, forwardedBytes,
             Tokens(originalCharacters), Tokens(forwardedCharacters), Tokens(originalCharacters) - Tokens(forwardedCharacters - toolCharacters),
             EstimatedToolTokens: Tokens(toolCharacters), FollowUpMeasuredRequests: 1);
-    }
 
     public static GainReport Build(GainQuery query, DateTimeOffset now, IReadOnlyList<GainHistoryEntry> requests,
         IReadOnlyList<GainFailure> failures, IReadOnlyList<GainRecallEvent> recallEvents, GainOtherTraffic? otherTraffic = null,
@@ -91,9 +86,8 @@ public static class GainReportBuilder
             .ToArray();
     }
 
-    public static GainTotals Sum(IEnumerable<GainTotals> rows)
-    {
-        return rows.Aggregate(new GainTotals(), static (sum, row) => new GainTotals(
+    public static GainTotals Sum(IEnumerable<GainTotals> rows) =>
+        rows.Aggregate(new GainTotals(), static (sum, row) => new GainTotals(
             sum.Requests + row.Requests, sum.OriginalCharacters + row.OriginalCharacters,
             sum.ForwardedCharacters + row.ForwardedCharacters, sum.OriginalBytes + row.OriginalBytes,
             sum.ForwardedBytes + row.ForwardedBytes, sum.EstimatedOriginalTokens + row.EstimatedOriginalTokens,
@@ -102,7 +96,6 @@ public static class GainReportBuilder
             sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens,
             sum.FollowUps + row.FollowUps, sum.FollowUpBytes + row.FollowUpBytes, sum.EstimatedFollowUpTokens + row.EstimatedFollowUpTokens,
             sum.FollowUpMeasuredRequests + row.FollowUpMeasuredRequests));
-    }
 
     private static IEnumerable<string> RuleMembers(string path)
     {
@@ -110,31 +103,17 @@ public static class GainReportBuilder
         return members.Length == 0 ? [path] : members;
     }
 
-    private static GainTotals RecallTotals(GainRecall recall)
-    {
-        return new GainTotals(Recalls: 1, RetrievedCharacters: recall.Characters, EstimatedRetrievedTokens: recall.EstimatedTokens);
-    }
+    private static GainTotals RecallTotals(GainRecall recall) => new(Recalls: 1, RetrievedCharacters: recall.Characters, EstimatedRetrievedTokens: recall.EstimatedTokens);
 
-    private static GainTotals FollowUpTotals(GainFollowUp followUp)
-    {
-        return new GainTotals(FollowUps: 1, FollowUpBytes: followUp.Bytes, EstimatedFollowUpTokens: followUp.EstimatedTokens);
-    }
+    private static GainTotals FollowUpTotals(GainFollowUp followUp) => new(FollowUps: 1, FollowUpBytes: followUp.Bytes, EstimatedFollowUpTokens: followUp.EstimatedTokens);
 
-    private static GainBucket[] Buckets(IReadOnlyList<GainHistoryEntry> rows, Func<DateTimeOffset, DateTimeOffset> start)
-    {
-        return rows.GroupBy(row => start(row.At)).OrderBy(static group => group.Key)
+    private static GainBucket[] Buckets(IReadOnlyList<GainHistoryEntry> rows, Func<DateTimeOffset, DateTimeOffset> start) =>
+        rows.GroupBy(row => start(row.At)).OrderBy(static group => group.Key)
             .Select(static group => new GainBucket(group.Key, Sum(group.Select(static row => row.Totals)))).ToArray();
-    }
 
-    private static DateTimeOffset Day(DateTimeOffset at)
-    {
-        return new DateTimeOffset(at.UtcDateTime.Date, TimeSpan.Zero);
-    }
+    private static DateTimeOffset Day(DateTimeOffset at) => new(at.UtcDateTime.Date, TimeSpan.Zero);
 
-    private static DateTimeOffset Month(DateTimeOffset at)
-    {
-        return new DateTimeOffset(at.UtcDateTime.Year, at.UtcDateTime.Month, 1, 0, 0, 0, TimeSpan.Zero);
-    }
+    private static DateTimeOffset Month(DateTimeOffset at) => new(at.UtcDateTime.Year, at.UtcDateTime.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
     private static DateTimeOffset Week(DateTimeOffset at)
     {

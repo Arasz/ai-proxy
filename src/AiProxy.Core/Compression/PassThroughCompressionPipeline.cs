@@ -13,9 +13,5 @@ public sealed class PassThroughCompressionPipeline : ICompressionPipeline
     public bool Compresses => false;
 
     /// <summary>Returns the body unchanged.</summary>
-    public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken)
-    {
-
-        return ValueTask.FromResult(new CompressionResult(request.Body, false));
-    }
+    public ValueTask<CompressionResult> CompressAsync(CompressionRequest request, CancellationToken cancellationToken) => ValueTask.FromResult(new CompressionResult(request.Body, false));
 }

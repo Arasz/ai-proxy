@@ -35,15 +35,9 @@ internal sealed class ProxyLogFile : ILoggerProvider
     }
 
     /// <summary>The provider for the log file inside a data directory.</summary>
-    public static ProxyLogFile ForDirectory(string directory)
-    {
-        return new ProxyLogFile(Path.Combine(directory, FileName), DefaultMaxBytes);
-    }
+    public static ProxyLogFile ForDirectory(string directory) => new(Path.Combine(directory, FileName), DefaultMaxBytes);
 
-    public ILogger CreateLogger(string categoryName)
-    {
-        return new FileLogger(categoryName, _queue.Writer);
-    }
+    public ILogger CreateLogger(string categoryName) => new FileLogger(categoryName, _queue.Writer);
 
     public void Dispose()
     {
@@ -117,15 +111,9 @@ internal sealed class ProxyLogFile : ILoggerProvider
 
     private sealed class FileLogger(string category, ChannelWriter<string> queue) : ILogger
     {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
-        {
-            return null;
-        }
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return logLevel != LogLevel.None;
-        }
+        public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
