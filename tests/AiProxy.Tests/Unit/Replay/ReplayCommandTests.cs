@@ -168,7 +168,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task A_good_zstd_capture_row_is_decoded_and_replayed()
     {
         using var compressor = new Compressor();
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300", "--include-encoded");
 
@@ -224,8 +224,8 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_row_that_is_not_json_and_a_row_with_no_tool_region_are_counted_in_their_own_denominators()
     {
-        var noTool = Encoding.UTF8.GetBytes("""{"messages":[{"role":"user","content":"hello"}]}""");
-        WriteCapture(Encoding.UTF8.GetBytes("this is not json"), noTool, ToolBody(Output));
+        var noTool = """{"messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
+        WriteCapture([.. "this is not json"u8], noTool, ToolBody(Output));
 
         var result = await ReplayAsync("--minimum", "300");
 
@@ -252,7 +252,7 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_preview_sent_by_two_requests_is_summed_over_both_under_its_id()
     {
-        WriteCapture(ToolBody(Output), ToolBody(Output).Concat(" "u8.ToArray()).ToArray());
+        WriteCapture(ToolBody(Output), [.. ToolBody(Output), .. " "u8.ToArray()]);
 
         var result = await ReplayAsync("--minimum", "300", "--source", "capture");
 
@@ -379,7 +379,7 @@ public sealed class ReplayCommandTests : IDisposable
     {
         using var compressor = new Compressor();
         WriteContent(ToolBody(Output));
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300");
 
@@ -393,7 +393,7 @@ public sealed class ReplayCommandTests : IDisposable
     public async Task Encoded_bodies_are_left_out_unless_they_are_asked_for()
     {
         using var compressor = new Compressor();
-        WriteCapture(compressor.Wrap(ToolBody(Output)).ToArray());
+        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
 
         var left = await ReplayAsync("--minimum", "300");
         var included = await ReplayAsync("--minimum", "300", "--include-encoded");

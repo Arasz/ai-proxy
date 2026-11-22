@@ -59,9 +59,12 @@ public sealed class CSharpCodeLexer : ICodeLexer
             return tokenLexingResult;
         }
 
-        var spans = new List<CodeToken>(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count);
-        spans.AddRange(triviaLexingResult.Tokens);
-        spans.AddRange(tokenLexingResult.Tokens);
+        List<CodeToken> spans =
+        [
+            with(triviaLexingResult.Tokens.Count + tokenLexingResult.Tokens.Count),
+            .. triviaLexingResult.Tokens,
+            .. tokenLexingResult.Tokens
+        ];
         spans.Sort(static (left, right) => left.Offset.CompareTo(right.Offset));
         var tokens = CompleteCoverage(text, spans);
         return tokens is null ? Unsupported() : new CodeLexResult(true, tokens);

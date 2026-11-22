@@ -39,12 +39,13 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     private const string EventStream = "text/event-stream";
     private const string Chunked = "chunked";
 
-    private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly HashSet<string> HopByHop =
+    [
+        with(StringComparer.OrdinalIgnoreCase),
         HeaderNames.Host, HeaderNames.ContentLength, HeaderNames.TransferEncoding, HeaderNames.Connection, HeaderNames.KeepAlive,
         HeaderNames.ProxyConnection, HeaderNames.ProxyAuthorization, HeaderNames.ProxyAuthenticate, HeaderNames.TE, HeaderNames.Trailer,
         HeaderNames.Upgrade, HeaderNames.Expect, HeaderNames.AcceptEncoding, HeaderNames.ContentEncoding
-    };
+    ];
 
     private readonly HttpClient _http = new(new SocketsHttpHandler
     {

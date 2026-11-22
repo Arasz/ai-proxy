@@ -101,7 +101,7 @@ public sealed class ToolOutputRegionFinderTests
     [Fact]
     public void A_lone_surrogate_escape_in_a_tool_result_throws_not_endorsed()
     {
-        var body = Encoding.UTF8.GetBytes("""{"messages":[{"role":"tool","content":"broken \ud83d here"},{"role":"tool","content":"fine"}]}""");
+        var body = """{"messages":[{"role":"tool","content":"broken \ud83d here"},{"role":"tool","content":"fine"}]}"""u8.ToArray();
 
         Assert.ThrowsAny<InvalidOperationException>(() => Finder.Find(body).ToArray());
     }

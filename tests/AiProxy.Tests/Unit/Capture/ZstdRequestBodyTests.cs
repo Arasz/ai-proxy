@@ -14,7 +14,7 @@ public sealed class ZstdRequestBodyTests
     [Fact]
     public void A_streamed_zstd_body_decodes_to_the_original_bytes()
     {
-        var original = Encoding.UTF8.GetBytes("""{"model":"gpt-5","input":"hello"}""");
+        var original = """{"model":"gpt-5","input":"hello"}"""u8.ToArray();
 
         Assert.Equal(original, ZstdRequestBody.Decode(Encode(original)));
     }
@@ -39,7 +39,7 @@ public sealed class ZstdRequestBodyTests
     [Fact]
     public void A_frame_declaring_a_window_above_the_decoder_cap_is_refused_even_when_its_content_is_small()
     {
-        var encoded = Encode(Encoding.UTF8.GetBytes("small"), windowLog: 27);
+        var encoded = Encode("small"u8.ToArray(), windowLog: 27);
 
         Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode(encoded));
     }
@@ -47,7 +47,7 @@ public sealed class ZstdRequestBodyTests
     [Fact]
     public void A_frame_declaring_a_window_at_the_decoder_cap_is_decoded()
     {
-        var original = Encoding.UTF8.GetBytes("small");
+        var original = "small"u8.ToArray();
 
         Assert.Equal(original, ZstdRequestBody.Decode(Encode(original, windowLog: 24)));
     }

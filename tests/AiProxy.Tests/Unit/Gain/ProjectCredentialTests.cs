@@ -27,7 +27,7 @@ public sealed class ProjectCredentialTests
     [InlineData("Digest")]
     public void Ignores_non_basic(string scheme)
     {
-        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/project/a"));
+        var payload = Convert.ToBase64String("ai-proxy:/project/a"u8.ToArray());
 
         Assert.Null(ProjectCredential.Read($"{scheme} {payload}"));
     }
@@ -35,7 +35,7 @@ public sealed class ProjectCredentialTests
     [Fact]
     public void Tolerates_space_around_the_payload()
     {
-        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/p"));
+        var payload = Convert.ToBase64String("ai-proxy:/p"u8.ToArray());
 
         Assert.Equal("/p", ProjectCredential.Read($"Basic  {payload} "));
     }
@@ -43,7 +43,7 @@ public sealed class ProjectCredentialTests
     [Fact]
     public void Accepts_scheme_in_any_case()
     {
-        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("ai-proxy:/p"));
+        var payload = Convert.ToBase64String("ai-proxy:/p"u8.ToArray());
 
         Assert.Equal("/p", ProjectCredential.Read($"bAsIc {payload}"));
     }

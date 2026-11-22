@@ -10,7 +10,7 @@ namespace AiProxy.Hosting.Integration;
 internal static class UnixProxySettings
 {
     /// <summary>The capturing process's own environment and the backend's armed flag are not system settings.</summary>
-    private static readonly HashSet<string> Ignored = new(StringComparer.Ordinal) { "_originalEnv", "_hasSnapshot" };
+    private static readonly HashSet<string> Ignored = [with(StringComparer.Ordinal), "_originalEnv", "_hasSnapshot"];
 
     /// <summary>True when every value is either ai-proxy's or the original's, and at least one changed value is still ai-proxy's.</summary>
     public static bool IsOwned(string current, string applied, string original)

@@ -10,7 +10,7 @@ namespace AiProxy.Core.Content;
 /// </remarks>
 internal sealed class ToolCallFiles
 {
-    private static readonly HashSet<string> PathKeys = new(StringComparer.Ordinal) { ToolCallJson.FilePathSnake, ToolCallJson.Path, ToolCallJson.FilePathCamel };
+    private static readonly HashSet<string> PathKeys = [with(StringComparer.Ordinal), ToolCallJson.FilePathSnake, ToolCallJson.Path, ToolCallJson.FilePathCamel];
 
     private readonly Dictionary<string, FileRead?> _calls = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _results = new(StringComparer.Ordinal);

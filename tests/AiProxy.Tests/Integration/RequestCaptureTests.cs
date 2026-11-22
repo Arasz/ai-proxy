@@ -82,7 +82,7 @@ public sealed class RequestCaptureTests : IDisposable
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
         // Multi-byte characters and odd spacing: a re-serialized or re-encoded body would differ.
-        var body = Encoding.UTF8.GetBytes("{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  ");
+        var body = "{ \"model\" :\"m\",\t\"messages\":[{\"role\":\"user\",\"content\":\"zażółć gęślą jaźń \\u00e9 ☃\"}]}  "u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -116,7 +116,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"capture-body-marker"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"capture-body-marker"}]}"""u8.ToArray();
         string[] secrets = ["secret-authorization-7f3a", "secret-api-key-91bc", "secret-cookie-4d2e", "secret-query-key-c0de"];
         using var handler = new HttpClientHandler { Proxy = new WebProxy(proxy.ProxyAddress), UseProxy = true, UseCookies = false };
         using var client = new HttpClient(handler);
@@ -148,7 +148,7 @@ public sealed class RequestCaptureTests : IDisposable
     {
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(false);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -164,7 +164,7 @@ public sealed class RequestCaptureTests : IDisposable
         var logs = new RecordingLoggerProvider();
         await using var upstream = await FakeUpstream.StartAsync();
         await using var proxy = await StartProxyAsync(true, store: new ThrowingCaptureStore(), logs: logs);
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 
@@ -208,7 +208,7 @@ public sealed class RequestCaptureTests : IDisposable
 
         var bytes = ReadCaptureFiles(directory.Path, writer.Close);
 
-        Assert.True(Contains(bytes, Encoding.UTF8.GetBytes("capture-inspection-marker")));
+        Assert.True(Contains(bytes, "capture-inspection-marker"u8.ToArray()));
     }
 
     [Fact]
@@ -218,8 +218,8 @@ public sealed class RequestCaptureTests : IDisposable
         await using var proxy = await ProxyHost.StartAsync(
             new Dictionary<string, string> { ["Proxy:Capture"] = "true" },
             providerHosts: new SingleProviderHost("127.0.0.1", Dialect.Anthropic));
-        var providerBody = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}""");
-        var otherBody = Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}""");
+        var providerBody = """{"model":"m","messages":[{"role":"user","content":"provider-marker"}]}"""u8.ToArray();
+        var otherBody = """{"jsonrpc":"2.0","method":"tools/list","params":{"marker":"pass-through-marker"}}"""u8.ToArray();
         var otherHost = new UriBuilder(upstream.BaseAddress) { Host = "localhost" }.Uri;
 
         using var providerResponse = await SendAsync(proxy, upstream.BaseAddress, providerBody);
@@ -266,7 +266,7 @@ public sealed class RequestCaptureTests : IDisposable
             return context.Response.Body.WriteAsync(encoded).AsTask();
         };
         await using var proxy = await StartProxyAsync(true, time: new FakeTimeProvider(now));
-        var body = Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"model":"m","messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         using var response = await SendAsync(proxy, upstream, body);
 

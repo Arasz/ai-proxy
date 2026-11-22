@@ -14,20 +14,20 @@ namespace AiProxy.Core.Content.Ccr;
 public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int Choices, bool IncludeUsage, bool CanRetrieve)
 {
     /// <summary>The path ending of the Chat Completions endpoint.</summary>
-    public const string PathEnding = "/chat/completions";
+    private const string PathEnding = "/chat/completions";
 
     /// <summary>The model id prefixes whose upstream provider the proxy can name; a router or an unknown prefix gets no CCR.</summary>
-    public static readonly IReadOnlyList<string> KnownPrefixes = ["anthropic/", "openai/", "google/", "deepseek/"];
+    private static readonly IReadOnlyList<string> KnownPrefixes = ["anthropic/", "openai/", "google/", "deepseek/"];
 
     private const string StreamOptions = ChatApi.Fields.StreamOptions;
     private const string UsageOption = ChatApi.Fields.IncludeUsage;
     private const string NoToolChoice = "none";
     private const int UnreadableChoices = 2;
     private static readonly byte[] DefinitionBytes = Encoding.UTF8.GetBytes(CcrRetrieval.ChatDefinition);
-    private static readonly byte[] TrueBytes = Encoding.UTF8.GetBytes("true");
-    private static readonly byte[] UsageMemberBytes = Encoding.UTF8.GetBytes("\"include_usage\":true");
-    private static readonly byte[] OptionsBytes = Encoding.UTF8.GetBytes("{\"include_usage\":true}");
-    private static readonly byte[] UsageBytes = Encoding.UTF8.GetBytes("\"stream_options\":{\"include_usage\":true}");
+    private static readonly byte[] TrueBytes = [.. "true"u8];
+    private static readonly byte[] UsageMemberBytes = [.. "\"include_usage\":true"u8];
+    private static readonly byte[] OptionsBytes = [.. "{\"include_usage\":true}"u8];
+    private static readonly byte[] UsageBytes = [.. "\"stream_options\":{\"include_usage\":true}"u8];
 
     /// <summary>Whether CCR can serve the request: streamed, with tools, one choice, a known model, and a tool choice that allows <c>proxy_retrieve</c>.</summary>
     public bool Qualifies => Streamed && HasTools && Choices <= 1 && CanRetrieve && KnownPrefixes.Any(prefix => Model.StartsWith(prefix, StringComparison.Ordinal));
@@ -109,22 +109,17 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
             return (scan.OptionsStart, scan.OptionsEnd, OptionsBytes);
         }
 
-        if (scan.UsageStart >= 0)
-        {
-            return (scan.UsageStart, scan.UsageEnd, TrueBytes);
-        }
-
-        return (scan.OptionsStart + 1, scan.OptionsStart + 1, scan.OptionsEmpty ? UsageMemberBytes : [.. UsageMemberBytes, (byte)',']);
+        return scan.UsageStart >= 0 ? (scan.UsageStart, scan.UsageEnd, TrueBytes) : (scan.OptionsStart + 1, scan.OptionsStart + 1, scan.OptionsEmpty ? UsageMemberBytes : [.. UsageMemberBytes, (byte)',']);
     }
 
     private static int ChoicesOf(JsonElement root)
     {
-        if (!root.TryGetProperty(ChatApi.Fields.Choices, out var n) || n.ValueKind == JsonValueKind.Null)
+        if (!root.TryGetProperty(ChatApi.Fields.Choices, out var element) || element.ValueKind == JsonValueKind.Null)
         {
             return 1;
         }
 
-        return n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out var count) ? count : UnreadableChoices;
+        return element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var count) ? count : UnreadableChoices;
     }
 
     private static bool AllowsRetrieval(JsonElement choice) =>
@@ -168,13 +163,15 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
             if (reader.ValueTextEquals(ChatApi.Fields.Tools))
             {
                 reader.Read();
-                if (reader.TokenType == JsonTokenType.StartArray)
+                if (reader.TokenType != JsonTokenType.StartArray)
                 {
-                    var start = (int)reader.TokenStartIndex;
-                    reader.Skip();
-                    scan.ToolsEnd = (int)reader.TokenStartIndex;
-                    (scan.ToolCount, scan.HasRetrieval) = ReadTools(body[start..(scan.ToolsEnd + 1)]);
+                    continue;
                 }
+
+                var start = (int)reader.TokenStartIndex;
+                reader.Skip();
+                scan.ToolsEnd = (int)reader.TokenStartIndex;
+                (scan.ToolCount, scan.HasRetrieval) = ReadTools(body[start..(scan.ToolsEnd + 1)]);
             }
             else if (reader.ValueTextEquals(StreamOptions))
             {
@@ -213,17 +210,18 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
         while (reader.Read() && !(reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == depth))
         {
             scan.OptionsEmpty = false;
-            if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == depth + 1 && reader.ValueTextEquals(UsageOption))
+            switch (reader.TokenType)
             {
-                reader.Read();
-                scan.UsageStart = (int)reader.TokenStartIndex;
-                scan.UsageRequested = reader.TokenType == JsonTokenType.True;
-                reader.Skip();
-                scan.UsageEnd = (int)reader.BytesConsumed;
-            }
-            else if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
-            {
-                reader.Skip();
+                case JsonTokenType.PropertyName when reader.CurrentDepth == depth + 1 && reader.ValueTextEquals(UsageOption):
+                    reader.Read();
+                    scan.UsageStart = (int)reader.TokenStartIndex;
+                    scan.UsageRequested = reader.TokenType == JsonTokenType.True;
+                    reader.Skip();
+                    scan.UsageEnd = (int)reader.BytesConsumed;
+                    break;
+                case JsonTokenType.StartObject or JsonTokenType.StartArray:
+                    reader.Skip();
+                    break;
             }
         }
 

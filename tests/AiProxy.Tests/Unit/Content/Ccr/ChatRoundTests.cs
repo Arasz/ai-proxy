@@ -173,7 +173,7 @@ public sealed class ChatRoundTests
         var (_, round) = await ReadAsync(wire);
 
         var body = round.FollowUp(
-            Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""),
+            """{"model":"m","messages":[{"role":"user","content":"q"}]}"""u8,
             [ToolResult.Of("call_r", new CcrRetrieval("TEXT", null)), ToolResult.Deferred("call_c")]);
 
         var messages = JsonNode.Parse(body)!["messages"]!.AsArray();
@@ -243,7 +243,7 @@ public sealed class ChatRoundTests
 
     private static JsonObject FollowUpOf(ChatRound round, params ToolResult[] results)
     {
-        var body = round.FollowUp(Encoding.UTF8.GetBytes("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""), results);
+        var body = round.FollowUp("""{"model":"m","messages":[{"role":"user","content":"q"}]}"""u8, results);
         return JsonNode.Parse(body)!["messages"]!.AsArray()[1]!.AsObject();
     }
 

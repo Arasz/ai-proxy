@@ -37,7 +37,7 @@ public sealed class GainViewLayoutTests
         return console.Output;
     }
 
-    public static TheoryData<string> Views => new() { "default", "history", "by-rule", "recalls", "all", "failures" };
+    public static TheoryData<string> Views => ["default", "history", "by-rule", "recalls", "all", "failures"];
 
     private static GainSettings Settings(string view) =>
         view switch

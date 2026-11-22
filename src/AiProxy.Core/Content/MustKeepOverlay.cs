@@ -119,12 +119,11 @@ public static partial class MustKeepOverlay
     private static HashSet<string> TokenSet(string text)
     {
         var tokens = Tokens(text);
-        var set = new HashSet<string>(tokens.Decisions, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var token in tokens.Others)
-        {
-            set.Add(token);
-        }
+        HashSet<string> set =
+        [
+            with(StringComparer.OrdinalIgnoreCase), .. tokens.Decisions,
+            .. tokens.Others
+        ];
 
         return set;
     }

@@ -265,7 +265,7 @@ public sealed class ResponseUsageReaderTests
     [Fact]
     public void A_body_that_decodes_to_exactly_the_limit_is_read()
     {
-        var body = Encoding.UTF8.GetBytes("""{"usage":{"input_tokens":7}}""");
+        var body = """{"usage":{"input_tokens":7}}"""u8.ToArray();
         var padded = new byte[SixteenMiB];
         Array.Fill(padded, (byte)' ');
         body.CopyTo(padded, 0);

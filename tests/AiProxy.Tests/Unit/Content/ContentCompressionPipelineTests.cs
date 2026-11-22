@@ -90,7 +90,7 @@ public sealed class ContentCompressionPipelineTests
     public async Task A_body_without_tool_output_is_forwarded_unchanged()
     {
         var (pipeline, store) = Build();
-        var body = Encoding.UTF8.GetBytes("""{"messages":[{"role":"user","content":"hello"}]}""");
+        var body = """{"messages":[{"role":"user","content":"hello"}]}"""u8.ToArray();
 
         var result = await pipeline.CompressAsync(
             new CompressionRequest(body, "application/json", Dialect.OpenAi),
@@ -178,8 +178,7 @@ public sealed class ContentCompressionPipelineTests
     public void The_regions_the_finder_found_do_not_overlap()
     {
         // The promise the guard rests on, checked against the finder itself.
-        var regions = new ToolOutputRegionFinder().Find(Encoding.UTF8.GetBytes(
-            """{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""));
+        var regions = new ToolOutputRegionFinder().Find("""{"messages":[{"role":"tool","content":"one"},{"role":"tool","content":"two"}]}"""u8.ToArray());
 
         var kept = ContentCompressionPipeline.WithoutOverlaps(regions);
 
