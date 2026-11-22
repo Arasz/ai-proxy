@@ -70,8 +70,10 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
     public async Task RelayAsync(SessionEventArgs e, CapturedExchange exchange, byte[] body, CcrPlan plan, IReadOnlyDictionary<string, string> originals)
     {
         var request = e.HttpClient.Request;
-        var headers = request.Headers.Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase))
-            .Select(static header => new ForwardedHeader(header.Name, header.Value)).ToArray();
+        var headers = request.Headers
+            .Where(static header => !HopByHop.Contains(header.Name) && !header.Name.Equals(GainApi.ProjectHeader, StringComparison.OrdinalIgnoreCase))
+            .Select(static header => new ForwardedHeader(header.Name, header.Value))
+            .ToArray();
         exchange.Relayed = true;
         if (exchange.CaptureId is not null)
         {
@@ -170,6 +172,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
         IReadOnlyDictionary<string, string> originals,
         IRetrievalRound firstRound)
     {
+        private const int BufferSize = 16 * 1024;
         private readonly RetrievalLoop _loop = new(firstRound);
         private CancellationToken _cancellation;
         private Stream _client = Stream.Null;
@@ -180,7 +183,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 using (response)
                 {
                     await using var upstream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                    var buffer = new byte[16 * 1024];
+                    var buffer = new byte[BufferSize];
                     int read;
                     while ((read = await upstream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                     {
@@ -208,45 +211,44 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
 
         private async Task LoopAsync(HttpResponseMessage first)
         {
-            var loop = _loop;
             var forwarded = body;
             var response = first;
             while (true)
             {
-                await ReadRoundAsync(loop, response);
-                switch (loop.Decide())
+                await ReadRoundAsync(_loop, response);
+                switch (_loop.Decide())
                 {
                     case RetrievalStep.Fail:
-                        await FailAsync(loop);
+                        await FailAsync(_loop);
                         return;
                     case RetrievalStep.Release:
-                        await ReleaseAsync(loop);
+                        await ReleaseAsync(_loop);
                         return;
                 }
 
-                if (plan.Mode == CcrMode.Stateless && loop.Round.Lossy)
+                if (plan.Mode == CcrMode.Stateless && _loop.Round.Lossy)
                 {
-                    await WriteFailureAsync(loop.Failure(Messages.LossyMessage));
+                    await WriteFailureAsync(_loop.Failure(Messages.LossyMessage));
                     return;
                 }
 
-                forwarded = await FollowUpAsync(loop, forwarded);
+                forwarded = await FollowUpAsync(_loop, forwarded);
                 var sent = await SendWithPingsAsync(forwarded);
                 if (sent is null)
                 {
-                    Log.FollowUpSilent(relay.Logger, uri.Host, loop.Answered);
-                    await WriteFailureAsync(loop.Failure(Messages.UpstreamSilent));
+                    Log.FollowUpSilent(relay.Logger, uri.Host, _loop.Answered);
+                    await WriteFailureAsync(_loop.Failure(Messages.UpstreamSilent));
                     return;
                 }
 
                 response = sent;
                 if (response.IsSuccessStatusCode)
                 {
-                    await RecordFollowUpAsync(loop, forwarded);
+                    await RecordFollowUpAsync(_loop, forwarded);
                     continue;
                 }
 
-                await RefuseFollowUpAsync(loop, response);
+                await RefuseFollowUpAsync(_loop, response);
                 return;
             }
         }
@@ -257,7 +259,8 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             using (response)
             {
                 await using var upstream = await response.Content.ReadAsStreamAsync(_cancellation);
-                await foreach (var sse in new SseReader().ReadAsync(upstream, _cancellation).ConfigureAwait(false))
+                var sseReader = new SseReader();
+                await foreach (var sse in sseReader.ReadAsync(upstream, _cancellation).ConfigureAwait(false))
                 {
                     foreach (var passed in loop.Round.Accept(sse))
                     {
@@ -266,7 +269,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 }
             }
 
-            exchange.Stages.Add(Labels.RoundPrefix + (loop.Answered + 1), Stopwatch.GetElapsedTime(started));
+            exchange.Stages.Add($"{Labels.RoundPrefix}{loop.Answered + 1}", Stopwatch.GetElapsedTime(started));
         }
 
         private async Task FailAsync(RetrievalLoop loop)

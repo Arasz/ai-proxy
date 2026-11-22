@@ -383,11 +383,13 @@ public sealed partial class ProviderRequestInspector(
         e.SetRequestBody(forwarded);
         exchange.Stages.Add(Stages.SetBody, time.GetElapsedTime(stage));
         exchange.ForwardedBytes = forwarded.Length;
-        if (compressed.Summary is { } summary)
+        if (compressed.Summary is not { } summary)
         {
-            exchange.ContentId = summary.RequestId;
-            e.UserData = exchange;
+            return;
         }
+
+        exchange.ContentId = summary.RequestId;
+        e.UserData = exchange;
     }
 
     /// <summary>Keeps the body as sent; a failed write is logged and never reaches the request.</summary>
