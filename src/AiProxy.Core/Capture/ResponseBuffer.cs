@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace AiProxy.Core.Capture;
@@ -26,6 +27,7 @@ public sealed class ResponseBuffer
     /// <summary>The content encoding that means the body is sent as is.</summary>
     public const string IdentityEncoding = "identity";
 
+    private readonly Lock _gate = new();
     private IStrategy? _strategy;
 
     private ResponseBuffer()
@@ -39,7 +41,16 @@ public sealed class ResponseBuffer
     public bool OverCap { get; private set; }
 
     /// <summary>The bytes to read usage from; empty when <see cref="OverCap" /> or released.</summary>
-    public ReadOnlyMemory<byte> Body => _strategy?.Body ?? ReadOnlyMemory<byte>.Empty;
+    public ReadOnlyMemory<byte> Body
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _strategy?.Body ?? ReadOnlyMemory<byte>.Empty;
+            }
+        }
+    }
 
     /// <summary>A buffer for a response with no known content type or encoding: kept whole up to the cap.</summary>
     public static ResponseBuffer Create() => new() { _strategy = new WholeBody() };
@@ -49,28 +60,47 @@ public sealed class ResponseBuffer
     ///     <c>message_start</c> and the final <c>message_delta</c>; any other body is kept whole up to the cap.
     ///     An empty <paramref name="contentEncoding" /> means the body is not encoded.
     /// </summary>
-    public static ResponseBuffer For(string contentType, string contentEncoding = IdentityEncoding)
+    public static ResponseBuffer For(string contentType, string contentEncoding = IdentityEncoding) => For(contentType, contentEncoding, ArrayPool<byte>.Shared);
+
+    /// <summary>As <see cref="For(string, string)" />, renting an event stream's head and tail from <paramref name="pool" />.</summary>
+    public static ResponseBuffer For(string contentType, string contentEncoding, ArrayPool<byte> pool)
     {
         var isUnencoded = string.IsNullOrWhiteSpace(contentEncoding) || contentEncoding.Trim().Equals(IdentityEncoding, StringComparison.OrdinalIgnoreCase);
         var isEventStream = contentType.Contains(EventStreamMediaType, StringComparison.OrdinalIgnoreCase);
-        return new ResponseBuffer { _strategy = isUnencoded && isEventStream ? new HeadAndTail() : new WholeBody() };
+        return new ResponseBuffer { _strategy = isUnencoded && isEventStream ? new HeadAndTail(pool) : new WholeBody() };
     }
 
     /// <summary>Copies passing bytes; never parses, so it costs the stream a copy and no more.</summary>
     public void Append(ReadOnlySpan<byte> bytes)
     {
-        Length += bytes.Length;
-        if (_strategy is null || _strategy.Append(bytes))
+        lock (_gate)
         {
-            return;
-        }
+            Length += bytes.Length;
+            if (_strategy is null || _strategy.Append(bytes))
+            {
+                return;
+            }
 
-        OverCap = true;
-        _strategy = null;
+            OverCap = true;
+            Drop();
+        }
     }
 
-    /// <summary>Lets the kept bytes go once usage has been read.</summary>
-    public void Release() => _strategy = null;
+    /// <summary>Lets the kept bytes go once usage has been read; a later append keeps nothing. Safe to call more than once.</summary>
+    public void Release()
+    {
+        lock (_gate)
+        {
+            Drop();
+        }
+    }
+
+    /// <summary>Gives back what the strategy rented and forgets it, so nothing writes to a returned array.</summary>
+    private void Drop()
+    {
+        _strategy?.Release();
+        _strategy = null;
+    }
 
     /// <summary>How a buffer keeps the bytes that pass; dropped once it reports they no longer fit.</summary>
     private interface IStrategy
@@ -80,6 +110,9 @@ public sealed class ResponseBuffer
 
         /// <summary>Keeps the bytes; false when they no longer fit.</summary>
         bool Append(ReadOnlySpan<byte> bytes);
+
+        /// <summary>Gives back any rented arrays; called once, after the last append.</summary>
+        void Release();
     }
 
     /// <summary>Keeps every byte up to <see cref="MaxBytes" />; past that it reports the body no longer fits.</summary>
@@ -99,13 +132,18 @@ public sealed class ResponseBuffer
             _bytes.Write(bytes);
             return true;
         }
+
+        public void Release()
+        {
+        }
     }
 
     /// <summary>
     ///     The first <see cref="HeadBytes" /> and a rolling last <see cref="TailBytes" />. It also notes where the last
     ///     Responses terminal event line starts and ends, so a terminal event longer than the tail keeps its end.
     /// </summary>
-    private sealed class HeadAndTail : IStrategy
+    /// <param name="pool">Lends the head and tail; they go back on <see cref="Release" />.</param>
+    private sealed class HeadAndTail(ArrayPool<byte> pool) : IStrategy
     {
         private const int LineHeadBytes = 64;
         private const byte NewLineByte = (byte)'\n';
@@ -123,9 +161,9 @@ public sealed class ResponseBuffer
                 .Select(static start => Encoding.UTF8.GetBytes(start))
         ];
 
-        private readonly byte[] _head = new byte[HeadBytes];
+        private readonly byte[] _head = pool.Rent(HeadBytes);
         private readonly byte[] _lineHead = new byte[LineHeadBytes];
-        private readonly byte[] _tail = new byte[TailBytes];
+        private readonly byte[] _tail = pool.Rent(TailBytes);
         private long _afterHead;
         private int _headCount;
         private bool _lineChecked;
@@ -167,6 +205,12 @@ public sealed class ResponseBuffer
                 tail.AsSpan(tailStart).CopyTo(stitched.AsSpan(headEnd + 1));
                 return stitched;
             }
+        }
+
+        public void Release()
+        {
+            pool.Return(_head);
+            pool.Return(_tail);
         }
 
         private static byte[] StitchCutTerminal(ReadOnlySpan<byte> head, ReadOnlySpan<byte> tail, int tailStart)

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text;
 using AiProxy.Hosting.Integration;
 using ZstdSharp;
@@ -59,6 +60,94 @@ public sealed class ZstdRequestBodyTests
     [InlineData("zstd, gzip", false)]
     [InlineData(null, false)]
     public void Only_a_lone_zstd_encoding_is_decoded(string? encoding, bool expected) => Assert.Equal(expected, ZstdRequestBody.IsZstd(encoding));
+
+    [Fact]
+    public void A_frame_that_declares_its_size_costs_the_decoded_size_once()
+    {
+        var original = Text(512 * 1024);
+        var encoded = OneShot(original);
+
+        var (decoded, allocated) = DecodeMeasured(encoded);
+
+        Assert.Equal(original, decoded);
+        Assert.True(allocated < original.Length + 32 * 1024, $"Decode allocated {allocated} bytes for {original.Length} decoded bytes");
+    }
+
+    [Fact]
+    public void A_frame_without_a_declared_size_costs_the_decoded_size_once()
+    {
+        var original = Text(512 * 1024);
+        var encoded = Streamed(original);
+        Assert.True(ZstandardDecoder.TryGetMaxDecompressedLength(encoded, out var bound) && bound > original.Length, "the frame must not declare its exact size");
+
+        var (decoded, allocated) = DecodeMeasured(encoded);
+
+        Assert.Equal(original, decoded);
+        Assert.True(allocated < original.Length + 32 * 1024, $"Decode allocated {allocated} bytes for {original.Length} decoded bytes");
+    }
+
+    [Fact]
+    public void Two_frames_decode_to_both_bodies_in_order()
+    {
+        var first = "first frame,"u8.ToArray();
+        var second = "second frame"u8.ToArray();
+
+        Assert.Equal([.. first, .. second], ZstdRequestBody.Decode([.. OneShot(first), .. Streamed(second)]));
+    }
+
+    [Fact]
+    public void Two_frames_that_together_pass_the_limit_are_refused()
+    {
+        var half = new byte[SixteenMiB / 2 + 1];
+
+        Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode([.. OneShot(half), .. OneShot(half)]));
+    }
+
+    private static (byte[] Decoded, long Allocated) DecodeMeasured(byte[] encoded)
+    {
+        ZstdRequestBody.Decode(encoded);
+        var thread = Environment.CurrentManagedThreadId;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var decoded = ZstdRequestBody.Decode(encoded);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.Equal(thread, Environment.CurrentManagedThreadId);
+        return (decoded, allocated);
+    }
+
+    private static byte[] Text(int length)
+    {
+        var bytes = new byte[length];
+        var random = new Random(7);
+        for (var i = 0; i < bytes.Length; i++)
+        {
+            bytes[i] = (byte)('a' + random.Next(8));
+        }
+
+        return bytes;
+    }
+
+    /// <summary>One frame that declares its decoded size.</summary>
+    private static byte[] OneShot(byte[] bytes)
+    {
+        var encoded = new byte[ZstandardEncoder.GetMaxCompressedLength(bytes.Length)];
+        Assert.True(ZstandardEncoder.TryCompress(bytes, encoded, out var written));
+        return encoded[..written];
+    }
+
+    /// <summary>One frame written in two flushes, so it does not declare its decoded size.</summary>
+    private static byte[] Streamed(byte[] bytes)
+    {
+        using var output = new MemoryStream();
+        using (var encoder = new ZstandardStream(output, CompressionMode.Compress, leaveOpen: true))
+        {
+            var half = bytes.Length / 2;
+            encoder.Write(bytes, 0, half);
+            encoder.Flush();
+            encoder.Write(bytes, half, bytes.Length - half);
+        }
+
+        return output.ToArray();
+    }
 
     private static byte[] Encode(byte[] bytes, int? windowLog = null)
     {
