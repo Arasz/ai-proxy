@@ -55,8 +55,6 @@ public sealed class ContentCompressionPipeline(
         }
 
         var requestId = Guid.CreateVersion7().ToString();
-        var original = Encoding.UTF8.GetString(request.Body.Span);
-        var body = request.Body.ToArray();
         var parts = new List<CompressedPart>();
         var replacements = new List<Replacement>();
         var failures = new List<PartFailure>();
@@ -84,7 +82,7 @@ public sealed class ContentCompressionPipeline(
                 continue;
             }
 
-            replacements.Add(new Replacement(region.Start, region.Length, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(sent, MessagesApi.Json))));
+            replacements.Add(new Replacement(region.Start, region.Length, JsonSerializer.SerializeToUtf8Bytes(sent, MessagesApi.Json)));
         }
 
         if (replacements.Count == 0)
@@ -93,10 +91,12 @@ public sealed class ContentCompressionPipeline(
         }
 
         started = time.GetTimestamp();
+        var body = request.Body.Span;
         var compressed = Rebuild(body, replacements);
         stages.Add("rebuild", time.GetElapsedTime(started));
+        var original = Encoding.UTF8.GetString(body);
         var compressedText = Encoding.UTF8.GetString(compressed);
-        var ratio = body.Length == 0 ? 1.0 : (double)compressed.Length / body.Length;
+        var ratio = (double)compressed.Length / body.Length;
         var paths = parts.Select(static part => part.Path);
         var path = string.Join(",", (originals.Count > 0 ? paths.Append(PreviewPath) : paths).Distinct(StringComparer.Ordinal));
         var record = new ContentRecord(
@@ -154,21 +154,30 @@ public sealed class ContentCompressionPipeline(
         return kept;
     }
 
-    private static byte[] Rebuild(byte[] body, List<Replacement> replacements)
+    /// <summary>Copies the body into one exactly sized array, with each replacement written over its region.</summary>
+    private static byte[] Rebuild(ReadOnlySpan<byte> body, List<Replacement> replacements)
     {
-        using var buffer = new MemoryStream(body.Length);
+        var length = body.Length;
+        foreach (var replacement in replacements)
+        {
+            length += replacement.Bytes.Length - replacement.Length;
+        }
+
+        var rebuilt = new byte[length];
+        var target = rebuilt.AsSpan();
         var position = 0;
 
         foreach (var replacement in replacements)
         {
-            buffer.Write(body, position, replacement.Start - position);
-            buffer.Write(replacement.Bytes);
+            body[position..replacement.Start].CopyTo(target);
+            target = target[(replacement.Start - position)..];
+            replacement.Bytes.CopyTo(target);
+            target = target[replacement.Bytes.Length..];
             position = replacement.Start + replacement.Length;
         }
 
-        buffer.Write(body, position, body.Length - position);
-
-        return buffer.ToArray();
+        body[position..].CopyTo(target);
+        return rebuilt;
     }
 
     private async ValueTask<CcrPreview?> PreviewAsync(
