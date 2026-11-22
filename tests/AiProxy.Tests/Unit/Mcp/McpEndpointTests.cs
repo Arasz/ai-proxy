@@ -1,5 +1,6 @@
 using System.Net;
 using AiProxy.Cli;
+using AiProxy.Client;
 using AiProxy.Mcp;
 using AiProxy.Tests.Unit.Cli;
 
@@ -23,15 +24,28 @@ public sealed class McpEndpointTests
     public async Task Probe_reports_whether_the_health_endpoint_answers_ok(HttpStatusCode status, bool expected)
     {
         using var handler = new Handler(_ => new HttpResponseMessage(status));
-        Assert.Equal(expected, await McpServerProcess.IsReachableAsync("http://127.0.0.1:1/", handler, TestContext.Current.CancellationToken));
+        var factory = new Factory(handler);
+        Assert.Equal(expected, await McpServerProcess.IsReachableAsync("http://127.0.0.1:1/", factory, TestContext.Current.CancellationToken));
         Assert.Equal("http://127.0.0.1:1/health", handler.Seen.Single().ToString());
+        Assert.Equal(ProxyClientServiceCollectionExtensions.ProxyClientName, factory.Names.Single());
     }
 
     [Fact]
     public async Task Probe_reports_unreachable_when_the_connection_fails()
     {
         using var handler = new Handler(_ => throw new HttpRequestException("refused"));
-        Assert.False(await McpServerProcess.IsReachableAsync("http://127.0.0.1:1/", handler, TestContext.Current.CancellationToken));
+        Assert.False(await McpServerProcess.IsReachableAsync("http://127.0.0.1:1/", new Factory(handler), TestContext.Current.CancellationToken));
+    }
+
+    private sealed class Factory(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public List<string> Names { get; } = [];
+
+        public HttpClient CreateClient(string name)
+        {
+            Names.Add(name);
+            return new HttpClient(handler, false);
+        }
     }
 
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
