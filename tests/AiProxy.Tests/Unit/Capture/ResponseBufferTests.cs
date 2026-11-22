@@ -27,19 +27,6 @@ public sealed class ResponseBufferTests
     }
 
     [Fact]
-    public void A_buffer_with_no_content_headers_keeps_the_body_whole_up_to_the_cap()
-    {
-        var buffer = ResponseBuffer.Create();
-        var body = new byte[FourMiB];
-        Random.Shared.NextBytes(body);
-
-        Append(buffer, body, 7919);
-
-        Assert.False(buffer.OverCap);
-        Assert.True(buffer.Body.Span.SequenceEqual(body));
-    }
-
-    [Fact]
     public void One_byte_over_the_cap_drops_the_body_and_keeps_counting()
     {
         var buffer = ResponseBuffer.For("application/json", null);

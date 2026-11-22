@@ -53,7 +53,7 @@ public sealed class CapturedExchange
     /// <summary>Copies response bytes as they pass on to the client; never holds them back.</summary>
     public void OnDataReceived(object? sender, DataEventArgs data)
     {
-        Response ??= ResponseBuffer.Create();
+        Response ??= ResponseBuffer.For(null, null);
         Response.Append(data.Buffer.AsSpan(data.Offset, data.Count));
     }
 }

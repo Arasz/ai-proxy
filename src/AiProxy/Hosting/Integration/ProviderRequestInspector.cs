@@ -34,9 +34,6 @@ public sealed partial class ProviderRequestInspector(
     TimeProvider time,
     IGainStore gain)
 {
-    private readonly List<HttpHeader> _plainTextResponseHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Text.Plain)];
-    private readonly List<HttpHeader> _jsonResponseHeaders = [new(HeaderNames.ContentType, MediaTypeNames.Application.Json)];
-
     private const long MaxInspectedBodyBytes = 8 * 1024 * 1024;
 
     /// <summary>The Codex Responses path; a WebSocket upgrade to it on a harness-only host gets 426, so Codex falls back to HTTPS.</summary>
@@ -69,7 +66,7 @@ public sealed partial class ProviderRequestInspector(
                 return;
             case true when request.UpgradeToWebSocket && request.RequestUri.AbsolutePath.TrimEnd('/').Equals(CodexResponsesPath, StringComparison.OrdinalIgnoreCase):
                 Log.WebSocketRefused(logger, host);
-                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, _plainTextResponseHeaders, true);
+                e.GenericResponse(UpgradeRequired, HttpStatusCode.UpgradeRequired, [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Text.Plain)], true);
                 return;
         }
 
@@ -133,7 +130,7 @@ public sealed partial class ProviderRequestInspector(
                 e.GenericResponse(
                     CcrPlan.LedgerUnavailable,
                     (HttpStatusCode)529,
-                    _jsonResponseHeaders,
+                    [new HttpHeader(HeaderNames.ContentType, MediaTypeNames.Application.Json)],
                     true);
                 return;
             }
@@ -189,7 +186,7 @@ public sealed partial class ProviderRequestInspector(
         }
 
         e.DataReceived -= exchange.OnDataReceived;
-        var kept = exchange.Response ?? ResponseBuffer.Create();
+        var kept = exchange.Response ?? ResponseBuffer.For(null, null);
         try
         {
             var response = e.HttpClient.Response;
@@ -294,9 +291,9 @@ public sealed partial class ProviderRequestInspector(
         var toolCharacters = 0;
         switch (plan.Action)
         {
-            case CcrAction.RelayWithTool when WithTool(plan, forwarded, out var appended) is { } withTool:
-                toolCharacters = appended;
-                forwarded = withTool;
+            case CcrAction.RelayWithTool when plan.WithTool(forwarded) is { } withTool:
+                toolCharacters = withTool.ToolCharacters;
+                forwarded = withTool.Body;
                 break;
             case CcrAction.RelayContinue:
                 forwarded = CcrRequest.ContinueFrom(forwarded, plan.ContinueFrom);
@@ -308,18 +305,6 @@ public sealed partial class ProviderRequestInspector(
         await RecordGainAsync(exchange, e.HttpClient.Request.Method, body, forwarded, rule, toolCharacters);
         e.UserData = exchange;
         await ccr.RelayAsync(e, exchange, forwarded, plan, compressed?.Originals ?? new Dictionary<string, string>());
-    }
-
-    private static byte[]? WithTool(CcrPlan plan, byte[] forwarded, out int toolCharacters)
-    {
-        if (plan.Wire == CcrWire.Chat)
-        {
-            return ChatRequest.Prepare(forwarded, out toolCharacters);
-        }
-
-        var withTool = CcrRequest.AppendTool(forwarded);
-        toolCharacters = withTool is null ? 0 : Encoding.UTF8.GetCharCount(withTool) - Encoding.UTF8.GetCharCount(forwarded);
-        return withTool;
     }
 
     private void LogFailures(SessionEventArgs e, CompressionResult? compressed)

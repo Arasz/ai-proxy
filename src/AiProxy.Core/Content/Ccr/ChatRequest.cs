@@ -60,43 +60,25 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
     ///     leaving every other byte as it was so the provider's prompt cache keeps matching. Returns null when the body
     ///     has no non-empty <c>tools</c> array or is not a whole JSON object: there is nothing to append to.
     /// </summary>
-    public static byte[]? Prepare(ReadOnlySpan<byte> body) => Prepare(body, out _);
-
-    /// <summary>As <see cref="Prepare(ReadOnlySpan{byte})" />, and reports how many characters the tool append added, without the usage option.</summary>
-    public static byte[]? Prepare(ReadOnlySpan<byte> body, out int toolCharacters)
+    public static ToolRequest? WithTool(ReadOnlySpan<byte> body)
     {
-        toolCharacters = 0;
         if (Scan(body) is not { ObjectEnd: >= 0, ToolsEnd: >= 0, ToolCount: > 0 } scan)
         {
             return null;
         }
 
-        var edits = new List<(int Start, int End, byte[] Text)>();
-        if (!scan.HasRetrieval)
-        {
-            edits.Add((scan.ToolsEnd, scan.ToolsEnd, [(byte)',', .. DefinitionBytes]));
-            toolCharacters = DefinitionBytes.Length + 1;
-        }
-
-        if (UsageEdit(scan) is { } usageEdit)
-        {
-            edits.Add(usageEdit);
-        }
-
-        var result = body.ToArray();
-        foreach (var (start, end, text) in edits.OrderByDescending(static edit => edit.Start))
-        {
-            result = [.. result[..start], .. text, .. result[end..]];
-        }
-
-        return result;
+        var toolEdit = ToolEdit(scan);
+        BodyEdit?[] edits = [toolEdit, UsageEdit(scan)];
+        return new ToolRequest(Apply(body, edits), toolEdit?.Text.Length ?? 0);
     }
 
-    private static (int Start, int End, byte[] Text)? UsageEdit(BodyScan scan)
+    private static BodyEdit? ToolEdit(BodyScan scan) => scan.HasRetrieval ? null : BodyEdit.Insert(scan.ToolsEnd, [(byte)',', .. DefinitionBytes]);
+
+    private static BodyEdit? UsageEdit(BodyScan scan)
     {
         if (!scan.HasStreamOptions)
         {
-            return (scan.ObjectEnd, scan.ObjectEnd, [(byte)',', .. UsageBytes]);
+            return BodyEdit.Insert(scan.ObjectEnd, [(byte)',', .. UsageBytes]);
         }
 
         if (scan.UsageRequested)
@@ -106,10 +88,23 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
 
         if (!scan.OptionsAreObject)
         {
-            return (scan.OptionsStart, scan.OptionsEnd, OptionsBytes);
+            return new BodyEdit(scan.OptionsStart, scan.OptionsEnd, OptionsBytes);
         }
 
-        return scan.UsageStart >= 0 ? (scan.UsageStart, scan.UsageEnd, TrueBytes) : (scan.OptionsStart + 1, scan.OptionsStart + 1, scan.OptionsEmpty ? UsageMemberBytes : [.. UsageMemberBytes, (byte)',']);
+        return scan.UsageStart >= 0
+            ? new BodyEdit(scan.UsageStart, scan.UsageEnd, TrueBytes)
+            : BodyEdit.Insert(scan.OptionsStart + 1, scan.OptionsEmpty ? UsageMemberBytes : [.. UsageMemberBytes, (byte)',']);
+    }
+
+    private static byte[] Apply(ReadOnlySpan<byte> body, IEnumerable<BodyEdit?> edits)
+    {
+        var result = body.ToArray();
+        foreach (var edit in edits.OfType<BodyEdit>().OrderByDescending(static edit => edit.Start))
+        {
+            result = [.. result[..edit.Start], .. edit.Text, .. result[edit.End..]];
+        }
+
+        return result;
     }
 
     private static int ChoicesOf(JsonElement root)
@@ -226,6 +221,15 @@ public sealed record ChatRequest(bool Streamed, bool HasTools, string Model, int
         }
 
         scan.OptionsEnd = (int)reader.BytesConsumed;
+    }
+
+    /// <summary>One byte-range replacement in a request body; an insert when <paramref name="Start" /> equals <paramref name="End" />.</summary>
+    /// <param name="Start">The first byte replaced.</param>
+    /// <param name="End">The byte after the last one replaced.</param>
+    /// <param name="Text">The bytes written in their place.</param>
+    private readonly record struct BodyEdit(int Start, int End, byte[] Text)
+    {
+        public static BodyEdit Insert(int at, byte[] text) => new(at, at, text);
     }
 
     private sealed class BodyScan
