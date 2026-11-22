@@ -13,7 +13,7 @@ public sealed class ReplayViewLayoutTests
         var report = new ReplayReport();
         foreach (var kind in Enum.GetValues<ContentType>())
         {
-            report.Add(new ReplayRow(ReplayOutcome.Replayed, [new ReplayBlock(kind, 235_400_000, 100_000_000, 12_300_000, "preview")], "api.anthropic.com"));
+            report.Add(new ReplayRow(ReplayOutcome.Replayed, [new ReplayBlock(kind, 235_400_000, 100_000_000, 12_300_000) { PreviewId = "preview" }]) { Host = "api.anthropic.com" });
         }
 
         var console = new TestConsole().Width(TableLayout.Width);

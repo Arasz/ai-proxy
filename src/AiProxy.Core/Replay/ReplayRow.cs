@@ -42,9 +42,11 @@ public enum ReplayOutcome
 /// <param name="OriginalTokens">The estimated tokens of the region as the client sent it.</param>
 /// <param name="ReducedTokens">The estimated tokens after the reducers, before any preview.</param>
 /// <param name="ForwardedTokens">The estimated tokens of the region as the pipeline would forward it, preview included.</param>
-/// <param name="PreviewId">The preview id the region went out as, or null when it did not become a preview.</param>
-public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int ReducedTokens, int ForwardedTokens, string? PreviewId = null)
+public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int ReducedTokens, int ForwardedTokens)
 {
+    /// <summary>The preview id the region went out as, or null when it did not become a preview.</summary>
+    public string? PreviewId { get; init; }
+
     /// <summary>Whether the region is a numbered read or a diff that reached the preview floor and was sent as the reducers left it.</summary>
     public bool Skipped { get; init; }
 
@@ -58,9 +60,11 @@ public sealed record ReplayBlock(ContentType Kind, int OriginalTokens, int Reduc
 /// <summary>The result of replaying one stored request.</summary>
 /// <param name="Outcome">What the row turned out to be.</param>
 /// <param name="Blocks">The tool output regions of a replayed row; empty for every other outcome.</param>
-/// <param name="Host">The host the request was captured for, or null when the source does not say.</param>
-public sealed record ReplayRow(ReplayOutcome Outcome, IReadOnlyList<ReplayBlock> Blocks, string? Host = null)
+public sealed record ReplayRow(ReplayOutcome Outcome, IReadOnlyList<ReplayBlock> Blocks)
 {
+    /// <summary>The host the request was captured for, or null when the source does not say.</summary>
+    public string? Host { get; init; }
+
     /// <summary>A row with no blocks.</summary>
     public static ReplayRow Of(ReplayOutcome outcome) => new(outcome, []);
 }

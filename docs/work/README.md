@@ -69,3 +69,4 @@ Active records:
 
 
 | [2026-10-25-proxy-architecture-guide.html](2026-10-25-proxy-architecture-guide.html) | Interactive architecture snapshot: provider tabs, data and logic charts, eleven plan exports, current/proposed distinctions and a sourced glossary. Source and rebuild instructions are in [the guide project](../../scripts/proxy-architecture-guide/README.md). |
+| [2026-11-22-nullable-inventory.md](2026-11-22-nullable-inventory.md) | Nullable declarations in `src/` by category, the shape each group gets under ADR 0022, the wave plan, and the places null stays. |

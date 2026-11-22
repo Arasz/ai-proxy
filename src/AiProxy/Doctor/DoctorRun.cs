@@ -28,7 +28,7 @@ internal sealed class DoctorRun(DoctorSettings settings, TimeProvider time, Func
         CheckResult inspection;
         if (!api.Reachable && !await IsListeningAsync(proxy, _timeout, cancellationToken).ConfigureAwait(false))
         {
-            first = new CheckResult(ApiCheck.Name, CheckStatus.Fail, $"The proxy is not running: nothing answers at {EndpointText.Safe(settings.Endpoint)} or listens at {EndpointText.Safe(proxy.ToString())}.", "Start ai-proxy.");
+            first = new CheckResult(ApiCheck.Name, CheckStatus.Fail, $"The proxy is not running: nothing answers at {EndpointText.Safe(settings.Endpoint)} or listens at {EndpointText.Safe(proxy.ToString())}.") { Fix = "Start ai-proxy." };
             inspection = new CheckResult(InspectionCheck.Name, CheckStatus.Unknown, "skipped because the proxy is not running.");
         }
         else

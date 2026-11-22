@@ -26,13 +26,13 @@ internal sealed class CaptureCheck(string dataDirectory, TimeProvider time, bool
 
         if (capture.State is { LastWriteError: { } error, LastWriteErrorAt: { } failedAt } && time.GetUtcNow() - failedAt <= RecentError)
         {
-            return new CheckResult(Name, CheckStatus.Warn, $"the last capture write failed at {CaptureText.Time(failedAt)}: {error}", "Check the free disk space and the permissions of capture.db, and read proxy.log.");
+            return new CheckResult(Name, CheckStatus.Warn, $"the last capture write failed at {CaptureText.Time(failedAt)}: {error}") { Fix = "Check the free disk space and the permissions of capture.db, and read proxy.log." };
         }
 
         if (!capture.Enabled)
         {
             return configuredOn
-                ? new CheckResult(Name, CheckStatus.Warn, "capture is off in the running proxy, but Proxy__Capture asks for it on.", "Restart ai-proxy so it reads the setting.")
+                ? new CheckResult(Name, CheckStatus.Warn, "capture is off in the running proxy, but Proxy__Capture asks for it on.") { Fix = "Restart ai-proxy so it reads the setting." }
                 : new CheckResult(Name, CheckStatus.Pass, "off.");
         }
 
