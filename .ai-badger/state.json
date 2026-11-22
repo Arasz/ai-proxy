@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2026-11-22T18:55:00Z",
-  "next": "Owner publish of 0.35.0 and the upgrade steps in docs/changelog/0.35.0-project-review-fixes.md. Then L5 Codex after an owner Codex session; capture-week read about 2026-11-27.",
+  "lastUpdated": "2026-11-22T19:35:03.272605+00:00",
+  "next": "Nullable wave 2 (ADR 0022): Valid/Invalid union for *Settings.Error + schema Violation; success/failure unions for CcrRetrieval and CompressionResult; Decompose overload after ContentRegion file union",
   "completedTasks": [
+    {
+      "id": "aip-minimize-nullable-core-union-types",
+      "pr": 170,
+      "merged": "d204ebb",
+      "summary": "ADR 0022: absent values are union cases; CcrParseResult union; 5 optional record fields -> init props; nullable inventory + wave plan in docs/work/2026-11-22-nullable-inventory.md"
+    },
     {
       "taskId": "aip-run-review-fix-campaign-waves",
       "title": "Project review fix campaign W0-W4: ADRs 0017-0021, P1-P14 packages, join review, release",
