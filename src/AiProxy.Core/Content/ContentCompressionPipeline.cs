@@ -194,7 +194,7 @@ public sealed class ContentCompressionPipeline(
     {
         if (mode == CcrMode.Off)
         {
-            return new NoCcrPreview();
+            return NoCcrPreview.Instance;
         }
 
         var started = time.GetTimestamp();
@@ -205,7 +205,7 @@ public sealed class ContentCompressionPipeline(
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             failures.Add(new PartFailure(RegionChunkId, PreviewPath, exception));
-            return new NoCcrPreview();
+            return NoCcrPreview.Instance;
         }
         finally
         {

@@ -23,4 +23,12 @@ public sealed partial record CcrPreview(string Id, string Text, int ShownLines, 
 public readonly union CcrPreviewResult(CcrPreview, NoCcrPreview);
 
 /// <summary>The region goes out as its reducers left it.</summary>
-public sealed record NoCcrPreview;
+public sealed record NoCcrPreview
+{
+    private NoCcrPreview()
+    {
+    }
+
+    /// <summary>The single value.</summary>
+    public static NoCcrPreview Instance { get; } = new();
+}

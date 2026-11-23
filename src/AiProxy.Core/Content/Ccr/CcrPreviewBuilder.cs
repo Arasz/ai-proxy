@@ -27,7 +27,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         {
             if (CcrPreview.IsIn(original) || !Initialize(original, options, reducedTokens))
             {
-                return new NoCcrPreview();
+                return NoCcrPreview.Instance;
             }
 
             var signalSpent = SelectSignals((int)(_lineRoom * options.SignalShare));
@@ -44,8 +44,8 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     private static CcrPreviewResult SavesEnough(CcrPreviewResult result, CcrOptions options, int reducedTokens) => result switch
     {
         CcrPreview preview when SavesEnough(preview, options, reducedTokens) => preview,
-        CcrPreview => new NoCcrPreview(),
-        NoCcrPreview => new NoCcrPreview(),
+        CcrPreview => NoCcrPreview.Instance,
+        NoCcrPreview none => none,
     };
 
     private static bool SavesEnough(CcrPreview preview, CcrOptions options, int reducedTokens)
@@ -181,7 +181,7 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     {
         if (_hidden.Length == 0)
         {
-            return new NoCcrPreview();
+            return NoCcrPreview.Instance;
         }
 
         var count = _shown.Count(line => line);

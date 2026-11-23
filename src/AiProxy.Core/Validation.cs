@@ -4,7 +4,15 @@ namespace AiProxy.Core;
 public readonly union Validation(Valid, Invalid);
 
 /// <summary>The input passed the check.</summary>
-public sealed record Valid;
+public sealed record Valid
+{
+    private Valid()
+    {
+    }
+
+    /// <summary>The single value.</summary>
+    public static Valid Instance { get; } = new();
+}
 
 /// <summary>The input failed the check, with the reason to show the caller.</summary>
 public sealed record Invalid(string Reason);

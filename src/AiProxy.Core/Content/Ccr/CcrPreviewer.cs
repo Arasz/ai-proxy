@@ -22,12 +22,12 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
         var reducedTokens = options.TokensOf(reduced.Length);
         if (mode == CcrMode.Off || reducedTokens < options.MinimumTokens)
         {
-            return new NoCcrPreview();
+            return NoCcrPreview.Instance;
         }
 
         if (options.SkipsPreview(original, reducedTokens))
         {
-            return new NoCcrPreview();
+            return NoCcrPreview.Instance;
         }
 
         var result = builders().Build(original, options, reducedTokens);

@@ -32,6 +32,14 @@ public sealed class CcrPreviewSkipTests
     }
 
     [Fact]
+    public async Task A_skipped_preview_is_the_shared_none_value()
+    {
+        var read = Read(300);
+
+        Assert.Same(NoCcrPreview.Instance, (await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None)).Value);
+    }
+
+    [Fact]
     public async Task A_numbered_read_is_previewed_at_and_above_the_band()
     {
         var read = Read(300);
