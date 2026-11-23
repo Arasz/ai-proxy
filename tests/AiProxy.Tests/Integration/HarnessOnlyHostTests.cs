@@ -14,7 +14,6 @@ using Dapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
-using ZstdSharp;
 using static AiProxy.Tests.Integration.TunnelClient;
 using TitaniumProxyService = AiProxy.Hosting.Integration.TitaniumProxyService;
 
@@ -327,16 +326,7 @@ public sealed class HarnessOnlyHostTests : IDisposable
 
     private static string ResponsesBody(string output) => $$"""{"model":"gpt-5","stream":true,"input":[{"type":"function_call_output","call_id":"call_1","output":{{JsonSerializer.Serialize(output)}}}]}""";
 
-    private static byte[] Zstd(byte[] bytes)
-    {
-        using var output = new MemoryStream();
-        using (var encoder = new CompressionStream(output, 3, leaveOpen: true))
-        {
-            encoder.Write(bytes);
-        }
-
-        return output.ToArray();
-    }
+    private static byte[] Zstd(byte[] bytes) => ZstdFrames.Streamed(bytes);
 
     private static ByteArrayContent ZstdContent(byte[] encoded)
     {

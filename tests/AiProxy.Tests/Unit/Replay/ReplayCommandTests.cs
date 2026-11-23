@@ -9,7 +9,6 @@ using AiProxy.Tests.Integration;
 using AiProxy.Tests.Unit.Cli;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
-using ZstdSharp;
 
 namespace AiProxy.Tests.Unit.Replay;
 
@@ -167,8 +166,7 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_good_zstd_capture_row_is_decoded_and_replayed()
     {
-        using var compressor = new Compressor();
-        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
+        WriteCapture([.. ZstdFrames.OneShot(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300", "--include-encoded");
 
@@ -377,9 +375,8 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task A_zstd_capture_copy_of_a_content_body_is_one_duplicate_by_its_decoded_bytes()
     {
-        using var compressor = new Compressor();
         WriteContent(ToolBody(Output));
-        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
+        WriteCapture([.. ZstdFrames.OneShot(ToolBody(Output))]);
 
         var result = await ReplayAsync("--minimum", "300");
 
@@ -392,8 +389,7 @@ public sealed class ReplayCommandTests : IDisposable
     [Fact]
     public async Task Encoded_bodies_are_left_out_unless_they_are_asked_for()
     {
-        using var compressor = new Compressor();
-        WriteCapture([.. compressor.Wrap(ToolBody(Output))]);
+        WriteCapture([.. ZstdFrames.OneShot(ToolBody(Output))]);
 
         var left = await ReplayAsync("--minimum", "300");
         var included = await ReplayAsync("--minimum", "300", "--include-encoded");
