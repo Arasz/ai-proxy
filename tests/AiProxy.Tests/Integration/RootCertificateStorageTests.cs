@@ -512,8 +512,7 @@ public sealed class RootCertificateStorageTests
     {
         IProviderHosts providerHosts = hosts is null ? new CanonicalProviderHosts() : new FixedHosts(hosts);
         ILoggerFactory loggerFactory = log is null ? NullLoggerFactory.Instance : new LoggerFactory([log]);
-        return new TitaniumProxyService(
-            null,
+        return TestTitaniumProxyService.Create(
             new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, trust, dataDirectory)
             {
                 RootCertificatePassword = password

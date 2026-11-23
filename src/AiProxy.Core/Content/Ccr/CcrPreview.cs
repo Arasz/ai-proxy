@@ -18,3 +18,9 @@ public sealed partial record CcrPreview(string Id, string Text, int ShownLines, 
     [GeneratedRegex(@"\[proxy preview [0-9a-f]{16}: [0-9]+ of [0-9]+ lines shown\.", RegexOptions.CultureInvariant)]
     private static partial Regex Header();
 }
+
+/// <summary>The decision for one region: a preview to send, or none.</summary>
+public readonly union CcrPreviewResult(CcrPreview, NoCcrPreview);
+
+/// <summary>The region goes out as its reducers left it.</summary>
+public sealed record NoCcrPreview;

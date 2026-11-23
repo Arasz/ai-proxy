@@ -19,7 +19,7 @@ public sealed class GuardCommandTests
         {
             clears++;
             lockedDuringClear = await ThrowsAsync(() => Task.FromResult(new FileStream(MarkerPath(directory), FileMode.Open, FileAccess.ReadWrite, FileShare.None)));
-        }, TimeSpan.Zero, TimeProvider.System);
+        }, TimeSpan.Zero, TimeProvider.System, static _ => Task.FromResult(false), static _ => true);
 
         var exitCode = await command.Run(new StringReader(""));
 
@@ -47,7 +47,7 @@ public sealed class GuardCommandTests
         {
             clears++;
             return Task.CompletedTask;
-        }, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned);
+        }, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned, static _ => true);
 
         var exitCode = await command.Run(new StringReader(""));
 
@@ -72,7 +72,8 @@ public sealed class GuardCommandTests
             static () => Task.CompletedTask,
             TimeSpan.Zero,
             TimeProvider.System,
-            static _ => Task.FromException<bool>(new InvalidOperationException("Restored settings differ from the snapshot.")));
+            static _ => Task.FromException<bool>(new InvalidOperationException("Restored settings differ from the snapshot.")),
+            static _ => true);
 
         var exitCode = await command.Run(new StringReader(""));
         using var marker = await SystemProxyMarker.Acquire(directory.Path, TimeSpan.Zero, TimeProvider.System);
@@ -102,7 +103,7 @@ public sealed class GuardCommandTests
             {
                 return Task.FromException(exception);
             }
-        }, TimeSpan.FromMilliseconds(100), TimeProvider.System).Run(new StringReader(""));
+        }, TimeSpan.FromMilliseconds(100), TimeProvider.System, static _ => Task.FromResult(false), static _ => true).Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
@@ -127,7 +128,7 @@ public sealed class GuardCommandTests
             {
                 return Task.FromException(exception);
             }
-        }, TimeSpan.Zero, TimeProvider.System).Run(new StringReader(""));
+        }, TimeSpan.Zero, TimeProvider.System, static _ => Task.FromResult(false), static _ => true).Run(new StringReader(""));
 
         Assert.Equal(0, exitCode);
         Assert.Equal(0, clears);
@@ -150,7 +151,8 @@ public sealed class GuardCommandTests
             },
             TimeSpan.Zero,
             TimeProvider.System,
-            isOwned: static _ => false);
+            static _ => Task.FromResult(false),
+            static _ => false);
 
         var exitCode = await command.Run(new StringReader(""));
 
@@ -177,7 +179,7 @@ public sealed class GuardCommandTests
             {
                 return Task.FromException(exception);
             }
-        }, TimeSpan.Zero, TimeProvider.System).Run(new StringReader("restored\n"));
+        }, TimeSpan.Zero, TimeProvider.System, static _ => Task.FromResult(false), static _ => true).Run(new StringReader("restored\n"));
 
         Assert.Equal(0, clears);
         Assert.True(File.Exists(MarkerPath(directory)));
@@ -197,7 +199,7 @@ public sealed class GuardCommandTests
             {
                 return Task.FromException(exception);
             }
-        }, TimeSpan.Zero, TimeProvider.System);
+        }, TimeSpan.Zero, TimeProvider.System, static _ => Task.FromResult(false), static _ => true);
 
         var exitCode = await command.Run(new StringReader(""));
 
@@ -231,7 +233,7 @@ public sealed class GuardCommandTests
 
         var snapshotProvider = new GuardSnapshotProvider { Current = "127.0.0.1:9090" };
         var recovery = new SystemProxyRecovery(snapshotProvider);
-        var command = new GuardCommand(directory.Path, () => Task.CompletedTask, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned);
+        var command = new GuardCommand(directory.Path, () => Task.CompletedTask, TimeSpan.Zero, TimeProvider.System, recovery.RestoreIfOwned, static _ => true);
 
         var exitCode = await command.Run(new StringReader(""));
 

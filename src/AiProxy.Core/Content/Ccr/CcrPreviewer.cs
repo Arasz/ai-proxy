@@ -12,32 +12,31 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
     /// <summary>The CCR numbers.</summary>
     public CcrOptions Options => options;
 
-    /// <summary>Returns the preview to send, or null to send the reduced text; throws when a thread's original could not be kept.</summary>
+    /// <summary>Returns the preview to send, or <see cref="NoCcrPreview"/> to send the reduced text; throws when a thread's original could not be kept.</summary>
     /// <param name="original">The region's text as the client sent it.</param>
     /// <param name="reduced">The region's text after its reducers.</param>
     /// <param name="mode">The request's CCR mode.</param>
     /// <param name="cancellationToken">The request's token.</param>
-    public async ValueTask<CcrPreview?> PreviewAsync(string original, string reduced, CcrMode mode, CancellationToken cancellationToken)
+    public async ValueTask<CcrPreviewResult> PreviewAsync(string original, string reduced, CcrMode mode, CancellationToken cancellationToken)
     {
         var reducedTokens = options.TokensOf(reduced.Length);
         if (mode == CcrMode.Off || reducedTokens < options.MinimumTokens)
         {
-            return null;
+            return new NoCcrPreview();
         }
 
         if (options.SkipsPreview(original, reducedTokens))
         {
-            return null;
+            return new NoCcrPreview();
         }
 
-        var preview = builders().Build(original, options, reducedTokens);
-        if (preview is null || mode != CcrMode.Thread)
+        var result = builders().Build(original, options, reducedTokens);
+        if (result.Value is CcrPreview preview && mode == CcrMode.Thread)
         {
-            return preview;
+            await KeepAsync(preview.Id, original, mode, cancellationToken).ConfigureAwait(false);
         }
 
-        await KeepAsync(preview.Id, original, mode, cancellationToken).ConfigureAwait(false);
-        return preview;
+        return result;
     }
 
     /// <summary>Keeps the original under its id in the store when the mode is a thread; throws when it could not be kept.</summary>

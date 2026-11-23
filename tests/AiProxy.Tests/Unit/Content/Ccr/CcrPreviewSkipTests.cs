@@ -20,7 +20,7 @@ public sealed class CcrPreviewSkipTests
         var read = Read(400);
         Assert.InRange(Options.TokensOf(read.Length), 7_000, 9_000);
 
-        Assert.NotNull(await Previewer(Options).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<CcrPreview>((await Previewer(Options).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class CcrPreviewSkipTests
     {
         var read = Read(300);
 
-        Assert.Null(await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<NoCcrPreview>((await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 
     [Fact]
@@ -37,8 +37,8 @@ public sealed class CcrPreviewSkipTests
         var read = Read(300);
         var tokens = Options.TokensOf(read.Length);
 
-        Assert.Null(await Previewer(Options with { SkipUnderTokens = tokens + 1 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
-        Assert.NotNull(await Previewer(Options with { SkipUnderTokens = tokens }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<NoCcrPreview>((await Previewer(Options with { SkipUnderTokens = tokens + 1 }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None)).Value);
+        Assert.IsType<CcrPreview>((await Previewer(Options with { SkipUnderTokens = tokens }).PreviewAsync(read, read, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class CcrPreviewSkipTests
     {
         var plain = string.Join("\n", Enumerable.Range(240, 300).Select(number => $"step {number}: compiling module m{number} in the usual way"));
 
-        Assert.NotNull(await Previewer(Options).PreviewAsync(plain, plain, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<CcrPreview>((await Previewer(Options).PreviewAsync(plain, plain, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 
     [Fact]
@@ -57,8 +57,8 @@ public sealed class CcrPreviewSkipTests
         var tokens = floor.TokensOf(diff.Length);
         Assert.InRange(tokens, 350, 450);
 
-        Assert.Null(await Previewer(floor).PreviewAsync(diff, diff, CcrMode.Stateless, CancellationToken.None));
-        Assert.NotNull(await Previewer(floor with { SkipUnderTokens = 0 }).PreviewAsync(diff, diff, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<NoCcrPreview>((await Previewer(floor).PreviewAsync(diff, diff, CcrMode.Stateless, CancellationToken.None)).Value);
+        Assert.IsType<CcrPreview>((await Previewer(floor with { SkipUnderTokens = 0 }).PreviewAsync(diff, diff, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 
     [Fact]
@@ -67,6 +67,6 @@ public sealed class CcrPreviewSkipTests
         var read = Read(300);
         var reduced = string.Join("\n", Enumerable.Range(1, 300).Select(index => $"view line {index} of a rewritten read, not numbered"));
 
-        Assert.Null(await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, reduced, CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<NoCcrPreview>((await Previewer(Options with { SkipUnderTokens = 100_000 }).PreviewAsync(read, reduced, CcrMode.Stateless, CancellationToken.None)).Value);
     }
 }
