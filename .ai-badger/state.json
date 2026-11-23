@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2026-11-23T00:37:58.189437+00:00",
+  "lastUpdated": "2026-11-23T01:21:33.571783+00:00",
   "next": "Nullable work: only GainRuntime.Variable is open (null selects case-insensitive env lookup in ProxyDataDirectory.Resolve; a union or second overload would fix it). Otherwise pick from backlog.",
   "completedTasks": [
+    {
+      "id": "aip-zstd-sizing-capture-buffer-pooling",
+      "pr": 174,
+      "merged": "e33bad4",
+      "summary": "0.35.4: ResponseBuffer.Read<T> lends pooled bytes (Body removed), whole bodies and SSE head/tail/stitch pooled behind a re-entry-safe lock, rented arrays only through windows; zstd via .NET 11 ZstandardDecoder into one pooled buffer, Reset between frames, ZstdSharp removed (ADR 0023)"
+    },
     {
       "id": "aip-nullable-wave-three-lookup-unions",
       "pr": 173,
