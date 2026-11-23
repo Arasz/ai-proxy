@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2026-11-23T00:03:39.350355+00:00",
-  "next": "Nullable wave 3 (docs/work/2026-11-22-nullable-inventory.md): body-rewrite NotApplicable unions, store lookups, test-seam constructors, FileRead union, CcrPreviewer/SourceCodeCompressionHandler.View",
+  "lastUpdated": "2026-11-23T00:37:58.189437+00:00",
+  "next": "Nullable work: only GainRuntime.Variable is open (null selects case-insensitive env lookup in ProxyDataDirectory.Resolve; a union or second overload would fix it). Otherwise pick from backlog.",
   "completedTasks": [
+    {
+      "id": "aip-nullable-wave-three-lookup-unions",
+      "pr": 173,
+      "merged": "9341ab6",
+      "summary": "0.35.3: CcrPreviewResult(CcrPreview|NoCcrPreview) union, View returns its fallback, required GuardCommand/Titanium seams, NoCcrPreview and Valid shared instances; lookups, scans, FileRead keep null (ADR 0022 rules 10-15)"
+    },
     {
       "id": "aip-nullable-wave-two-result-unions",
       "pr": 172,
