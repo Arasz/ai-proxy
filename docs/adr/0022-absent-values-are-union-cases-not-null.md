@@ -61,7 +61,9 @@ candidates for later waves.
     (`SourceCodeCompressionHandler.View`).
 14. A delegate that every production caller supplies is a required parameter. A default that
     production always takes is an explicit argument of the public constructor or an `init`
-    default, never `= null` (`GuardCommand`, `TitaniumProxyService`, `GainRuntime`).
+    default, never `= null` (`GuardCommand`, `TitaniumProxyService`). A null that selects other
+    behaviour is not a default: `GainRuntime.Variable` stays nullable, as null makes
+    `ProxyDataDirectory.Resolve` read the real environment and ignore case.
 15. A domain decision with several reasons for "none" is a union, even when the empty case
     carries no reason (`CcrPreviewResult(CcrPreview, NoCcrPreview)`).
 

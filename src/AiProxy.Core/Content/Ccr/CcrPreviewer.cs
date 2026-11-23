@@ -31,7 +31,7 @@ public sealed class CcrPreviewer(IOriginalStore store, Func<CcrPreviewBuilder> b
         }
 
         var result = builders().Build(original, options, reducedTokens);
-        if (result.Value is CcrPreview preview && mode == CcrMode.Thread)
+        if (result is CcrPreview preview && mode == CcrMode.Thread)
         {
             await KeepAsync(preview.Id, original, mode, cancellationToken).ConfigureAwait(false);
         }
