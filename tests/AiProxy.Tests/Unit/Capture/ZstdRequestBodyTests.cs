@@ -60,6 +60,12 @@ public sealed class ZstdRequestBodyTests
     public void Only_a_lone_zstd_encoding_is_decoded(string? encoding, bool expected) => Assert.Equal(expected, ZstdRequestBody.IsZstd(encoding));
 
     [Fact]
+    public void An_empty_frame_decodes_to_no_bytes() => Assert.Empty(ZstdRequestBody.Decode(ZstdFrames.OneShot([])));
+
+    [Fact]
+    public void An_empty_body_decodes_to_no_bytes() => Assert.Empty(ZstdRequestBody.Decode([]));
+
+    [Fact]
     public void A_frame_that_declares_its_size_costs_the_decoded_size_once()
     {
         var original = Text(512 * 1024);

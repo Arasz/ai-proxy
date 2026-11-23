@@ -18,12 +18,18 @@ internal static class ZstdRequestBody
     /// <summary>Returns the decoded bytes; throws <see cref="InvalidDataException" /> on a body that does not decode, is cut short or is too large.</summary>
     public static byte[] Decode(byte[] body)
     {
+        if (body.Length == 0)
+        {
+            return [];
+        }
+
         if (!ZstandardDecoder.TryGetMaxDecompressedLength(body, out var bound))
         {
             throw new InvalidDataException("The zstd body does not decode.");
         }
 
-        var limit = (int)Math.Min(bound, MaxDecodedBytes);
+        // An empty frame reports a bound of 0, and the decoder needs room for at least one byte to finish it.
+        var limit = (int)Math.Clamp(bound, 1, MaxDecodedBytes);
         var scratch = ArrayPool<byte>.Shared.Rent(limit);
         try
         {
@@ -66,8 +72,8 @@ internal static class ZstdRequestBody
                 case OperationStatus.Done when consumed > 0:
                     decoder.Reset();
                     continue;
-                case OperationStatus.DestinationTooSmall:
-                    throw new InvalidDataException($"The zstd body decodes to more than {destination.Length} bytes.");
+                case OperationStatus.DestinationTooSmall when destination.Length == MaxDecodedBytes:
+                    throw new InvalidDataException($"The zstd body decodes to more than {MaxDecodedBytes} bytes.");
                 default:
                     throw new InvalidDataException("The zstd body does not decode.");
             }
