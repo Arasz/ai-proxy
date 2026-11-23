@@ -19,6 +19,8 @@ public sealed class GainWatch(GainRuntime runtime)
         await runtime.Console.Live(new Panel(view.Render(initial, settings)).Header("gain (Ctrl+C exits)").Expand())
             .AutoClear(true).StartAsync(async display =>
             {
+                // The live display draws nothing until the first refresh; later polls redraw only on change.
+                display.Refresh();
                 while (true)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2), runtime.Time, cancellationToken).ConfigureAwait(false);
