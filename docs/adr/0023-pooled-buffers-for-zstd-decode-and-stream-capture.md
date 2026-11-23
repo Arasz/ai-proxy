@@ -36,42 +36,44 @@ request-body copies. Two measured costs stay
    in `finally`. The decoder is reset between frames: without `Reset` it reports `Done` again and
    consumes nothing. A frame whose window passes the limit makes the decoder throw `IOException`,
    which becomes `InvalidDataException`. ZstdSharp leaves `src/` and stays a test-only package.
-2. `ResponseBuffer` rents its two 64 KB arrays (head and tail) from an `ArrayPool<byte>`. The
-   64-byte line head stays a plain array.
-3. The guard: `Append`, `Body` and `Release` take one lock per buffer. `Release` returns the
-   arrays once and drops the strategy, so a second `Release` and any later `Append` do nothing.
-   The head-and-tail `Body` always builds a new array, so a pooled array never leaves the
-   buffer. Code reads only `HeadBytes`/`TailBytes` of each rented array, because a pool may lend
-   a longer one. The pool overload of `For` is internal, for tests.
+2. `ResponseBuffer` keeps every byte in rented arrays. An event stream rents its 64 KB head and
+   tail. A whole body (up to 4 MiB) starts at 16 KB and grows by renting an array twice the size
+   and giving the old one back. The 64-byte line head stays a plain array.
+3. `ResponseBuffer.Body` is replaced by `Read<T>(Func<ReadOnlyMemory<byte>, T> reader)`. The
+   reader gets the kept bytes for the length of the call and must not keep them. A whole body is
+   lent in place. An event stream is stitched straight into one rented array (no scratch tail)
+   that goes back to the pool when the reader returns, also when it throws.
+   The guard: `Append`, `Read` and `Release` take one lock per buffer. `Release` returns the
+   arrays once and drops the strategy, so a second `Release` and any later `Append` do nothing,
+   and `Read` after `Release` lends empty memory. The pool overload of `For` is internal, for
+   tests.
+   Every use of a rented array goes through a window of the size the code asked for
+   (`AsSpan(0, n)`, `AsMemory(0, n)`), never through the array itself, because a pool may lend a
+   longer array (`Shared.Rent(100_000)` gives 131,072 bytes).
 4. Returned arrays are not cleared. They hold prompt and response bytes, but only this process
    can rent them, and clearing would cost a write of every byte.
 
 ## Measured
 
-BenchmarkDotNet 0.15.8, in-process (it does not yet know .NET 11 as a runtime), Apple M-series,
-one stream of 256 KB of SSE appended in chunks, then `Body` and `Release`. The four variants
-were generated from this `ResponseBuffer.cs`, with the lock and the pool switched on and off.
+BenchmarkDotNet 0.15.8, in-process (it does not yet know .NET 11 as a runtime), Apple M-series.
+One response appended in 4 KB chunks, read, and released; `Before` is `ResponseBuffer.cs` from
+main, `After` is this change.
 
-| Variant | 256 B chunks | 4 KB chunks | Allocated |
-|---|---|---|---|
-| allocated, no lock (as before) | 133.8 us | 126.4 us | 320.5 KB |
-| allocated, lock | 147.0 us (SD 11.9) | 108.1 us (SD 7.6) | 320.5 KB |
-| pooled, no lock | 125.8 us | 106.0 us | 192.5 KB |
-| pooled, lock (this change) | 126.8 us | 109.3 us | 192.5 KB |
+| Body | | Mean | Allocated | Gen2 per 1,000 |
+|---|---|---|---|---|
+| whole JSON, 1 MB | before | 206.7 us | 4,191,931 B | 235 |
+| whole JSON, 1 MB | after | 67.6 us | 128 B | 0 |
+| event stream, 256 KB | before | 148.4 us | 524,824 B | 83 |
+| event stream, 256 KB | after | 120.7 us | 280 B | 0 |
 
-Eight streams in parallel, 1 KB chunks: 51.9 us before, 49.8 us after, per stream (ratio 0.97,
-RatioSD 0.12).
-
-- The lock costs about 1 us per 1,024 appends between the two pooled variants, inside the
-  noise. The allocated pair is too noisy to give a figure.
-- Pooling saves 128 KB per stream. Gen2 collections stay at about 40 per 1,000 streams in every
-  variant: `Body` still allocates a 64 KB scratch tail and a stitched result of up to 128 KB,
-  which goes to the large object heap. That is the next cost to remove.
+The lock was measured on its own first, with four variants generated from this file (pool on or
+off, lock on or off), on 1,024 appends of 256 B: about 1 us between the pooled variants, inside
+the noise.
 
 ## Consequences
 
 - A zstd body costs its decoded size once, for both frame kinds.
-- A captured event stream costs no 64 KB arrays once the pool is warm.
+- A captured response costs no arrays once the pool is warm, and causes no gen2 collections.
 - The lock costs one uncontended enter per appended chunk.
 - A buffer that is never released (an exchange that dies before `AfterResponse`) does not return
   its arrays; the pool rents new ones and the GC collects the lost ones, the same as today.
