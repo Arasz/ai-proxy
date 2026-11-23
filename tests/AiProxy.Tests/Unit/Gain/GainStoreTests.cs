@@ -607,6 +607,23 @@ public sealed class GainStoreTests
         }
     }
 
+    [Fact]
+    public async Task The_summary_takes_recall_cost_from_recall_rows_only()
+    {
+        using var directory = new TemporaryDirectory();
+        var at = DateTimeOffset.Parse("2026-11-02T12:00Z");
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(at));
+        var request = Entry("request", "2026-11-02T10:00Z", "/a", "log", 289, 100);
+        await store.RecordAsync(request with { Totals = request.Totals with { Recalls = 5, RetrievedCharacters = 50, EstimatedRetrievedTokens = 17 } },
+            [], TestContext.Current.CancellationToken);
+        await store.RecallAsync(new GainRecall(at, "preview", "/a", "caller", "whole", 289, 100, null),
+            "anthropic", "POST", "log", "tool_result", "content", TestContext.Current.CancellationToken);
+
+        var summary = (await store.QueryAsync(new GainQuery(), TestContext.Current.CancellationToken)).Summary;
+
+        Assert.Equal((1L, 289L, 100L), (summary.Recalls, summary.RetrievedCharacters, summary.EstimatedRetrievedTokens));
+    }
+
     private static GainHistoryEntry Entry(string id, string at, string project, string rule, long original, long forwarded) =>
         new(id, DateTimeOffset.Parse(at), project, "anthropic", "POST", rule, "tool_result", "content",
             GainReportBuilder.RequestTotals(original, forwarded, original, forwarded));
