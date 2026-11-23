@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2026-11-23T01:21:33.571783+00:00",
+  "lastUpdated": "2026-11-23",
   "next": "Nullable work: only GainRuntime.Variable is open (null selects case-insensitive env lookup in ProxyDataDirectory.Resolve; a union or second overload would fix it). Otherwise pick from backlog.",
   "completedTasks": [
+    {
+      "id": "aip-trace-live-allocations-cut-gc",
+      "pr": 176,
+      "merged": "8ab3893",
+      "summary": "0.35.5: live trace showed GET /gain (polled every 2 s by gain --watch) was ~99% of proxy CPU and ~78% of allocations; report reads each ledger value once into columns, last report cached by query + (MAX(sequence), COUNT(*), user_version), GainReportBuilder sums with one accumulator, watch redraws only on change (ADR 0024). NuGet publish not run."
+    },
     {
       "id": "aip-zstd-sizing-capture-buffer-pooling",
       "pr": 174,
