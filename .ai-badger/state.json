@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2026-11-22T19:35:03.272605+00:00",
-  "next": "Nullable wave 2 (ADR 0022): Valid/Invalid union for *Settings.Error + schema Violation; success/failure unions for CcrRetrieval and CompressionResult; Decompose overload after ContentRegion file union",
+  "lastUpdated": "2026-11-23T00:03:39.350355+00:00",
+  "next": "Nullable wave 3 (docs/work/2026-11-22-nullable-inventory.md): body-rewrite NotApplicable unions, store lookups, test-seam constructors, FileRead union, CcrPreviewer/SourceCodeCompressionHandler.View",
   "completedTasks": [
+    {
+      "id": "aip-nullable-wave-two-result-unions",
+      "pr": 172,
+      "merged": "71b1b8e",
+      "summary": "0.35.2: Validation union (schema, gain API), CLI Settings.Check guards, CcrAnswer(CcrFound|CcrFailed) with static CcrRetrieval, CompressionResult StoreFailure/Summary init props; ContentRegion path stays nullable (ADR 0022 rule 9)"
+    },
     {
       "id": "aip-minimize-nullable-core-union-types",
       "pr": 170,
