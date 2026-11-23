@@ -5,6 +5,7 @@ using AiProxy.Core.Providers;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>What the capture keeps of a response body as it passes: all of it up to a cap, or a stream's head and tail.</summary>
+[Collection(SharedArrayPoolCollection.Name)]
 public sealed class ResponseBufferTests
 {
     private const string EventStream = "text/event-stream";
@@ -23,7 +24,7 @@ public sealed class ResponseBufferTests
 
         Assert.False(buffer.OverCap);
         Assert.Equal(body.Length, buffer.Length);
-        Assert.True(buffer.Body.Span.SequenceEqual(body));
+        Assert.True(buffer.Read(kept => kept.Span.SequenceEqual(body)));
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public sealed class ResponseBufferTests
         Append(buffer, body, 7919);
 
         Assert.False(buffer.OverCap);
-        Assert.True(buffer.Body.Span.SequenceEqual(body));
+        Assert.True(buffer.Read(kept => kept.Span.SequenceEqual(body)));
     }
 
     [Fact]
@@ -49,7 +50,7 @@ public sealed class ResponseBufferTests
 
         Assert.True(buffer.OverCap);
         Assert.Equal(FourMiB + 11, buffer.Length);
-        Assert.True(buffer.Body.IsEmpty);
+        Assert.True(buffer.Read(static kept => kept.IsEmpty));
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public sealed class ResponseBufferTests
 
         Append(buffer, stream, 333);
 
-        Assert.True(buffer.Body.Span.SequenceEqual(stream));
+        Assert.True(buffer.Read(kept => kept.Span.SequenceEqual(stream)));
     }
 
     [Fact]
@@ -86,8 +87,8 @@ public sealed class ResponseBufferTests
 
         Assert.False(buffer.OverCap);
         Assert.Equal(stream.Length, buffer.Length);
-        Assert.True(buffer.Body.Length <= ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes + 1);
-        var reading = ResponseUsageReader.Read(buffer.Body, EventStream, null);
+        Assert.True(buffer.Read(static kept => kept.Length) <= ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes + 1);
+        var reading = buffer.Read(body => ResponseUsageReader.Read(body, EventStream, null));
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
     }
@@ -113,7 +114,7 @@ public sealed class ResponseBufferTests
 
         Append(buffer, stream, 4096);
 
-        var reading = ResponseUsageReader.Read(buffer.Body, EventStream, null);
+        var reading = buffer.Read(body => ResponseUsageReader.Read(body, EventStream, null));
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(100, 57, 200, 301), reading.Usage);
     }
@@ -132,8 +133,8 @@ public sealed class ResponseBufferTests
 
         Append(buffer, stream, 4093);
 
-        Assert.True(buffer.Body.Length <= ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes + 64, $"kept {buffer.Body.Length} bytes");
-        var reading = ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.OpenAi);
+        Assert.True(buffer.Read(static kept => kept.Length) <= ResponseBuffer.HeadBytes + ResponseBuffer.TailBytes + 64, $"kept {buffer.Read(static kept => kept.Length)} bytes");
+        var reading = buffer.Read(body => ResponseUsageReader.Read(body, EventStream, null, Dialect.OpenAi));
         Assert.Null(reading.Error);
         Assert.Equal(new ResponseUsage(200, 50, null, 800), reading.Usage);
     }
@@ -146,7 +147,7 @@ public sealed class ResponseBufferTests
 
         Append(buffer, stream, 4093);
 
-        Assert.Equal(new UsageReading(null, ResponseUsageReader.NoUsage), ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.OpenAi));
+        Assert.Equal(new UsageReading(null, ResponseUsageReader.NoUsage), buffer.Read(body => ResponseUsageReader.Read(body, EventStream, null, Dialect.OpenAi)));
     }
 
     [Fact]
@@ -157,7 +158,7 @@ public sealed class ResponseBufferTests
 
         Append(buffer, stream, 4093);
 
-        Assert.Equal(ResponseUsageReader.NoUsage, ResponseUsageReader.Read(buffer.Body, EventStream, null, Dialect.Anthropic).Error);
+        Assert.Equal(ResponseUsageReader.NoUsage, buffer.Read(body => ResponseUsageReader.Read(body, EventStream, null, Dialect.Anthropic)).Error);
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public sealed class ResponseBufferTests
 
         buffer.Release();
 
-        Assert.True(buffer.Body.IsEmpty);
+        Assert.True(buffer.Read(static kept => kept.IsEmpty));
     }
 
     private static void Append(ResponseBuffer buffer, byte[] bytes, int chunk)

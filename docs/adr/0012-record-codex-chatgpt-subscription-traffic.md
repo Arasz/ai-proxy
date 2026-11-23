@@ -62,3 +62,5 @@ requests is out of scope and needs its own decision.
   behaviour, and Codex run outside the harness would still send zstd.
 - A custom Codex model provider: loses the built-in provider's OpenAI-specific behaviour.
 - Document the gap only: subscription usage stays invisible.
+
+Amended 2026-11-23 ([ADR 0023](0023-pooled-buffers-for-zstd-decode-and-stream-capture.md)): decision 4 now uses the .NET 11 `ZstandardDecoder` into one pooled buffer, not a managed package; ZstdSharp is no longer a dependency. Shipped in 0.35.4.
