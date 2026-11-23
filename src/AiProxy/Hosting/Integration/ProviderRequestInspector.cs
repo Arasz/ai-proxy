@@ -237,7 +237,7 @@ public sealed partial class ProviderRequestInspector(
             var stage = time.GetTimestamp();
             var reading = kept.OverCap
                 ? new UsageReading(null, ResponseUsageReader.OverCap)
-                : ResponseUsageReader.Read(kept.Body, response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value, exchange.Dialect);
+                : ReadUsage(kept, response.ContentType, response.Headers.GetFirstHeader(ContentEncodingHeader)?.Value, exchange.Dialect);
             exchange.Stages.Add(Stages.UsageRead, time.GetElapsedTime(stage));
             AddTitaniumTimings(exchange.Stages, e);
 
@@ -267,6 +267,10 @@ public sealed partial class ProviderRequestInspector(
             exchange.Response = null;
         }
     }
+
+    /// <summary>Reads the usage from the kept bytes while the buffer lends them.</summary>
+    private static UsageReading ReadUsage(ResponseBuffer kept, string? contentType, string? contentEncoding, Dialect dialect) =>
+        kept.Read(body => ResponseUsageReader.Read(body, contentType, contentEncoding, dialect));
 
     /// <summary>Titanium's own measurements of the exchange, prefixed <c>titanium.</c>.</summary>
     private static void AddTitaniumTimings(StageTimings stages, SessionEventArgs e)
