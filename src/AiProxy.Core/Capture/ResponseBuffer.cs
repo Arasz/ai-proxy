@@ -28,6 +28,7 @@ public sealed class ResponseBuffer
     public const string IdentityEncoding = "identity";
 
     private readonly Lock _gate = new();
+    private bool _reading;
     private IStrategy? _strategy;
 
     private ResponseBuffer()
@@ -42,13 +43,27 @@ public sealed class ResponseBuffer
 
     /// <summary>
     ///     Runs <paramref name="reader" /> over the kept bytes, empty when <see cref="OverCap" /> or released. The memory is
-    ///     lent from a pool for the length of the call: the reader must not keep it, or any slice of it.
+    ///     lent from a pool for the length of the call: the reader must not keep it, or any slice of it, and must not
+    ///     call <see cref="Append" /> or <see cref="Release" />.
     /// </summary>
     public T Read<T>(Func<ReadOnlyMemory<byte>, T> reader)
     {
         lock (_gate)
         {
-            return _strategy is null ? reader(ReadOnlyMemory<byte>.Empty) : _strategy.Read(reader);
+            if (_strategy is null)
+            {
+                return reader(ReadOnlyMemory<byte>.Empty);
+            }
+
+            _reading = true;
+            try
+            {
+                return _strategy.Read(reader);
+            }
+            finally
+            {
+                _reading = false;
+            }
         }
     }
 
@@ -75,6 +90,7 @@ public sealed class ResponseBuffer
     {
         lock (_gate)
         {
+            ThrowIfReading();
             Length += bytes.Length;
             if (_strategy is null || _strategy.Append(bytes))
             {
@@ -91,7 +107,17 @@ public sealed class ResponseBuffer
     {
         lock (_gate)
         {
+            ThrowIfReading();
             Drop();
+        }
+    }
+
+    /// <summary>The lock lets the reader's own thread back in, so a change from inside a reader is refused here.</summary>
+    private void ThrowIfReading()
+    {
+        if (_reading)
+        {
+            throw new InvalidOperationException("A response buffer cannot change while a reader holds its bytes.");
         }
     }
 

@@ -28,8 +28,7 @@ internal static class ZstdRequestBody
             throw new InvalidDataException("The zstd body does not decode.");
         }
 
-        // An empty frame reports a bound of 0, and the decoder needs room for at least one byte to finish it.
-        var limit = (int)Math.Clamp(bound, 1, MaxDecodedBytes);
+        var limit = (int)Math.Min(bound, MaxDecodedBytes);
         var scratch = ArrayPool<byte>.Shared.Rent(limit);
         try
         {
@@ -43,24 +42,25 @@ internal static class ZstdRequestBody
     }
 
     /// <summary>Decodes every frame of the body into the destination and returns how many bytes it wrote.</summary>
-    /// <remarks>The decoder stops after each frame and must be reset before the next one.</remarks>
+    /// <remarks>
+    ///     The decoder stops after each frame and must be reset before the next one. It will not finish even an empty
+    ///     frame into an empty span, so once the destination is full it decodes into a one-byte probe; a byte there means
+    ///     the body is larger than the destination.
+    /// </remarks>
     private static int Decompress(ReadOnlySpan<byte> source, Span<byte> destination)
     {
         using var decoder = new ZstandardDecoder(MaxWindowLog);
+        Span<byte> probe = stackalloc byte[1];
         var written = 0;
         while (true)
         {
-            OperationStatus status;
-            int consumed;
-            int count;
-            try
+            var full = written == destination.Length;
+            var (status, consumed, count) = Step(decoder, source, full ? probe : destination[written..]);
+            if (full && count > 0)
             {
-                status = decoder.Decompress(source, destination[written..], out consumed, out count);
-            }
-            catch (IOException exception)
-            {
-                // The decoder throws, rather than reporting InvalidData, when a frame needs a window above MaxWindowLog.
-                throw new InvalidDataException("The zstd body does not decode.", exception);
+                throw destination.Length == MaxDecodedBytes
+                    ? new InvalidDataException($"The zstd body decodes to more than {MaxDecodedBytes} bytes.")
+                    : new InvalidDataException("The zstd body does not decode.");
             }
 
             source = source[consumed..];
@@ -71,12 +71,26 @@ internal static class ZstdRequestBody
                     return written;
                 case OperationStatus.Done when consumed > 0:
                     decoder.Reset();
-                    continue;
-                case OperationStatus.DestinationTooSmall when destination.Length == MaxDecodedBytes:
-                    throw new InvalidDataException($"The zstd body decodes to more than {MaxDecodedBytes} bytes.");
+                    break;
+                case OperationStatus.DestinationTooSmall when consumed > 0 || count > 0:
+                    break;
                 default:
                     throw new InvalidDataException("The zstd body does not decode.");
             }
+        }
+    }
+
+    /// <summary>One decoder call; the decoder throws, rather than reporting InvalidData, when a frame needs a window above MaxWindowLog.</summary>
+    private static (OperationStatus Status, int Consumed, int Written) Step(ZstandardDecoder decoder, ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        try
+        {
+            var status = decoder.Decompress(source, destination, out var consumed, out var written);
+            return (status, consumed, written);
+        }
+        catch (IOException exception)
+        {
+            throw new InvalidDataException("The zstd body does not decode.", exception);
         }
     }
 }

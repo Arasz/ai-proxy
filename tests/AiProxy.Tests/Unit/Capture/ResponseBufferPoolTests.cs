@@ -7,6 +7,7 @@ using AiProxy.Core.Capture;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>An event-stream buffer rents its head and tail, gives them back once, and never writes to them after that.</summary>
+[Collection(SharedArrayPoolCollection.Name)]
 public sealed class ResponseBufferPoolTests
 {
     private const string EventStream = "text/event-stream";
@@ -78,6 +79,34 @@ public sealed class ResponseBufferPoolTests
         Assert.Equal(Encoding.UTF8.GetString(sent), text);
         Assert.Contains(lent!, pool.Rented);
         Assert.Single(pool.Returned, returned => ReferenceEquals(returned, lent));
+    }
+
+    [Theory]
+    [InlineData(EventStream, "release")]
+    [InlineData(EventStream, "append")]
+    [InlineData(Json, "release")]
+    [InlineData(Json, "append")]
+    public void A_reader_cannot_release_or_append_while_it_holds_the_bytes(string contentType, string change)
+    {
+        var pool = new RecordingPool();
+        var buffer = ResponseBuffer.For(contentType, ResponseBuffer.IdentityEncoding, pool);
+        buffer.Append(Stream(10));
+
+        Assert.Throws<InvalidOperationException>(() => buffer.Read<int>(kept =>
+        {
+            if (change == "release")
+            {
+                buffer.Release();
+            }
+            else
+            {
+                buffer.Append(Stream(50_000));
+            }
+
+            return kept.Length;
+        }));
+
+        Assert.Equal(Stream(10), buffer.Read(static kept => kept.ToArray()));
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using AiProxy.Core.Providers;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>What the capture keeps of a response body as it passes: all of it up to a cap, or a stream's head and tail.</summary>
+[Collection(SharedArrayPoolCollection.Name)]
 public sealed class ResponseBufferTests
 {
     private const string EventStream = "text/event-stream";

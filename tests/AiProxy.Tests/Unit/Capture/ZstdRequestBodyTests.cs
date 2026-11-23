@@ -5,6 +5,7 @@ using AiProxy.Hosting.Integration;
 namespace AiProxy.Tests.Unit.Capture;
 
 /// <summary>Decoding a zstd request body for capture and measurement.</summary>
+[Collection(SharedArrayPoolCollection.Name)]
 public sealed class ZstdRequestBodyTests
 {
     // Written out, not read from the decoder, so a changed limit fails here.
@@ -61,6 +62,14 @@ public sealed class ZstdRequestBodyTests
 
     [Fact]
     public void An_empty_frame_decodes_to_no_bytes() => Assert.Empty(ZstdRequestBody.Decode(ZstdFrames.OneShot([])));
+
+    [Fact]
+    public void An_empty_frame_after_a_frame_that_fills_the_bound_is_decoded() =>
+        Assert.Equal("{}"u8.ToArray(), ZstdRequestBody.Decode([.. ZstdFrames.OneShot("{}"u8.ToArray()), .. ZstdFrames.OneShot([])]));
+
+    [Fact]
+    public void An_empty_frame_after_a_frame_of_exactly_the_limit_is_decoded() =>
+        Assert.Equal(SixteenMiB, ZstdRequestBody.Decode([.. ZstdFrames.OneShot(new byte[SixteenMiB]), .. ZstdFrames.OneShot([])]).Length);
 
     [Fact]
     public void An_empty_body_decodes_to_no_bytes() => Assert.Empty(ZstdRequestBody.Decode([]));

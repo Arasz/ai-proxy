@@ -35,7 +35,9 @@ request-body copies. Two measured costs stay
    frame into it, and copies the exact result out once. The scratch buffer goes back to the pool
    in `finally`. The decoder is reset between frames: without `Reset` it reports `Done` again and
    consumes nothing. A frame whose window passes the limit makes the decoder throw `IOException`,
-   which becomes `InvalidDataException`. ZstdSharp leaves `src/` and stays a test-only package.
+   which becomes `InvalidDataException`. The decoder will not finish even an empty frame into an empty
+   span, so once the buffer is full it decodes into a one-byte probe; a byte there refuses the body.
+   ZstdSharp is removed from the product and the tests; tests build bodies with the .NET encoder.
 2. `ResponseBuffer` keeps every byte in rented arrays. An event stream rents its 64 KB head and
    tail. A whole body (up to 4 MiB) starts at 16 KB and grows by renting an array twice the size
    and giving the old one back. The 64-byte line head stays a plain array.
@@ -45,7 +47,8 @@ request-body copies. Two measured costs stay
    that goes back to the pool when the reader returns, also when it throws.
    The guard: `Append`, `Read` and `Release` take one lock per buffer. `Release` returns the
    arrays once and drops the strategy, so a second `Release` and any later `Append` do nothing,
-   and `Read` after `Release` lends empty memory. The pool overload of `For` is internal, for
+   and `Read` after `Release` lends empty memory. `Lock` lets the reader's own thread back in, so
+   `Append` and `Release` throw `InvalidOperationException` while a reader holds the bytes. The pool overload of `For` is internal, for
    tests.
    Every use of a rented array goes through a window of the size the code asked for
    (`AsSpan(0, n)`, `AsMemory(0, n)`), never through the array itself, because a pool may lend a
@@ -73,7 +76,9 @@ the noise.
 ## Consequences
 
 - A zstd body costs its decoded size once, for both frame kinds.
-- A captured response costs no arrays once the pool is warm, and causes no gen2 collections.
+- A captured response allocates no payload buffers when the pool can lend them; only the 64-byte
+  line head and the buffer object remain. The benchmark measured no gen2 collections; that is a
+  measurement, not a guarantee.
 - The lock costs one uncontended enter per appended chunk.
 - A buffer that is never released (an exchange that dies before `AfterResponse`) does not return
   its arrays; the pool rents new ones and the GC collects the lost ones, the same as today.
