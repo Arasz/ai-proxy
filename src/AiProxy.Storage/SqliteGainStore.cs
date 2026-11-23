@@ -25,6 +25,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private readonly SemaphoreSlim _writer = new(1, 1);
     private bool _initialized;
+    private CachedReport? _cached;
 
     public async ValueTask RecordAsync(GainHistoryEntry entry, IReadOnlyList<GainFailure> failures, CancellationToken cancellationToken) =>
         await WriteAsync(async connection =>
@@ -59,12 +60,27 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         await EnsureAsync(cancellationToken);
         await using var connection = Open();
         connection.CreateCollation("ordinal", string.CompareOrdinal);
+        await using var transaction = connection.BeginTransaction(deferred: true);
+        var version = await connection.QuerySingleAsync<LedgerVersion>(new CommandDefinition(
+            Sql.Version, transaction: transaction, cancellationToken: cancellationToken));
+        if (Volatile.Read(ref _cached) is { } cached && cached.Query == query && cached.Version == version)
+        {
+            return cached.Report with { GeneratedAt = time.GetUtcNow() };
+        }
+
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
-            Sql.Report, query.ToSqlParameters(), cancellationToken: cancellationToken))).ToArray();
+            Sql.Report, query.ToSqlParameters(), transaction, cancellationToken: cancellationToken))).ToArray();
+        var report = Report(query, rows);
+        Volatile.Write(ref _cached, new CachedReport(query, version, report));
+        return report;
+    }
+
+    private GainReport Report(GainQuery query, AggregateRow[] rows)
+    {
         var history = Details<GainHistoryEntry>(rows, Views.History);
         var failures = Details<GainFailure>(rows, Views.Failure);
         var recalls = Details<GainRecall>(rows, Views.Recall);
-        var other = JsonSerializer.Deserialize<GainOtherTraffic>(rows.Single(static row => row.View == Views.Other).Totals)
+        var other = JsonSerializer.Deserialize<GainOtherTraffic>(rows.Single(static row => row.View == Views.Other).Payload)
                     ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainOtherTraffic)}");
 
         var attributions = Attributions.SelectMany(dimension => GainReportBuilder.Attribute(dimension,
@@ -119,7 +135,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
     private static T[] Details<T>(AggregateRow[] rows, string view) where T : class =>
     [
         .. rows.Where(row => row.View == view).OrderBy(static row => row.Start)
-            .Select(static row => JsonSerializer.Deserialize<T>(row.Totals)).OfType<T>()
+            .Select(static row => JsonSerializer.Deserialize<T>(row.Payload)).OfType<T>()
     ];
 
     private static async Task InsertAsync(SqliteConnection connection, GainEventInput gainEvent,
@@ -196,10 +212,41 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
 
     private static void CreateResetAuditTable(SqliteConnection connection) => connection.Execute(Sql.ResetAuditSchema);
 
-    private sealed record AggregateRow(string View, long Start, string? Name, string Host, string Totals)
+    /// <summary>One row of the report statement: an aggregate's sums, or a detail row's payload text.</summary>
+    private sealed record AggregateRow
     {
-        public GainTotals ConvertToTotals() => JsonSerializer.Deserialize<GainTotals>(Totals) ?? throw new InvalidDataException($"Failed to deserialize {nameof(GainTotals)}");
+        public string View { get; init; } = "";
+        public long Start { get; init; }
+        public string? Name { get; init; }
+        public string Host { get; init; } = "";
+        public string Payload { get; init; } = "";
+        public long Requests { get; init; }
+        public long OriginalCharacters { get; init; }
+        public long ForwardedCharacters { get; init; }
+        public long OriginalBytes { get; init; }
+        public long ForwardedBytes { get; init; }
+        public long EstimatedOriginalTokens { get; init; }
+        public long EstimatedForwardedTokens { get; init; }
+        public long EstimatedSavedTokens { get; init; }
+        public long Recalls { get; init; }
+        public long RetrievedCharacters { get; init; }
+        public long EstimatedRetrievedTokens { get; init; }
+        public long EstimatedToolTokens { get; init; }
+        public long FollowUps { get; init; }
+        public long FollowUpBytes { get; init; }
+        public long EstimatedFollowUpTokens { get; init; }
+        public long FollowUpMeasuredRequests { get; init; }
+
+        public GainTotals ConvertToTotals() => new(Requests, OriginalCharacters, ForwardedCharacters, OriginalBytes, ForwardedBytes,
+            EstimatedOriginalTokens, EstimatedForwardedTokens, EstimatedSavedTokens, Recalls, RetrievedCharacters, EstimatedRetrievedTokens,
+            EstimatedToolTokens, FollowUps, FollowUpBytes, EstimatedFollowUpTokens, FollowUpMeasuredRequests);
     }
+
+    /// <summary>The ledger's state: an insert raises <paramref name="Last"/>, a delete lowers <paramref name="Rows"/>.</summary>
+    private sealed record LedgerVersion(long Last, long Rows);
+
+    /// <summary>The last report the store built, for the query and ledger version it was built from.</summary>
+    private sealed record CachedReport(GainQuery Query, LedgerVersion Version, GainReport Report);
 
     internal sealed record GainEventInput(
         string Kind,
@@ -252,72 +299,72 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                                      DELETE FROM gain_event WHERE sequence <= @Snapshot AND at <= @Cutoff AND {Predicate}
                                                      """;
 
-        /// <summary>The whole report in one statement: the aggregate rows, then the newest payloads of three kinds (position in <c>Start</c>), then the other-traffic count.</summary>
-        public const string Report = $"""
-                                      {Aggregate}
-                                      UNION ALL SELECT '{Views.History}',Position,'','',payload FROM (
-                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,id COLLATE ordinal,sequence) AS Position FROM (
-                                              SELECT payload,at,id,sequence FROM gain_event WHERE kind = '{Kinds.Request}' AND {Predicate} ORDER BY at DESC,id COLLATE ordinal,sequence LIMIT @HistoryLimit))
-                                      UNION ALL SELECT '{Views.Failure}',Position,'','',payload FROM (
-                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
-                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Failure}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
-                                      UNION ALL SELECT '{Views.Recall}',Position,'','',payload FROM (
-                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
-                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Recall}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
-                                      UNION ALL SELECT '{Views.Other}',0,'','',json_object('Requests',COUNT(*),'Bytes',COALESCE(SUM(json_extract(payload,'$.Bytes')),0))
-                                          FROM gain_event WHERE kind = '{Kinds.Other}' AND {Predicate}
-                                      """;
-
         public const string Predicate = """
                                         (@Project IS NULL OR project = @Project) AND (@From IS NULL OR at >= @From) AND (@To IS NULL OR at < @To)
                                         AND (@Provider IS NULL OR provider = @Provider) AND (@Method IS NULL OR method = @Method)
                                         AND (@Rule IS NULL OR rule = @Rule OR (instr(@Rule, ',') = 0 AND instr(',' || rule || ',', ',' || @Rule || ',') > 0)) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
                                         """;
 
-        private const string SumJson = """
-                                       json_object(
-                                           'Requests',COALESCE(SUM(json_extract(totals,'$.Requests')),0),
-                                           'OriginalCharacters',COALESCE(SUM(json_extract(totals,'$.OriginalCharacters')),0),
-                                           'ForwardedCharacters',COALESCE(SUM(json_extract(totals,'$.ForwardedCharacters')),0),
-                                           'OriginalBytes',COALESCE(SUM(json_extract(totals,'$.OriginalBytes')),0),
-                                           'ForwardedBytes',COALESCE(SUM(json_extract(totals,'$.ForwardedBytes')),0),
-                                           'EstimatedOriginalTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedOriginalTokens')),0),
-                                           'EstimatedForwardedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedForwardedTokens')),0),
-                                           'EstimatedSavedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedSavedTokens')),0),
-                                           'Recalls',COALESCE(SUM(json_extract(totals,'$.Recalls')),0),
-                                           'RetrievedCharacters',COALESCE(SUM(json_extract(totals,'$.RetrievedCharacters')),0),
-                                           'EstimatedRetrievedTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedRetrievedTokens')),0),
-                                           'EstimatedToolTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedToolTokens')),0),
-                                           'FollowUps',COALESCE(SUM(json_extract(totals,'$.FollowUps')),0),
-                                           'FollowUpBytes',COALESCE(SUM(json_extract(totals,'$.FollowUpBytes')),0),
-                                           'EstimatedFollowUpTokens',COALESCE(SUM(json_extract(totals,'$.EstimatedFollowUpTokens')),0),
-                                           'FollowUpMeasuredRequests',COALESCE(SUM(json_extract(totals,'$.FollowUpMeasuredRequests')),0))
-                                       """;
+        public const string Version = "SELECT COALESCE(MAX(sequence),0) AS Last,COUNT(*) AS Rows FROM gain_event";
 
-        private const string MetricsSelect = $"""
-                                              SELECT kind,at,provider,method,rule,layer,pipeline,
-                                                  COALESCE(json_extract(payload,'$.Host'),'') AS host,
-                                                  CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals')
-                                                      WHEN 'followup' THEN json_object('FollowUps',1,'FollowUpBytes',json_extract(payload,'$.Bytes'),
-                                                          'EstimatedFollowUpTokens',json_extract(payload,'$.EstimatedTokens'))
-                                                      ELSE json_object('Recalls',1,'RetrievedCharacters',json_extract(payload,'$.Characters'),
-                                                          'EstimatedRetrievedTokens',json_extract(payload,'$.EstimatedTokens')) END AS totals
-                                              FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate}
-                                              """;
+        /// <summary>The totals fields, with what a follow-up and a recall row hold in each; a request row reads them from its <c>Totals</c>.</summary>
+        private static readonly (string Name, string FollowUp, string Recall)[] Fields =
+        [
+            ("Requests", "NULL", "NULL"), ("OriginalCharacters", "NULL", "NULL"), ("ForwardedCharacters", "NULL", "NULL"),
+            ("OriginalBytes", "NULL", "NULL"), ("ForwardedBytes", "NULL", "NULL"), ("EstimatedOriginalTokens", "NULL", "NULL"),
+            ("EstimatedForwardedTokens", "NULL", "NULL"), ("EstimatedSavedTokens", "NULL", "NULL"),
+            ("Recalls", "NULL", "1"), ("RetrievedCharacters", "NULL", "json_extract(payload,'$.Characters')"),
+            ("EstimatedRetrievedTokens", "NULL", "json_extract(payload,'$.EstimatedTokens')"), ("EstimatedToolTokens", "NULL", "NULL"),
+            ("FollowUps", "1", "NULL"), ("FollowUpBytes", "json_extract(payload,'$.Bytes')", "NULL"),
+            ("EstimatedFollowUpTokens", "json_extract(payload,'$.EstimatedTokens')", "NULL"), ("FollowUpMeasuredRequests", "NULL", "NULL")
+        ];
 
-        public const string Aggregate = $"""
-                                         WITH metrics AS MATERIALIZED ({MetricsSelect})
-                                         SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,json_set({SumJson}    ,'$.Recalls',COALESCE(SUM(CASE WHEN kind = 'recall' THEN 1 ELSE 0 END),0),
-                                             '$.RetrievedCharacters',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.RetrievedCharacters') ELSE 0 END),0),
-                                             '$.EstimatedRetrievedTokens',COALESCE(SUM(CASE WHEN kind = 'recall' THEN json_extract(totals,'$.EstimatedRetrievedTokens') ELSE 0 END),0)) AS Totals
-                                         FROM metrics
-                                         UNION ALL SELECT 'daily',at - at % 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
-                                         UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
-                                         UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','',{SumJson}FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
-                                         UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,'',{SumJson}FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
-                                         GROUP BY dimension,Name
-                                         UNION ALL SELECT 'provider',0,provider,host,{SumJson}FROM metrics GROUP BY provider,host
-                                         """;
+        /// <summary>The summary counts recall cost from recall rows only.</summary>
+        private static readonly string[] RecallOnly = ["Recalls", "RetrievedCharacters", "EstimatedRetrievedTokens"];
+
+        private static readonly string Zeros = string.Concat(Fields.Select(static field => $",0 AS {field.Name}"));
+
+        private static readonly string Sums = string.Join(",", Fields.Select(static field => $"COALESCE(SUM({field.Name}),0) AS {field.Name}"));
+
+        private static readonly string SummarySums = string.Join(",", Fields.Select(static field => RecallOnly.Contains(field.Name)
+            ? $"COALESCE(SUM(CASE WHEN kind = 'recall' THEN {field.Name} ELSE 0 END),0) AS {field.Name}"
+            : $"COALESCE(SUM({field.Name}),0) AS {field.Name}"));
+
+        /// <summary>Each value is read from the payload once, here; every pass below sums the columns.</summary>
+        private static readonly string MetricsSelect = $"""
+                                                        SELECT kind,at,provider,method,rule,layer,pipeline,
+                                                            COALESCE(json_extract(payload,'$.Host'),'') AS host,
+                                                            {string.Join(",", Fields.Select(static field =>
+                                                                $"CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals.{field.Name}') WHEN 'followup' THEN {field.FollowUp} ELSE {field.Recall} END AS {field.Name}"))}
+                                                        FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate}
+                                                        """;
+
+        private static readonly string Aggregate = $"""
+                                                    WITH metrics AS MATERIALIZED ({MetricsSelect})
+                                                    SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,'' AS Payload,{SummarySums} FROM metrics
+                                                    UNION ALL SELECT 'daily',at - at % 864000000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
+                                                    UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+                                                    UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+                                                    UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,'','',{Sums} FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
+                                                    GROUP BY dimension,Name
+                                                    UNION ALL SELECT 'provider',0,provider,host,'',{Sums} FROM metrics GROUP BY provider,host
+                                                    """;
+
+        /// <summary>The whole report in one statement: the aggregate rows, then the newest payloads of three kinds (position in <c>Start</c>), then the other-traffic count.</summary>
+        public static readonly string Report = $"""
+                                      {Aggregate}
+                                      UNION ALL SELECT '{Views.History}',Position,'','',payload{Zeros} FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,id COLLATE ordinal,sequence) AS Position FROM (
+                                              SELECT payload,at,id,sequence FROM gain_event WHERE kind = '{Kinds.Request}' AND {Predicate} ORDER BY at DESC,id COLLATE ordinal,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Failure}',Position,'','',payload{Zeros} FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
+                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Failure}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Recall}',Position,'','',payload{Zeros} FROM (
+                                          SELECT payload,ROW_NUMBER() OVER (ORDER BY at DESC,sequence) AS Position FROM (
+                                              SELECT payload,at,sequence FROM gain_event WHERE kind = '{Kinds.Recall}' AND {Predicate} ORDER BY at DESC,sequence LIMIT @HistoryLimit))
+                                      UNION ALL SELECT '{Views.Other}',0,'','',json_object('Requests',COUNT(*),'Bytes',COALESCE(SUM(json_extract(payload,'$.Bytes')),0)){Zeros}
+                                          FROM gain_event WHERE kind = '{Kinds.Other}' AND {Predicate}
+                                      """;
     }
 
     /// <summary>Whether a write is on a proxied request's path, which must not wait long, or is a reset, which may.</summary>

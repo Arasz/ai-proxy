@@ -24,7 +24,7 @@ public sealed class GainLedgerTests
     }
 
     [Fact]
-    public async Task The_report_issues_one_query()
+    public async Task The_report_issues_the_version_read_and_one_report_statement_then_only_the_version_read()
     {
         using var directory = new TemporaryDirectory();
         var statements = new Statements();
@@ -32,11 +32,19 @@ public sealed class GainLedgerTests
 
         statements.Recording = true;
         await store.QueryAsync(new GainQuery(HistoryLimit: 50), TestContext.Current.CancellationToken);
+        var built = Queries(statements);
+        statements.Clear();
+        await store.QueryAsync(new GainQuery(HistoryLimit: 50), TestContext.Current.CancellationToken);
+        var cached = Queries(statements);
         statements.Recording = false;
 
-        var queries = statements.Texts.Where(static text => text.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
-                                                            || text.TrimStart().StartsWith("WITH", StringComparison.OrdinalIgnoreCase)).ToArray();
-        Assert.Single(queries);
+        Assert.Equal(2, built.Length);
+        Assert.StartsWith("SELECT COALESCE(MAX(sequence),0)", built[0]);
+        Assert.StartsWith("SELECT COALESCE(MAX(sequence),0)", Assert.Single(cached));
+
+        static string[] Queries(Statements statements) =>
+            statements.Texts.Select(static text => text.TrimStart())
+                .Where(static text => text.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) || text.StartsWith("WITH", StringComparison.OrdinalIgnoreCase)).ToArray();
     }
 
     [Fact]
@@ -206,6 +214,8 @@ public sealed class GainLedgerTests
         public bool Recording { get; set; }
 
         public IReadOnlyList<string> Texts => _texts;
+
+        public void Clear() => _texts.Clear();
 
         public void Watch(SqliteConnection connection) =>
             SQLitePCL.raw.sqlite3_trace(connection.Handle, static (state, text) =>
