@@ -13,10 +13,7 @@ public sealed class StatusCommand : AsyncCommand<StatusSettings>
     public override async Task<int> ExecuteAsync(CommandContext context, StatusSettings settings, CancellationToken cancellationToken)
     {
         var runtime = context.Data as GainRuntime ?? throw new InvalidOperationException("The status command was registered without its runtime.");
-        if (StatusSettings.Validator.Error(settings) is { } validationError)
-        {
-            throw new ArgumentException(validationError);
-        }
+        StatusSettings.Validator.Check(settings);
 
         var directory = ProxyDataDirectory.FromEnvironment(settings.DataDirectory);
         var reading = await ProxyControl.ReadOwnerAsync(directory, cancellationToken).ConfigureAwait(false);

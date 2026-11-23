@@ -26,7 +26,11 @@ public sealed record ToolResult(string ToolUseId, string Content, [property: Jso
     public bool IsError => Outcome == ToolOutcome.Failed;
 
     /// <summary>The result of a call the proxy answered.</summary>
-    public static ToolResult Of(string toolUseId, CcrRetrieval answer) => new(toolUseId, answer.Text, answer.Error is null ? ToolOutcome.Succeeded : ToolOutcome.Failed);
+    public static ToolResult Of(string toolUseId, CcrAnswer answer) => new(toolUseId, answer.Text, answer switch
+    {
+        CcrFailed => ToolOutcome.Failed,
+        CcrFound => ToolOutcome.Succeeded,
+    });
 
     /// <summary>The result of a client call the proxy did not run.</summary>
     public static ToolResult Deferred(string toolUseId) => new(toolUseId, RetrievalLoop.DeferredCall, ToolOutcome.Failed);

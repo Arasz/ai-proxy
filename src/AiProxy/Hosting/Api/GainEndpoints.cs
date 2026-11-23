@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AiProxy.Core;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Gain;
 
@@ -21,10 +22,11 @@ public static partial class GainEndpoints
         app.MapGet("/gain", static async (HttpRequest request, IGainStore store, CancellationToken cancellationToken) => !TryQuery(request.Query, out var query, out var error) ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400) : Results.Json(await store.QueryAsync(query, cancellationToken)));
         app.MapPost("/gain/reset", static async (GainQuery query, HttpRequest request, IGainStore store, CancellationToken cancellationToken) =>
         {
-            var error = Validate(query);
-            return error is not null
-                ? Results.Problem(title: "invalid_gain_filter", detail: error, statusCode: 400)
-                : Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken));
+            return Validate(query) switch
+            {
+                Invalid invalid => Results.Problem(title: "invalid_gain_filter", detail: invalid.Reason, statusCode: 400),
+                Valid => Results.Json(await store.ResetAsync(query, CallerOf(request), cancellationToken)),
+            };
         });
         app.MapPost("/retrieval", static async (RetrievalRequest request, HttpContext context, IGainStore gain, TimeProvider time, CancellationToken cancellationToken) =>
         {
@@ -45,7 +47,7 @@ public static partial class GainEndpoints
             try
             {
                 await gain.RecallAsync(new GainRecall(time.GetUtcNow(), request.Id, project, project is null ? GainLabels.Unknown : GainLabels.Attributions.Caller,
-                        request.Mode, answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.Error),
+                        request.Mode, answer.Text.Length, GainReportBuilder.Tokens(answer.Text.Length), answer.ErrorCode),
                     null, GainLabels.RetrieveOriginal, GainLabels.Unknown, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, cancellationToken);
             }
             catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
@@ -53,7 +55,7 @@ public static partial class GainEndpoints
                 Log.RecallWriteFailed(context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(GainEndpoints)), exception);
             }
 
-            return Results.Json(new RetrievalResponse(answer.Text, answer.Error));
+            return Results.Json(new RetrievalResponse(answer.Text, answer.ErrorCode));
         });
     }
 
@@ -101,22 +103,22 @@ public static partial class GainEndpoints
         }
 
         query = new GainQuery(Value("project"), from, to, Value("provider"), Value("method"), Value("rule"), Value("layer"), Value("pipeline"), limit);
-        error = Validate(query);
+        error = Validate(query) is Invalid invalid ? invalid.Reason : null;
         return error is null;
 
         string? Value(string key) => values.TryGetValue(key, out var value) ? value.ToString() : null;
     }
 
-    private static string? Validate(GainQuery query)
+    private static Validation Validate(GainQuery query)
     {
         if (query.HistoryLimit is < 0 or > 1000)
         {
-            return "historyLimit must be from 0 to 1000.";
+            return new Invalid("historyLimit must be from 0 to 1000.");
         }
 
         if (query is { From: { } from, To: { } to } && from >= to)
         {
-            return "from must be earlier than to.";
+            return new Invalid("from must be earlier than to.");
         }
 
         var filters = (string?[])[query.Project, query.Provider, query.Method, query.Rule, query.Layer, query.Pipeline];
@@ -124,11 +126,11 @@ public static partial class GainEndpoints
         {
             if (value is not null && (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl)))
             {
-                return "Filters must be nonblank text without control characters, at most 4096 characters.";
+                return new Invalid("Filters must be nonblank text without control characters, at most 4096 characters.");
             }
         }
 
-        return null;
+        return new Valid();
     }
 
     private static partial class Log

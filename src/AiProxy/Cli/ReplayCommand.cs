@@ -13,10 +13,7 @@ public sealed class ReplayCommand : AsyncCommand<ReplaySettings>
     {
         ArgumentNullException.ThrowIfNull(context.Data);
         var runtime = (GainRuntime)context.Data;
-        if (ReplaySettings.Validator.Error(settings) is { } validationError)
-        {
-            throw new ArgumentException(validationError);
-        }
+        ReplaySettings.Validator.Check(settings);
 
         var home = ProxyDataDirectory.FromEnvironment(settings.Home);
         using var runner = ReplayRunner.Create(home, settings.Minimum, settings.BudgetShare, settings.MinimumSaving, settings.SkipUnder, new ConfigurationBuilder().AddEnvironmentVariables().Build());

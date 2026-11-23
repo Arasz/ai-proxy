@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AiProxy.Core;
 using AiProxy.Core.Content.Ccr;
 using AiProxy.Core.Json;
 using Json.Schema;
@@ -18,10 +19,10 @@ public sealed class RetrievalArgumentSchema : IToolArgumentSchema
     private static readonly JsonSchema Schema = JsonSchema.FromText(Text);
 
     /// <inheritdoc />
-    public string? Violation(JsonElement arguments)
+    public Validation Check(JsonElement arguments)
     {
         var results = Schema.Evaluate(arguments, Options);
-        return results.IsValid ? null : Describe(results);
+        return results.IsValid ? new Valid() : new Invalid(Describe(results));
     }
 
     private static string Describe(EvaluationResults results)

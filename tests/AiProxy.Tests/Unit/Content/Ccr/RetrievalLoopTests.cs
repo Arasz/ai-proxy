@@ -51,7 +51,7 @@ public sealed class RetrievalLoopTests
             Sse.Tool("tu_c", "Read", """{"file_path":"/b.cs"}""")));
 
         Assert.Equal(RetrievalStep.Retrieve, loop.Decide());
-        var results = loop.ToolResults(new Dictionary<string, CcrRetrieval> { ["tu_r"] = new("the whole text", null) });
+        var results = loop.ToolResults(new Dictionary<string, CcrAnswer> { ["tu_r"] = new CcrFound("the whole text") });
         Assert.Equal(2, results.Count);
         Assert.Equal([new ToolResult("tu_r", "the whole text", ToolOutcome.Succeeded), ToolResult.Deferred("tu_c")], results);
 
