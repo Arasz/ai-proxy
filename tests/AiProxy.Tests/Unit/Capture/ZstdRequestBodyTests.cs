@@ -103,6 +103,15 @@ public sealed class ZstdRequestBodyTests
         Assert.Throws<InvalidDataException>(() => ZstdRequestBody.Decode([.. OneShot(half), .. OneShot(half)]));
     }
 
+    [Fact]
+    public void A_streamed_frame_of_exactly_the_limit_is_decoded_though_its_bound_is_larger()
+    {
+        var encoded = Streamed(new byte[SixteenMiB]);
+        Assert.True(ZstandardDecoder.TryGetMaxDecompressedLength(encoded, out var bound) && bound > SixteenMiB, "the bound must pass the limit");
+
+        Assert.Equal(SixteenMiB, ZstdRequestBody.Decode(encoded).Length);
+    }
+
     private static (byte[] Decoded, long Allocated) DecodeMeasured(byte[] encoded)
     {
         ZstdRequestBody.Decode(encoded);
