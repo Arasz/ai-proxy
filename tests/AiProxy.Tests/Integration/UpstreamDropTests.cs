@@ -119,8 +119,7 @@ public sealed class UpstreamDropTests
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
-        await using var service = new TitaniumProxyService(
-            null,
+        await using var service = TestTitaniumProxyService.Create(
             new ProxyRuntimeOptions(IPAddress.Loopback, port, false, false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
@@ -128,7 +127,7 @@ public sealed class UpstreamDropTests
             loggerFactory,
             TimeSpan.Zero,
             TimeProvider.System,
-            static _ => throw new MissingMethodException("renamed"));
+            upstreamClosed: static _ => throw new MissingMethodException("renamed"));
         await service.StartAsync(TestContext.Current.CancellationToken);
         using var client = new HttpClient(new SocketsHttpHandler { Proxy = new WebProxy(service.Address), UseProxy = true }) { Timeout = ClientTimeout };
 

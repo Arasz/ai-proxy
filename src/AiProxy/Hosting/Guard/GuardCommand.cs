@@ -8,8 +8,8 @@ public sealed class GuardCommand(
     Func<Task> clearProxy,
     TimeSpan lockWait,
     TimeProvider timeProvider,
-    Func<SystemProxyMarker, Task<bool>>? restoreIfOwned = null,
-    Func<string, bool>? isOwned = null)
+    Func<SystemProxyMarker, Task<bool>> restoreIfOwned,
+    Func<string, bool> isOwned)
 {
     /// <summary>The first argument that selects guard mode; the second is the data directory.</summary>
     public const string Argument = "--guard-system-proxy";
@@ -52,16 +52,11 @@ public sealed class GuardCommand(
             {
                 if (marker.PreviousSettingsSnapshot is not null)
                 {
-                    if (restoreIfOwned is null)
-                    {
-                        throw new InvalidOperationException("The system proxy snapshot recovery provider is unavailable.");
-                    }
-
                     await restoreIfOwned(marker);
                 }
                 else
                 {
-                    if (marker.PreviousEndpoint is { } endpoint && (isOwned is null || isOwned(endpoint)))
+                    if (marker.PreviousEndpoint is { } endpoint && isOwned(endpoint))
                     {
                         await clearProxy();
                     }

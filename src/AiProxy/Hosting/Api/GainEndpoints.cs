@@ -130,7 +130,7 @@ public static partial class GainEndpoints
             }
         }
 
-        return new Valid();
+        return Valid.Instance;
     }
 
     private static partial class Log

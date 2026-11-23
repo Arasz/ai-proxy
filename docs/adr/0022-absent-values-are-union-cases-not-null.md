@@ -49,6 +49,24 @@ candidates for later waves.
    its text and offsets switch, and an overload of `Decompose` only moves the check to its two
    callers. This is a rule 4 boundary.
 
+### Wave 3 (owner rulings, 2026-11-23)
+
+10. A store lookup keeps a nullable return. The row is absent in SQLite, the port mirrors the
+    reader, and each caller turns null into its own answer at once (404, `Forward`, not kept).
+11. A request-body scan that returns null when it cannot apply keeps null. Its one caller
+    matches the pattern at once (`CcrRequest`, `ChatRequest`, `CcrPlan.WithTool`).
+12. An internal value whose only exit is a rule 9 nullable field keeps null along its path
+    (`FileRead`).
+13. A private helper whose only caller puts in a default returns that default itself
+    (`SourceCodeCompressionHandler.View`).
+14. A delegate that every production caller supplies is a required parameter. A default that
+    production always takes is an explicit argument of the public constructor or an `init`
+    default, never `= null` (`GuardCommand`, `TitaniumProxyService`). A null that selects other
+    behaviour is not a default: `GainRuntime.Variable` stays nullable, as null makes
+    `ProxyDataDirectory.Resolve` read the real environment and ignore case.
+15. A domain decision with several reasons for "none" is a union, even when the empty case
+    carries no reason (`CcrPreviewResult(CcrPreview, NoCcrPreview)`).
+
 ## Consequences
 
 - Readers switch over named cases, so a missed case is a compile error, not a

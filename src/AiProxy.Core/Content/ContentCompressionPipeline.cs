@@ -70,13 +70,11 @@ public sealed class ContentCompressionPipeline(
                 continue;
             }
 
-            var preview = await PreviewAsync(region, reduced ?? region.Text, request.Ccr, failures, stages, cancellationToken);
-            if (preview is not null)
+            var sent = await PreviewAsync(region, reduced ?? region.Text, request.Ccr, failures, stages, cancellationToken) switch
             {
-                originals[preview.Id] = region.Text;
-            }
-
-            var sent = preview?.Text ?? reduced;
+                CcrPreview preview => KeepOriginal(originals, preview, region),
+                NoCcrPreview => reduced,
+            };
             if (sent is null)
             {
                 continue;
@@ -180,7 +178,13 @@ public sealed class ContentCompressionPipeline(
         return rebuilt;
     }
 
-    private async ValueTask<CcrPreview?> PreviewAsync(
+    private static string KeepOriginal(Dictionary<string, string> originals, CcrPreview preview, ContentRegion region)
+    {
+        originals[preview.Id] = region.Text;
+        return preview.Text;
+    }
+
+    private async ValueTask<CcrPreviewResult> PreviewAsync(
         ContentRegion region,
         string reduced,
         CcrMode mode,
@@ -190,7 +194,7 @@ public sealed class ContentCompressionPipeline(
     {
         if (mode == CcrMode.Off)
         {
-            return null;
+            return NoCcrPreview.Instance;
         }
 
         var started = time.GetTimestamp();
@@ -201,7 +205,7 @@ public sealed class ContentCompressionPipeline(
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             failures.Add(new PartFailure(RegionChunkId, PreviewPath, exception));
-            return null;
+            return NoCcrPreview.Instance;
         }
         finally
         {

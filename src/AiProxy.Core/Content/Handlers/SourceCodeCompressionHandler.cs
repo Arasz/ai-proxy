@@ -19,19 +19,21 @@ public sealed class SourceCodeCompressionHandler(IEnumerable<ICodeLexer> lexers)
     public bool CanHandle(ContentType type) => type == ContentType.SourceCode;
 
     /// <inheritdoc />
-    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => ValueTask.FromResult(View(part) ?? new HandledContent(WithoutBlankLines(part.Text), HandlerPath));
+    public ValueTask<HandledContent> HandleAsync(ContentPart part, CancellationToken cancellationToken) => ValueTask.FromResult(View(part));
 
-    private HandledContent? View(ContentPart part)
+    private HandledContent View(ContentPart part)
     {
         if (part.Ccr == CcrMode.Off || _lexers.FirstOrDefault(lexer => lexer.SupportsPath(part.FilePath)) is not { } lexer)
         {
-            return null;
+            return Fallback(part);
         }
 
         var id = CcrView.IdOf(part.Text);
         var view = new CodeReducer(lexer).Reduce(part.Text, part.FilePath, new CodeReductionOptions(), CcrView.Hint(id));
-        return view.Changed ? new HandledContent(view.Text, CodeViewPath) { RetrievalId = id } : null;
+        return view.Changed ? new HandledContent(view.Text, CodeViewPath) { RetrievalId = id } : Fallback(part);
     }
+
+    private static HandledContent Fallback(ContentPart part) => new(WithoutBlankLines(part.Text), HandlerPath);
 
     private static string WithoutBlankLines(string text)
     {
