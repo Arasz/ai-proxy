@@ -43,7 +43,7 @@ Compression is on by default. It changes provider request bodies, so set `PROXY_
 |---|---|
 | `PROXY__COMPRESSION__ENABLED` | Request compression. The default is `true`; `false` turns it off. |
 | `PROXY__COMPRESSION__DATABASE` | Where original request bodies are kept. The default is `~/.ai-proxy/content.db`. |
-| `PROXY__COMPRESSION__MINIMUM` | At least 1. A minimum size applied to every content kind, checked against the whole tool result. Without it, logs use 200 characters, JSON uses 100, prose uses 512, and directory listings are left alone. |
+| `PROXY__COMPRESSION__MINIMUM` | At least 1. A minimum size applied to every content kind, checked against the whole tool result. Without it, JSON, XML and TOML use 100 characters; logs, Markdown, shell transcripts and build output use 200; source code uses 500; prose uses 512; and directory listings are left alone. |
 | `PROXY__COMPRESSION__CODEVIEWS` | A whole C#, Python, JavaScript or TypeScript file a tool call read goes out as its code view, and the original stays available to `proxy_retrieve`. The default is `true`; `false` turns it off. |
 | `PROXY__COMPRESSION__MODEL` | Reserved for the extractive model artifact, which is not included in this version. |
 

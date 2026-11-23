@@ -52,11 +52,12 @@ That is also what makes the stage safe to run: the proxy can be asked what it ch
 answer with the thing it changed it from. The storage and the queue that carries the record
 are in [ADR 0002](../adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md).
 
-## Why it is off by default
+## Turning it off
 
-Because the stage changes what the provider is sent, and that is the operator's call, not the
-tool's. The proxy's other job is to be transparent, and a proxy that quietly rewrites a
-request is not that. `PROXY__COMPRESSION__ENABLED=true` is the switch, and
+The stage changes what the provider is sent, and that stays the operator's call. Since 0.10.0 it
+is on by default, and every change it makes can be read back from the store for 14 days, as
+above; older originals are deleted ([environment variables](../reference/environment-variables.md)).
+`PROXY__COMPRESSION__ENABLED=false` forwards every request untouched, and
 [the how-to](../how-to/turning-on-the-compression-stage.md) is what an operator reads first.
 
 ## What is still open
