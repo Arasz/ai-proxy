@@ -76,31 +76,90 @@ public static class GainReportBuilder
     /// <summary>One dimension's rows, largest saving first. A rule row naming a comma path counts under each member rule.</summary>
     public static IReadOnlyList<GainAttribution> Attribute(string dimension, IEnumerable<GainAttribution> rows)
     {
-        var named = dimension == GainLabels.Dimensions.Rule
-            ? rows.SelectMany(static row => RuleMembers(row.Name).Select(member => (Name: member, row.Totals)))
-            : rows.Select(static row => (row.Name, row.Totals));
-        return named.GroupBy(static row => row.Name, StringComparer.Ordinal)
-            .Select(group => new GainAttribution(dimension, group.Key, Sum(group.Select(static row => row.Totals))))
-            .OrderByDescending(static row => row.Totals.EstimatedSavedTokens)
-            .ThenBy(static row => row.Name, StringComparer.Ordinal)
-            .ToArray();
+        var sums = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
+        var byMember = sums.GetAlternateLookup<ReadOnlySpan<char>>();
+        var split = dimension == GainLabels.Dimensions.Rule;
+        Span<Range> members = stackalloc Range[16];
+        foreach (var row in rows)
+        {
+            if (!split || !AddMembers(byMember, row.Name, row.Totals, ref members))
+            {
+                Add(byMember, row.Name, row.Totals);
+            }
+        }
+
+        var result = new GainAttribution[sums.Count];
+        var index = 0;
+        foreach (var (name, sum) in sums)
+        {
+            result[index++] = new GainAttribution(dimension, name, sum.ToTotals());
+        }
+
+        Array.Sort(result, static (left, right) => right.Totals.EstimatedSavedTokens.CompareTo(left.Totals.EstimatedSavedTokens) is var order and not 0
+            ? order
+            : string.CompareOrdinal(left.Name, right.Name));
+        return result;
     }
 
-    public static GainTotals Sum(IEnumerable<GainTotals> rows) =>
-        rows.Aggregate(new GainTotals(), static (sum, row) => new GainTotals(
-            sum.Requests + row.Requests, sum.OriginalCharacters + row.OriginalCharacters,
-            sum.ForwardedCharacters + row.ForwardedCharacters, sum.OriginalBytes + row.OriginalBytes,
-            sum.ForwardedBytes + row.ForwardedBytes, sum.EstimatedOriginalTokens + row.EstimatedOriginalTokens,
-            sum.EstimatedForwardedTokens + row.EstimatedForwardedTokens, sum.EstimatedSavedTokens + row.EstimatedSavedTokens,
-            sum.Recalls + row.Recalls, sum.RetrievedCharacters + row.RetrievedCharacters,
-            sum.EstimatedRetrievedTokens + row.EstimatedRetrievedTokens, sum.EstimatedToolTokens + row.EstimatedToolTokens,
-            sum.FollowUps + row.FollowUps, sum.FollowUpBytes + row.FollowUpBytes, sum.EstimatedFollowUpTokens + row.EstimatedFollowUpTokens,
-            sum.FollowUpMeasuredRequests + row.FollowUpMeasuredRequests));
-
-    private static IEnumerable<string> RuleMembers(string path)
+    public static GainTotals Sum(IEnumerable<GainTotals> rows)
     {
-        var members = path.Split(',', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
-        return members.Length == 0 ? [path] : members;
+        var sum = new Accumulator();
+        foreach (var row in rows)
+        {
+            sum.Add(row);
+        }
+
+        return sum.ToTotals();
+    }
+
+    /// <summary>Adds <paramref name="totals"/> once under each distinct member of a comma path; false when the path has no member.</summary>
+    private static bool AddMembers(Dictionary<string, Accumulator>.AlternateLookup<ReadOnlySpan<char>> byMember, string path, GainTotals totals, ref Span<Range> members)
+    {
+        var text = path.AsSpan();
+        var count = text.Count(',') + 1;
+        if (count > members.Length)
+        {
+            members = new Range[count];
+        }
+
+        var distinct = 0;
+        foreach (var range in text.Split(','))
+        {
+            var member = text[range];
+            if (member.IsEmpty || Seen(text, members[..distinct], member))
+            {
+                continue;
+            }
+
+            members[distinct++] = range;
+            Add(byMember, member, totals);
+        }
+
+        return distinct > 0;
+    }
+
+    private static bool Seen(ReadOnlySpan<char> text, ReadOnlySpan<Range> members, ReadOnlySpan<char> member)
+    {
+        foreach (var range in members)
+        {
+            if (text[range].SequenceEqual(member))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void Add(Dictionary<string, Accumulator>.AlternateLookup<ReadOnlySpan<char>> byMember, ReadOnlySpan<char> name, GainTotals totals)
+    {
+        if (!byMember.TryGetValue(name, out var sum))
+        {
+            sum = new Accumulator();
+            byMember[name] = sum;
+        }
+
+        sum.Add(totals);
     }
 
     private static GainTotals RecallTotals(GainRecall recall) => new(Recalls: 1, RetrievedCharacters: recall.Characters, EstimatedRetrievedTokens: recall.EstimatedTokens);
@@ -126,4 +185,35 @@ public static class GainReportBuilder
 
     /// <summary>Totals to attribute, with the path they belong to.</summary>
     private sealed record Attributed(GainPath Path, GainTotals Totals);
+
+    /// <summary>Running totals that add in place, so summing many rows makes one <see cref="GainTotals"/>.</summary>
+    private sealed class Accumulator
+    {
+        private long _requests, _originalCharacters, _forwardedCharacters, _originalBytes, _forwardedBytes, _originalTokens, _forwardedTokens, _savedTokens,
+            _recalls, _retrievedCharacters, _retrievedTokens, _toolTokens, _followUps, _followUpBytes, _followUpTokens, _followUpMeasuredRequests;
+
+        public void Add(GainTotals row)
+        {
+            _requests += row.Requests;
+            _originalCharacters += row.OriginalCharacters;
+            _forwardedCharacters += row.ForwardedCharacters;
+            _originalBytes += row.OriginalBytes;
+            _forwardedBytes += row.ForwardedBytes;
+            _originalTokens += row.EstimatedOriginalTokens;
+            _forwardedTokens += row.EstimatedForwardedTokens;
+            _savedTokens += row.EstimatedSavedTokens;
+            _recalls += row.Recalls;
+            _retrievedCharacters += row.RetrievedCharacters;
+            _retrievedTokens += row.EstimatedRetrievedTokens;
+            _toolTokens += row.EstimatedToolTokens;
+            _followUps += row.FollowUps;
+            _followUpBytes += row.FollowUpBytes;
+            _followUpTokens += row.EstimatedFollowUpTokens;
+            _followUpMeasuredRequests += row.FollowUpMeasuredRequests;
+        }
+
+        public GainTotals ToTotals() => new(_requests, _originalCharacters, _forwardedCharacters, _originalBytes, _forwardedBytes, _originalTokens,
+            _forwardedTokens, _savedTokens, _recalls, _retrievedCharacters, _retrievedTokens, _toolTokens, _followUps, _followUpBytes, _followUpTokens,
+            _followUpMeasuredRequests);
+    }
 }

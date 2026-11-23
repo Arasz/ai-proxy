@@ -46,6 +46,11 @@ ai-proxy gain --format json   # or csv; same numbers as the text view
 ai-proxy gain --watch         # live view, Ctrl+C exits
 ```
 
+The watch view asks the proxy every 2 seconds and redraws only when the report changed. The proxy
+keeps the last report until a new event or a reset changes the ledger, so an idle watch costs one
+indexed read per poll.
+
+
 Token counts are estimates at 2.89 characters per token. Saved and Net cover the first request only;
 the Follow column and the billed balance below add what the proxy's own follow-up requests cost.
 Character and byte counts are measured. The summary, bucket and attribution tables show the gross
