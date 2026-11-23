@@ -24,6 +24,38 @@ public sealed class GainRuleSplitTests
         Assert.DoesNotContain(rules, static row => row.Name.Contains(','));
     }
 
+    [Theory]
+    [InlineData("a,a,b", new[] { "a", "b" })]
+    [InlineData(",a,,b,", new[] { "a", "b" })]
+    [InlineData(",,", new[] { ",," })]
+    [InlineData("", new[] { "" })]
+    public void A_rule_path_counts_each_distinct_member_once_and_a_path_without_members_as_itself(string path, string[] expected)
+    {
+        var rows = GainReportBuilder.Attribute(GainLabels.Dimensions.Rule, [new GainAttribution(GainLabels.Dimensions.Rule, path, new GainTotals(1, EstimatedSavedTokens: 3))]);
+
+        Assert.Equal(expected, rows.Select(static row => row.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.All(rows, static row => Assert.Equal(new GainTotals(1, EstimatedSavedTokens: 3), row.Totals));
+    }
+
+    [Fact]
+    public void Attributing_a_ledger_sized_set_of_rule_rows_allocates_little_more_than_the_result()
+    {
+        string[] members = ["prose.dedupe", "below-minimum", "sourcecode.blank-lines", "log.signal-filter", "markdown.strip-comments", "json.compact", "xml.compact", "ccr.preview"];
+        var rows = Enumerable.Range(0, 260)
+            .Select(i => new GainAttribution(GainLabels.Dimensions.Rule, string.Join(',', members.Take(1 + i % members.Length).Skip(Math.Min(i % 3, i % members.Length))), new GainTotals(1, i, i, i, i, i, i, i)))
+            .ToArray();
+        GainReportBuilder.Attribute(GainLabels.Dimensions.Rule, rows);
+
+        var thread = Environment.CurrentManagedThreadId;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var result = GainReportBuilder.Attribute(GainLabels.Dimensions.Rule, rows);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(thread, Environment.CurrentManagedThreadId);
+        Assert.Equal(members.Length, result.Count);
+        Assert.True(allocated < 16_000, $"allocated {allocated:N0} bytes");
+    }
+
     [Fact]
     public void Rule_rows_are_sorted_by_saved_tokens_descending_then_name()
     {
