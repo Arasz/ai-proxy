@@ -111,14 +111,19 @@ public sealed class ResponseBufferPoolTests
     {
         var pool = new RecordingPool();
         var buffer = ResponseBuffer.For(Json, ResponseBuffer.IdentityEncoding, pool);
-        buffer.Append(Stream(5_000));
+        var bytes = Stream(5_000);
+        for (var offset = 0; offset < bytes.Length; offset += 4096)
+        {
+            buffer.Append(bytes.AsSpan(offset, Math.Min(4096, bytes.Length - offset)));
+        }
+
         buffer.Release();
         var snapshots = pool.Returned.Select(static array => array.ToArray()).ToList();
 
         buffer.Append(Stream(5_000));
         buffer.Release();
 
-        Assert.NotEmpty(pool.Rented);
+        Assert.True(pool.Rented.Count > 1, "the body must grow at least once");
         Assert.Equal(pool.Rented.OrderBy(RuntimeHelpers.GetHashCode), pool.Returned.OrderBy(RuntimeHelpers.GetHashCode));
         Assert.All(pool.Returned.Zip(snapshots), pair => Assert.Equal(pair.Second, pair.First));
     }
