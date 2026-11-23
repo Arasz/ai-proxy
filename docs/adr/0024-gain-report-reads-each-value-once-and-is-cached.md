@@ -29,10 +29,12 @@ each time the view gets a new target, also when nothing changed.
    sums as columns, so `SqliteGainStore` builds `GainTotals` without JSON. Detail rows (history,
    failures, recalls, other traffic) keep their payload text.
 2. **Cache the last report.** The store keeps the last report with its query and a ledger version
-   (`MAX(sequence)` and `COUNT(*)` of `gain_event`). A query with the same filters and the same
-   version gets the cached report with a new `GeneratedAt`. An insert raises the maximum sequence and
-   a reset lowers the count, so either one makes the next query run the statement again. The
-   version is read from the database, so a write from another process also counts.
+   (`MAX(sequence)` and `COUNT(*)` of `gain_event`, and the file's `user_version`), read in the same
+   read transaction as the report. A query with the same filters and the same version gets the
+   cached report with a new `GeneratedAt` and the filters it asked for. An insert raises the maximum
+   sequence, a reset lowers the count, and a schema step raises `user_version`, so each one makes the
+   next query run the statement again. The version is read from the database, so a write from
+   another process also counts.
 3. **Sum and group with loops.** `GainReportBuilder.Sum` and `Attribute` add into local values and
    one dictionary, not through LINQ chains that make a new `GainTotals` for each row.
 4. **The watcher redraws only on change.** `gain --watch` gives the live display a new target only
@@ -43,8 +45,8 @@ each time the view gets a new target, also when nothing changed.
 - One report on the measured ledger takes about 0.17 s when it is not cached. A cached report
   costs one indexed read.
 - The cache holds one report (about 75 KB as JSON) for each store. A different filter replaces it.
-- A writer that changes rows in place, not through insert or delete, does not change the version.
-  The store does not do this after the schema step, which runs before the first query.
+- An `UPDATE` of rows does not change the version. The only one is a schema step, and a schema step
+  raises `user_version`. A future write path that updates rows must also change the version.
 - The live view's clock does not move when the report does not change.
 
 ## Alternatives
