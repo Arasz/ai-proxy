@@ -22,7 +22,7 @@ public sealed class RetrievalArgumentSchema : IToolArgumentSchema
     public Validation Check(JsonElement arguments)
     {
         var results = Schema.Evaluate(arguments, Options);
-        return results.IsValid ? new Valid() : new Invalid(Describe(results));
+        return results.IsValid ? Valid.Instance : new Invalid(Describe(results));
     }
 
     private static string Describe(EvaluationResults results)

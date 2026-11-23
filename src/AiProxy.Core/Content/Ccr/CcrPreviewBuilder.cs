@@ -17,17 +17,17 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
     private int _overlayRoom;
     private bool[] _shown = [];
 
-    /// <summary>Returns a preview, or null for an existing preview, insufficient budget, or a preview that does not save enough.</summary>
+    /// <summary>Returns a preview, or <see cref="NoCcrPreview"/> for an existing preview, insufficient budget, or a preview that does not save enough.</summary>
     /// <param name="original">The region's text as the client sent it.</param>
     /// <param name="options">The CCR numbers.</param>
     /// <param name="reducedTokens">The region's estimated tokens after its reducers; the saving is measured on it; the budget comes from the original.</param>
-    public CcrPreview? Build(string original, CcrOptions options, int reducedTokens)
+    public CcrPreviewResult Build(string original, CcrOptions options, int reducedTokens)
     {
         try
         {
             if (CcrPreview.IsIn(original) || !Initialize(original, options, reducedTokens))
             {
-                return null;
+                return NoCcrPreview.Instance;
             }
 
             var signalSpent = SelectSignals((int)(_lineRoom * options.SignalShare));
@@ -41,15 +41,17 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         }
     }
 
-    private static CcrPreview? SavesEnough(CcrPreview? preview, CcrOptions options, int reducedTokens)
+    private static CcrPreviewResult SavesEnough(CcrPreviewResult result, CcrOptions options, int reducedTokens) => result switch
     {
-        if (preview is null)
-        {
-            return null;
-        }
+        CcrPreview preview when SavesEnough(preview, options, reducedTokens) => preview,
+        CcrPreview => NoCcrPreview.Instance,
+        NoCcrPreview none => none,
+    };
 
+    private static bool SavesEnough(CcrPreview preview, CcrOptions options, int reducedTokens)
+    {
         var saving = reducedTokens - options.TokensOf(preview.Text.Length);
-        return saving > 0 && saving >= options.MinimumSavingTokens ? preview : null;
+        return saving > 0 && saving >= options.MinimumSavingTokens;
     }
 
     private bool Initialize(string original, CcrOptions options, int reducedTokens)
@@ -175,11 +177,11 @@ public sealed class CcrPreviewBuilder(CcrPreviewOverlay overlay)
         return end;
     }
 
-    private CcrPreview? Finish()
+    private CcrPreviewResult Finish()
     {
         if (_hidden.Length == 0)
         {
-            return null;
+            return NoCcrPreview.Instance;
         }
 
         var count = _shown.Count(line => line);

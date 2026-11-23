@@ -18,7 +18,8 @@ Newest first; add each release's line in the same PR that adds its file.
 
 | Version | What changed | PRs |
 |---|---|---|
-| [0.35.3](0.35.3-pooled-capture-and-zstd-buffers.md) | Pooled capture and zstd buffers: a captured response allocates no arrays once the pool is warm, a zstd body decodes with the .NET 11 decoder into one pooled buffer, and ZstdSharp is gone. | [#174](https://github.com/Arasz/ai-proxy/pull/174) |
+| [0.35.4](0.35.4-pooled-capture-and-zstd-buffers.md) | Pooled capture and zstd buffers: a captured response allocates no arrays once the pool is warm, a zstd body decodes with the .NET 11 decoder into one pooled buffer, and ZstdSharp is gone. | [#174](https://github.com/Arasz/ai-proxy/pull/174) |
+| [0.35.3](0.35.3-preview-union-and-required-seams.md) | Internal refactor: preview decisions are a union, the code view returns its own fallback, `GuardCommand` and `TitaniumProxyService` take required seams. No behaviour change. | [#173](https://github.com/Arasz/ai-proxy/pull/173) |
 | [0.35.2](0.35.2-absent-values-are-union-cases.md) | Internal refactor: missing results are union cases (`CcrParseResult`, `CcrAnswer`, `Validation`), CLI settings checks throw, optional record fields are `init` properties. No behaviour change. | [#170](https://github.com/Arasz/ai-proxy/pull/170), [#172](https://github.com/Arasz/ai-proxy/pull/172) |
 | [0.35.1](0.35.1-request-path-copies.md) | Fewer body copies on the request path: the region finder parses in place, the pipeline copies only a changed body, and the inspector and capture use the body without a copy. | [#171](https://github.com/Arasz/ai-proxy/pull/171) |
 | [0.34.0](0.34.0-chat-completions-recoverable-compression.md) | Streamed Chat Completions requests to OpenRouter models (`anthropic/`, `openai/`, `google/`, `deepseek/`) get recoverable previews and in-request `proxy_retrieve`, as the Anthropic path does. | [#137](https://github.com/Arasz/ai-proxy/pull/137) |

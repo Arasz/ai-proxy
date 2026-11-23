@@ -396,15 +396,15 @@ public sealed class TitaniumProxyServiceTests
     {
         using var directory = new TemporaryDirectory();
         var events = new List<string>();
-        await using var service = new TitaniumProxyService(
-            new RecordingSystemProxyRegistrar(events),
+        await using var service = TestTitaniumProxyService.Create(
             new ProxyRuntimeOptions(IPAddress.Loopback, 0, false, false, directory.Path),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             new RecordingGuardLauncher(events),
             NullLoggerFactory.Instance,
             TimeSpan.Zero,
-            TimeProvider.System);
+            TimeProvider.System,
+            new RecordingSystemProxyRegistrar(events));
 
         await service.StartAsync(TestContext.Current.CancellationToken);
         await service.StopAsync(CancellationToken.None);
@@ -520,15 +520,15 @@ public sealed class TitaniumProxyServiceTests
         TimeSpan? markerWait = null,
         TimeProvider? timeProvider = null,
         RecordingLoggerProvider? loggerProvider = null) =>
-        new(
-            registrar,
+        TestTitaniumProxyService.Create(
             new ProxyRuntimeOptions(IPAddress.Loopback, port, true, false, dataDirectory),
             new ProviderRequestInspector(new PassThroughCompressionPipeline(), new CanonicalProviderHosts(), new NoRequestCapture(), new CcrOff(), NullLogger<ProviderRequestInspector>.Instance, TimeProvider.System, new NoGainLedger()),
             new CanonicalProviderHosts(),
             launcher ?? new RecordingGuardLauncher([]),
             loggerProvider is null ? NullLoggerFactory.Instance : new LoggerFactory([loggerProvider]),
             markerWait ?? TimeSpan.FromSeconds(1),
-            timeProvider ?? TimeProvider.System);
+            timeProvider ?? TimeProvider.System,
+            registrar);
 
     private sealed class RecordingSystemProxyRegistrar(List<string>? events = null) : ISystemProxyRegistrar
     {

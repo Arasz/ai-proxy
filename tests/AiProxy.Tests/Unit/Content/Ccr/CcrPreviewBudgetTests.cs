@@ -7,9 +7,11 @@ public sealed class CcrPreviewBudgetTests
 {
     private static readonly CcrOptions Options = CcrOptions.Default;
 
+    private static CcrPreview Made(CcrPreviewResult result) => Assert.IsType<CcrPreview>(result.Value);
+
     private static string Log(int lines) => string.Join("\n", Enumerable.Range(1, lines).Select(index => $"step {index}: compiling module m{index} in the usual way"));
 
-    private static CcrPreview? Build(string original, CcrOptions options, int reducedTokens, CcrPreviewBuilder? builder = null) => (builder ?? new CcrPreviewBuilder(new CcrPreviewOverlay())).Build(original, options, reducedTokens);
+    private static CcrPreviewResult Build(string original, CcrOptions options, int reducedTokens, CcrPreviewBuilder? builder = null) => (builder ?? new CcrPreviewBuilder(new CcrPreviewOverlay())).Build(original, options, reducedTokens);
 
     [Theory]
     [InlineData(120)]
@@ -19,7 +21,7 @@ public sealed class CcrPreviewBudgetTests
         var original = Log(lines);
         var reduced = Options.TokensOf(original.Length);
 
-        var preview = Build(original, Options, reduced) ?? throw new InvalidOperationException("expected a preview");
+        var preview = Made(Build(original, Options, reduced));
 
         var ceiling = Math.Min(1_500, (int)(0.4m * reduced));
         Assert.True(Options.TokensOf(preview.Text.Length) <= ceiling, $"{Options.TokensOf(preview.Text.Length)} tokens is over {ceiling}");
@@ -31,8 +33,8 @@ public sealed class CcrPreviewBudgetTests
         var original = Log(400);
         var originalTokens = Options.TokensOf(original.Length);
 
-        var afterReducers = Build(original, Options, 3_000) ?? throw new InvalidOperationException("expected a preview");
-        var afterNone = Build(original, Options, originalTokens) ?? throw new InvalidOperationException("expected a preview");
+        var afterReducers = Made(Build(original, Options, 3_000));
+        var afterNone = Made(Build(original, Options, originalTokens));
 
         Assert.Equal(afterNone, afterReducers);
     }
@@ -41,10 +43,10 @@ public sealed class CcrPreviewBudgetTests
     public void A_preview_that_is_exactly_as_long_as_the_reduced_text_is_not_made_and_one_token_shorter_is()
     {
         var original = Log(400);
-        var previewTokens = Options.TokensOf((Build(original, Options, Options.TokensOf(original.Length)) ?? throw new InvalidOperationException("expected a preview")).Text.Length);
+        var previewTokens = Options.TokensOf(Made(Build(original, Options, Options.TokensOf(original.Length))).Text.Length);
 
-        Assert.Null(Build(original, Options, previewTokens));
-        Assert.NotNull(Build(original, Options, previewTokens + 1));
+        Assert.IsType<NoCcrPreview>(Build(original, Options, previewTokens).Value);
+        Assert.IsType<CcrPreview>(Build(original, Options, previewTokens + 1).Value);
     }
 
     [Fact]
@@ -57,9 +59,9 @@ public sealed class CcrPreviewBudgetTests
         Build(big, Options, Options.TokensOf(big.Length), builder);
         var reused = Build(small, Options, Options.TokensOf(small.Length), builder);
 
-        Assert.NotNull(reused);
-        Assert.Equal(Build(small, Options, Options.TokensOf(small.Length)), reused);
-        Assert.Equal(reused, Build(small, Options, Options.TokensOf(small.Length), builder));
+        var made = Made(reused);
+        Assert.Equal(Made(Build(small, Options, Options.TokensOf(small.Length))), made);
+        Assert.Equal(made, Made(Build(small, Options, Options.TokensOf(small.Length), builder)));
     }
 
     [Fact]
@@ -68,7 +70,7 @@ public sealed class CcrPreviewBudgetTests
         var original = Log(120);
         var wide = Options with { BudgetShare = 2m };
 
-        Assert.Null(Build(original, wide, 600));
+        Assert.IsType<NoCcrPreview>(Build(original, wide, 600).Value);
     }
 
     [Fact]
@@ -76,10 +78,10 @@ public sealed class CcrPreviewBudgetTests
     {
         var original = Log(400);
         var reduced = Options.TokensOf(original.Length);
-        var saving = reduced - Options.TokensOf((Build(original, Options, reduced) ?? throw new InvalidOperationException("expected a preview")).Text.Length);
+        var saving = reduced - Options.TokensOf(Made(Build(original, Options, reduced)).Text.Length);
 
-        Assert.NotNull(Build(original, Options with { MinimumSavingTokens = saving }, reduced));
-        Assert.Null(Build(original, Options with { MinimumSavingTokens = saving + 1 }, reduced));
+        Assert.IsType<CcrPreview>(Build(original, Options with { MinimumSavingTokens = saving }, reduced).Value);
+        Assert.IsType<NoCcrPreview>(Build(original, Options with { MinimumSavingTokens = saving + 1 }, reduced).Value);
     }
 
     [Fact]
@@ -91,8 +93,8 @@ public sealed class CcrPreviewBudgetTests
         var shrunk = await previewer.PreviewAsync(original, Log(50), CcrMode.Stateless, CancellationToken.None);
         var kept = await previewer.PreviewAsync(original, original, CcrMode.Stateless, CancellationToken.None);
 
-        Assert.Null(shrunk);
-        Assert.NotNull(kept);
+        Assert.IsType<NoCcrPreview>(shrunk.Value);
+        Assert.IsType<CcrPreview>(kept.Value);
     }
 
     [Fact]
@@ -101,7 +103,7 @@ public sealed class CcrPreviewBudgetTests
         var previewer = new CcrPreviewer(new MemoryOriginalStore(), () => new CcrPreviewBuilder(new CcrPreviewOverlay()), Options with { MinimumTokens = 3_000 });
         var original = new string('x', 59) + string.Concat(Enumerable.Repeat($"\n{new string('y', 99)}", 86));
 
-        Assert.Null(await previewer.PreviewAsync(original + new string('z', 10), original + new string('z', 10), CcrMode.Stateless, CancellationToken.None));
-        Assert.NotNull(await previewer.PreviewAsync(original + new string('z', 11), original + new string('z', 11), CcrMode.Stateless, CancellationToken.None));
+        Assert.IsType<NoCcrPreview>((await previewer.PreviewAsync(original + new string('z', 10), original + new string('z', 10), CcrMode.Stateless, CancellationToken.None)).Value);
+        Assert.IsType<CcrPreview>((await previewer.PreviewAsync(original + new string('z', 11), original + new string('z', 11), CcrMode.Stateless, CancellationToken.None)).Value);
     }
 }

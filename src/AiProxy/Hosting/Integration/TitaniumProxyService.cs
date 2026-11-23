@@ -60,12 +60,23 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
         ILoggerFactory loggerFactory)
-        : this(null, options, inspector, providerHosts, new ProcessSystemProxyGuardLauncher(), loggerFactory, TimeSpan.FromSeconds(3), TimeProvider.System)
+        : this(
+              static server => new TitaniumSystemProxyRegistrar(server),
+              options,
+              inspector,
+              providerHosts,
+              new ProcessSystemProxyGuardLauncher(),
+              loggerFactory,
+              TimeSpan.FromSeconds(3),
+              TimeProvider.System,
+              UpstreamConnection.IsClosed,
+              static certificates => new TitaniumRootCertificate(certificates))
     {
     }
 
+    /// <summary>Creates the service with every seam supplied; the public constructor passes the production ones.</summary>
     internal TitaniumProxyService(
-        ISystemProxyRegistrar? systemProxyRegistrar,
+        Func<ProxyServer, ISystemProxyRegistrar> systemProxyRegistrar,
         ProxyRuntimeOptions options,
         ProviderRequestInspector inspector,
         IProviderHosts providerHosts,
@@ -73,11 +84,11 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         ILoggerFactory loggerFactory,
         TimeSpan markerWait,
         TimeProvider timeProvider,
-        Func<HttpWebClient, bool>? upstreamClosed = null,
-        Func<CertificateManager, IRootCertificate>? rootCertificate = null)
+        Func<HttpWebClient, bool> upstreamClosed,
+        Func<CertificateManager, IRootCertificate> rootCertificate)
     {
         Server = new ProxyServer(false);
-        _systemProxyRegistrar = systemProxyRegistrar ?? new TitaniumSystemProxyRegistrar(Server);
+        _systemProxyRegistrar = systemProxyRegistrar(Server);
         _guardLauncher = guardLauncher;
         _markerWait = markerWait;
         _options = options;
@@ -85,9 +96,9 @@ public sealed partial class TitaniumProxyService : IHostedService, IAsyncDisposa
         _providerHosts = providerHosts;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<TitaniumProxyService>();
-        _upstreamClosed = upstreamClosed ?? UpstreamConnection.IsClosed;
+        _upstreamClosed = upstreamClosed;
         _timeProvider = timeProvider;
-        _rootCertificate = rootCertificate ?? (static certificates => new TitaniumRootCertificate(certificates));
+        _rootCertificate = rootCertificate;
     }
 
     /// <summary>The listener address used by system proxy settings and local clients.</summary>

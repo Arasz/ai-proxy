@@ -26,9 +26,11 @@ public sealed partial class CcrPreviewTests
 
     private static string IdOf(string original) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(original)))[..16];
 
-    private static CcrPreview? Built(CcrPreviewBuilder builder, string original, CcrOptions options) => builder.Build(original, options, options.TokensOf(original.Length));
+    private static CcrPreviewResult Built(CcrPreviewBuilder builder, string original, CcrOptions options) => builder.Build(original, options, options.TokensOf(original.Length));
 
-    private static CcrPreview Build(string original) => Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options) ?? throw new InvalidOperationException("expected a preview");
+    private static CcrPreview Made(CcrPreviewResult result) => Assert.IsType<CcrPreview>(result.Value);
+
+    private static CcrPreview Build(string original) => Made(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options));
 
     [Theory]
     [InlineData("plain", "c5ff72de3e0f8dff", "be371a8c77ae6bbe06630d1c6d98a44b0864917cced3574edb7241329524dbc5")]
@@ -39,8 +41,7 @@ public sealed partial class CcrPreviewTests
     [InlineData("unicode-cut", "d46017f5dfa0eb65", "f76f5c4ced2a2f24d795fd53dc7229bd3422ba8b219d727228144eb3c1fad7ae")]
     public void Preview_bytes_match_the_captured_core_baseline(string shape, string id, string digest)
     {
-        var preview = Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), Shape(shape), BaselineOptions)
-                      ?? throw new InvalidOperationException("expected a preview");
+        var preview = Made(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), Shape(shape), BaselineOptions));
 
         Assert.Equal(id, preview.Id);
         Assert.Equal(digest, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(preview.Text))));
@@ -58,16 +59,16 @@ public sealed partial class CcrPreviewTests
     public void Reusing_the_builder_after_skips_and_different_options_preserves_each_result()
     {
         var builder = new CcrPreviewBuilder(new CcrPreviewOverlay());
-        var first = Built(builder, Shape("plain"), Options);
+        var first = Made(Built(builder, Shape("plain"), Options));
         var differentOptions = Options with { BudgetTokens = 700, SignalShare = 0.2m };
 
-        Assert.Null(Built(builder, "small", Options));
-        Assert.Null(Built(builder, first!.Text + Shape("plain"), Options));
-        var different = Built(builder, Shape("sparse-signals"), differentOptions);
+        Assert.IsType<NoCcrPreview>(Built(builder, "small", Options).Value);
+        Assert.IsType<NoCcrPreview>(Built(builder, first.Text + Shape("plain"), Options).Value);
+        var different = Made(Built(builder, Shape("sparse-signals"), differentOptions));
 
-        Assert.Equal(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), Shape("sparse-signals"), differentOptions), different);
+        Assert.Equal(Made(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), Shape("sparse-signals"), differentOptions)), different);
         Assert.NotEqual(first, different);
-        Assert.Equal(first, Built(builder, Shape("plain"), Options));
+        Assert.Equal(first, Made(Built(builder, Shape("plain"), Options)));
     }
 
     [Fact]
@@ -140,7 +141,7 @@ public sealed partial class CcrPreviewTests
     {
         var original = $"[proxy preview 0123456789abcdef: 1 of 2 lines shown.]\n{Log(400)}";
 
-        Assert.Null(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options));
+        Assert.IsType<NoCcrPreview>(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options).Value);
     }
 
     [Fact]
@@ -149,7 +150,7 @@ public sealed partial class CcrPreviewTests
         var preview = Build(Log(400));
 
         Assert.True(CcrPreview.IsIn(preview.Text));
-        Assert.Null(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), $"{preview.Text}\n{Log(400)}", Options));
+        Assert.IsType<NoCcrPreview>(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), $"{preview.Text}\n{Log(400)}", Options).Value);
     }
 
     [Theory]
@@ -160,7 +161,7 @@ public sealed partial class CcrPreviewTests
     {
         var original = $"{mention}\n{Log(400)}";
 
-        Assert.NotNull(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options));
+        Assert.IsType<CcrPreview>(Built(new CcrPreviewBuilder(new CcrPreviewOverlay()), original, Options).Value);
     }
 
     [Theory]
