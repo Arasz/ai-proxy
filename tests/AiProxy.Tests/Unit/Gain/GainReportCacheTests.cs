@@ -97,12 +97,42 @@ public sealed class GainReportCacheTests
         Assert.Equal("/b", report.Filters.Project);
     }
 
-    private static void EditInPlace(string path, long originalCharacters)
+    [Fact]
+    public async Task A_schema_version_change_makes_the_next_query_run_again()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "gain.db");
+        var store = new SqliteGainStore(new GainStoreOptions(path), new FakeTimeProvider(At));
+        await store.RecordAsync(Entry("a", 300, 100), [], Cancellation);
+        await store.QueryAsync(new GainQuery(), Cancellation);
+
+        // A newer build's schema step rewrites rows in place and raises user_version.
+        EditInPlace(path, 900, "PRAGMA user_version = 99;");
+        var report = await store.QueryAsync(new GainQuery(), Cancellation);
+
+        Assert.Equal(900, report.Summary.OriginalCharacters);
+    }
+
+    [Fact]
+    public async Task A_cached_report_carries_the_filters_it_was_asked_for()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new SqliteGainStore(new GainStoreOptions(Path.Combine(directory.Path, "gain.db")), new FakeTimeProvider(At));
+        await store.RecordAsync(Entry("a", 300, 100), [], Cancellation);
+        await store.QueryAsync(new GainQuery(From: DateTimeOffset.Parse("2026-10-31T23:00Z")), Cancellation);
+
+        var asked = DateTimeOffset.Parse("2026-11-01T00:00+01:00");
+        var report = await store.QueryAsync(new GainQuery(From: asked), Cancellation);
+
+        Assert.Equal(asked.Offset, report.Filters.From!.Value.Offset);
+    }
+
+    private static void EditInPlace(string path, long originalCharacters, string also = "")
     {
         using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
         connection.Open();
         using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE gain_event SET payload = json_set(payload,'$.Totals.OriginalCharacters',$value) WHERE kind = 'request'";
+        command.CommandText = also + "UPDATE gain_event SET payload = json_set(payload,'$.Totals.OriginalCharacters',$value) WHERE kind = 'request'";
         command.Parameters.AddWithValue("$value", originalCharacters);
         Assert.Equal(1, command.ExecuteNonQuery());
     }

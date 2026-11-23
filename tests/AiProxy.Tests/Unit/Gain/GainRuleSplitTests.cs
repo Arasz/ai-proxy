@@ -29,6 +29,7 @@ public sealed class GainRuleSplitTests
     [InlineData(",a,,b,", new[] { "a", "b" })]
     [InlineData(",,", new[] { ",," })]
     [InlineData("", new[] { "" })]
+    [InlineData("a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,a,r", new[] { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r" })]
     public void A_rule_path_counts_each_distinct_member_once_and_a_path_without_members_as_itself(string path, string[] expected)
     {
         var rows = GainReportBuilder.Attribute(GainLabels.Dimensions.Rule, [new GainAttribution(GainLabels.Dimensions.Rule, path, new GainTotals(1, EstimatedSavedTokens: 3))]);

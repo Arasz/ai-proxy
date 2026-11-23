@@ -65,7 +65,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             Sql.Version, transaction: transaction, cancellationToken: cancellationToken));
         if (Volatile.Read(ref _cached) is { } cached && cached.Query == query && cached.Version == version)
         {
-            return cached.Report with { GeneratedAt = time.GetUtcNow() };
+            return cached.Report with { GeneratedAt = time.GetUtcNow(), Filters = query };
         }
 
         var rows = (await connection.QueryAsync<AggregateRow>(new CommandDefinition(
@@ -242,8 +242,8 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
             EstimatedToolTokens, FollowUps, FollowUpBytes, EstimatedFollowUpTokens, FollowUpMeasuredRequests);
     }
 
-    /// <summary>The ledger's state: an insert raises <paramref name="Last"/>, a delete lowers <paramref name="Rows"/>.</summary>
-    private sealed record LedgerVersion(long Last, long Rows);
+    /// <summary>The ledger's state: an insert raises <paramref name="Last"/>, a delete lowers <paramref name="Rows"/>, a schema step that rewrites rows raises <paramref name="Schema"/>.</summary>
+    private sealed record LedgerVersion(long Last, long Rows, long Schema);
 
     /// <summary>The last report the store built, for the query and ledger version it was built from.</summary>
     private sealed record CachedReport(GainQuery Query, LedgerVersion Version, GainReport Report);
@@ -305,7 +305,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                         AND (@Rule IS NULL OR rule = @Rule OR (instr(@Rule, ',') = 0 AND instr(',' || rule || ',', ',' || @Rule || ',') > 0)) AND (@Layer IS NULL OR layer = @Layer) AND (@Pipeline IS NULL OR pipeline = @Pipeline)
                                         """;
 
-        public const string Version = "SELECT COALESCE(MAX(sequence),0) AS Last,COUNT(*) AS Rows FROM gain_event";
+        public const string Version = "SELECT COALESCE(MAX(sequence),0) AS Last,COUNT(*) AS Rows,(SELECT user_version FROM pragma_user_version) AS Schema FROM gain_event";
 
         /// <summary>The totals fields, with what a follow-up and a recall row hold in each; a request row reads them from its <c>Totals</c>.</summary>
         private static readonly (string Name, string FollowUp, string Recall)[] Fields =
@@ -327,7 +327,7 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
         private static readonly string Sums = string.Join(",", Fields.Select(static field => $"COALESCE(SUM({field.Name}),0) AS {field.Name}"));
 
         private static readonly string SummarySums = string.Join(",", Fields.Select(static field => RecallOnly.Contains(field.Name)
-            ? $"COALESCE(SUM(CASE WHEN kind = 'recall' THEN {field.Name} ELSE 0 END),0) AS {field.Name}"
+            ? $"COALESCE(SUM(CASE WHEN kind = '{Kinds.Recall}' THEN {field.Name} ELSE 0 END),0) AS {field.Name}"
             : $"COALESCE(SUM({field.Name}),0) AS {field.Name}"));
 
         /// <summary>Each value is read from the payload once, here; every pass below sums the columns.</summary>
@@ -335,16 +335,16 @@ public sealed class SqliteGainStore(GainStoreOptions options, TimeProvider time)
                                                         SELECT kind,at,provider,method,rule,layer,pipeline,
                                                             COALESCE(json_extract(payload,'$.Host'),'') AS host,
                                                             {string.Join(",", Fields.Select(static field =>
-                                                                $"CASE kind WHEN 'request' THEN json_extract(payload,'$.Totals.{field.Name}') WHEN 'followup' THEN {field.FollowUp} ELSE {field.Recall} END AS {field.Name}"))}
-                                                        FROM gain_event WHERE kind IN ('request','recall','followup') AND{Predicate}
+                                                                $"CASE kind WHEN '{Kinds.Request}' THEN json_extract(payload,'$.Totals.{field.Name}') WHEN '{Kinds.FollowUp}' THEN {field.FollowUp} ELSE {field.Recall} END AS {field.Name}"))}
+                                                        FROM gain_event WHERE kind IN ('{Kinds.Request}','{Kinds.Recall}','{Kinds.FollowUp}') AND{Predicate}
                                                         """;
 
         private static readonly string Aggregate = $"""
                                                     WITH metrics AS MATERIALIZED ({MetricsSelect})
                                                     SELECT 'summary' AS View,0 AS Start,'' AS Name,'' AS Host,'' AS Payload,{SummarySums} FROM metrics
-                                                    UNION ALL SELECT 'daily',at - at % 864000000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY at - at % 864000000000
-                                                    UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
-                                                    UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','','',{Sums} FROM metrics WHERE kind = 'request' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
+                                                    UNION ALL SELECT 'daily',at - at % 864000000000,'','','',{Sums} FROM metrics WHERE kind = '{Kinds.Request}' GROUP BY at - at % 864000000000
+                                                    UNION ALL SELECT 'weekly',(at / 864000000000 - at / 864000000000 % 7) * 864000000000,'','','',{Sums} FROM metrics WHERE kind = '{Kinds.Request}' GROUP BY (at / 864000000000 - at / 864000000000 % 7) * 864000000000
+                                                    UNION ALL SELECT 'monthly',(CAST(strftime('%s',at / 10000000 - 62135596800,'unixepoch','start of month') AS INTEGER) + 62135596800) * 10000000,'','','',{Sums} FROM metrics WHERE kind = '{Kinds.Request}' GROUP BY strftime('%Y-%m',at / 10000000 - 62135596800,'unixepoch')
                                                     UNION ALL SELECT dimension,0,CASE dimension WHEN 'method' THEN method WHEN 'rule' THEN rule WHEN 'layer' THEN layer ELSE pipeline END AS Name,'','',{Sums} FROM metrics CROSS JOIN (SELECT 'method' AS dimension UNION ALL SELECT 'rule' UNION ALL SELECT 'layer' UNION ALL SELECT 'pipeline')
                                                     GROUP BY dimension,Name
                                                     UNION ALL SELECT 'provider',0,provider,host,'',{Sums} FROM metrics GROUP BY provider,host
