@@ -52,6 +52,7 @@ Something off? `ai-proxy doctor` checks the setup and changes nothing.
 
 ## What's new
 
+- Cheaper live gain view: the gain report reads each ledger value once and is cached until the ledger changes, so `gain --watch` no longer keeps a quarter of a core busy in the proxy (0.35.5). [Release notes](docs/changelog/0.35.5-cheaper-gain-report-and-watch.md)
 - Less memory per request: request bodies are no longer copied on the way through (0.35.1), and response capture and zstd decoding take their buffers from a pool, so a captured response no longer allocates its payload buffers (0.35.4). [Release notes](docs/changelog/0.35.4-pooled-capture-and-zstd-buffers.md)
 - Project review fixes: a loopback API token, a rolling `proxy.log`, capture that evicts its oldest rows at the cap, a root that names the exact hosts, and typos that exit 1 instead of starting the proxy (0.35.0). Read the upgrade steps first. [Release notes](docs/changelog/0.35.0-project-review-fixes.md)
 - Streamed Chat Completions requests to OpenRouter get recoverable previews and in-request `proxy_retrieve`, as Anthropic requests do (0.34.0). [Release notes](docs/changelog/0.34.0-chat-completions-recoverable-compression.md)
