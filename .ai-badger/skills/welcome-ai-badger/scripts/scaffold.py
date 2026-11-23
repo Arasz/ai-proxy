@@ -28,7 +28,6 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -208,6 +207,7 @@ from tool_catalog import ToolCatalog  # noqa: E402
 from statusline_wiring import StatusLineWiring  # noqa: E402
 # relink_hermes_skills is re-exported: den-refresh's refresh.py calls it on this module.
 from skill_delivery import SkillDelivery, prune_namespaces, relink_hermes_skills  # noqa: E402
+from skill_install import SkillInstall  # noqa: E402
 from skills_argv import resolve_requested_skills  # noqa: E402
 from superseded_prune import SupersededPrune  # noqa: E402
 from project_id import ensure_project_id, project_name  # noqa: E402
@@ -281,6 +281,7 @@ class Scaffolder:
         self.superseded = SupersededPrune(self.ctx, self.skill_delivery)
         self.install = install
         self.execute = execute
+        self.skill_install = SkillInstall(self.ctx, install, execute)
         self.tools = ToolCatalog(self.ctx, execute=execute)
         self.commit, self.dirty = git_provenance(root)
         self.entries: List[Dict[str, Any]] = []
@@ -362,11 +363,15 @@ class Scaffolder:
             self.record(feature, stack, item["name"], src, dest)
         return dest if dest is not None else dest_dir / src.name
 
-    def record_template(self, src: Path, dest: Path, seed_once: bool = False) -> None:
-        """Record a template's provenance; `seed_once` marks one the scaffold never rewrites."""
+    def record_template(self, src: Path, dest: Path, seed_once: bool = False,
+                        editable: bool = False) -> None:
+        """Record a template's provenance; `seed_once` marks one the scaffold never rewrites,
+        `editable` a source-of-truth copy the project is told to edit."""
         rel = src.relative_to(self.root / "features").parts
         self.record("templates", rel[0], Path(*rel[2:]).as_posix(), src, dest)
         self.entries[-1]["seedOnce"] = seed_once
+        if editable:
+            self.entries[-1]["editable"] = True
 
     def generated_config_records(self) -> List[Dict[str, Any]]:
         """Every generated-but-not-owned config path the manifest should carry (#194)."""
@@ -475,52 +480,8 @@ class Scaffolder:
 
     # -- skill installation --------------------------------------------------------
     def install_plugins(self) -> List[str]:
-        """Generate skill installation commands using the install_plugins library.
-
-        Reads skills-source.json + skills.json per stack, resolves per-agent
-        installation commands from plugins-instructions.json.
-        """
-        import install_plugins as ip_lib
-        result = ip_lib.install_skills(self.root, self.config, dry_run=not self.install)
-
-        # Provenance: copy skills-source.json + skills.json per stack
-        for stack in self.stacks:
-            for fname in ("skills-source.json", "skills.json"):
-                src = self.root / "features" / stack / fname
-                if src.exists():
-                    dest_dir = self.aib / "skills-data" / stack
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                    dest = dest_dir / fname
-                    shutil.copyfile(src, dest)
-                    feature = "skills"
-                    self.record(feature, stack, f"{stack}/{fname}", src, dest)
-
-        cmds = result["commands"]
-        if self.execute and cmds:
-            for cmd in cmds:
-                try:
-                    proc = subprocess.run(
-                        cmd, capture_output=True, text=True,
-                        timeout=30, cwd=str(self.target), check=False,
-                    )
-                    shown = ip_lib.printable(cmd)
-                    if proc.returncode == 0:
-                        self.notes.append(f"executed: {shown}")
-                    else:
-                        self.notes.append(
-                            f"command failed (exit {proc.returncode}): {shown}"
-                            f"{': ' + proc.stderr.strip() if proc.stderr.strip() else ''}"
-                        )
-                except subprocess.TimeoutExpired:
-                    self.notes.append(f"command timed out (30s): {ip_lib.printable(cmd)}")
-                except OSError as exc:
-                    self.notes.append(f"command error: {ip_lib.printable(cmd)} — {exc}")
-        elif self.install and cmds:
-            self.notes.append("skill auto-install requested but deferred to report "
-                              "(run the commands below manually or via --execute)")
-        for w in result.get("warnings", []):
-            self.notes.append(f"skill install warning: {w}")
-        return cmds
+        """Generate skill installation commands, through `skill_install`."""
+        return self.skill_install.run()
 
     # -- hooks ------------------------------------------------------------------------
     def wire_hooks(self) -> None:
