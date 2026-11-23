@@ -11,13 +11,13 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
     /// <param name="arguments">The tool call's input, as JSON.</param>
     /// <param name="original">The original text kept under the id, or null when none is kept.</param>
     /// <param name="options">The caps the answer keeps to.</param>
-    public CcrRetrieval Answer(string arguments, string? original, CcrOptions options) => Answer(parser.Parse(arguments, options), original, options);
+    public CcrAnswer Answer(string arguments, string? original, CcrOptions options) => Answer(parser.Parse(arguments, options), original, options);
 
     /// <summary>Answers a call the caller already parsed, against the original it found for the request's id.</summary>
     /// <param name="parsed">The parsed call.</param>
     /// <param name="original">The original text kept under the id, or null when none is kept.</param>
     /// <param name="options">The caps the answer keeps to.</param>
-    public static CcrRetrieval Answer(CcrParseResult parsed, string? original, CcrOptions options)
+    public static CcrAnswer Answer(CcrParseResult parsed, string? original, CcrOptions options)
     {
         return parsed switch
         {
@@ -26,7 +26,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         };
     }
 
-    private static CcrRetrieval Answer(CcrRetrievalRequest request, string? original, CcrOptions options)
+    private static CcrAnswer Answer(CcrRetrievalRequest request, string? original, CcrOptions options)
     {
         if (original is null || IdOf(original) != request.Id)
         {
@@ -44,7 +44,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         };
     }
 
-    private static CcrRetrieval AnswerLines(string header, string[] lines, int start, int end, CcrOptions options)
+    private static CcrAnswer AnswerLines(string header, string[] lines, int start, int end, CcrOptions options)
     {
         if (start < 1 || end < start || end > lines.Length)
         {
@@ -71,7 +71,7 @@ public sealed class CcrRetriever(CcrRetrievalParser parser)
         return CcrRetrieval.Answered(text.ToString());
     }
 
-    private static CcrRetrieval AnswerPattern(string header, string[] lines, string pattern, int context, CcrOptions options)
+    private static CcrAnswer AnswerPattern(string header, string[] lines, string pattern, int context, CcrOptions options)
     {
         var regex = Compile(pattern, options);
         if (regex is null)

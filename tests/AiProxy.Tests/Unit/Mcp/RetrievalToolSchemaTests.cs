@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AiProxy.Ccr;
+using AiProxy.Core;
 using AiProxy.Mcp;
 
 namespace AiProxy.Tests.Unit.Mcp;
@@ -72,9 +73,9 @@ public sealed class RetrievalToolSchemaTests
     {
         using var document = JsonDocument.Parse(arguments);
 
-        var violation = new RetrievalArgumentSchema().Violation(document.RootElement);
+        var result = new RetrievalArgumentSchema().Check(document.RootElement);
 
-        Assert.Equal(accepted, violation is null);
+        Assert.Equal(accepted, result.Value is Valid);
     }
 
     [Fact]
@@ -82,10 +83,10 @@ public sealed class RetrievalToolSchemaTests
     {
         using var document = JsonDocument.Parse("""{"id":"0123456789abcdef","mode":"everything"}""");
 
-        var violation = new RetrievalArgumentSchema().Violation(document.RootElement);
+        var invalid = Assert.IsType<Invalid>(new RetrievalArgumentSchema().Check(document.RootElement).Value);
 
-        Assert.Contains("lines", violation, StringComparison.Ordinal);
-        Assert.Contains("pattern", violation, StringComparison.Ordinal);
-        Assert.Contains("whole", violation, StringComparison.Ordinal);
+        Assert.Contains("lines", invalid.Reason, StringComparison.Ordinal);
+        Assert.Contains("pattern", invalid.Reason, StringComparison.Ordinal);
+        Assert.Contains("whole", invalid.Reason, StringComparison.Ordinal);
     }
 }

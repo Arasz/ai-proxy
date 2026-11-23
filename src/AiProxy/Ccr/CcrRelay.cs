@@ -356,28 +356,28 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
             }
         }
 
-        private async Task<IReadOnlyDictionary<string, CcrRetrieval>> AnswerAsync(RetrievalLoop loop)
+        private async Task<IReadOnlyDictionary<string, CcrAnswer>> AnswerAsync(RetrievalLoop loop)
         {
-            var answers = new Dictionary<string, CcrRetrieval>(StringComparer.Ordinal);
+            var answers = new Dictionary<string, CcrAnswer>(StringComparer.Ordinal);
             foreach (var call in loop.Round.ToolCalls.Where(static call => call.IsRetrieval))
             {
                 var parsed = relay.Parser.Parse(call.Input, relay.Options);
                 var answer = loop.AtLimit ? CcrRetrieval.Limit() : await AnswerAsync(parsed).ConfigureAwait(false);
                 answers[call.Id] = answer;
-                Log.Retrieved(relay.Logger, call.Input, answer.Error ?? Labels.Success, answer.Text.Length, loop.Answered);
+                Log.Retrieved(relay.Logger, call.Input, answer switch { CcrFailed failed => failed.Code, CcrFound => Labels.Success }, answer.Text.Length, loop.Answered);
                 await RecordRecallAsync(parsed, answer);
             }
 
             return answers;
         }
 
-        private async Task<CcrRetrieval> AnswerAsync(CcrParseResult parsed) => parsed switch
+        private async Task<CcrAnswer> AnswerAsync(CcrParseResult parsed) => parsed switch
         {
             CcrRetrievalRequest request => CcrRetriever.Answer(parsed, await OriginalAsync(request.Id).ConfigureAwait(false), relay.Options),
             CcrRefusal => CcrRetriever.Answer(parsed, null, relay.Options),
         };
 
-        private async Task RecordRecallAsync(CcrParseResult parsed, CcrRetrieval answer)
+        private async Task RecordRecallAsync(CcrParseResult parsed, CcrAnswer answer)
         {
             try
             {
@@ -388,7 +388,7 @@ public sealed partial class CcrRelay(IOriginalStore store, Func<CcrRetriever> re
                 };
                 await relay.Gain.RecallAsync(new GainRecall(relay.Time.GetUtcNow(), id, exchange.GainProject,
                         exchange.GainProject is null ? GainLabels.Unknown : GainLabels.Attributions.Caller, mode, answer.Text.Length,
-                        GainReportBuilder.Tokens(answer.Text.Length), answer.Error, exchange.Host), exchange.Dialect.ToString().ToLowerInvariant(),
+                        GainReportBuilder.Tokens(answer.Text.Length), answer.ErrorCode, exchange.Host), exchange.Dialect.ToString().ToLowerInvariant(),
                     exchange.GainMethod, exchange.GainRule, GainLabels.Layers.Retrieval, GainLabels.Pipelines.Ccr, _cancellation);
             }
             catch (Exception exception) when (!_cancellation.IsCancellationRequested)

@@ -27,6 +27,13 @@ public sealed class StatusSettings : OptionValueSettings
                 .WithMessage("Output format must be text or json.");
         }
 
-        public static string? Error(StatusSettings settings) => new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
+        /// <summary>Throws <see cref="ArgumentException"/> with the first validation message when the settings are invalid.</summary>
+        public static void Check(StatusSettings settings)
+        {
+            if (new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage is { } message)
+            {
+                throw new ArgumentException(message);
+            }
+        }
     }
 }

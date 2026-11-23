@@ -87,6 +87,13 @@ public sealed class ReplaySettings : OptionValueSettings
                 .WithMessage("The since value must be a date or time.");
         }
 
-        public static string? Error(ReplaySettings settings) => new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage;
+        /// <summary>Throws <see cref="ArgumentException"/> with the first validation message when the settings are invalid.</summary>
+        public static void Check(ReplaySettings settings)
+        {
+            if (new Validator().Validate(settings).Errors.FirstOrDefault()?.ErrorMessage is { } message)
+            {
+                throw new ArgumentException(message);
+            }
+        }
     }
 }

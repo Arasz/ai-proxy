@@ -139,7 +139,21 @@ public sealed class ContentCompressionPipelineTests
             CancellationToken.None);
 
         Assert.True(result.Changed);
-        Assert.Contains("the disk is full", result.Failure, StringComparison.Ordinal);
+        Assert.Contains("the disk is full", result.StoreFailure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_working_store_leaves_the_store_failure_null()
+    {
+        var (pipeline, _) = Build();
+
+        var result = await pipeline.CompressAsync(
+            new CompressionRequest(Encoding.UTF8.GetBytes(Body(ToolOutput)), "application/json", Dialect.OpenAi),
+            CancellationToken.None);
+
+        Assert.True(result.Changed);
+        Assert.Null(result.StoreFailure);
+        Assert.NotNull(result.Summary);
     }
 
     [Fact]

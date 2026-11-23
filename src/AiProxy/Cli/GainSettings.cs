@@ -180,11 +180,15 @@ public sealed class GainSettings : OptionValueSettings
                 .WithMessage("Watch requires an interactive terminal. Use --text for pipes or redirected output.");
         }
 
-        public static string? Error(GainSettings settings, GainRuntime runtime)
+        /// <summary>Throws <see cref="ArgumentException"/> with the first validation message when the settings are invalid.</summary>
+        public static void Check(GainSettings settings, GainRuntime runtime)
         {
             var context = new ValidationContext<GainSettings>(settings);
             context.RootContextData[InteractiveContextKey] = runtime.Interactive;
-            return new Validator().Validate(context).Errors.FirstOrDefault()?.ErrorMessage;
+            if (new Validator().Validate(context).Errors.FirstOrDefault()?.ErrorMessage is { } message)
+            {
+                throw new ArgumentException(message);
+            }
         }
     }
 }

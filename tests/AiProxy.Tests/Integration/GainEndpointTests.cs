@@ -39,6 +39,34 @@ public sealed class GainEndpointTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    [Fact]
+    public async Task An_invalid_query_returns_the_validator_reason_as_the_problem_detail()
+    {
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+        using var client = proxy.CreateApiClient();
+        using var response = await client.GetAsync("/gain?historyLimit=1001", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("invalid_gain_filter", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal("historyLimit must be from 0 to 1000.", problem.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task A_reset_with_an_invalid_filter_returns_the_validator_reason_and_a_valid_one_is_served()
+    {
+        await using var proxy = await ProxyHost.StartAsync(new Dictionary<string, string>());
+        using var client = proxy.CreateApiClient();
+
+        using var bad = await client.PostAsync("/gain/reset", JsonContent.Create(new GainQuery(" ")), TestContext.Current.CancellationToken);
+        using var good = await client.PostAsync("/gain/reset", JsonContent.Create(new GainQuery("/a")), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        using var problem = JsonDocument.Parse(await bad.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("Filters must be nonblank text without control characters, at most 4096 characters.", problem.RootElement.GetProperty("detail").GetString());
+        Assert.Equal(HttpStatusCode.OK, good.StatusCode);
+    }
+
     [Theory]
     [InlineData("evil.test")]
     [InlineData("evil.test:17432")]

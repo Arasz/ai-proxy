@@ -17,8 +17,12 @@ public sealed class CcrRetrievalParser(IToolArgumentSchema schema)
         }
 
         var root = document.RootElement;
-        var violation = HasMalformedUnicode(root) ? "The arguments contain malformed Unicode." : schema.Violation(root);
-        return violation is null ? Validate(root, options) : new CcrRefusal(violation);
+        Validation check = HasMalformedUnicode(root) ? new Invalid("The arguments contain malformed Unicode.") : schema.Check(root);
+        return check switch
+        {
+            Invalid invalid => new CcrRefusal(invalid.Reason),
+            Valid => Validate(root, options),
+        };
     }
 
     private static bool HasMalformedUnicode(JsonElement root)

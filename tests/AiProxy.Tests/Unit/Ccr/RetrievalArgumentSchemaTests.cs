@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AiProxy.Ccr;
+using AiProxy.Core;
 using AiProxy.Core.Content.Ccr;
 
 namespace AiProxy.Tests.Unit.Ccr;
@@ -9,17 +10,17 @@ public sealed class RetrievalArgumentSchemaTests
 {
     private static readonly RetrievalArgumentSchema Schema = new();
 
-    private static string? Violation(string arguments)
+    private static Validation Check(string arguments)
     {
         using var document = JsonDocument.Parse(arguments);
-        return Schema.Violation(document.RootElement);
+        return Schema.Check(document.RootElement);
     }
 
     [Theory]
     [InlineData("""{"id":"0123456789abcdef","mode":"whole"}""")]
     [InlineData("""{"id":"0123456789abcdef","mode":"lines","start":1,"end":2}""")]
     [InlineData("""{"id":"0123456789abcdef","mode":"pattern","pattern":"x","context":10}""")]
-    public void Arguments_that_follow_the_tool_schema_pass(string arguments) => Assert.Null(Violation(arguments));
+    public void Arguments_that_follow_the_tool_schema_pass(string arguments) => Assert.IsType<Valid>(Check(arguments).Value);
 
     [Theory]
     [InlineData("[]")]
@@ -32,9 +33,18 @@ public sealed class RetrievalArgumentSchemaTests
     [InlineData("""{"id":"0123456789abcdef","mode":"pattern","pattern":"x","context":11}""")]
     public void Arguments_that_break_the_tool_schema_name_the_violation(string arguments)
     {
-        var violation = Violation(arguments);
+        var invalid = Assert.IsType<Invalid>(Check(arguments).Value);
 
-        Assert.False(string.IsNullOrWhiteSpace(violation));
+        Assert.False(string.IsNullOrWhiteSpace(invalid.Reason));
+    }
+
+    [Fact]
+    public void A_bad_enum_value_is_invalid_and_names_the_property_and_the_allowed_values()
+    {
+        var invalid = Assert.IsType<Invalid>(Check("""{"id":"0123456789abcdef","mode":"everything"}""").Value);
+
+        Assert.Contains("/mode", invalid.Reason, StringComparison.Ordinal);
+        Assert.Contains("Allowed values", invalid.Reason, StringComparison.Ordinal);
     }
 
     [Fact]

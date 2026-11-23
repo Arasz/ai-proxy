@@ -174,7 +174,7 @@ public sealed class ChatRoundTests
 
         var body = round.FollowUp(
             """{"model":"m","messages":[{"role":"user","content":"q"}]}"""u8,
-            [ToolResult.Of("call_r", new CcrRetrieval("TEXT", null)), ToolResult.Deferred("call_c")]);
+            [ToolResult.Of("call_r", new CcrFound("TEXT")), ToolResult.Deferred("call_c")]);
 
         var messages = JsonNode.Parse(body)!["messages"]!.AsArray();
         Assert.Equal(4, messages.Count);
@@ -336,7 +336,7 @@ public sealed class ChatRoundTests
         var loop = new RetrievalLoop(round);
         loop.Decide();
 
-        var results = loop.ToolResults(new Dictionary<string, CcrRetrieval> { ["a"] = new("T", null) });
+        var results = loop.ToolResults(new Dictionary<string, CcrAnswer> { ["a"] = new CcrFound("T") });
         var assistant = FollowUpOf(round, [.. results]);
 
         Assert.Equal([new ToolCall("a", "proxy_retrieve", "{\"x\":1}"), new ToolCall("b", "read", "{}")], round.ToolCalls);
