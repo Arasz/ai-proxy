@@ -42,6 +42,7 @@ ai-proxy gain                 # summary
 ai-proxy gain --daily         # UTC days; --weekly starts on Monday, --monthly, --all
 ai-proxy gain --history       # the most recent requests (--limit, 1-1000)
 ai-proxy gain --recalls       # what retrievals cost back
+ai-proxy gain --graph         # ASCII graph of daily estimated savings
 ai-proxy gain --format json   # or csv; same numbers as the text view
 ai-proxy gain --watch         # live view, Ctrl+C exits
 ```

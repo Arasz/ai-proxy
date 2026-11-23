@@ -24,7 +24,8 @@ survives is intact, and a fact that does not survive is in the store.
 
 ## Turning it on
 
-Set the variable and start the proxy:
+It is on by default. To set it explicitly, or to move the store, set the variables and start
+the proxy:
 
 ```bash
 export PROXY__COMPRESSION__ENABLED=true
@@ -50,10 +51,11 @@ header. The id is the request's, so one request has one id.
 ## Getting the original back
 
 The original of every request the stage changed is in the database, and the endpoint serves it
-back:
+back. Like every route except `/health`, it needs the API token from the data directory:
 
 ```bash
-curl http://127.0.0.1:17432/content/0198f3c2-1a4b-7c8d-9e0f-2b3c4d5e6f70
+curl -H "Authorization: Bearer $(cat ~/.ai-proxy/api-token)" \
+  http://127.0.0.1:17432/content/0198f3c2-1a4b-7c8d-9e0f-2b3c4d5e6f70
 ```
 
 The body comes back exactly as the client sent it. An id nobody stored is answered with a
@@ -61,8 +63,9 @@ problem details response and a 404, not with an empty body.
 
 ## The thresholds
 
-Each kind has its own smallest region worth compressing: 200 characters for a log, 100 for JSON,
-512 for prose. The threshold is checked against the whole tool result, using the kind that holds
+Each kind has its own smallest region worth compressing: 100 characters for JSON, XML and TOML;
+200 for a log, Markdown, a shell transcript and build output; 500 for source code; and 512 for
+prose. The threshold is checked against the whole tool result, using the kind that holds
 most of its characters, and not against each fragment. A result under it is left alone, because
 compressing a small result costs more than it saves. Once a result passes, every fragment is
 reduced, except fragments of a kind that is switched off, such as directory listings. `PROXY__COMPRESSION__MINIMUM` sets one threshold for every kind and

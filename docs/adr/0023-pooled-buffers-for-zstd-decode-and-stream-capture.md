@@ -1,6 +1,6 @@
 # 0023 - Pooled buffers for zstd decode and stream capture
 
-Status: Proposed 2026-11-23 (implemented on task/aip-zstd-sizing-capture-buffer-pooling; awaiting owner review)
+Status: Accepted 2026-11-23 (owner reviewed and merged; shipped in 0.35.4)
 
 ## Context
 
