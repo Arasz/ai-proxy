@@ -51,7 +51,8 @@ header. The id is the request's, so one request has one id.
 ## Getting the original back
 
 The original of every request the stage changed is in the database, and the endpoint serves it
-back. Like every route except `/health`, it needs the API token from the data directory:
+back. Like every route except `/health`, it needs the API token from the running proxy's data
+directory (`~/.ai-proxy` unless you set `PROXY__DATADIRECTORY`):
 
 ```bash
 curl -H "Authorization: Bearer $(cat ~/.ai-proxy/api-token)" \

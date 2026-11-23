@@ -55,7 +55,8 @@ are in [ADR 0002](../adr/0002-the-store-is-an-adapter-and-sqlite-is-the-queue.md
 ## Turning it off
 
 The stage changes what the provider is sent, and that stays the operator's call. Since 0.10.0 it
-is on by default, and every change it makes can be read back from the store, as above.
+is on by default, and every change it makes can be read back from the store for 14 days, as
+above; older originals are deleted ([environment variables](../reference/environment-variables.md)).
 `PROXY__COMPRESSION__ENABLED=false` forwards every request untouched, and
 [the how-to](../how-to/turning-on-the-compression-stage.md) is what an operator reads first.
 
