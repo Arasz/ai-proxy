@@ -42,12 +42,12 @@ each time the view gets a new target, also when nothing changed.
 
 ## Consequences
 
-- One report on the measured ledger takes about 0.17 s when it is not cached. A cached report
-  costs one indexed read.
+- One report on the measured ledger takes about 0.21 s and 450 KB when it is not cached. A cached report
+  costs about 2 ms and 7 KB.
 - The cache holds one report (about 75 KB as JSON) for each store. A different filter replaces it.
 - An `UPDATE` of rows does not change the version. The only one is a schema step, and a schema step
   raises `user_version`. A future write path that updates rows must also change the version.
-- The live view's clock does not move when the report does not change.
+- The live view shows no clock, so a skipped redraw hides nothing.
 
 ## Alternatives
 
